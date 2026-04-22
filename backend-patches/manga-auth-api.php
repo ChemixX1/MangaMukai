@@ -77,6 +77,20 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true',
     ]);
     
+    // ── Catálogo completo: todos los mangas del post type 'manga' ──
+    register_rest_route('mangamukai/v1', '/catalog', [
+        'methods'             => 'GET',
+        'callback'            => 'mm_handle_catalog',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // ── Detalle de un manga por ID (post type 'manga') ──
+    register_rest_route('mangamukai/v1', '/manga/(?P<id>\d+)', [
+        'methods'             => 'GET',
+        'callback'            => 'mm_handle_manga_detail',
+        'permission_callback' => '__return_true',
+    ]);
+
     // ── Capítulos de una serie por ero_seri (consulta directa por meta, sin límite) ──
     register_rest_route('mangamukai/v1', '/series/(?P<id>\d+)/chapters', [
         'methods'             => 'GET',
@@ -706,5 +720,128 @@ function mm_handle_series_chapters(WP_REST_Request $req): WP_REST_Response
     return new WP_REST_Response([
         'success'  => true,
         'chapters' => $chapters,
+    ], 200);
+}
+
+// ─── REST: CATÁLOGO COMPLETO (post type 'manga') ──────────────────────────────
+function mm_handle_catalog(WP_REST_Request $req): WP_REST_Response
+{
+    $query = new WP_Query([
+        'post_type'      => 'manga',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'no_found_rows'  => true,
+    ]);
+
+    $mangas = [];
+
+    foreach ($query->posts as $post) {
+        $pid = $post->ID;
+
+        // Portada (thumbnail)
+        $thumb_id  = get_post_thumbnail_id($pid);
+        $cover_url = $thumb_id ? wp_get_attachment_url($thumb_id) : '';
+
+        // Tipo (Manga / Manhwa / Manhua / Comic)
+        $tipo = get_post_meta($pid, 'ero_type', true) ?: 'Manga';
+
+        // Géneros desde taxonomía
+        $terms  = get_the_terms($pid, 'genres');
+        $genres = ($terms && !is_wp_error($terms))
+            ? array_map(fn($t) => $t->name, $terms)
+            : [];
+
+        // Estado de publicación
+        $ero_status = get_post_meta($pid, 'ero_status', true) ?: '';
+
+        // Primer capítulo disponible (para saber si es gratis)
+        $first_chapter_free = false;
+        $first_chapter_id   = null;
+        $chapter_query = new WP_Query([
+            'post_type'      => 'post',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'meta_query'     => [[
+                'key'     => 'ero_seri',
+                'value'   => $pid,
+                'compare' => '=',
+                'type'    => 'NUMERIC',
+            ]],
+            'meta_key' => 'ero_chapter',
+            'orderby'  => 'meta_value_num',
+            'order'    => 'ASC',
+            'no_found_rows' => true,
+        ]);
+
+        if ($chapter_query->have_posts()) {
+            $ch = $chapter_query->posts[0];
+            $first_chapter_id = $ch->ID;
+            $sell = get_post_meta($ch->ID, 'myCRED_sell_content', true);
+            $first_chapter_free = !(is_array($sell)
+                && isset($sell['status'])
+                && $sell['status'] === 'enabled'
+                && floatval($sell['price'] ?? 0) > 0);
+        }
+
+        // Descripción (contenido del post)
+        $desc = wp_strip_all_tags($post->post_content);
+        if (strlen($desc) > 500) $desc = substr($desc, 0, 497) . '...';
+
+        $mangas[] = [
+            'id'          => $pid,
+            'titulo'      => $post->post_title,
+            'portada'     => $cover_url ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada',
+            'fecha'       => $post->post_date,
+            'tipo'        => $tipo,
+            'genres'      => $genres,
+            'descripcion' => $desc ?: 'Lee esta historia en MangaMukai.',
+            'esGratis'    => $first_chapter_free,
+            'firstChapterId' => $first_chapter_id,
+            'status'      => $ero_status,
+        ];
+    }
+
+    return new WP_REST_Response([
+        'success' => true,
+        'total'   => count($mangas),
+        'mangas'  => $mangas,
+    ], 200);
+}
+
+// ─── REST: DETALLE DE UN MANGA POR ID ────────────────────────────────────────
+function mm_handle_manga_detail(WP_REST_Request $req): WP_REST_Response
+{
+    $pid  = (int) $req->get_param('id');
+    $post = get_post($pid);
+
+    if (!$post || $post->post_type !== 'manga' || $post->post_status !== 'publish') {
+        return new WP_REST_Response(['success' => false, 'message' => 'Manga no encontrado'], 404);
+    }
+
+    $thumb_id  = get_post_thumbnail_id($pid);
+    $cover_url = $thumb_id ? wp_get_attachment_url($thumb_id) : '';
+
+    $tipo   = get_post_meta($pid, 'ero_type', true) ?: 'Manga';
+    $status = get_post_meta($pid, 'ero_status', true) ?: '';
+
+    $terms  = get_the_terms($pid, 'genres');
+    $genres = ($terms && !is_wp_error($terms))
+        ? array_map(fn($t) => $t->name, $terms)
+        : [];
+
+    $desc = wp_strip_all_tags($post->post_content);
+
+    return new WP_REST_Response([
+        'success'     => true,
+        'id'          => $pid,
+        'titulo'      => $post->post_title,
+        'portada'     => $cover_url ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada',
+        'fecha'       => $post->post_date,
+        'tipo'        => $tipo,
+        'genres'      => $genres,
+        'descripcion' => $desc ?: 'Lee esta historia en MangaMukai.',
+        'status'      => $status,
     ], 200);
 }

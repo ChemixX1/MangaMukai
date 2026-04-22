@@ -110,50 +110,46 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
 };
 
 // ---------------------------------------------------------------------------
-// 1. CATÁLOGO GENERAL — trae TODAS las series paginando hasta el final
+// Mapper para respuesta del endpoint /catalog (post type 'manga')
+// ---------------------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mapearMangaCatalog = (item: any): MangaCapitulo => {
+  const genres: string[] = Array.isArray(item.genres) ? item.genres : [];
+
+  const TAGS_MUJER  = ['shoujo','shojo','josei','romance','yaoi','bl','yuri','otome'];
+  const TAGS_HOMBRE = ['shounen','shonen','seinen','ecchi','harem','isekai','acción','accion','action','mecha'];
+  const gl = genres.map((g: string) => g.toLowerCase());
+  let genero: 'Hombre' | 'Mujer' | null = null;
+  if (gl.some(g => TAGS_MUJER.includes(g)))  genero = 'Mujer';
+  if (gl.some(g => TAGS_HOMBRE.includes(g))) genero = 'Hombre';
+
+  return {
+    id:       item.id,
+    titulo:   item.titulo,
+    portada:  item.portada,
+    imagenes: [],
+    fecha:    new Date(item.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
+    descripcion: item.descripcion,
+    categorias:  [],
+    genres:      genres,
+    esGratis:    !!item.esGratis,
+    tipo:        item.tipo || 'Manga',
+    genero,
+    eroSeri:     item.id,   // en el endpoint /catalog, el ID del post ES el ero_seri
+    capitulosRecientes: [],
+  };
+};
+
+// ---------------------------------------------------------------------------
+// 1. CATÁLOGO GENERAL — consulta directamente el post type 'manga' (448 series)
 // ---------------------------------------------------------------------------
 export const getUltimosCapitulos = async (): Promise<MangaCapitulo[]> => {
   try {
-    const PER_PAGE = 100;
-    const BATCH = 6; // páginas en paralelo por lote
-
-    // Primera página: obtener datos y total de páginas
-    const primeraUrl = `${API_URL}?_embed&per_page=${PER_PAGE}&page=1&_fields=${CAMPOS_SOLICITADOS}`;
-    const primeraRes = await fetch(primeraUrl);
-    if (!primeraRes.ok) return [];
-
-    const totalPaginas = parseInt(primeraRes.headers.get('X-WP-TotalPages') || '1', 10);
-    const primerData: WPManga[] = await primeraRes.json();
-    let todos: WPManga[] = [...primerData];
-
-    // Páginas restantes en lotes paralelos
-    if (totalPaginas > 1) {
-      const paginas = Array.from({ length: totalPaginas - 1 }, (_, i) => i + 2);
-      for (let i = 0; i < paginas.length; i += BATCH) {
-        const lote = paginas.slice(i, i + BATCH);
-        const resultados = await Promise.all(
-          lote.map(async (p) => {
-            const res = await fetch(
-              `${API_URL}?_embed&per_page=${PER_PAGE}&page=${p}&_fields=${CAMPOS_SOLICITADOS}`
-            );
-            if (!res.ok) return [] as WPManga[];
-            return res.json() as Promise<WPManga[]>;
-          })
-        );
-        resultados.forEach((data) => { todos = [...todos, ...data]; });
-      }
-    }
-
-    // Una entrada por serie (ero_seri o primera categoría)
-    const seriesVistas = new Map<number, WPManga>();
-    todos.forEach((item) => {
-      const idSerie = item.ero_seri
-        ? Number(item.ero_seri)
-        : (item.categories?.[0] ?? item.id);
-      if (!seriesVistas.has(idSerie)) seriesVistas.set(idSerie, item);
-    });
-
-    return Array.from(seriesVistas.values()).map((item) => mapearManga(item, false));
+    const res = await fetch(`${MM_API}/catalog`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.mangas)) return [];
+    return data.mangas.map(mapearMangaCatalog);
   } catch (error) {
     console.error('Error getUltimosCapitulos:', error);
     return [];
@@ -307,14 +303,16 @@ export const getNewReleases = async (): Promise<MangaCapitulo[]> => {
 };
 
 // ---------------------------------------------------------------------------
-// 6. MANGA POR ID (para MangaDetail)
+// 6. MANGA POR ID (post type 'manga' — usa endpoint propio)
 // ---------------------------------------------------------------------------
 export const getMangaById = async (id: number | string): Promise<MangaCapitulo | null> => {
   try {
-    const res = await fetch(`${API_URL}/${id}?_embed&_fields=${CAMPOS_SOLICITADOS}`);
+    const res = await fetch(`${MM_API}/manga/${id}`);
     if (!res.ok) return null;
-    const item = await res.json();
-    return mapearManga(item, false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const item: any = await res.json();
+    if (!item.success) return null;
+    return mapearMangaCatalog(item);
   } catch (error) {
     console.error('Error getMangaById:', error);
     return null;
