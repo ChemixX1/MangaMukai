@@ -115,7 +115,6 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapearMangaCatalog = (item: any): MangaCapitulo => {
   const genres: string[] = Array.isArray(item.genres) ? item.genres : [];
-  // El backend ya calcula el género; si no viene, inferir en cliente
   let genero: 'Hombre' | 'Mujer' | null = item.genero === 'Hombre' ? 'Hombre'
     : item.genero === 'Mujer' ? 'Mujer'
     : null;
@@ -123,8 +122,16 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     const gl = genres.map((g: string) => g.toLowerCase());
     if (gl.some(g => ['romance','drama','reencarnación','shoujo','otome','yuri'].includes(g))) genero = 'Mujer';
     if (gl.some(g => ['harem','shounen','seinen','acción','mecha'].includes(g))) genero = 'Hombre';
-    if (!genero) genero = 'Mujer'; // default
+    if (!genero) genero = 'Mujer';
   }
+
+  // Poblar capitulosRecientes desde firstChapterId cuando exista
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const caps: MangaCapitulo['capitulosRecientes'] = (Array.isArray(item.capitulosRecientes) && item.capitulosRecientes.length > 0)
+    ? item.capitulosRecientes
+    : item.firstChapterId
+      ? [{ id: item.firstChapterId, numero: '1', esGratis: !!item.esGratis, fecha: item.fecha }]
+      : [];
 
   return {
     id:          item.id,
@@ -139,7 +146,10 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     tipo:        item.tipo || 'Manga',
     genero,
     eroSeri:     item.id,
-    capitulosRecientes: [],
+    status:      item.status || '',
+    totalViews:  item.totalViews || 0,
+    rawFecha:    item.fecha || '',
+    capitulosRecientes: caps,
   };
 };
 
@@ -390,6 +400,80 @@ export const getChaptersByCategory = async (categoryId: number): Promise<Array<{
     console.error('Error getChaptersByCategory:', error);
     return [];
   }
+};
+
+// ---------------------------------------------------------------------------
+// 10. POPULARES MUJERES POR VISITAS (semanal / mensual / histórico)
+// ---------------------------------------------------------------------------
+export const getPopularWomenByViews = async (period: 'weekly' | 'monthly' | 'historical' = 'historical'): Promise<MangaCapitulo[]> => {
+  try {
+    const res = await fetch(`${MM_API}/popular-women?period=${period}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = await res.json();
+    if (!data.success || !Array.isArray(data.mangas)) return [];
+    return data.mangas.map(mapearMangaCatalog);
+  } catch (error) {
+    console.error('Error getPopularWomenByViews:', error);
+    return [];
+  }
+};
+
+// ---------------------------------------------------------------------------
+// 11. ÚLTIMAS ACTUALIZACIONES MUJERES con datos de capítulo
+// ---------------------------------------------------------------------------
+export const getLatestWomenUpdates = async (limit = 18): Promise<MangaCapitulo[]> => {
+  try {
+    const res = await fetch(`${MM_API}/latest-women?limit=${limit}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = await res.json();
+    if (!data.success || !Array.isArray(data.mangas)) return [];
+    return data.mangas.map(mapearMangaCatalog);
+  } catch (error) {
+    console.error('Error getLatestWomenUpdates:', error);
+    return [];
+  }
+};
+
+// ---------------------------------------------------------------------------
+// 13. MANGAS RELACIONADOS (por géneros + visitas)
+// ---------------------------------------------------------------------------
+export interface RelatedManga {
+  id: number;
+  titulo: string;
+  portada: string;
+  tipo: string;
+  genres: string[];
+  totalViews: number;
+  sharedGenres: number;
+}
+
+export const getRelatedMangas = async (mangaId: number | string, limit = 10): Promise<RelatedManga[]> => {
+  try {
+    const res = await fetch(`${MM_API}/related/${mangaId}?limit=${limit}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = await res.json();
+    if (!data.success || !Array.isArray(data.mangas)) return [];
+    return data.mangas as RelatedManga[];
+  } catch (error) {
+    console.error('Error getRelatedMangas:', error);
+    return [];
+  }
+};
+
+// ---------------------------------------------------------------------------
+// 12. REGISTRAR VISITA A CAPÍTULO
+// ---------------------------------------------------------------------------
+export const trackChapterView = async (chapterId: number | string, mangaId: number | string): Promise<void> => {
+  try {
+    await fetch(`${MM_API}/track-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chapter_id: Number(chapterId), manga_id: Number(mangaId) }),
+    });
+  } catch { /* silent — no crítico */ }
 };
 
 // ---------------------------------------------------------------------------

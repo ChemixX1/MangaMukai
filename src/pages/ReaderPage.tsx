@@ -8,6 +8,7 @@ import {
   ListMusic, X, Heart, Shuffle, MoreHorizontal,
   Lock, Youtube, MessageCircle, Music
 } from "lucide-react";
+import { trackChapterView } from "../services/mangaService";
 import { motion, AnimatePresence } from "framer-motion";
 import React from "react";
 
@@ -511,6 +512,11 @@ export const ReaderPage = () => {
           nextPrice,
           isNextUnlocked,
         });
+
+        // Registrar visita (no bloquea el render)
+        if (chapterId && mangaPostId) {
+          trackChapterView(chapterId, mangaPostId);
+        }
 
         setPlaylist([]);
         setCurrentTrack(null);

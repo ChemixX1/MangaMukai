@@ -738,12 +738,13 @@ function mm_handle_catalog(WP_REST_Request $req): WP_REST_Response
 
     global $wpdb;
 
-    // ── QUERY 1: todos los mangas con thumbnail y meta ────────────────────────
+    // ── QUERY 1: todos los mangas con thumbnail y meta (solo con capítulos) ────
     $posts = $wpdb->get_results("
         SELECT p.ID, p.post_title, p.post_date, p.post_content,
                att.guid          AS cover_url,
                pm_type.meta_value AS tipo,
-               pm_status.meta_value AS ero_status
+               pm_status.meta_value AS ero_status,
+               pm_cv.meta_value  AS custom_cover
         FROM {$wpdb->posts} p
         LEFT JOIN {$wpdb->postmeta} pm_thumb
                ON pm_thumb.post_id = p.ID AND pm_thumb.meta_key = '_thumbnail_id'
@@ -753,7 +754,17 @@ function mm_handle_catalog(WP_REST_Request $req): WP_REST_Response
                ON pm_type.post_id = p.ID AND pm_type.meta_key = 'ero_type'
         LEFT JOIN {$wpdb->postmeta} pm_status
                ON pm_status.post_id = p.ID AND pm_status.meta_key = 'ero_status'
+        LEFT JOIN {$wpdb->postmeta} pm_cv
+               ON pm_cv.post_id = p.ID AND pm_cv.meta_key = 'manga_cover'
         WHERE p.post_type = 'manga' AND p.post_status = 'publish'
+          AND EXISTS (
+            SELECT 1 FROM {$wpdb->postmeta} pm_ex
+            JOIN {$wpdb->posts} p_ex ON p_ex.ID = pm_ex.post_id
+            WHERE pm_ex.meta_key = 'ero_seri'
+              AND CAST(pm_ex.meta_value AS UNSIGNED) = p.ID
+              AND p_ex.post_type = 'post'
+              AND p_ex.post_status = 'publish'
+          )
         ORDER BY p.post_date DESC
     ", ARRAY_A);
 
@@ -769,7 +780,7 @@ function mm_handle_catalog(WP_REST_Request $req): WP_REST_Response
         SELECT tr.object_id AS manga_id, t.name AS genre
         FROM {$wpdb->term_relationships} tr
         JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
-                                       AND tt.taxonomy = 'genres'
+                                       AND tt.taxonomy IN ('wp-manga-genre', 'genres', 'category')
         JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
         WHERE tr.object_id IN ({$ids_in})
     ", ARRAY_A);
@@ -859,7 +870,7 @@ function mm_handle_catalog(WP_REST_Request $req): WP_REST_Response
         $mangas[] = [
             'id'             => $pid,
             'titulo'         => $p['post_title'],
-            'portada'        => $p['cover_url'] ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada',
+            'portada'        => $p['custom_cover'] ?: ($p['cover_url'] ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada'),
             'fecha'          => $p['post_date'],
             'tipo'           => $p['tipo'] ?: 'Manga',
             'genres'         => $genres,
@@ -889,14 +900,19 @@ function mm_handle_manga_detail(WP_REST_Request $req): WP_REST_Response
 
     $thumb_id  = get_post_thumbnail_id($pid);
     $cover_url = $thumb_id ? wp_get_attachment_url($thumb_id) : '';
+    $custom_cover = get_post_meta($pid, 'manga_cover', true);
 
     $tipo   = get_post_meta($pid, 'ero_type', true) ?: 'Manga';
     $status = get_post_meta($pid, 'ero_status', true) ?: '';
 
-    $terms  = get_the_terms($pid, 'genres');
-    $genres = ($terms && !is_wp_error($terms))
-        ? array_map(fn($t) => $t->name, $terms)
-        : [];
+    $genres = [];
+    foreach (['wp-manga-genre', 'genres', 'category'] as $tax) {
+        $terms = get_the_terms($pid, $tax);
+        if ($terms && !is_wp_error($terms)) {
+            $genres = array_unique(array_merge($genres, array_map(fn($t) => $t->name, $terms)));
+        }
+    }
+    $genres = array_values($genres);
 
     $desc = wp_strip_all_tags($post->post_content);
 
@@ -904,7 +920,7 @@ function mm_handle_manga_detail(WP_REST_Request $req): WP_REST_Response
         'success'     => true,
         'id'          => $pid,
         'titulo'      => $post->post_title,
-        'portada'     => $cover_url ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada',
+        'portada'     => $custom_cover ?: ($cover_url ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada'),
         'fecha'       => $post->post_date,
         'tipo'        => $tipo,
         'genres'      => $genres,

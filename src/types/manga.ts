@@ -62,10 +62,14 @@ export interface MangaCapitulo {
   tipo: string;
   genero?: 'Hombre' | 'Mujer' | null;
   eroSeri?: number | null;
+  status?: string;
+  totalViews?: number;
+  rawFecha?: string;
   capitulosRecientes: Array<{
     id: number;
     numero: string;
     esGratis: boolean;
     fecha: string;
+    free_at?: string | null;
   }>;
 }
