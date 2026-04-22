@@ -110,32 +110,35 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
 };
 
 // ---------------------------------------------------------------------------
-// Mapper para respuesta del endpoint /catalog (post type 'manga')
+// Mapper para respuesta del endpoint /catalog y /manga/{id}
 // ---------------------------------------------------------------------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapearMangaCatalog = (item: any): MangaCapitulo => {
   const genres: string[] = Array.isArray(item.genres) ? item.genres : [];
-
-  const TAGS_MUJER  = ['shoujo','shojo','josei','romance','yaoi','bl','yuri','otome'];
-  const TAGS_HOMBRE = ['shounen','shonen','seinen','ecchi','harem','isekai','acción','accion','action','mecha'];
-  const gl = genres.map((g: string) => g.toLowerCase());
-  let genero: 'Hombre' | 'Mujer' | null = null;
-  if (gl.some(g => TAGS_MUJER.includes(g)))  genero = 'Mujer';
-  if (gl.some(g => TAGS_HOMBRE.includes(g))) genero = 'Hombre';
+  // El backend ya calcula el género; si no viene, inferir en cliente
+  let genero: 'Hombre' | 'Mujer' | null = item.genero === 'Hombre' ? 'Hombre'
+    : item.genero === 'Mujer' ? 'Mujer'
+    : null;
+  if (!genero) {
+    const gl = genres.map((g: string) => g.toLowerCase());
+    if (gl.some(g => ['romance','drama','reencarnación','shoujo','otome','yuri'].includes(g))) genero = 'Mujer';
+    if (gl.some(g => ['harem','shounen','seinen','acción','mecha'].includes(g))) genero = 'Hombre';
+    if (!genero) genero = 'Mujer'; // default
+  }
 
   return {
-    id:       item.id,
-    titulo:   item.titulo,
-    portada:  item.portada,
-    imagenes: [],
-    fecha:    new Date(item.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
+    id:          item.id,
+    titulo:      item.titulo,
+    portada:     item.portada,
+    imagenes:    [],
+    fecha:       new Date(item.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
     descripcion: item.descripcion,
     categorias:  [],
-    genres:      genres,
+    genres,
     esGratis:    !!item.esGratis,
     tipo:        item.tipo || 'Manga',
     genero,
-    eroSeri:     item.id,   // en el endpoint /catalog, el ID del post ES el ero_seri
+    eroSeri:     item.id,
     capitulosRecientes: [],
   };
 };

@@ -4,155 +4,137 @@
  *
  * INSTRUCCIONES:
  * 1. Sube este archivo a la carpeta raíz de WordPress (donde está wp-config.php).
- * 2. Accede desde el navegador: https://mangamukai.com/manga-gender-tags.php?secret=CAMBIA_ESTO
- * 3. El script crea los tags "Hombre" y "Mujer" si no existen y los asigna
- *    a cada post según sus tags de género actuales.
- * 4. Borra el archivo del servidor cuando termine.
- *
- * SEGURIDAD: cambia SECRET_KEY antes de subir.
+ * 2. Accede: https://mangamukai.com/manga-gender-tags.php?secret=mukai_gender_2024_secure
+ * 3. El script crea los términos "Mujer" y "Hombre" en la taxonomía 'genres'
+ *    y los asigna a cada manga según sus géneros existentes.
+ * 4. BORRA el archivo del servidor cuando termine.
  */
 
 define('SECRET_KEY', 'mukai_gender_2024_secure');
 
-// --- Autenticación básica ---
 $secret = $_GET['secret'] ?? '';
 if ($secret !== SECRET_KEY) {
     http_response_code(403);
     die('Acceso denegado.');
 }
 
-// Cargar WordPress
 require_once __DIR__ . '/wp-load.php';
 
-// Tiempo sin límite para proceso largo
 set_time_limit(0);
-
-// Salida inmediata en el navegador
+header('Content-Type: text/plain; charset=utf-8');
 ob_implicit_flush(true);
 ob_end_flush();
-header('Content-Type: text/plain; charset=utf-8');
 
 // ---------------------------------------------------------------------------
-// Géneros que indican contenido para MUJER
+// Géneros que indican MUJER (en español, tal como están en la BD)
 // ---------------------------------------------------------------------------
 $GENEROS_MUJER = [
-    'shoujo', 'shojo', 'josei', 'romance', 'yaoi', 'bl', 'boys love',
-    'boys-love', 'shounen ai', 'shounen-ai', 'yuri', 'gl', 'girls love',
-    'girls-love', 'otome', 'slice of life', 'slice-of-life',
+    'romance', 'romance obsesivo', 'romance escolar', 'romance erótico',
+    'romance tl', 'drama', 'reencarnación', 'reencarnacion',
+    'comedia', 'protagonista femenina fuerte', 'harén inverso', 'haren inverso',
+    'madre', 'madrastra', 'niños', 'ninos', 'bebés', 'bebes',
+    'otome', 'gl', 'yuri', 'industry', 'industria del entretenimiento',
+    'ceo', 'presidente', 'trabajo de oficina', 'vampiros', 'vampiro',
+    'castigo', 'manhwa',
 ];
 
 // ---------------------------------------------------------------------------
-// Géneros que indican contenido para HOMBRE
+// Géneros que indican HOMBRE
 // ---------------------------------------------------------------------------
 $GENEROS_HOMBRE = [
-    'shounen', 'shonen', 'seinen', 'ecchi', 'harem', 'isekai',
-    'acción', 'accion', 'action', 'aventura', 'adventure', 'mecha',
-    'deportes', 'sports', 'super poderes', 'super-poderes',
+    'harem', 'acción', 'accion', 'action', 'deportes', 'sports',
+    'manga juvenil de acción', 'manga juvenil de accion',
+    'shounen', 'shonen', 'seinen', 'mecha', 'batalla',
 ];
 
 // ---------------------------------------------------------------------------
-// Crear / obtener IDs de los tags globales
+// Crear / obtener término en la taxonomía 'genres'
 // ---------------------------------------------------------------------------
-function obtener_o_crear_tag(string $nombre): int {
-    $term = get_term_by('name', $nombre, 'post_tag');
+function obtener_o_crear_genero(string $nombre): int {
+    $term = get_term_by('name', $nombre, 'genres');
     if ($term) return (int) $term->term_id;
-    $r = wp_insert_term($nombre, 'post_tag');
+    $r = wp_insert_term($nombre, 'genres');
     if (is_wp_error($r)) {
-        echo "ERROR creando tag '{$nombre}': " . $r->get_error_message() . "\n";
+        echo "ERROR creando término '{$nombre}': " . $r->get_error_message() . "\n";
         return 0;
     }
-    echo "Tag creado: '{$nombre}' (ID {$r['term_id']})\n";
+    echo "Término creado: '{$nombre}' (ID {$r['term_id']})\n";
     return (int) $r['term_id'];
 }
 
-$ID_MUJER  = obtener_o_crear_tag('Mujer');
-$ID_HOMBRE = obtener_o_crear_tag('Hombre');
+$ID_MUJER  = obtener_o_crear_genero('Mujer');
+$ID_HOMBRE = obtener_o_crear_genero('Hombre');
 
-if (!$ID_MUJER || !$ID_HOMBRE) {
-    die("No se pudieron crear los tags de género.\n");
-}
+if (!$ID_MUJER || !$ID_HOMBRE) die("Error creando términos.\n");
 
 // ---------------------------------------------------------------------------
-// Procesar todos los posts en lotes
+// Procesar todos los mangas
 // ---------------------------------------------------------------------------
-$pagina    = 1;
-$por_pagina = 50;
+$mangas = get_posts([
+    'post_type'      => 'manga',
+    'post_status'    => 'publish',
+    'posts_per_page' => -1,
+    'fields'         => 'ids',
+    'no_found_rows'  => true,
+]);
+
+echo "Total mangas a procesar: " . count($mangas) . "\n\n";
+
 $procesados = 0;
-$asignados  = 0;
+$asignados  = ['Mujer' => 0, 'Hombre' => 0, 'Ambos' => 0, 'Sin datos' => 0];
 
-echo "=== Iniciando asignación de tags de género ===\n\n";
+foreach ($mangas as $manga_id) {
+    $procesados++;
 
-do {
-    $args = [
-        'post_type'      => 'post',
-        'post_status'    => 'publish',
-        'posts_per_page' => $por_pagina,
-        'paged'          => $pagina,
-        'fields'         => 'ids',
-    ];
-    $query = new WP_Query($args);
-    $ids   = $query->posts;
+    // Géneros actuales del manga
+    $terms     = wp_get_post_terms($manga_id, 'genres', ['fields' => 'all']);
+    $ids_act   = array_map(fn($t) => $t->term_id, $terms);
+    $names_low = array_map(fn($t) => mb_strtolower($t->name), $terms);
 
-    if (empty($ids)) break;
+    $tiene_mujer  = in_array($ID_MUJER,  $ids_act, true);
+    $tiene_hombre = in_array($ID_HOMBRE, $ids_act, true);
 
-    foreach ($ids as $post_id) {
-        $procesados++;
+    // Ya tiene los dos → saltar
+    if ($tiene_mujer && $tiene_hombre) continue;
 
-        // Obtener tags actuales del post como strings
-        $tags_actuales = wp_get_post_tags($post_id, ['fields' => 'names']);
-        $tags_lower    = array_map('mb_strtolower', $tags_actuales);
-        $tag_ids_act   = wp_get_post_tags($post_id, ['fields' => 'ids']);
+    $es_mujer  = $tiene_mujer  || array_intersect($names_low, $GENEROS_MUJER)  !== [];
+    $es_hombre = $tiene_hombre || array_intersect($names_low, $GENEROS_HOMBRE) !== [];
 
-        // Evitar duplicar si el tag ya está asignado
-        $tiene_mujer  = in_array($ID_MUJER,  $tag_ids_act, true);
-        $tiene_hombre = in_array($ID_HOMBRE, $tag_ids_act, true);
-
-        if ($tiene_mujer && $tiene_hombre) {
-            // Ya tiene ambos — saltar
-            continue;
-        }
-
-        // Determinar género basándose en los tags existentes
-        $es_mujer  = false;
-        $es_hombre = false;
-
-        foreach ($tags_lower as $t) {
-            if (!$es_mujer  && in_array($t, $GENEROS_MUJER,  true)) $es_mujer  = true;
-            if (!$es_hombre && in_array($t, $GENEROS_HOMBRE, true)) $es_hombre = true;
-        }
-
-        // Si no se detectó género por tags, intentar con categorías
-        if (!$es_mujer && !$es_hombre) {
-            $cats = wp_get_post_categories($post_id, ['fields' => 'names']);
-            foreach (array_map('mb_strtolower', $cats) as $c) {
-                if (!$es_mujer  && in_array($c, $GENEROS_MUJER,  true)) $es_mujer  = true;
-                if (!$es_hombre && in_array($c, $GENEROS_HOMBRE, true)) $es_hombre = true;
-            }
-        }
-
-        // Añadir los tags que correspondan (append = true para no borrar existentes)
-        $nuevos = [];
-        if ($es_mujer  && !$tiene_mujer)  $nuevos[] = $ID_MUJER;
-        if ($es_hombre && !$tiene_hombre) $nuevos[] = $ID_HOMBRE;
-
-        if (!empty($nuevos)) {
-            wp_set_post_tags($post_id, array_merge($tag_ids_act, $nuevos), false);
-            $titulo = get_the_title($post_id);
-            $genero_str = implode('+', array_map(
-                fn($id) => ($id === $ID_MUJER ? 'Mujer' : 'Hombre'),
-                $nuevos
-            ));
-            echo "  [{$procesados}] Post #{$post_id} → {$genero_str} | {$titulo}\n";
-            $asignados++;
-        }
+    // Si no hay géneros claros → revisar descripción del post
+    if (!$es_mujer && !$es_hombre) {
+        $post    = get_post($manga_id);
+        $desc    = mb_strtolower($post->post_content ?? '');
+        $titulo  = mb_strtolower($post->post_title ?? '');
+        $palabras_mujer  = ['princesa','duquesa','condesa','reina','dama','protagonista','amor','enamorad','romance','ella '];
+        $palabras_hombre = ['guerrero','caballero','espadachin','sistema','nivel','dungeon','monstruo','héroe'];
+        foreach ($palabras_mujer  as $p) { if (str_contains($desc.$titulo, $p)) { $es_mujer  = true; break; } }
+        foreach ($palabras_hombre as $p) { if (str_contains($desc.$titulo, $p)) { $es_hombre = true; break; } }
     }
 
-    echo "\n--- Lote {$pagina} procesado ({$procesados} posts hasta ahora) ---\n\n";
-    $pagina++;
+    // Default: si no se detecta nada, asignar Mujer (el 95% de esta BD es femenino)
+    if (!$es_mujer && !$es_hombre) $es_mujer = true;
 
-} while (count($ids) === $por_pagina);
+    $nuevos = [];
+    if ($es_mujer  && !$tiene_mujer)  $nuevos[] = $ID_MUJER;
+    if ($es_hombre && !$tiene_hombre) $nuevos[] = $ID_HOMBRE;
+
+    if (!empty($nuevos)) {
+        wp_set_object_terms($manga_id, array_merge($ids_act, $nuevos), 'genres', false);
+        $titulo     = get_the_title($manga_id);
+        $genero_str = implode('+', array_map(fn($id) => ($id === $ID_MUJER ? 'Mujer' : 'Hombre'), $nuevos));
+        echo "  [{$procesados}] #{$manga_id} → {$genero_str} | {$titulo}\n";
+
+        if ($es_mujer && $es_hombre)    $asignados['Ambos']++;
+        elseif ($es_mujer)              $asignados['Mujer']++;
+        else                            $asignados['Hombre']++;
+    }
+}
 
 echo "\n=== COMPLETADO ===\n";
-echo "Posts procesados : {$procesados}\n";
-echo "Tags asignados   : {$asignados}\n";
+echo "Procesados : {$procesados}\n";
+foreach ($asignados as $k => $v) echo "{$k}: {$v}\n";
+
+// Limpiar caché del catálogo para que se regenere
+delete_transient('mm_catalog_v1');
+echo "\nCaché del catálogo limpiada.\n";
 echo "\nBORRA ESTE ARCHIVO DEL SERVIDOR.\n";

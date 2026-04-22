@@ -723,91 +723,158 @@ function mm_handle_series_chapters(WP_REST_Request $req): WP_REST_Response
     ], 200);
 }
 
-// ─── REST: CATÁLOGO COMPLETO (post type 'manga') ──────────────────────────────
+// ─── REST: CATÁLOGO COMPLETO — optimizado con 3 queries en lote + cache ──────
 function mm_handle_catalog(WP_REST_Request $req): WP_REST_Response
 {
-    $query = new WP_Query([
-        'post_type'      => 'manga',
-        'post_status'    => 'publish',
-        'posts_per_page' => -1,
-        'orderby'        => 'date',
-        'order'          => 'DESC',
-        'no_found_rows'  => true,
-    ]);
+    $cache_key     = 'mm_catalog_v1';
+    $cache_seconds = 900; // 15 minutos
+
+    // Servir desde caché si existe y no se pide refresco
+    $force_refresh = $req->get_param('refresh') === '1';
+    if (!$force_refresh) {
+        $cached = get_transient($cache_key);
+        if ($cached !== false) return new WP_REST_Response($cached, 200);
+    }
+
+    global $wpdb;
+
+    // ── QUERY 1: todos los mangas con thumbnail y meta ────────────────────────
+    $posts = $wpdb->get_results("
+        SELECT p.ID, p.post_title, p.post_date, p.post_content,
+               att.guid          AS cover_url,
+               pm_type.meta_value AS tipo,
+               pm_status.meta_value AS ero_status
+        FROM {$wpdb->posts} p
+        LEFT JOIN {$wpdb->postmeta} pm_thumb
+               ON pm_thumb.post_id = p.ID AND pm_thumb.meta_key = '_thumbnail_id'
+        LEFT JOIN {$wpdb->posts} att
+               ON att.ID = pm_thumb.meta_value
+        LEFT JOIN {$wpdb->postmeta} pm_type
+               ON pm_type.post_id = p.ID AND pm_type.meta_key = 'ero_type'
+        LEFT JOIN {$wpdb->postmeta} pm_status
+               ON pm_status.post_id = p.ID AND pm_status.meta_key = 'ero_status'
+        WHERE p.post_type = 'manga' AND p.post_status = 'publish'
+        ORDER BY p.post_date DESC
+    ", ARRAY_A);
+
+    if (empty($posts)) {
+        return new WP_REST_Response(['success' => true, 'total' => 0, 'mangas' => []], 200);
+    }
+
+    $all_ids = array_column($posts, 'ID');
+    $ids_in  = implode(',', array_map('intval', $all_ids));
+
+    // ── QUERY 2: todos los géneros de todos los mangas en un solo JOIN ────────
+    $genre_rows = $wpdb->get_results("
+        SELECT tr.object_id AS manga_id, t.name AS genre
+        FROM {$wpdb->term_relationships} tr
+        JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+                                       AND tt.taxonomy = 'genres'
+        JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
+        WHERE tr.object_id IN ({$ids_in})
+    ", ARRAY_A);
+
+    // Agrupar géneros por manga_id
+    $genres_map = [];
+    foreach ($genre_rows as $row) {
+        $genres_map[(int)$row['manga_id']][] = $row['genre'];
+    }
+
+    // ── QUERY 3: primer capítulo (más bajo ero_chapter) por manga ─────────────
+    $chapter_rows = $wpdb->get_results("
+        SELECT pm_seri.meta_value AS ero_seri,
+               p.ID               AS chapter_id,
+               pm_sell.meta_value AS sell_meta
+        FROM {$wpdb->postmeta} pm_seri
+        JOIN {$wpdb->posts} p ON p.ID = pm_seri.post_id
+                              AND p.post_type = 'post'
+                              AND p.post_status = 'publish'
+        JOIN (
+            SELECT pm_seri2.meta_value AS s,
+                   MIN(CAST(pm_ch.meta_value AS UNSIGNED)) AS min_ch
+            FROM {$wpdb->postmeta} pm_seri2
+            JOIN {$wpdb->postmeta} pm_ch ON pm_ch.post_id = pm_seri2.post_id
+                                        AND pm_ch.meta_key = 'ero_chapter'
+            JOIN {$wpdb->posts} pp ON pp.ID = pm_seri2.post_id
+                                  AND pp.post_type = 'post'
+                                  AND pp.post_status = 'publish'
+            WHERE pm_seri2.meta_key = 'ero_seri'
+              AND pm_seri2.meta_value IN ({$ids_in})
+            GROUP BY pm_seri2.meta_value
+        ) first ON first.s = pm_seri.meta_value
+        JOIN {$wpdb->postmeta} pm_ch2 ON pm_ch2.post_id = p.ID
+                                     AND pm_ch2.meta_key = 'ero_chapter'
+                                     AND CAST(pm_ch2.meta_value AS UNSIGNED) = first.min_ch
+        LEFT JOIN {$wpdb->postmeta} pm_sell ON pm_sell.post_id = p.ID
+                                           AND pm_sell.meta_key = 'myCRED_sell_content'
+        WHERE pm_seri.meta_key = 'ero_seri'
+          AND pm_seri.meta_value IN ({$ids_in})
+    ", ARRAY_A);
+
+    // Indexar por ero_seri
+    $chapters_map = [];
+    foreach ($chapter_rows as $row) {
+        $sid = (int)$row['ero_seri'];
+        if (!isset($chapters_map[$sid])) {
+            $sell     = maybe_unserialize($row['sell_meta']);
+            $is_paid  = is_array($sell)
+                && ($sell['status'] ?? '') === 'enabled'
+                && floatval($sell['price'] ?? 0) > 0;
+            $chapters_map[$sid] = [
+                'id'      => (int)$row['chapter_id'],
+                'is_free' => !$is_paid,
+            ];
+        }
+    }
+
+    // ── ENSAMBLAR RESPUESTA ───────────────────────────────────────────────────
+    $generos_mujer  = ['romance','drama','reencarnación','reencarnacion','romance obsesivo',
+                       'comedia','protagonista femenina fuerte','harén inverso','haren inverso',
+                       'madre','madrastra','niños','ninos','bebés','bebes','otome','gl','yuri',
+                       'ceo','presidente','trabajo de oficina','vampiros','vampiro','manhwa',
+                       'industria del entretenimiento','romance escolar','romance erótico','romance tl'];
+    $generos_hombre = ['harem','acción','accion','action','deportes','sports',
+                       'manga juvenil de acción','manga juvenil de accion',
+                       'shounen','shonen','seinen','mecha','batalla'];
 
     $mangas = [];
+    foreach ($posts as $p) {
+        $pid    = (int)$p['ID'];
+        $genres = $genres_map[$pid] ?? [];
+        $gl     = array_map('mb_strtolower', $genres);
 
-    foreach ($query->posts as $post) {
-        $pid = $post->ID;
+        $es_mujer  = array_intersect($gl, $generos_mujer)  !== [];
+        $es_hombre = array_intersect($gl, $generos_hombre) !== [];
 
-        // Portada (thumbnail)
-        $thumb_id  = get_post_thumbnail_id($pid);
-        $cover_url = $thumb_id ? wp_get_attachment_url($thumb_id) : '';
+        // Mujer = default cuando no se detecta género masculino explícito
+        if (!$es_mujer && !$es_hombre) $es_mujer = true;
 
-        // Tipo (Manga / Manhwa / Manhua / Comic)
-        $tipo = get_post_meta($pid, 'ero_type', true) ?: 'Manga';
+        $genero = $es_mujer ? 'Mujer' : 'Hombre';
+        if ($es_mujer && $es_hombre) $genero = 'Mujer'; // prioridad mujer si ambos
 
-        // Géneros desde taxonomía
-        $terms  = get_the_terms($pid, 'genres');
-        $genres = ($terms && !is_wp_error($terms))
-            ? array_map(fn($t) => $t->name, $terms)
-            : [];
-
-        // Estado de publicación
-        $ero_status = get_post_meta($pid, 'ero_status', true) ?: '';
-
-        // Primer capítulo disponible (para saber si es gratis)
-        $first_chapter_free = false;
-        $first_chapter_id   = null;
-        $chapter_query = new WP_Query([
-            'post_type'      => 'post',
-            'post_status'    => 'publish',
-            'posts_per_page' => 1,
-            'meta_query'     => [[
-                'key'     => 'ero_seri',
-                'value'   => $pid,
-                'compare' => '=',
-                'type'    => 'NUMERIC',
-            ]],
-            'meta_key' => 'ero_chapter',
-            'orderby'  => 'meta_value_num',
-            'order'    => 'ASC',
-            'no_found_rows' => true,
-        ]);
-
-        if ($chapter_query->have_posts()) {
-            $ch = $chapter_query->posts[0];
-            $first_chapter_id = $ch->ID;
-            $sell = get_post_meta($ch->ID, 'myCRED_sell_content', true);
-            $first_chapter_free = !(is_array($sell)
-                && isset($sell['status'])
-                && $sell['status'] === 'enabled'
-                && floatval($sell['price'] ?? 0) > 0);
-        }
-
-        // Descripción (contenido del post)
-        $desc = wp_strip_all_tags($post->post_content);
-        if (strlen($desc) > 500) $desc = substr($desc, 0, 497) . '...';
+        $ch   = $chapters_map[$pid] ?? null;
+        $desc = wp_strip_all_tags($p['post_content'] ?? '');
+        if (strlen($desc) > 400) $desc = substr($desc, 0, 397) . '...';
 
         $mangas[] = [
-            'id'          => $pid,
-            'titulo'      => $post->post_title,
-            'portada'     => $cover_url ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada',
-            'fecha'       => $post->post_date,
-            'tipo'        => $tipo,
-            'genres'      => $genres,
-            'descripcion' => $desc ?: 'Lee esta historia en MangaMukai.',
-            'esGratis'    => $first_chapter_free,
-            'firstChapterId' => $first_chapter_id,
-            'status'      => $ero_status,
+            'id'             => $pid,
+            'titulo'         => $p['post_title'],
+            'portada'        => $p['cover_url'] ?: 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada',
+            'fecha'          => $p['post_date'],
+            'tipo'           => $p['tipo'] ?: 'Manga',
+            'genres'         => $genres,
+            'genero'         => $genero,
+            'descripcion'    => $desc ?: 'Lee esta historia en MangaMukai.',
+            'esGratis'       => $ch ? $ch['is_free'] : true,
+            'firstChapterId' => $ch ? $ch['id'] : null,
+            'status'         => $p['ero_status'] ?: '',
         ];
     }
 
-    return new WP_REST_Response([
-        'success' => true,
-        'total'   => count($mangas),
-        'mangas'  => $mangas,
-    ], 200);
+    $response = ['success' => true, 'total' => count($mangas), 'mangas' => $mangas];
+    set_transient($cache_key, $response, $cache_seconds);
+
+    return new WP_REST_Response($response, 200);
 }
 
 // ─── REST: DETALLE DE UN MANGA POR ID ────────────────────────────────────────
