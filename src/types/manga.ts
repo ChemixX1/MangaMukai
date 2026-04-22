@@ -57,7 +57,7 @@ export interface MangaCapitulo {
   fecha: string;
   descripcion?: string;
   categorias?: number[];
-  genres?: number[];
+  genres?: string[];
   esGratis: boolean;
   tipo: string;
   genero?: 'Hombre' | 'Mujer' | null;
