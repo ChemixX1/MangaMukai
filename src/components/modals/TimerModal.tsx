@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Play, Square, AlarmClock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from '../../hooks/useTheme';
+import { lockPageScroll } from '../../utils/scrollLock';
 
 interface TimerModalProps {
   isOpen: boolean;
@@ -21,12 +22,8 @@ export const TimerModal = ({ isOpen, onClose, onStartTimer, onStopTimer, activeT
 
   // BLOQUEO DE SCROLL
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden"; // Bloquea scroll
-    } else {
-      document.body.style.overflow = "unset"; // Restaura scroll
-    }
-    return () => { document.body.style.overflow = "unset"; }; // Limpieza al desmontar
+    if (!isOpen) return;
+    return lockPageScroll();
   }, [isOpen]);
 
   const formatTime = (seconds: number) => {

@@ -154,8 +154,8 @@ export const LatestUpdates = () => {
             className="home-men-ramp pointer-events-none absolute bottom-[-20px] left-0 h-10 w-full bg-gradient-to-r from-[#67E8F9] via-[#38BDF8] to-[#3B82F6]"
           />
 
-          <div className="relative z-10 mx-auto flex h-full w-full max-w-[1600px] items-end px-4 pb-1 md:items-center md:px-6 md:pb-0 lg:px-12">
-              <div className="flex items-center gap-2 overflow-visible md:gap-3 md:border-l-4 md:border-[#38BDF8] md:pl-4">
+          <div className="desktop-content-shell relative z-10 mx-auto flex h-full w-full max-w-[1600px] items-end px-4 pb-1 md:items-center md:px-6 md:pb-0 lg:px-12">
+              <div className="flex items-center gap-2 overflow-visible md:gap-3">
                   <h2 className="home-men-section-title flex shrink-0 -translate-y-1 items-center gap-2 overflow-visible whitespace-nowrap text-[23px] font-[900] uppercase italic leading-none tracking-tighter text-white sm:translate-y-0 md:gap-3 md:text-4xl lg:translate-y-3">
                       <span className="text-[#38BDF8] drop-shadow-[0_0_10px_rgba(56,189,248,0.5)] shrink-0">
                           <UserRound className="h-6 w-6 md:h-7 md:w-7" strokeWidth={3} />
@@ -188,10 +188,10 @@ export const LatestUpdates = () => {
       </div>
 
       {/* 3. CONTENIDO PRINCIPAL */}
-      <div className="container relative z-10 mx-auto flex flex-grow flex-col items-center gap-0 px-6 pt-20 sm:gap-5 sm:px-4 sm:pt-[70px] md:gap-8 md:px-6 md:pt-28 lg:flex-row lg:pt-20">
+      <div className="desktop-content-shell container relative z-10 mx-auto flex flex-grow flex-col items-center gap-0 px-6 pt-20 sm:gap-5 sm:px-4 sm:pt-[70px] md:gap-8 md:px-6 md:pt-28 lg:flex-row lg:pt-20">
         
         {/* INFO COLUMN */}
-        <div className="order-2 z-20 -mt-2 flex w-full flex-col items-center justify-center sm:mt-0 sm:items-start lg:order-1 lg:w-[44%] lg:pl-10 xl:pl-14">
+        <div className="order-2 z-20 -mt-2 flex w-full flex-col items-center justify-center sm:mt-0 sm:items-start lg:order-1 lg:w-[44%] lg:pl-10">
           <AnimatePresence mode="wait">
             {activeItem && (
                 <motion.div

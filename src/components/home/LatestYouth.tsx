@@ -112,7 +112,7 @@ export const YouthLatest = () => {
       {/* Fondo degradado azul sutil */}
       <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#00C2FF]/10 via-[#00C2FF]/5 to-transparent pointer-events-none"></div>
 
-      <div id="latest-youth-grid" className="w-full max-w-[1600px] scroll-mt-24 mx-auto px-4 md:px-6 lg:px-12 pt-6">
+      <div id="latest-youth-grid" className="desktop-content-shell w-full max-w-[1600px] scroll-mt-24 mx-auto px-4 md:px-6 lg:px-12 pt-6">
         
         {/* HEADER */}
         <div className="flex justify-between items-end mb-8">
@@ -122,7 +122,7 @@ export const YouthLatest = () => {
                  </span>
                  ÚLTIMAS <span className="text-[#00C2FF]">ACTUALIZACIONES</span>
              </h2>
-             <Link to="/catalog" className="home-theme-surface home-theme-title hidden md:flex items-center gap-2 px-6 py-2 rounded bg-[#1a1a1a] text-white font-bold uppercase text-sm hover:text-[#00C2FF] transition-colors border border-transparent hover:border-[#00C2FF]">
+             <Link to="/biblioteca?audience=hombre" className="home-theme-surface home-theme-title hidden md:flex items-center gap-2 px-6 py-2 rounded bg-[#1a1a1a] text-white font-bold uppercase text-sm hover:text-[#00C2FF] transition-colors border border-transparent hover:border-[#00C2FF]">
                  <Grid size={18} /> VER TODO
              </Link>
         </div>
@@ -145,15 +145,13 @@ export const YouthLatest = () => {
                         loading="lazy"
                         />
                         
-                        {/* ETIQUETA TIPO + RATING */}
-                        <div className="absolute bottom-2 right-2 flex items-center justify-end gap-1.5">
-                            <div className={`${getTypeColor(manga.type)} text-white text-[8px] md:text-[9px] font-black px-1.5 md:px-2 py-0.5 rounded-sm shadow-sm uppercase tracking-wider`}>
-                                {manga.type}
-                            </div>
-                            <div className="bg-yellow-500 text-black text-[8px] md:text-[9px] font-black px-1.5 py-0.5 rounded-sm shadow-sm flex items-center gap-0.5">
-                                <Star size={10} fill="currentColor" strokeWidth={0} />
-                                <span>{manga.rating}</span>
-                            </div>
+                        {/* ETIQUETA TIPO (IZQUIERDA) + RATING (DERECHA) */}
+                        <div className={`absolute bottom-2 left-2 ${getTypeColor(manga.type)} rounded-sm px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white shadow-sm md:px-2 md:text-[9px]`}>
+                            {manga.type}
+                        </div>
+                        <div className="absolute bottom-2 right-2 flex items-center gap-0.5 rounded-sm bg-yellow-500 px-1.5 py-0.5 text-[8px] font-black text-black shadow-sm md:text-[9px]">
+                            <Star size={10} fill="currentColor" strokeWidth={0} />
+                            <span>{manga.rating}</span>
                         </div>
                     </Link>
                   </div>

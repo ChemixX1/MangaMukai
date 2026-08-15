@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { migrateOldDataToWordPress } from './services/migrationService';
 import { GlobalLoader } from './components/common';
 import { Navbar } from './components/layout';
@@ -8,7 +8,7 @@ const Home = lazy(() => import('./pages/Home'));
 const MangaBlackWhite = lazy(() => import('./pages/MangaBlackWhite'));
 const MangaAdult = lazy(() => import('./pages/MangaAdult'));
 const MangaDetail = lazy(() => import('./pages/MangaDetail').then(({ MangaDetail: Page }) => ({ default: Page })));
-const Catalog = lazy(() => import('./pages/Catalog').then(({ Catalog: Page }) => ({ default: Page })));
+const Biblioteca = lazy(() => import('./pages/Biblioteca').then(({ Biblioteca: Page }) => ({ default: Page })));
 const AboutPage = lazy(() => import('./pages/AboutPage').then(({ AboutPage: Page }) => ({ default: Page })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then(({ ContactPage: Page }) => ({ default: Page })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(({ ProfilePage: Page }) => ({ default: Page })));
@@ -44,7 +44,9 @@ function AppInner() {
             <Route path="/perfil" element={<ProfilePage />} />
             <Route path="/saved" element={<SavedMangas />} />
             <Route path="/legal" element={<TermsAndPrivacy />} />
-            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/biblioteca" element={<Biblioteca />} />
+            <Route path="/catalog" element={<Navigate to="/biblioteca" replace />} />
+            <Route path="/catalogo" element={<Navigate to="/biblioteca" replace />} />
             <Route path="/manga/:id" element={<MangaDetail />} />
             <Route path="/read/:chapterId" element={<ReaderPage />} />
             <Route path="/pago-exitoso" element={<PaymentSuccess />} />

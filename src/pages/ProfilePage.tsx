@@ -552,13 +552,13 @@ export const ProfilePage = () => {
                             </div>
                             <h3 className="text-xl font-bold text-white mb-2">Tu historia comienza aquí</h3>
                             <p className="text-zinc-400 max-w-sm mb-8 font-medium">
-                                Aún no has leído ningún manga. ¡Explora nuestro catálogo y empieza a leer para subir de nivel!
+                                Aún no has leído ningún manga. ¡Explora nuestra biblioteca y empieza a leer para subir de nivel!
                             </p>
                             <button 
-                                onClick={() => navigate('/catalog')} 
+                                onClick={() => navigate('/biblioteca')}
                                 className="px-8 py-4 bg-white text-black font-[1000] uppercase text-xs tracking-[0.2em] rounded-xl hover:bg-[#FF4D88] hover:text-white transition-all shadow-lg"
                             >
-                                Ir al Catálogo
+                                Ir a la Biblioteca
                             </button>
                         </div>
                      )}

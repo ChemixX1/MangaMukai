@@ -86,9 +86,9 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
   useEffect(() => {
     let mounted = true;
     Promise.all([getUltimosCapitulos(), getPopularWomenByViews("historical")])
-      .then(([catalog, popular]) => {
+      .then(([library, popular]) => {
         if (!mounted) return;
-        const all = uniqueMangas([...catalog, ...popular]);
+        const all = uniqueMangas([...library, ...popular]);
         const matching = all.filter((manga) => belongsToCollection(manga, variant));
         setMangas(matching.length >= 6 ? matching : all);
       })
@@ -136,7 +136,7 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
         {active?.portada && <img src={active.portada} alt="" className="absolute inset-0 h-full w-full scale-105 object-cover grayscale brightness-[0.28] blur-sm" />}
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/25" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#080b10] via-transparent to-black/30" />
-        <div className="relative z-10 mx-auto flex min-h-[790px] max-w-[1500px] flex-col items-center gap-12 px-5 pb-20 pt-32 lg:flex-row lg:px-16">
+        <div className="desktop-content-shell relative z-10 mx-auto flex min-h-[790px] max-w-[1500px] flex-col items-center gap-12 px-5 pb-20 pt-32 lg:flex-row lg:px-16">
           <div className="order-2 w-full lg:order-1 lg:w-[47%]">
             <div className="mb-5 flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 text-[11px] font-black uppercase tracking-widest text-white" style={{ backgroundColor: theme.accent }}>{theme.badge}</span>
@@ -149,7 +149,7 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
             </div>
             <div className="mb-7 flex flex-wrap gap-2">{(active?.genres || [theme.badge]).slice(0, 4).map((genre) => <span key={genre} className="bg-white px-3 py-1 text-[10px] font-black uppercase text-black">{genre}</span>)}</div>
             <div className="flex flex-wrap gap-4">
-              <Link to={active ? `/manga/${active.id}` : "/catalog"} className={`flex items-center gap-2 px-7 py-4 text-xs font-black uppercase tracking-widest transition ${theme.button}`}><Play size={15} fill="currentColor" /> Leer ahora</Link>
+              <Link to={active ? `/manga/${active.id}` : "/biblioteca"} className={`flex items-center gap-2 px-7 py-4 text-xs font-black uppercase tracking-widest transition ${theme.button}`}><Play size={15} fill="currentColor" /> Leer ahora</Link>
               <Link to="/saved" className="flex items-center gap-2 border border-white/25 bg-black/30 px-7 py-4 text-xs font-black uppercase tracking-widest transition hover:bg-white hover:text-black"><BookOpen size={15} /> Guardar</Link>
             </div>
           </div>
@@ -167,7 +167,7 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
           </div>
         </div>
       </section>
-      <section className="mx-auto max-w-[1400px] px-5 py-16 lg:px-16">
+      <section className="desktop-content-shell mx-auto max-w-[1400px] px-5 py-16 lg:px-16">
         <div className="mb-8 flex items-end justify-between gap-5">
           <div><p className="mb-2 text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: theme.accent }}>Explora la colección</p><h2 className="text-3xl font-black uppercase italic tracking-tight sm:text-4xl">{theme.title}</h2></div>
           <span className="text-xs font-bold text-white/40">{visibleMangas.length} títulos</span>
@@ -205,7 +205,7 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
       <section className={`bg-gradient-to-b ${theme.glow} to-transparent py-16 text-center`}>
         <Flame className="mx-auto mb-4" style={{ color: theme.accent }} />
         <h2 className="mb-3 text-3xl font-black uppercase italic">¿Buscas algo diferente?</h2>
-        <Link to="/catalog" className="text-xs font-black uppercase tracking-[0.25em] text-white/60 hover:text-white">Ver catálogo completo</Link>
+        <Link to="/biblioteca" className="text-xs font-black uppercase tracking-[0.25em] text-white/60 hover:text-white">Ver biblioteca completa</Link>
       </section>
     </main>
   );

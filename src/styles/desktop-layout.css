@@ -1,0 +1,48 @@
+/*
+ * Composicion estable para monitores de escritorio.
+ *
+ * Los fondos siguen ocupando todo el viewport, pero el contenido deja de
+ * crecer con cada monitor. La regla comienza exactamente donde el proyecto
+ * activa su composicion de escritorio (lg), sin intervenir en movil.
+ */
+
+@media (min-width: 1024px) {
+  :root {
+    --desktop-layout-width: 1366px;
+    --desktop-layout-gutter: 3rem;
+  }
+
+  .desktop-content-shell {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--desktop-layout-width) !important;
+    margin-inline: auto;
+  }
+
+  /* El hero mantiene la misma composicion en monitores 16:9 y 16:10. */
+  .home-hero-layout {
+    max-width: var(--desktop-layout-width);
+    gap: 2rem;
+    padding-left: 4rem;
+    padding-right: var(--desktop-layout-gutter);
+  }
+
+  .home-hero-info {
+    width: 45%;
+  }
+
+  .home-hero-cards {
+    width: 50%;
+  }
+
+  /* Iguala el bloque de texto juvenil con el ancho util del hero. */
+  .home-men-copy-width {
+    width: calc(100% + 1.5rem);
+    max-width: calc(100% + 1.5rem);
+  }
+
+  /* Las tarjetas del marquee ya no cambian de escala entre monitores. */
+  .home-popular-marquee-card {
+    width: calc((min(100vw, var(--desktop-layout-width)) - 6rem) / 6);
+  }
+}

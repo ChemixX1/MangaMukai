@@ -1,19 +1,49 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Search, CalendarDays, Flame, ChevronRight, Zap, LayoutGrid } from "lucide-react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { getNewReleases, searchMangas } from '../../services/mangaService';
+import { getLatestMenUpdates, getLatestWomenUpdates, searchMangas } from '../../services/mangaService';
 import type { MangaCapitulo } from '../../types/manga';
 import { useTheme } from '../../hooks/useTheme';
+import { lockPageScroll } from '../../utils/scrollLock';
+import { preloadImages } from '../../utils/preloadImages';
 
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+let cachedSearchReleases: MangaCapitulo[] | null = null;
+let pendingSearchReleases: Promise<MangaCapitulo[]> | null = null;
+
+const loadSearchReleases = () => {
+  if (cachedSearchReleases) return Promise.resolve(cachedSearchReleases);
+  if (pendingSearchReleases) return pendingSearchReleases;
+
+  pendingSearchReleases = Promise.all([
+    getLatestWomenUpdates(2),
+    getLatestMenUpdates(2),
+  ]).then(([women, men]) => {
+    const uniqueReleases = new Map<string, MangaCapitulo>();
+    [...women, ...men].forEach((manga) => uniqueReleases.set(String(manga.id), manga));
+
+    cachedSearchReleases = [...uniqueReleases.values()]
+      .sort((a, b) => Date.parse(b.rawFecha || '') - Date.parse(a.rawFecha || ''))
+      .slice(0, 4);
+
+    return cachedSearchReleases;
+  }).finally(() => {
+    pendingSearchReleases = null;
+  });
+
+  return pendingSearchReleases;
+};
+
 export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MangaCapitulo[]>([]);
-  const [recentMangas, setRecentMangas] = useState<MangaCapitulo[]>([]);
+  const [recentMangas, setRecentMangas] = useState<MangaCapitulo[]>(cachedSearchReleases || []);
+  const [recentLoading, setRecentLoading] = useState(!cachedSearchReleases);
   const [loading, setLoading] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -21,59 +51,84 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   const { theme } = useTheme();
   const isLight = theme === 'light';
 
-  // Cargar novedades recientes al abrir
+  const handleCloseSearch = useCallback(() => {
+    setQuery("");
+    setResults([]);
+    setLoading(false);
+    onClose();
+  }, [onClose]);
+
+  // Precargar cuatro novedades ligeras; evita descargar la biblioteca completa solo para esta vista.
   useEffect(() => {
-    getNewReleases()
+    let cancelled = false;
+    setRecentLoading(!cachedSearchReleases);
+
+    loadSearchReleases()
       .then((mangas) => {
-        const latestFour = [...mangas]
-          .sort((a, b) => Date.parse(b.rawFecha || '') - Date.parse(a.rawFecha || ''))
-          .slice(0, 4);
-        setRecentMangas(latestFour);
+        if (cancelled) return;
+        setRecentMangas(mangas);
+        void preloadImages(mangas.map((manga) => manga.portada).filter(Boolean));
       })
-      .catch(() => setRecentMangas([]));
+      .catch(() => {
+        if (!cancelled) setRecentMangas([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecentLoading(false);
+      });
+
+    return () => { cancelled = true; };
   }, []);
 
   // Focus y scroll lock
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => { document.body.style.overflow = 'unset'; };
+    if (!isOpen) return;
+
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 100);
+    const releaseScroll = lockPageScroll();
+    return () => {
+      window.clearTimeout(focusTimer);
+      releaseScroll();
+    };
   }, [isOpen]);
 
-  // Búsqueda con debounce via WordPress
+  // Búsqueda con debounce sobre la misma biblioteca que usa la página principal.
   useEffect(() => {
+    let cancelled = false;
     const timer = setTimeout(async () => {
       if (query.trim().length > 1) {
         setLoading(true);
-        const data = await searchMangas(query);
-        setResults(data);
-        setLoading(false);
+        try {
+          const data = await searchMangas(query);
+          if (!cancelled) setResults(data);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
       } else {
         setResults([]);
+        setLoading(false);
       }
     }, 350);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [query]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") handleCloseSearch(); };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [handleCloseSearch]);
 
   const goToManga = (id: number | string) => {
     navigate(`/manga/${id}`);
-    onClose();
+    handleCloseSearch();
   };
 
   const handleAdvancedSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
-    navigate("/catalog", { state: { searchTerm: query } });
-    onClose();
+    navigate("/biblioteca", { state: { searchTerm: query } });
+    handleCloseSearch();
   };
 
   if (!isOpen) return null;
@@ -83,9 +138,18 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className={`absolute inset-0 backdrop-blur-md ${isLight ? 'bg-white/45' : 'bg-black/65'}`} onClick={onClose}></div>
+      <div className={`absolute inset-0 backdrop-blur-md ${isLight ? 'bg-white/45' : 'bg-black/65'}`} onClick={handleCloseSearch}></div>
 
-      <div role="dialog" aria-modal="true" aria-label="Buscador de mangas" data-testid="search-modal-panel" className={`search-modal-panel relative flex h-[min(460px,calc(100dvh-2rem))] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-3xl border shadow-2xl ${isLight ? 'border-zinc-200 bg-white text-zinc-950' : 'border-white/10 bg-black text-white'}`}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 22 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Buscador de mangas"
+        data-testid="search-modal-panel"
+        className={`search-modal-panel relative flex h-[min(460px,calc(100dvh-2rem))] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-3xl border shadow-2xl ${isLight ? 'border-zinc-200 bg-white text-zinc-950' : 'border-white/10 bg-black text-white'}`}
+      >
 
         {/* INPUT */}
         <form onSubmit={handleAdvancedSearch} className="relative flex items-center p-6 flex-shrink-0 z-10">
@@ -101,7 +165,7 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
               placeholder="¿Qué quieres leer hoy?"
               className={`h-12 w-full bg-transparent pl-10 pr-10 text-xl font-[900] italic uppercase tracking-tight focus:outline-none sm:text-2xl ${isLight ? 'text-zinc-950 placeholder:text-zinc-400' : 'text-white placeholder:text-zinc-700'}`}
             />
-            <button type="button" onClick={onClose} aria-label="Cerrar buscador" className={`absolute right-0 top-1/2 -translate-y-1/2 rounded-full border p-1.5 transition-all ${isLight ? 'border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-black' : 'border-white/5 bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}>
+            <button type="button" onClick={handleCloseSearch} aria-label="Cerrar buscador" className={`absolute right-0 top-1/2 -translate-y-1/2 rounded-full border p-1.5 transition-all ${isLight ? 'border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-black' : 'border-white/5 bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}>
               <X size={16} />
             </button>
           </div>
@@ -110,7 +174,7 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
 
         {/* RESULTADOS */}
         <div data-testid="search-modal-results" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pt-0 [scrollbar-gutter:stable]">
-          {loading ? (
+          {loading || (!hasSearchQuery && recentLoading) ? (
             <div className="flex h-full min-h-40 flex-col items-center justify-center text-zinc-500">
               <div className="relative">
                 <div className={`h-10 w-10 rounded-full border-4 ${isLight ? 'border-zinc-200' : 'border-zinc-800'}`}></div>
@@ -128,7 +192,7 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
 
               {displayList.length > 0 ? (
                 <div className="grid auto-rows-min grid-cols-1 gap-3 md:grid-cols-2">
-                  {displayList.map((manga) => (
+                  {displayList.map((manga, index) => (
                     <button
                       key={manga.id}
                       onClick={() => goToManga(manga.id)}
@@ -137,7 +201,14 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                       <div className={`absolute inset-0 bg-gradient-to-r from-[#FF4D88]/0 transition-all duration-500 ${isLight ? 'to-[#FF4D88]/[0.03] group-hover:to-[#FF4D88]/[0.07]' : 'to-[#FF4D88]/5 group-hover:to-[#FF4D88]/10'}`}></div>
 
                       <div className="relative flex-shrink-0 w-[50px] h-[75px] rounded overflow-hidden shadow-lg group-hover:scale-105 transition-all duration-500">
-                        <img src={manga.portada || "https://placehold.co/100x150"} alt={manga.titulo} className="w-full h-full object-cover" />
+                        <img
+                          src={manga.portada || "https://placehold.co/100x150"}
+                          alt={manga.titulo}
+                          className="h-full w-full object-cover"
+                          loading="eager"
+                          decoding="async"
+                          fetchPriority={index < 2 ? "high" : "auto"}
+                        />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                       </div>
 
@@ -181,13 +252,13 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
             className={`group flex w-full items-center justify-center gap-2 rounded-lg border py-3 transition-all duration-300 ${isLight ? 'border-zinc-200 bg-white text-zinc-900 hover:border-zinc-900 hover:bg-zinc-900 hover:text-white' : 'border-white/10 bg-[#111] text-white hover:border-white hover:bg-white hover:text-black'}`}
           >
             <span className="text-xs font-[900] uppercase tracking-[0.15em]">
-              {hasSearchQuery ? "Ver todos los resultados" : "Ver Catálogo Completo"}
+              {hasSearchQuery ? "Ver todos los resultados" : "Ver biblioteca completa"}
             </span>
             <LayoutGrid size={16} className="transition-transform group-hover:scale-110" />
           </button>
         </div>
 
-      </div>
+      </motion.div>
     </div>
   );
 };

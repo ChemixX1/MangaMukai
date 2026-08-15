@@ -93,7 +93,7 @@ export const SavedMangas = () => {
          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
       </div>
 
-      <div className="relative z-10 flex-grow max-w-[1400px] mx-auto w-full px-6 pt-32 pb-20">
+      <div className="desktop-content-shell relative z-10 flex-grow max-w-[1400px] mx-auto w-full px-6 pt-32 pb-20">
         
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 border-b border-white/10 pb-6 gap-4">
@@ -126,10 +126,10 @@ export const SavedMangas = () => {
                 <BookOpen size={64} className="text-zinc-700 mb-6" />
                 <h2 className="text-2xl font-black text-white uppercase italic tracking-tight mb-2">Tu biblioteca está vacía</h2>
                 <p className="text-zinc-500 max-w-md mb-8 text-sm">
-                    Aún no has guardado ningún manga. Explora el catálogo y dale al botón de guardar para leerlos más tarde.
+                    Aún no has guardado ningún manga. Explora la biblioteca y dale al botón de guardar para leerlos más tarde.
                 </p>
-                <Link to="/catalogo" className="px-8 py-3 bg-white text-black font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2">
-                    Explorar Catálogo <ArrowRight size={16} />
+                <Link to="/biblioteca" className="px-8 py-3 bg-white text-black font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2">
+                    Explorar Biblioteca <ArrowRight size={16} />
                 </Link>
             </div>
         ) : (

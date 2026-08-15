@@ -6,11 +6,20 @@ import { ArrowUpRight, Heart, X, Check, ChevronRight, ChevronLeft, Zap, Gamepad2
 import renewalBackdrop from '../../assets/banners/mythical-dragon-beast-anime-style.jpg';
 import premiumBackdrop from '../../assets/banners/anime-style-mythical-dragon-creature.jpg';
 import subscriptionBackdrop from '../../assets/banners/illustration-anime-character-rain.jpg';
-import { CoinMarketModal, SubscriptionModal } from '../modals';
-import { getStoredUser } from '../../services/authService';
+import { AuthModal, CoinMarketModal, SubscriptionModal } from '../modals';
+import {
+  AUTH_CHANGED_EVENT,
+  AUTH_SESSION_EXPIRED_EVENT,
+  getStoredToken,
+  getStoredUser,
+  type MMUser,
+} from '../../services/authService';
 import { useTheme } from '../../hooks/useTheme';
+import { lockPageScroll } from '../../utils/scrollLock';
 
 const PAYPAL_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg";
+let donationSuccessClaimed = false;
+const getAuthenticatedUser = (): MMUser | null => getStoredToken() ? getStoredUser() : null;
 
 const PayPalLogo = ({ className = "h-5 w-auto" }: { className?: string }) => (
   <img
@@ -37,8 +46,8 @@ const slides = [
     title: "NOS RENOVAMOS",
     subtitle: "V 2.0 UPDATE",
     description: "Prepárate para la batalla. Nuevo diseño, rendimiento extremo y una interfaz pensada para verdaderos guerreros del manga.",
-    cta: "Entrar al Catálogo",
-    link: "/catalog",
+    cta: "Entrar a la Biblioteca",
+    link: "/biblioteca",
     action: null,
     color: "#FF4D88"
   },
@@ -111,10 +120,28 @@ export default function News() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCoinModal, setShowCoinModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<MMUser | null>(getAuthenticatedUser);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredToken()));
   const [donationAmount, setDonationAmount] = useState("5.00");
   const [customAmount, setCustomAmount] = useState("");
+  const [donationError, setDonationError] = useState("");
   
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Mantiene las acciones privadas sincronizadas con la sesión actual.
+  useEffect(() => {
+    const updateAuth = () => {
+      setCurrentUser(getAuthenticatedUser());
+      setIsAuthenticated(Boolean(getStoredToken()));
+    };
+    window.addEventListener(AUTH_CHANGED_EVENT, updateAuth);
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, updateAuth);
+    return () => {
+      window.removeEventListener(AUTH_CHANGED_EVENT, updateAuth);
+      window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, updateAuth);
+    };
+  }, []);
 
   // Auto-play slider
   useEffect(() => {
@@ -125,20 +152,35 @@ export default function News() {
   }, []);
 
   useEffect(() => {
+    if (donationSuccessClaimed) return;
+
+    const currentUrl = new URL(window.location.href);
+    if (currentUrl.searchParams.get("donation") !== "success") return;
+
+    donationSuccessClaimed = true;
+    setShowSuccessModal(true);
+    currentUrl.searchParams.delete("donation");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`
+    );
+  }, []);
+
+  useEffect(() => {
     if (!showDonateModal && !showSuccessModal) return;
 
-    const previousOverflow = document.body.style.overflow;
+    const releaseScroll = lockPageScroll();
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setShowDonateModal(false);
       setShowSuccessModal(false);
     };
 
-    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       document.removeEventListener("keydown", handleEscape);
     };
   }, [showDonateModal, showSuccessModal]);
@@ -156,30 +198,45 @@ export default function News() {
 
   const handleDonation = () => {
     try {
+      setDonationError("");
       const returnUrl = `${window.location.origin}/?donation=success`;
       const paypalParams = new URLSearchParams({
         cmd: '_xclick',
         business: '25tumanhuaerick12@gmail.com',
         item_name: 'Donación al Servidor MangaMukai',
-        amount: donationAmount || "1.00",
+        amount: parsedDonationAmount.toFixed(2),
         currency_code: 'USD',
         return: returnUrl,
         cancel_return: window.location.origin,
         rm: '2'
       });
-      window.open(`https://www.paypal.com/cgi-bin/webscr?${paypalParams.toString()}`, '_blank');
-      setTimeout(() => {
-        setShowDonateModal(false);
-        setShowSuccessModal(true);
-      }, 1000);
+
+      const paypalWindow = window.open(`https://www.paypal.com/cgi-bin/webscr?${paypalParams.toString()}`, '_blank');
+      if (!paypalWindow) {
+        setDonationError("No se pudo abrir PayPal. Permite las ventanas emergentes e inténtalo otra vez.");
+        return;
+      }
+
+      try {
+        paypalWindow.opener = null;
+      } catch {
+        // Algunos navegadores aíslan la ventana externa automáticamente.
+      }
+      setShowDonateModal(false);
     } catch (error) {
       console.error(error);
-      alert('Hubo un error. Intenta de nuevo.');
+      setDonationError("Hubo un error al conectar con PayPal. Inténtalo nuevamente.");
     }
   };
 
   const handleAction = (action: string | null, link: string | null) => {
+    if ((action === "coins" || action === "vip") && !isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (action === "donate") {
+      setDonationError("");
       setShowDonateModal(true);
     } else if (action === "coins") {
       setShowCoinModal(true);
@@ -610,6 +667,12 @@ export default function News() {
                       </span>
                     </span>
                   </button>
+
+                  {donationError && (
+                    <p role="alert" className="mt-3 text-center text-[12px] font-semibold leading-relaxed text-red-400">
+                      {donationError}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -620,26 +683,42 @@ export default function News() {
 
       {/* MODAL DE AGRADECIMIENTO */}
       {showSuccessModal && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in zoom-in duration-300">
-          <div className="card-clip relative w-full max-w-sm bg-[#0a0508] border-2 border-[#FF4D88] shadow-[0_0_80px_rgba(255,77,136,0.4)] text-center p-10">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#FF4D88]/20 via-transparent to-transparent"></div>
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-24 h-24 bg-[#FF4D88] -skew-x-12 flex items-center justify-center shadow-[0_0_30px_#FF4D88] mb-8 animate-bounce">
-                <Heart size={48} className="text-white fill-white skew-x-12" />
+        <div className="fixed inset-0 z-[450] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/85 p-3 backdrop-blur-md animate-in fade-in duration-200 sm:p-6">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Cerrar agradecimiento"
+            className="fixed inset-0 cursor-default"
+            onClick={() => setShowSuccessModal(false)}
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="donation-success-title"
+            className="relative z-10 my-auto w-full max-w-[310px] overflow-hidden rounded-[24px] border border-[#FF4D88]/70 bg-[#0a0508] text-center shadow-[0_24px_80px_-28px_rgba(255,77,136,0.65)] sm:max-w-[360px]"
+          >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(255,77,136,0.22),transparent_48%)]" />
+
+              <div className="relative z-10 flex flex-col items-center px-5 py-6 sm:px-8 sm:py-8">
+                <div className="relative mb-5 grid h-16 w-16 place-items-center rounded-[22px] border border-white/15 bg-gradient-to-br from-[#ff7aa7] via-[#FF4D88] to-[#d92562] shadow-[0_12px_32px_-10px_rgba(255,77,136,0.9)] sm:h-20 sm:w-20 sm:rounded-[26px]">
+                  <span className="absolute inset-1 rounded-[18px] bg-white/10 sm:rounded-[22px]" />
+                  <Heart aria-hidden="true" className="relative z-10 h-8 w-8 fill-white text-white sm:h-10 sm:w-10" strokeWidth={2.4} />
+                </div>
+
+                <h2 id="donation-success-title" className="text-[24px] font-black uppercase italic leading-[0.95] tracking-tighter text-white sm:text-[28px]">
+                  ¡Gracias por tu <span className="text-[#FF4D88]">apoyo!</span>
+                </h2>
+
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setShowSuccessModal(false)}
+                  className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-5 py-3 text-[13px] font-black uppercase italic tracking-[0.16em] text-black shadow-[0_10px_28px_-14px_rgba(255,255,255,0.7)] transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4D88] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0508] active:bg-zinc-300"
+                >
+                  <Check size={18} strokeWidth={3} aria-hidden="true" /> Finalizar
+                </button>
               </div>
-              <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-4 glitch-text" data-text="¡OPERACIÓN EXITOSA!">
-                ¡OPERACIÓN <span className="text-[#FF4D88]">EXITOSA!</span>
-              </h2>
-              <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest leading-relaxed mb-8">
-                Tu contribución ha sido procesada. El gremio te lo agradece profundamente.
-              </p>
-              <button
-                onClick={() => setShowSuccessModal(false)}
-                className="w-full py-4 bg-white hover:bg-zinc-200 text-black font-black uppercase italic tracking-[0.2em] text-sm btn-clip transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center justify-center gap-2 hover:scale-105"
-              >
-                <Check size={20} strokeWidth={3} /> FINALIZAR
-              </button>
-            </div>
           </div>
         </div>,
         document.body
@@ -648,12 +727,17 @@ export default function News() {
       <CoinMarketModal
         isOpen={showCoinModal}
         onClose={() => setShowCoinModal(false)}
-        username={getStoredUser()?.username || ''}
-        userId={String(getStoredUser()?.id || '')}
+        username={currentUser?.username || ''}
+        userId={String(currentUser?.id || '')}
       />
       <SubscriptionModal
         isOpen={showSubscriptionModal}
         onClose={() => setShowSubscriptionModal(false)}
+      />
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialView="login"
       />
     </section>
   );

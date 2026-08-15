@@ -7,8 +7,11 @@ import {
   getLatestMenUpdates,
   getNewReleases,
 } from '../services/mangaService';
+import { preloadImages } from '../utils/preloadImages';
 
 interface HomeData {
+  popularWeekly: MangaCapitulo[];
+  popularMenWeekly: MangaCapitulo[];
   popularHistorical: MangaCapitulo[];
   popularMenHistorical: MangaCapitulo[];
   latestWomen: MangaCapitulo[];
@@ -20,6 +23,7 @@ interface HomeData {
 type HomeDataPayload = Omit<HomeData, 'isReady'>;
 
 const HOME_LOADING_EVENT = 'mangamukai:home-loading';
+const HOME_REQUEST_COUNT = 7;
 
 let cachedHomeData: HomeDataPayload | null = null;
 let pendingHomeData: Promise<HomeDataPayload> | null = null;
@@ -30,27 +34,10 @@ const emitLoadingProgress = (progress: number, complete = false) => {
   }));
 };
 
-const preloadImage = (source: string): Promise<void> => new Promise((resolve) => {
-  if (!source) {
-    resolve();
-    return;
-  }
-
-  const image = new Image();
-  const timeout = window.setTimeout(resolve, 2500);
-  const finish = () => {
-    window.clearTimeout(timeout);
-    resolve();
-  };
-
-  image.onload = finish;
-  image.onerror = finish;
-  image.src = source;
-  if (image.complete) finish();
-});
-
 const preloadCriticalImages = async (payload: HomeDataPayload) => {
   const sources = [
+    ...payload.popularWeekly,
+    ...payload.popularMenWeekly,
     ...payload.popularHistorical.slice(0, 3),
     ...payload.popularMenHistorical.slice(0, 2),
     ...payload.latestWomen.slice(0, 2),
@@ -58,7 +45,7 @@ const preloadCriticalImages = async (payload: HomeDataPayload) => {
     ...payload.newReleases.slice(0, 1),
   ].map(manga => manga.portada).filter(Boolean);
 
-  await Promise.allSettled([...new Set(sources)].map(preloadImage));
+  await preloadImages(sources);
 };
 
 const loadHomeData = (): Promise<HomeDataPayload> => {
@@ -71,17 +58,21 @@ const loadHomeData = (): Promise<HomeDataPayload> => {
       return await request;
     } finally {
       completedRequests += 1;
-      emitLoadingProgress(completedRequests * 17);
+      emitLoadingProgress(8 + Math.round((completedRequests / HOME_REQUEST_COUNT) * 80));
     }
   };
 
   pendingHomeData = Promise.all([
+    track(getPopularWomenByViews('weekly', false)),
+    track(getPopularMenByViews('weekly', false)),
     track(getPopularWomenByViews('historical', false)),
     track(getPopularMenByViews('historical', false)),
     track(getLatestWomenUpdates(72)),
     track(getLatestMenUpdates(72)),
     track(getNewReleases()),
   ]).then(([
+    popularWomenWeekly,
+    popularMenWeekly,
     popularWomen,
     popularMen,
     latestWomen,
@@ -89,6 +80,8 @@ const loadHomeData = (): Promise<HomeDataPayload> => {
     newReleases,
   ]) => {
     cachedHomeData = {
+      popularWeekly: popularWomenWeekly.slice(0, 12),
+      popularMenWeekly: popularMenWeekly.slice(0, 12),
       popularHistorical: popularWomen.slice(0, 12),
       popularMenHistorical: popularMen.slice(0, 12),
       latestWomen: latestWomen.slice(0, 72),
@@ -104,6 +97,8 @@ const loadHomeData = (): Promise<HomeDataPayload> => {
 };
 
 const HomeDataContext = createContext<HomeData>({
+  popularWeekly: [],
+  popularMenWeekly: [],
   popularHistorical: [],
   popularMenHistorical: [],
   latestWomen: [],
@@ -116,6 +111,8 @@ export const useHomeData = () => useContext(HomeDataContext);
 
 export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
   const [data, setData] = useState<HomeData>({
+    popularWeekly: [],
+    popularMenWeekly: [],
     popularHistorical: [],
     popularMenHistorical: [],
     latestWomen: [],

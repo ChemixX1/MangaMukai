@@ -8,7 +8,7 @@ const FilterStripTactical = () => {
 
   const handleFilterClick = (category: string) => {
     setActiveFilter(category);
-    navigate('/catalog', category === 'Todos' ? undefined : { state: { filterCategory: category } });
+    navigate('/biblioteca', category === 'Todos' ? undefined : { state: { filterCategory: category } });
   };
 
   return (

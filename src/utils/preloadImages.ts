@@ -9,7 +9,7 @@ const preloadImage = (source: string): Promise<void> => {
   const request = new Promise<void>((resolve) => {
     const image = new Image();
     let finished = false;
-    const timeout = window.setTimeout(() => finish(), 1800);
+    let timeout = 0;
     const finish = () => {
       if (finished) return;
       finished = true;
@@ -17,11 +17,25 @@ const preloadImage = (source: string): Promise<void> => {
       resolve();
     };
 
+    const decodeAndFinish = async () => {
+      if (finished) return;
+      try {
+        await image.decode();
+      } catch {
+        // onload ya confirma que el recurso llegó; decode puede no estar disponible.
+      }
+      finish();
+    };
+
     image.decoding = "async";
-    image.onload = finish;
+    image.onload = () => { void decodeAndFinish(); };
     image.onerror = finish;
+    timeout = window.setTimeout(finish, 3500);
     image.src = source;
-    if (image.complete) finish();
+    if (image.complete) {
+      if (image.naturalWidth > 0) void decodeAndFinish();
+      else finish();
+    }
   });
 
   imageRequests.set(source, request);

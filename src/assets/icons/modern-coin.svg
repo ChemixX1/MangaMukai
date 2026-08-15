@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Moneda MangaMukai">
+  <defs>
+    <linearGradient id="coin-edge" x1="8" y1="18" x2="55" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#15151B"/>
+      <stop offset="0.34" stop-color="#3B1827"/>
+      <stop offset="0.62" stop-color="#08080B"/>
+      <stop offset="0.82" stop-color="#6F193A"/>
+      <stop offset="1" stop-color="#111116"/>
+    </linearGradient>
+    <radialGradient id="coin-face" cx="0" cy="0" r="1" gradientTransform="translate(23 19) rotate(48) scale(38)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD5E4"/>
+      <stop offset="0.32" stop-color="#FF8DB5"/>
+      <stop offset="0.7" stop-color="#FF4D88"/>
+      <stop offset="0.82" stop-color="#E52F70"/>
+      <stop offset="1" stop-color="#8E153F"/>
+    </radialGradient>
+    <linearGradient id="coin-ring" x1="17" y1="14" x2="47" y2="47" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF4F8"/>
+      <stop offset="0.42" stop-color="#FF9DBE"/>
+      <stop offset="0.72" stop-color="#D52A65"/>
+      <stop offset="1" stop-color="#141419"/>
+    </linearGradient>
+    <filter id="coin-shadow" x="3" y="4" width="58" height="58" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4.5" stdDeviation="3.2" flood-color="#050507" flood-opacity="0.62"/>
+    </filter>
+  </defs>
+  <ellipse cx="33" cy="56" rx="25" ry="4" fill="#050507" opacity="0.48"/>
+  <g filter="url(#coin-shadow)">
+    <g transform="rotate(6 35 45)">
+      <path d="M11 45c0 4.4 10.7 8 24 8s24-3.6 24-8v5.8c0 4.4-10.7 8-24 8s-24-3.6-24-8V45Z" fill="url(#coin-edge)" stroke="#050507" stroke-width="1.1"/>
+      <path d="M13 49.2c3.8 3 12 5 22 5s18.2-2 22-5v2.4c-4.2 3.1-12.4 5.1-22 5.1s-17.8-2-22-5.1v-2.4Z" fill="#FF4D88" opacity="0.36"/>
+      <ellipse cx="35" cy="45" rx="24" ry="8.6" fill="url(#coin-face)" stroke="#0A0A0E" stroke-width="1.25"/>
+      <ellipse cx="35" cy="45" rx="19.6" ry="5.8" fill="none" stroke="url(#coin-ring)" stroke-width="1.7"/>
+      <path d="M16 42.8c5-3.7 14.7-5.6 24.2-4.6" fill="none" stroke="#FFF" stroke-width="1.7" stroke-linecap="round" opacity="0.25"/>
+    </g>
+    <g transform="rotate(-7 28 34)">
+      <path d="M4 34c0 4.4 10.7 8 24 8s24-3.6 24-8v5.8c0 4.4-10.7 8-24 8s-24-3.6-24-8V34Z" fill="url(#coin-edge)" stroke="#050507" stroke-width="1.1"/>
+      <path d="M6 38.2c3.8 3 12 5 22 5s18.2-2 22-5v2.4c-4.2 3.1-12.4 5.1-22 5.1s-17.8-2-22-5.1v-2.4Z" fill="#FF4D88" opacity="0.34"/>
+      <ellipse cx="28" cy="34" rx="24" ry="8.6" fill="url(#coin-face)" stroke="#0A0A0E" stroke-width="1.25"/>
+      <ellipse cx="28" cy="34" rx="19.6" ry="5.8" fill="none" stroke="url(#coin-ring)" stroke-width="1.7"/>
+      <ellipse cx="19" cy="30.8" rx="7.5" ry="1.7" fill="#FFF" opacity="0.31"/>
+    </g>
+    <g transform="rotate(8 36 22)">
+      <path d="M12 22c0 4.4 10.7 8 24 8s24-3.6 24-8v5.8c0 4.4-10.7 8-24 8s-24-3.6-24-8V22Z" fill="url(#coin-edge)" stroke="#050507" stroke-width="1.1"/>
+      <path d="M14 26.2c3.8 3 12 5 22 5s18.2-2 22-5v2.4c-4.2 3.1-12.4 5.1-22 5.1s-17.8-2-22-5.1v-2.4Z" fill="#FF4D88" opacity="0.35"/>
+      <ellipse cx="36" cy="22" rx="24" ry="8.6" fill="url(#coin-face)" stroke="#08080B" stroke-width="1.3"/>
+      <ellipse cx="36" cy="22" rx="19.6" ry="5.8" fill="none" stroke="url(#coin-ring)" stroke-width="1.8"/>
+      <path d="M26.5 26.5v-9.3H30l6 5 6-5h3.5v9.3h-3.8v-4.6L36 26.4l-5.7-4.5v4.6h-3.8Z" fill="#FFF8FB"/>
+      <ellipse cx="27" cy="18.3" rx="7.5" ry="1.7" fill="#FFF" opacity="0.42"/>
+      <path d="m53.5 13 .7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" fill="#FFF" opacity="0.94"/>
+    </g>
+  </g>
+</svg>

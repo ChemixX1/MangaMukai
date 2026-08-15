@@ -1,5 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#09090b"/>
-  <path d="M13 46V18h9l10 14 10-14h9v28h-9V32L32 45 22 32v14z" fill="#fff"/>
-  <path d="M42 18h9v28h-9z" fill="#ff4d88"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 410 404" role="img" aria-label="Vite">
+  <path fill="url(#vite-a)" d="M399.641 59.524 215.643 388.545c-3.798 6.792-13.559 6.832-17.414.072L10.582 59.556c-4.201-7.366 2.098-16.29 10.446-14.797l184.195 32.923a10 10 0 0 0 3.542-.006l180.354-32.87c8.319-1.517 14.653 7.353 10.522 14.718Z"/>
+  <path fill="url(#vite-b)" d="M292.965 1.574 156.801 28.255a5 5 0 0 0-4.031 4.613l-8.375 141.452c-.197 3.333 2.865 5.915 6.115 5.164l37.901-8.759c3.547-.82 6.755 2.305 6.026 5.874l-11.261 55.111c-.758 3.708 2.725 6.88 6.341 5.766l23.41-7.21c3.621-1.115 7.107 2.064 6.342 5.776l-17.896 86.725c-1.12 5.425 6.098 8.384 9.108 3.728l2.01-3.109 110.895-221.057c1.858-3.705-1.347-7.93-5.412-7.145l-39.018 7.537c-3.667.708-6.786-2.709-5.751-6.299l25.466-88.393c1.036-3.597-2.04-7.174-5.706-6.455Z"/>
+  <defs>
+    <linearGradient id="vite-a" x1="6" x2="235" y1="33" y2="344" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#41D1FF"/>
+      <stop offset="1" stop-color="#BD34FE"/>
+    </linearGradient>
+    <linearGradient id="vite-b" x1="194.651" x2="236.076" y1="8.818" y2="292.989" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFEA83"/>
+      <stop offset=".083" stop-color="#FFDD35"/>
+      <stop offset="1" stop-color="#FFA800"/>
+    </linearGradient>
+  </defs>
 </svg>

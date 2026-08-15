@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react";
 import { Play, Loader2, Bookmark, Eye, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +34,71 @@ const formatViews = (n: number) => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+};
+
+const heroTagClassName = "home-hero-tag home-theme-panel shrink-0 whitespace-nowrap rounded-sm border border-neutral-600 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white";
+
+const FittingHeroTagRow = ({ tags }: { tags: string[] }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(tags.length);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const measureRow = measureRef.current;
+    if (!container || !measureRow) return;
+
+    let animationFrame = 0;
+    const updateVisibleTags = () => {
+      const availableWidth = container.clientWidth;
+      const gap = Number.parseFloat(window.getComputedStyle(measureRow).columnGap) || 0;
+      let occupiedWidth = 0;
+      let nextVisibleCount = 0;
+
+      for (const chip of Array.from(measureRow.children)) {
+        const chipWidth = (chip as HTMLElement).getBoundingClientRect().width;
+        const nextWidth = occupiedWidth + (nextVisibleCount > 0 ? gap : 0) + chipWidth;
+
+        if (nextWidth > availableWidth + 0.5) break;
+
+        occupiedWidth = nextWidth;
+        nextVisibleCount += 1;
+      }
+
+      setVisibleCount(nextVisibleCount);
+    };
+
+    const scheduleMeasurement = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(updateVisibleTags);
+    };
+
+    const resizeObserver = new ResizeObserver(scheduleMeasurement);
+    resizeObserver.observe(container);
+    updateVisibleTags();
+    void document.fonts?.ready.then(scheduleMeasurement);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [tags]);
+
+  return (
+    <div ref={containerRef} className="relative w-full overflow-hidden">
+      <div className="flex w-full flex-nowrap items-center justify-center gap-1.5 lg:justify-start">
+        {tags.slice(0, visibleCount).map((tag, index) => (
+          <span key={`${tag}-${index}`} className={heroTagClassName}>{tag}</span>
+        ))}
+      </div>
+
+      <div ref={measureRef} aria-hidden="true" className="pointer-events-none invisible absolute left-0 top-0 flex w-max flex-nowrap items-center gap-1.5">
+        {tags.map((tag, index) => (
+          <span key={`${tag}-${index}`} className={heroTagClassName}>{tag}</span>
+        ))}
+      </div>
+    </div>
+  );
 };
 
  
@@ -162,7 +227,7 @@ export default function Hero() {
         </AnimatePresence>
       </div>
 
-      <div className="home-hero-layout relative z-10 mx-auto flex h-full w-full flex-col items-center justify-start gap-0 pt-20 lg:flex-row lg:justify-between lg:gap-8 lg:pt-0">
+      <div className="home-hero-layout desktop-content-shell relative z-10 mx-auto flex h-full w-full flex-col items-center justify-start gap-0 pt-20 lg:flex-row lg:justify-between lg:gap-8 lg:pt-0">
 
         {/* INFO IZQUIERDA (SKELETON O REAL) */}
         <div className="home-hero-info relative z-30 order-2 -mt-5 flex w-full flex-col items-center justify-start space-y-5 pt-0 lg:order-1 lg:mt-0 lg:w-[45%] lg:items-start lg:justify-center lg:pt-[72px]">
@@ -213,12 +278,8 @@ export default function Hero() {
 
               <AnimatePresence mode="wait">
                 <motion.div key={activeItem?.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.1 }} className="space-y-6 w-full flex flex-col items-center lg:items-start">
-                  <div className="mx-auto flex w-fit max-w-full flex-nowrap justify-start gap-1.5 overflow-hidden px-4 lg:mx-0 lg:px-0">
-                    {activeItem?.tags.map((tag, i) => (
-                      <span key={i} className="home-hero-tag home-theme-panel shrink-0 whitespace-nowrap rounded-sm border border-neutral-600 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                        {tag}
-                      </span>
-                    ))}
+                  <div className="w-full px-4 lg:px-0">
+                    <FittingHeroTagRow tags={activeItem?.tags || []} />
                   </div>
                   <div className="!mt-8 flex flex-wrap justify-center gap-4 lg:justify-start">
                     <button onClick={() => activeItem && navigate(`/manga/${activeItem.id}`)} className="flex h-[45px] -skew-x-[20deg] items-center border-2 border-[#FF4D88] bg-[#FF4D88] px-4 transition-all hover:border-[#e63f78] hover:bg-[#e63f78] active:scale-95">

@@ -53,10 +53,11 @@ const mergePopularItems = (...groups: CarouselManga[][]): CarouselManga[] => {
 };
 
 export const YouthCarousel = () => {
-  const { latestMen, popularMenHistorical, isReady } = useHomeData();
+  const { latestMen, popularMenWeekly, popularMenHistorical, isReady } = useHomeData();
   const [items, setItems] = useState<CarouselManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
+  const [isTouchPaused, setIsTouchPaused] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState("Semanal");
 
@@ -81,7 +82,6 @@ export const YouthCarousel = () => {
     if (!isReady) return;
     void (async () => {
       const warmedPeriods = await Promise.all([
-        getPopularMenByViews('weekly', false),
         getPopularMenByViews('monthly', false),
       ]);
       await preloadImages(warmedPeriods.flat().slice(0, 24).map(manga => manga.portada));
@@ -92,19 +92,19 @@ export const YouthCarousel = () => {
     if (!isReady) return;
     let cancelled = false;
 
-    if (activeFilter === "Histórico" && popularMenHistorical.length > 0) {
-      setItems(formatItems(popularMenHistorical));
-      setLoading(false);
-      setFilterLoading(false);
-      return () => { cancelled = true; };
-    }
-
     const fetchMangas = async () => {
       try {
         if (items.length === 0) setLoading(true);
         else setFilterLoading(true);
         const period = activeFilter === 'Semanal' ? 'weekly' : activeFilter === 'Mensual' ? 'monthly' : 'historical';
-        const mangasWP = await getPopularMenByViews(period, false);
+        const contextualMangas = activeFilter === 'Semanal'
+          ? popularMenWeekly
+          : activeFilter === 'Histórico'
+            ? popularMenHistorical
+            : [];
+        const mangasWP = contextualMangas.length > 0
+          ? contextualMangas
+          : await getPopularMenByViews(period, false);
         let nextItems = mergePopularItems(
           formatItems(mangasWP),
           formatItems(popularMenHistorical),
@@ -112,9 +112,9 @@ export const YouthCarousel = () => {
         );
 
         if (nextItems.length === 0) {
-          const catalog = await getUltimosCapitulos();
-          const menCatalog = catalog.filter(manga => manga.genero === 'Hombre');
-          nextItems = formatItems(menCatalog.length > 0 ? menCatalog : catalog);
+          const library = await getUltimosCapitulos();
+          const menLibrary = library.filter(manga => manga.genero === 'Hombre');
+          nextItems = formatItems(menLibrary.length > 0 ? menLibrary : library);
         }
 
         if (nextItems.length > 0) {
@@ -138,7 +138,7 @@ export const YouthCarousel = () => {
     void fetchMangas();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFilter, isReady, popularMenHistorical.length, latestMen.length]);
+  }, [activeFilter, isReady, popularMenWeekly.length, popularMenHistorical.length, latestMen.length]);
 
   const showSkeleton = loading && items.length === 0;
   const marqueeItems = items.length === 0
@@ -171,7 +171,7 @@ export const YouthCarousel = () => {
         }
       `}</style>
 
-      <div className="w-full max-w-[1600px] mx-auto relative z-20 px-6 lg:px-12">
+      <div className="desktop-content-shell w-full max-w-[1600px] mx-auto relative z-20 px-6 lg:px-12">
         
         {/* CABECERA */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-4 gap-6">
@@ -205,31 +205,15 @@ export const YouthCarousel = () => {
 
         {/* SLIDER */}
         <div className="relative min-h-[300px]"> 
-            {showSkeleton && (
-              <div className="overflow-hidden py-4 -mx-2" aria-hidden="true">
-                <div className="flex">
-                  {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="home-popular-marquee-card animate-pulse">
-                      <div className="home-theme-surface flex flex-col overflow-hidden rounded-xl bg-[#0f1115] ring-1 ring-white/5">
-                        <div className="aspect-[3/4.2] w-full bg-white/5" />
-                        <div className="flex h-[2.6rem] items-center justify-center px-3 py-2 md:h-[3rem]">
-                          <div className="h-3 w-3/4 rounded bg-white/10" />
-                        </div>
-                        <div className="flex items-center justify-between gap-2 border-t border-white/5 bg-[#1a1a1a] px-2 py-2.5 md:px-3">
-                          <div className="h-2 w-1/4 rounded bg-white/10" />
-                          <div className="h-2 w-1/4 rounded bg-white/10" />
-                          <div className="h-2 w-1/4 rounded bg-white/10" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {!showSkeleton && (
-            <div className="overflow-hidden py-4 -mx-2" aria-label="Mangas populares juveniles en movimiento continuo"> 
-                    <div className="home-popular-marquee-track">
+            <div
+              className="-mx-2 touch-pan-y overflow-hidden py-4"
+              aria-label="Mangas populares juveniles en movimiento continuo"
+              onTouchStart={() => setIsTouchPaused(true)}
+              onTouchEnd={() => setIsTouchPaused(false)}
+              onTouchCancel={() => setIsTouchPaused(false)}
+            >
+                    <div className="home-popular-marquee-track" style={isTouchPaused ? { animationPlayState: 'paused' } : undefined}>
                         {items.length > 0 ? (
                           [0, 1].map((copyIndex) => (
                             <div

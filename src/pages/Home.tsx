@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'; 
-import { Moon, Sun } from 'lucide-react';
 
 // --- SERVICIOS Y TIPOS (CONEXIÓN HOSTINGER) ---
 // (Ya no necesitamos importar el servicio aquí, porque Latest se encarga solo)
@@ -22,12 +21,12 @@ import { useTheme } from '../hooks/useTheme';
 
 function HomeContent() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const { isReady } = useHomeData();
 
   // Manejador del FilterStrip
   const handleCategoryClick = (category: string) => {
-    navigate('/catalog#tactical-filters', { 
+    navigate('/biblioteca#filtros', {
       state: { filterCategory: category }
     });
   };
@@ -89,26 +88,12 @@ function HomeContent() {
             {/* --- FIN BLOQUE JUVENIL --- */}
 
             {/* Bloque Final: Nuevos Lanzamientos */}
-            <section className="home-block home-block-releases"><NewReleases /></section>
+            <section className="home-block home-block-releases -mt-4 sm:mt-0"><NewReleases /></section>
         </div>
         </div>
 
         <Footer />
       </div>
-
-      <button
-        type="button"
-        onClick={toggleTheme}
-        aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
-        title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
-        className={`fixed bottom-4 right-4 z-[90] grid h-9 w-9 place-items-center rounded-full border opacity-40 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#38BDF8] md:bottom-6 md:right-6 ${
-          theme === 'light'
-            ? 'border-zinc-300/70 bg-white/65 text-zinc-600 hover:text-zinc-950'
-            : 'border-white/10 bg-black/35 text-white/55 hover:border-white/25 hover:text-white'
-        }`}
-      >
-        {theme === 'light' ? <Moon size={16} strokeWidth={2} /> : <Sun size={16} strokeWidth={2} />}
-      </button>
     </div>
   );
 }

@@ -66,7 +66,7 @@ const FilterStrip = ({ activeCategory, onCategoryChange, id, className = '', bea
             <div className="beam scan-bottom"></div>
         </div>
 
-        <div className="container mx-auto max-w-full">
+        <div className="desktop-content-shell container mx-auto max-w-full">
           
           {/* CAMBIO REALIZADO AQUÍ:
               - Móvil (default): 'flex overflow-x-auto no-scrollbar' -> Crea una fila con scroll horizontal sin barra visible.

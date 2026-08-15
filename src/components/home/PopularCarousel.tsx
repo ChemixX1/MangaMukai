@@ -43,7 +43,7 @@ const formatPopularItems = (mangasWP: any[]): CarouselManga[] =>
     .slice(0, 12)
     .map(manga => {
       // capitulosRecientes[0] = capítulo más popular (desde /popular-women)
-      // o primer capítulo (desde catalog fallback)
+      // o primer capítulo (desde el respaldo de biblioteca)
       const popularChapter = manga.capitulosRecientes?.[0];
       const rawDate = popularChapter?.fecha || manga.rawFecha || manga.fecha;
       return {
@@ -73,10 +73,11 @@ const mergePopularItems = (...groups: CarouselManga[][]): CarouselManga[] => {
 };
 
 export const PopularCarousel = () => {
-  const { popularHistorical, latestWomen, isReady } = useHomeData();
+  const { popularWeekly, popularHistorical, latestWomen, isReady } = useHomeData();
   const [items, setItems] = useState<CarouselManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
+  const [isTouchPaused, setIsTouchPaused] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState("Semanal");
 
@@ -86,7 +87,6 @@ export const PopularCarousel = () => {
     if (!isReady) return;
     void (async () => {
       const warmedPeriods = await Promise.all([
-        getPopularWomenByViews('weekly', false),
         getPopularWomenByViews('monthly', false),
       ]);
       await preloadImages(warmedPeriods.flat().slice(0, 24).map(manga => manga.portada));
@@ -97,14 +97,6 @@ export const PopularCarousel = () => {
     if (!isReady) return;
     let cancelled = false;
 
-    // Carga inicial con datos del contexto (sin skeleton)
-    if (activeFilter === "Histórico" && popularHistorical.length > 0) {
-      setItems(formatPopularItems(popularHistorical));
-      setLoading(false);
-      setFilterLoading(false);
-      return () => { cancelled = true; };
-    }
-
     const fetchPopularMangas = async () => {
       try {
         if (items.length > 0) {
@@ -113,7 +105,14 @@ export const PopularCarousel = () => {
           setLoading(true);
         }
         const period = activeFilter === 'Semanal' ? 'weekly' : activeFilter === 'Mensual' ? 'monthly' : 'historical';
-        const mangasWP = await getPopularWomenByViews(period, false);
+        const contextualMangas = activeFilter === 'Semanal'
+          ? popularWeekly
+          : activeFilter === 'Histórico'
+            ? popularHistorical
+            : [];
+        const mangasWP = contextualMangas.length > 0
+          ? contextualMangas
+          : await getPopularWomenByViews(period, false);
         let nextItems = mergePopularItems(
           formatPopularItems(mangasWP),
           formatPopularItems(popularHistorical),
@@ -145,13 +144,10 @@ export const PopularCarousel = () => {
     void fetchPopularMangas();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFilter, isReady, popularHistorical.length, latestWomen.length]);
+  }, [activeFilter, isReady, popularWeekly.length, popularHistorical.length, latestWomen.length]);
 
-  // Carga inicial (cubierta por GlobalLoader) → invisible
+  // La carga inicial queda cubierta por GlobalLoader y no dibuja moldes vacíos.
   const showSkeleton = loading && items.length === 0;
-
-  // Número de skeleton cards a mostrar al cambiar filtro
-  const skeletonCount = 6;
   const marqueeItems = items.length === 0
     ? []
     : Array.from({ length: Math.max(12, items.length) }, (_, index) => items[index % items.length]);
@@ -182,7 +178,7 @@ export const PopularCarousel = () => {
         }
       `}</style>
 
-      <div className="w-full max-w-[1600px] mx-auto relative z-20 px-6 lg:px-12">
+      <div className="desktop-content-shell w-full max-w-[1600px] mx-auto relative z-20 px-6 lg:px-12">
         
         {/* CABECERA */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-4 gap-6">
@@ -216,35 +212,15 @@ export const PopularCarousel = () => {
 
         {/* SLIDER */}
         <div className="relative min-h-[300px]">
-            {/* Skeleton al cambiar filtro — mantiene el alto */}
-            {showSkeleton && (
-              <div className="overflow-x-hidden py-4 -mx-2">
-                <div className="flex">
-                  {Array.from({ length: skeletonCount }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="home-popular-marquee-card animate-pulse"
-                    >
-                      <div className="home-theme-surface flex flex-col rounded-xl overflow-hidden bg-[#0f1115] ring-1 ring-white/5">
-                        <div className="aspect-[3/4.2] w-full bg-white/5" />
-                        <div className="px-3 py-2 h-[2.6rem] md:h-[3rem] flex items-center justify-center">
-                          <div className="h-3 w-3/4 rounded bg-white/10" />
-                        </div>
-                        <div className="flex items-center justify-between px-2 md:px-3 py-2.5 bg-[#1a1a1a] border-t border-white/5 gap-2">
-                          <div className="h-2 w-1/4 rounded bg-white/10" />
-                          <div className="h-2 w-1/4 rounded bg-white/10" />
-                          <div className="h-2 w-1/4 rounded bg-white/10" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {!showSkeleton && (
-            <div className="overflow-hidden py-4 -mx-2" aria-label="Mangas populares en movimiento continuo">
-                    <div className="home-popular-marquee-track">
+            <div
+              className="-mx-2 touch-pan-y overflow-hidden py-4"
+              aria-label="Mangas populares en movimiento continuo"
+              onTouchStart={() => setIsTouchPaused(true)}
+              onTouchEnd={() => setIsTouchPaused(false)}
+              onTouchCancel={() => setIsTouchPaused(false)}
+            >
+                    <div className="home-popular-marquee-track" style={isTouchPaused ? { animationPlayState: 'paused' } : undefined}>
                         {items.length > 0 ? (
                           [0, 1].map((copyIndex) => (
                             <div

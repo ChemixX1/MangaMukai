@@ -7,10 +7,26 @@ import loginBg from "../../assets/modals/auth-login.webp";
 import registerBg from "../../assets/modals/auth-register.webp";
 import { MANGAMUKAI_API, wordpressUrl } from "../../config/api";
 import { useTheme } from "../../hooks/useTheme";
+import { lockPageScroll } from "../../utils/scrollLock";
 
 const AUTH_ASSETS = {
   inicio: loginBg,
   registro: registerBg
+};
+
+let authAssetsPreloaded = false;
+
+const preloadAuthAssets = () => {
+  if (authAssetsPreloaded || typeof Image === 'undefined') return;
+  authAssetsPreloaded = true;
+
+  Object.values(AUTH_ASSETS).forEach((source, index) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.fetchPriority = index === 0 ? 'high' : 'low';
+    image.src = source;
+    void image.decode().catch(() => undefined);
+  });
 };
 
 const WP_AUTH_BASE = MANGAMUKAI_API;
@@ -41,8 +57,8 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
   };
 
   useEffect(() => {
-    document.body.style.overflow = isModalOpen ? "hidden" : "unset";
-    return () => { document.body.style.overflow = "unset"; };
+    if (!isModalOpen) return;
+    return lockPageScroll();
   }, [isModalOpen]);
 
   useEffect(() => {
@@ -54,15 +70,7 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
   }, [isOpen, initialView, isModalOpen]);
 
   useEffect(() => {
-    const preloadTimer = window.setTimeout(() => {
-      Object.values(AUTH_ASSETS).forEach((source) => {
-        const image = new Image();
-        image.decoding = 'async';
-        image.src = source;
-      });
-    }, 400);
-
-    return () => window.clearTimeout(preloadTimer);
+    preloadAuthAssets();
   }, []);
 
   // ─── Interceptar URL y Clics del Menú ──────────────────────────────────
@@ -173,30 +181,40 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
       >
         <div className="pointer-events-none absolute inset-0 overflow-hidden md:hidden" aria-hidden="true">
           <AnimatePresence mode="wait">
-            <motion.div
+            <motion.img
               key={isLoginView ? 'mobile-login-art' : 'mobile-register-art'}
+              src={isLoginView ? AUTH_ASSETS.inicio : AUTH_ASSETS.registro}
+              alt=""
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              draggable={false}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.35 }}
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${isLoginView ? AUTH_ASSETS.inicio : AUTH_ASSETS.registro})` }}
+              className="absolute inset-0 h-full w-full object-cover object-center"
             />
           </AnimatePresence>
           <div className={`absolute inset-0 ${isLightMode ? 'bg-white/80' : 'bg-[#08080b]/75'}`} />
         </div>
 
         {/* --- PANEL IZQUIERDO --- */}
-        <div className="relative hidden min-h-[600px] flex-col justify-end bg-black p-10 md:flex md:w-5/12">
+        <div className="relative hidden min-h-[600px] flex-col justify-end overflow-hidden bg-black p-10 md:flex md:w-5/12">
           <AnimatePresence mode="wait">
-            <motion.div
+            <motion.img
               key={isLoginView ? 'img-login' : 'img-reg'}
+              src={isLoginView ? AUTH_ASSETS.inicio : AUTH_ASSETS.registro}
+              alt=""
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              draggable={false}
               initial={{ opacity: 0, scale: 1.1 }}
               animate={{ opacity: 0.46, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.6 }}
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${isLoginView ? AUTH_ASSETS.inicio : AUTH_ASSETS.registro})` }}
+              className="absolute inset-0 h-full w-full object-cover object-center"
             />
           </AnimatePresence>
           <div className="relative z-10">
@@ -336,7 +354,7 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
               <button
                 type="submit"
                 disabled={loading}
-                className={`mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#FF4D88] py-4 text-[11px] font-[1000] uppercase tracking-[0.25em] text-white shadow-lg shadow-[#FF4D88]/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${isLightMode ? 'hover:bg-black' : 'hover:bg-white hover:text-black'}`}
+                className={`noto-sans-myanmar-auth mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#FF4D88] py-[1.05rem] text-[12px] uppercase tracking-normal text-white shadow-lg shadow-[#FF4D88]/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:text-[13px] ${isLightMode ? 'hover:bg-black' : 'hover:bg-white hover:text-black'}`}
               >
                 {loading ? (
                   <Loader2 size={18} className="animate-spin" />
@@ -354,9 +372,13 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
                   setEmail(""); setPassword(""); setUsername("");
                   setError(null); setSuccess(null);
                 }}
-                className={`cursor-pointer border-b-2 border-transparent pb-1 text-[10px] font-black tracking-[0.08em] transition-colors hover:border-[#FF4D88] ${isLightMode ? 'text-zinc-700 hover:text-black' : 'text-zinc-400 hover:text-white'}`}
+                className={`open-sans-auth-switch cursor-pointer border-b-2 border-transparent pb-1 text-xs tracking-normal transition-colors hover:border-[#FF4D88] sm:text-[13px] ${isLightMode ? 'text-zinc-700' : 'text-zinc-400'}`}
               >
-                {isLoginView ? "¿Nuevo aquí? Regístrate gratis" : "¿Ya tienes cuenta? Inicia sesión"}
+                {isLoginView ? (
+                  <>¿Nuevo aquí? <span className="font-bold text-[#FF4D88]">Regístrate gratis</span></>
+                ) : (
+                  <>¿Ya tienes cuenta? <span className="font-bold text-[#FF4D88]">Inicia sesión</span></>
+                )}
               </button>
             </footer>
           </div>

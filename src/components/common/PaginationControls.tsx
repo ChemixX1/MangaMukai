@@ -6,16 +6,21 @@ interface PaginationControlsProps {
   onPageChange: (page: number) => void;
   accent: 'pink' | 'blue';
   scrollTargetId: string;
+  theme?: 'light' | 'dark';
 }
 
 const accentStyles = {
   pink: {
-    active: 'border-[#FF4D88] bg-[#FF4D88] text-black',
-    hover: 'hover:border-[#FF4D88]/70 hover:bg-[#fff3f7]',
+    lightActive: 'border-[#FF4D88] bg-[#FF4D88] text-black',
+    lightHover: 'hover:border-[#FF4D88]/70 hover:bg-[#fff3f7]',
+    darkActive: 'border-[#FF4D88] bg-[#18181b] text-white shadow-[0_0_0_1px_rgba(255,77,136,.2)]',
+    darkHover: 'hover:border-[#FF4D88]/70 hover:bg-[#201319]',
   },
   blue: {
-    active: 'border-[#00C2FF] bg-[#00C2FF] text-black',
-    hover: 'hover:border-[#00C2FF]/70 hover:bg-[#effbff]',
+    lightActive: 'border-[#00C2FF] bg-[#00C2FF] text-black',
+    lightHover: 'hover:border-[#00C2FF]/70 hover:bg-[#effbff]',
+    darkActive: 'border-[#00C2FF] bg-[#18181b] text-white shadow-[0_0_0_1px_rgba(0,194,255,.2)]',
+    darkHover: 'hover:border-[#00C2FF]/70 hover:bg-[#102027]',
   },
 };
 
@@ -25,8 +30,11 @@ export const PaginationControls = ({
   onPageChange,
   accent,
   scrollTargetId,
+  theme = 'light',
 }: PaginationControlsProps) => {
   const styles = accentStyles[accent];
+  const isDark = theme === 'dark';
+  const hoverStyles = isDark ? styles.darkHover : styles.lightHover;
   const groupStart = Math.floor((currentPage - 1) / 3) * 3 + 1;
   const visiblePages = Array.from(
     { length: Math.min(3, Math.max(0, totalPages - groupStart + 1)) },
@@ -41,7 +49,7 @@ export const PaginationControls = ({
     });
   };
 
-  const navigationClass = `home-pagination-control home-pagination-nav group flex h-11 -skew-x-12 items-center justify-center border border-black/10 bg-white px-3 text-[9px] font-black uppercase tracking-[0.1em] text-black transition-all disabled:cursor-not-allowed disabled:opacity-25 sm:px-5 sm:text-[10px] sm:tracking-[0.16em] ${styles.hover}`;
+  const navigationClass = `home-pagination-control home-pagination-nav group flex h-11 -skew-x-12 items-center justify-center border px-3 text-[9px] font-black uppercase tracking-[0.1em] transition-all disabled:cursor-not-allowed disabled:opacity-25 sm:px-5 sm:text-[10px] sm:tracking-[0.16em] ${isDark ? 'border-white/15 bg-[#151518] text-white' : 'border-black/10 bg-white text-black'} ${hoverStyles}`;
 
   return (
     <nav className="home-pagination mt-12 flex items-center justify-center gap-2 sm:gap-3" aria-label="Paginación de actualizaciones" data-accent={accent}>
@@ -69,8 +77,8 @@ export const PaginationControls = ({
             data-active={page === currentPage}
             className={`home-pagination-control home-pagination-page grid h-10 w-10 -skew-x-12 place-items-center border text-[11px] font-black text-black transition-all ${
               page === currentPage
-                ? styles.active
-                : `border-black/10 bg-white ${styles.hover}`
+                ? (isDark ? styles.darkActive : styles.lightActive)
+                : `${isDark ? 'border-white/15 bg-[#151518] text-white' : 'border-black/10 bg-white text-black'} ${hoverStyles}`
             }`}
           >
             <span className="skew-x-12">{page}</span>

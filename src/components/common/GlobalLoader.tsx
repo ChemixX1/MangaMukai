@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useTheme } from '../../hooks/useTheme';
+import { lockPageScroll } from '../../utils/scrollLock';
 
 const HOME_LOADING_EVENT = 'mangamukai:home-loading';
 const MINIMUM_VISIBLE_TIME = 720;
-const MAXIMUM_VISIBLE_TIME = 7000;
+const MAXIMUM_VISIBLE_TIME = 10000;
 
 export const GlobalLoader = () => {
   const [show, setShow] = useState(true);
   const [progress, setProgress] = useState(6);
-  const previousOverflowRef = useRef('');
-  const previousHtmlOverflowRef = useRef('');
+  const releaseScrollRef = useRef<(() => void) | null>(null);
   const startedAtRef = useRef(0);
   const finishingRef = useRef(false);
   const finishTimerRef = useRef<number | null>(null);
@@ -19,18 +19,17 @@ export const GlobalLoader = () => {
   const isLightMode = theme === 'light';
 
   const restoreScroll = () => {
-    document.body.style.overflow = previousOverflowRef.current;
-    document.documentElement.style.overflow = previousHtmlOverflowRef.current;
+    releaseScrollRef.current?.();
+    releaseScrollRef.current = null;
   };
 
   useEffect(() => {
+    // El fondo crítico del HTML permanece hasta que este overlay ya fue pintado.
+    document.documentElement.classList.remove('app-preloading');
     startedAtRef.current = performance.now();
     finishingRef.current = false;
     finishTimerRef.current = null;
-    previousOverflowRef.current = document.body.style.overflow;
-    previousHtmlOverflowRef.current = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
+    releaseScrollRef.current = lockPageScroll();
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 
     const finish = () => {
@@ -106,14 +105,29 @@ export const GlobalLoader = () => {
               <span className="text-[#FF4D88]">MUKAI</span>
             </motion.div>
 
-            <div className="mt-8 flex items-center justify-center">
-              <div className={`relative h-12 w-12 rounded-full border-2 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                <motion.div
-                  className={`absolute -inset-[2px] rounded-full border-2 border-transparent ${isLightMode ? 'border-r-[#FF4D88] border-t-[#24262b]' : 'border-r-[#FF4D88] border-t-white'}`}
-                  animate={reduceMotion ? undefined : { rotate: 360 }}
-                  transition={reduceMotion ? undefined : { duration: 0.85, ease: 'linear', repeat: Infinity }}
-                />
-              </div>
+            <div className="mt-6 flex items-center justify-center">
+              <motion.svg
+                viewBox="0 0 64 64"
+                className={`h-12 w-12 ${isLightMode ? 'text-[#15161a]' : 'text-white'}`}
+                animate={reduceMotion ? undefined : { rotate: 360 }}
+                transition={reduceMotion ? undefined : { duration: 1.05, ease: 'linear', repeat: Infinity }}
+                aria-hidden="true"
+              >
+                <defs>
+                  <path
+                    id="loader-blade"
+                    d="M31.5 4.5c6.2-.1 12.2 1.8 17.1 5.4l-7.3 1.2 3.2 6.7c-3.9-3.5-8.3-5.3-13-5.4V4.5Z"
+                  />
+                </defs>
+                {Array.from({ length: 8 }, (_, index) => (
+                  <use
+                    key={index}
+                    href="#loader-blade"
+                    fill="currentColor"
+                    transform={`rotate(${index * 45} 32 32)`}
+                  />
+                ))}
+              </motion.svg>
             </div>
           </motion.div>
         </motion.div>

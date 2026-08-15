@@ -41,7 +41,7 @@ export const NewReleases = () => {
 
   return (
     <section className="home-new-releases relative w-full py-10 z-20">
-      <div className="w-full max-w-[1600px] mx-auto px-6 lg:px-12">
+      <div className="desktop-content-shell w-full max-w-[1600px] mx-auto px-6 lg:px-12">
         
         {/* --- HEADER --- */}
         <div className="flex items-center gap-3 mb-8 border-l-4 border-violet-600 pl-4">

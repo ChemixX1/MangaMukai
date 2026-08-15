@@ -404,6 +404,160 @@ html {
   .home-main > .relative { gap: 4.5rem; }
 }
 
+.michroma-regular {
+  font-family: "Michroma", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.noto-sans-myanmar-auth {
+  font-family: "Noto Sans Myanmar", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 800;
+  font-style: normal;
+  font-variation-settings: "wdth" 100;
+}
+
+.audiowide-library {
+  font-family: "Audiowide", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.open-sans-library-filters {
+  font-family: "Open Sans", sans-serif;
+  font-style: normal;
+}
+
+.google-sans-library {
+  font-family: "Google Sans Flex", sans-serif;
+  font-optical-sizing: auto;
+}
+
+.anta-library-date {
+  font-family: "Anta", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@keyframes library-flip-top-out {
+  0% {
+    filter: brightness(1);
+    transform: rotateX(0deg);
+  }
+  100% {
+    filter: brightness(0.68);
+    transform: rotateX(-90deg);
+  }
+}
+
+@keyframes library-flip-bottom-in {
+  0% {
+    filter: brightness(0.7);
+    transform: rotateX(90deg);
+  }
+  76% {
+    filter: brightness(1.04);
+    transform: rotateX(-5deg);
+  }
+  90% {
+    filter: brightness(1);
+    transform: rotateX(2deg);
+  }
+  100% {
+    filter: brightness(1);
+    transform: rotateX(0deg);
+  }
+}
+
+@keyframes library-flip-shadow-out {
+  0% { opacity: 0; }
+  100% { opacity: 0.42; }
+}
+
+@keyframes library-flip-shadow-in {
+  0% { opacity: 0.38; }
+  100% { opacity: 0; }
+}
+
+.library-flip-tile {
+  perspective: 420px;
+  transform-style: preserve-3d;
+}
+
+.library-flip-top-out,
+.library-flip-bottom-in {
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  will-change: transform, filter;
+}
+
+.library-flip-old-bottom {
+  z-index: 1;
+}
+
+.library-flip-top-out {
+  z-index: 4;
+  transform-origin: bottom;
+  animation: library-flip-top-out 0.3s cubic-bezier(.55, .085, .68, .53) both;
+}
+
+.library-flip-bottom-in {
+  z-index: 3;
+  transform-origin: top;
+  animation: library-flip-bottom-in 0.34s cubic-bezier(.22, 1, .36, 1) 0.28s both;
+}
+
+.library-flip-top-shadow {
+  background: linear-gradient(to bottom, transparent 12%, rgba(0, 0, 0, 0.72));
+  animation: library-flip-shadow-out 0.3s ease-in both;
+}
+
+.library-flip-bottom-shadow {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent 88%);
+  animation: library-flip-shadow-in 0.34s ease-out 0.28s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-flip-old-bottom,
+  .library-flip-top-out,
+  .library-flip-bottom-in,
+  .library-flip-top-shadow,
+  .library-flip-bottom-shadow { display: none; }
+}
+
+.open-sans-auth-switch {
+  font-family: "Open Sans", sans-serif;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.coin-cancel-button {
+  font-family: "Google Sans Flex", sans-serif;
+  font-weight: 800;
+}
+
+.subscription-modal-note {
+  font-family: "Open Sans", sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: normal;
+}
+
+.mobile-account-label {
+  font-family: "Montserrat", sans-serif;
+  font-style: normal;
+}
+
+@media (max-width: 767px) {
+  .mobile-nav-michroma {
+    font-family: "Michroma", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+    letter-spacing: normal;
+  }
+}
+
 /* Codex production: keep Manga +19 controls white in both themes. */
 .adult-theme-light .adult-hero-chip-muted,.adult-theme-dark .adult-hero-chip-muted,.adult-theme-light .adult-hero-save-btn,.adult-theme-dark .adult-hero-save-btn,.adult-theme-light .home-theme-tab-button,.adult-theme-dark .home-theme-tab-button,.adult-theme-light .home-latest a.home-theme-title,.adult-theme-dark .home-latest a.home-theme-title,.adult-theme-light .home-youth-popular button,.adult-theme-dark .home-youth-popular button{color:#fff!important}
 .adult-theme-light .adult-hero-chip-muted span,.adult-theme-dark .adult-hero-chip-muted span{color:#fff!important}
@@ -439,14 +593,14 @@ html {
 
 /* Codex production: responsive recharge modal. */
 @media (max-width: 767px){
-  .coin-market-overlay{align-items:flex-start!important;justify-content:center!important;padding:10px!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important}
-  .coin-market-dialog{width:min(100%,430px)!important;height:auto!important;min-height:calc(100dvh - 20px)!important;max-height:none!important;border-radius:18px!important;overflow:hidden!important}
-  .coin-market-panel{height:auto!important;min-height:calc(100dvh - 20px)!important}
+  .coin-market-overlay{align-items:center!important;justify-content:center!important;padding:12px!important;overflow:hidden!important}
+  .coin-market-dialog{width:min(100%,430px)!important;height:min(620px,calc(100dvh - 24px))!important;min-height:0!important;max-height:calc(100dvh - 24px)!important;border-radius:18px!important;overflow:hidden!important;transition:height .48s cubic-bezier(.22,1,.36,1),background-color .25s ease,border-color .25s ease!important;will-change:height,transform;transform:translateZ(0)}
+  .coin-market-panel{height:100%!important;min-height:0!important}
   .coin-market-header{padding:18px 16px 6px!important;gap:10px!important;align-items:flex-start!important}
   .coin-market-header h3{font-size:clamp(1.55rem,7vw,2rem)!important;line-height:.95!important;flex-wrap:wrap!important;max-width:calc(100% - 44px)!important}
   .coin-market-header button{flex:0 0 auto!important}
   .coin-market-body{padding:10px 14px 18px!important;justify-content:flex-start!important;overflow-y:auto!important;min-height:0!important}
-  .coin-pack-grid{grid-template-columns:1fr!important;gap:10px!important;max-width:100%!important}
+  .coin-pack-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;max-width:100%!important}
   .coin-pack-card{height:auto!important;min-height:104px!important;padding:14px!important;border-radius:14px!important}
   .coin-pack-card p{font-size:clamp(1.55rem,7vw,2rem)!important;line-height:1!important}
   .coin-checkout{max-width:100%!important;gap:14px!important}
@@ -454,17 +608,22 @@ html {
   .coin-checkout-summary p{line-height:1.05!important}
   .coin-paypal-zone{min-height:72px!important}
   .coin-paypal-zone button{min-height:52px!important;padding-top:12px!important;padding-bottom:12px!important}
+  .coin-market-dialog.coin-market-dialog-checkout{height:min(430px,calc(100dvh - 24px))!important}
+  .coin-market-dialog-checkout .coin-market-header{padding-bottom:2px!important}
+  .coin-market-dialog-checkout .coin-market-body{justify-content:center!important;padding:4px 14px 8px!important;overflow:hidden!important}
+  .coin-market-dialog-checkout .coin-checkout{gap:10px!important}
+  .coin-market-dialog-checkout .coin-checkout-summary{align-items:center!important;flex-direction:row!important;padding:14px!important}
+  .coin-market-dialog-checkout .coin-paypal-zone{min-height:52px!important}
+  .coin-market-dialog-checkout .coin-paypal-zone button{min-height:46px!important;padding-top:10px!important;padding-bottom:10px!important}
+  .coin-market-dialog-checkout .coin-cancel-button{margin-top:0!important;padding-top:6px!important;padding-bottom:6px!important}
+}
+@media (prefers-reduced-motion: reduce){
+  .coin-market-dialog{transition:none!important;will-change:auto}
 }
 @media (max-height: 700px) and (max-width: 767px){
-  .coin-market-dialog{min-height:auto!important}
-  .coin-market-panel{min-height:auto!important}
   .coin-pack-card{min-height:92px!important;padding:12px!important}
   .coin-market-body{padding-bottom:14px!important}
 }
-@media (min-width: 480px) and (max-width: 767px){
-  .coin-pack-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-}
-
 /* Codex 2026-05-31: reader mobile pages flush together; desktop keeps the original spacing. */
 @media (max-width: 767px){
   .reader-image-stack{
@@ -498,5 +657,32 @@ html {
   }
   .reader-page-stack .reader-page-image + .reader-page-image{
     margin-top:-1px!important;
+  }
+}
+@keyframes navbar-fire-burn {
+  0%, 100% {
+    transform: translateY(0) scale(1) rotate(-3deg);
+    filter: drop-shadow(0 0 2px rgba(255, 77, 0, 0.65));
+  }
+  35% {
+    transform: translateY(-2px) scale(1.12, 0.94) rotate(3deg);
+    filter: drop-shadow(0 0 6px rgba(255, 136, 0, 0.95));
+  }
+  70% {
+    transform: translateY(-1px) scale(0.96, 1.08) rotate(-1deg);
+    filter: drop-shadow(0 0 4px rgba(255, 40, 0, 0.8));
+  }
+}
+
+.navbar-fire {
+  color: #ff7a18;
+  fill: #ff3d00;
+  transform-origin: center bottom;
+  animation: navbar-fire-burn 0.82s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-fire {
+    animation: none;
   }
 }

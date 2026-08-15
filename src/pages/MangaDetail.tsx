@@ -268,7 +268,7 @@ export const MangaDetail = () => {
 
         {/* Contenido hero */}
         <div className="absolute inset-0 z-20 flex items-end">
-          <div className="w-full max-w-[1400px] mx-auto px-4 lg:px-10 pb-8 flex flex-col lg:flex-row items-end gap-6">
+          <div className="desktop-content-shell w-full max-w-[1400px] mx-auto px-4 lg:px-10 pb-8 flex flex-col lg:flex-row items-end gap-6">
 
             {/* Portada */}
             <motion.div
@@ -349,7 +349,7 @@ export const MangaDetail = () => {
       </div>
 
       {/* ── CUERPO ─────────────────────────────────────────────────────────── */}
-      <div className="w-full max-w-[1400px] mx-auto px-4 lg:px-10 py-8 space-y-8">
+      <div className="desktop-content-shell w-full max-w-[1400px] mx-auto px-4 lg:px-10 py-8 space-y-8">
 
         {/* Portada móvil */}
         <div className="flex lg:hidden justify-center -mt-16 relative z-20">
@@ -392,7 +392,7 @@ export const MangaDetail = () => {
               {genres.map((g, i) => (
                 <Link
                   key={i}
-                  to={`/catalog?genre=${encodeURIComponent(g)}`}
+                  to={`/biblioteca?genre=${encodeURIComponent(g)}`}
                   className="text-[11px] font-semibold text-[#FF4D88] bg-[#FF4D88]/10 border border-[#FF4D88]/20 px-3 py-1 rounded-full hover:bg-[#FF4D88]/20 transition-colors"
                 >
                   {g}

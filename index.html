@@ -1,8 +1,42 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="app-preloading">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root {
+        --initial-loader-bg: #f6f7f9;
+        --initial-loader-color: #111216;
+      }
+
+      html.app-preloading,
+      html.app-preloading body,
+      html.app-preloading #root {
+        min-height: 100%;
+        background: var(--initial-loader-bg) !important;
+        color: var(--initial-loader-color);
+      }
+
+      html.app-preloading body {
+        margin: 0;
+      }
+    </style>
+    <script>
+      (function () {
+        try {
+          var isDark = localStorage.getItem('mangamukai-theme') === 'dark';
+          document.documentElement.style.setProperty('--initial-loader-bg', isDark ? '#070709' : '#f6f7f9');
+          document.documentElement.style.setProperty('--initial-loader-color', isDark ? '#ffffff' : '#111216');
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (_) {
+          document.documentElement.style.backgroundColor = '#f6f7f9';
+        }
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=vite" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Anta&family=Audiowide&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Michroma&family=Montserrat:wght@600;700;800;900&family=Noto+Sans+Myanmar:wght@100..900&family=Open+Sans:wght@400;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MangaMukai — Lee Manga Online Gratis</title>
     <meta name="description" content="Lee manga online en español: romance, acción, fantasía, B&N y contenido para adultos. Nuevos capítulos cada día." />
