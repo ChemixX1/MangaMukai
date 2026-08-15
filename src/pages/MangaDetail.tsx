@@ -9,8 +9,8 @@ import { motion } from "framer-motion";
 import { getMangaById, getChaptersBySeries, trackChapterView, getRelatedMangas } from "../services/mangaService";
 import type { MangaCapitulo } from "../types/manga";
 import type { SeriesChapter, RelatedManga } from "../services/mangaService";
-import { ChapterList } from "../components/ChapterList";
-import { getStoredUser, getStoredToken, getUnlockedChapters, refreshUser } from "../utils/auth";
+import { ChapterList } from "../components/manga";
+import { getStoredUser, getStoredToken, getUnlockedChapters, refreshUser } from "../services/authService";
 
 const getTypeColor = (type: string) => {
   const t = type?.toLowerCase() || "";
@@ -137,18 +137,28 @@ export const MangaDetail = () => {
 
   const loadUser = useCallback(async () => {
     const stored = getStoredUser();
-    if (stored) {
+    const token = getStoredToken();
+    if (stored && token) {
       setUserInfo({ id: String(stored.id), username: stored.username });
       setUserCoins(stored.coins || 0);
+    } else {
+      setUserInfo({ id: "", username: "" });
+      setUserCoins(0);
     }
-    const token = getStoredToken();
     if (token) {
       const [fresh, unlocked] = await Promise.all([refreshUser(), getUnlockedChapters()]);
       if (fresh) {
         setUserInfo({ id: String(fresh.id), username: fresh.username });
         setUserCoins(fresh.coins || 0);
+      } else if (!getStoredToken()) {
+        setUserInfo({ id: "", username: "" });
+        setUserCoins(0);
+        setPurchasedIds(new Set<string>());
+        return;
       }
       setPurchasedIds(unlocked);
+    } else {
+      setPurchasedIds(new Set<string>());
     }
   }, []);
 
@@ -227,8 +237,9 @@ export const MangaDetail = () => {
 
   const statusConfig = getStatusLabel(manga.status || "");
   const totalCh   = chapters.length;
-  const paidCh    = chapters.filter(c => c.is_paid).length;
-  const freeCh    = totalCh - paidCh;
+  const now       = new Date();
+  const freeCh    = chapters.filter(c => !c.is_paid || (!!c.free_at && new Date(c.free_at) <= now)).length;
+  const paidCh    = totalCh - freeCh;
   const genres    = manga.genres || [];
 
   return (

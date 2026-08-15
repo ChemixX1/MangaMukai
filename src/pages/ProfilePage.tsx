@@ -1,15 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { 
+import {
   Camera, MapPin, Edit3, Save, X, User, 
   BookOpen, Clock, Facebook, Instagram, 
   Crown, Medal, Award, Check, Github, Youtube
 } from "lucide-react";
-import { supabase } from "../supabaseClient";
 import { useNavigate, Link } from "react-router-dom";
-import { getStoredUser } from "../utils/auth";
-import { getInteractions } from "../utils/interactions";
+import { getStoredToken, getStoredUser } from "../services/authService";
+import { getInteractions } from "../services/interactionsService";
 import { getMangaById } from "../services/mangaService";
+import {
+  emptySocialLinks,
+  getWordPressProfile,
+  saveWordPressProfile,
+  uploadWordPressProfileImage,
+} from "../services/wordpressService";
+import { wordpressUrl } from "../config/api";
 
 // --- ICONOS PERSONALIZADOS ---
 const WhatsAppIcon = ({ size = 18, className = "" }) => (
@@ -124,26 +130,21 @@ export const ProfilePage = () => {
   useEffect(() => {
     const fetchData = async () => {
       const currentUser = getStoredUser();
-      if (!currentUser) { navigate("/"); return; }
+      if (!currentUser || !getStoredToken()) { navigate("/"); return; }
       setUserId(String(currentUser.id));
 
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-
-      if (profileData) {
-        setProfile({
-            username: profileData.username || currentUser.username,
-            bio: profileData.bio || "",
-            location: profileData.location || "",
-            avatar_url: profileData.avatar_url || currentUser.avatar || "",
-            banner_url: profileData.banner_url || "",
-            banner_color: profileData.banner_color || "bg-[#FF4D88]",
-            is_pro: profileData.is_pro || false,
-            created_at: profileData.created_at || new Date().toISOString(),
-            social_links: profileData.social_links || { facebook: "", twitter: "", instagram: "", discord: "", whatsapp: "", telegram: "", youtube: "", github: "" }
-        });
-      } else {
-        setProfile(prev => ({ ...prev, username: currentUser.username, avatar_url: currentUser.avatar || '' }));
-      }
+      const profileData = await getWordPressProfile(currentUser);
+      setProfile({
+        username: profileData.username || currentUser.username,
+        bio: profileData.bio || "",
+        location: profileData.location || "",
+        avatar_url: profileData.avatar_url || currentUser.avatar || "",
+        banner_url: profileData.banner_url || "",
+        banner_color: profileData.banner_color || "bg-[#FF4D88]",
+        is_pro: profileData.is_pro || false,
+        created_at: profileData.created_at || new Date().toISOString(),
+        social_links: profileData.social_links || emptySocialLinks(),
+      });
 
       // Obtener el historial desde WP
       const interactions = await getInteractions();
@@ -170,16 +171,13 @@ export const ProfilePage = () => {
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
     if (!event.target.files || !event.target.files[0] || !userId) return;
     const file = event.target.files[0];
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}/${type}_${Date.now()}.${fileExt}`;
 
     setSaving(true);
     try {
-      await supabase.storage.from('profiles').upload(fileName, file);
-      const { data: { publicUrl } } = supabase.storage.from('profiles').getPublicUrl(fileName);
+      const result = await uploadWordPressProfileImage(file, type);
+      if (!result.success) throw new Error(result.message);
       const field = type === 'avatar' ? 'avatar_url' : 'banner_url';
-      await supabase.from('profiles').update({ [field]: publicUrl }).eq('id', userId);
-      setProfile(prev => ({ ...prev, [field]: publicUrl }));
+      setProfile(prev => ({ ...prev, [field]: result.url }));
     } catch (error) { console.error("Error imagen:", error); } 
     finally { setSaving(false); }
   };
@@ -189,13 +187,8 @@ export const ProfilePage = () => {
     if (!userId) return;
     setSaving(true);
     try {
-      await supabase.from('profiles').update({
-          username: profile.username,
-          bio: profile.bio,
-          location: profile.location,
-          social_links: profile.social_links,
-          banner_color: profile.banner_color
-        }).eq('id', userId);
+      const result = await saveWordPressProfile(profile);
+      if (!result.success) throw new Error(result.message);
       setIsEditing(false);
     } catch (error) { console.error("Error guardar:", error); } 
     finally { setSaving(false); }
@@ -464,7 +457,7 @@ export const ProfilePage = () => {
                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-4">Mi Cuenta</h3>
                     <div className="flex flex-col gap-2">
                         <a
-                            href="https://mangamukai.com/account"
+                            href={wordpressUrl('account')}
                             target="_blank"
                             rel="noreferrer"
                             className="flex items-center gap-3 bg-zinc-900 p-3 rounded-lg hover:bg-black transition-colors text-zinc-300 hover:text-white text-sm font-bold"
@@ -472,7 +465,7 @@ export const ProfilePage = () => {
                             <User size={16} className="text-[#FF4D88]" /> Perfil
                         </a>
                         <a
-                            href="https://mangamukai.com/canjear-cupon"
+                            href={wordpressUrl('canjear-cupon')}
                             target="_blank"
                             rel="noreferrer"
                             className="flex items-center gap-3 bg-zinc-900 p-3 rounded-lg hover:bg-black transition-colors text-zinc-300 hover:text-white text-sm font-bold"
@@ -480,7 +473,7 @@ export const ProfilePage = () => {
                             <Award size={16} className="text-yellow-400" /> Monedas
                         </a>
                         <a
-                            href="https://mangamukai.com/my-library"
+                            href={wordpressUrl('my-library')}
                             target="_blank"
                             rel="noreferrer"
                             className="flex items-center gap-3 bg-zinc-900 p-3 rounded-lg hover:bg-black transition-colors text-zinc-300 hover:text-white text-sm font-bold"

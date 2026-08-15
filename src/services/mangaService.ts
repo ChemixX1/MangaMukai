@@ -1,18 +1,17 @@
 // src/services/mangaService.ts
 
 import type { WPManga, MangaCapitulo } from '../types/manga';
+import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from '../config/api';
 
 // ---------------------------------------------------------------------------
 // CONFIGURACIÓN
 // ---------------------------------------------------------------------------
 
-const API_URL = 'https://mangamukai.com/wp-json/wp/v2/posts';
-const MM_API  = 'https://mangamukai.com/wp-json/mangamukai/v1';
+const API_URL = WORDPRESS_POSTS_API;
+const MM_API = MANGAMUKAI_API;
 
-// NOTA: Los IDs de categoría originales (517, 519) resultaron ser nombres de
-// series específicas, no géneros. Se dejan vacíos para devolver todos los posts
-// hasta que se configuren categorías de género reales en WordPress.
-const IDS_GENEROS_MUJER: number[] = [];
+// Los IDs antiguos resultaron pertenecer a series, no a géneros. La lista queda
+// vacía hasta que WordPress exponga categorías masculinas configuradas como tal.
 const IDS_GENEROS_HOMBRE: number[] = [];
 
 const IMAGEN_DEFAULT = 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada';
@@ -27,7 +26,7 @@ const CAMPOS_SOLICITADOS = [
 // UTILS
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const obtenerPortadaReal = (item: any): string => {
   // First, check if the true manga cover was exposed by the backend patch
   if (item.manga_cover) {
@@ -62,7 +61,7 @@ const limpiarTitulo = (titulo: string): string => {
     .trim();
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
   const titulo = item.title?.rendered || '';
   const myCred = item.myCRED_sell_content;
@@ -105,6 +104,7 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
     tipo: tipoReal,
     genero: generoReal,
     eroSeri: item.ero_seri ? Number(item.ero_seri) : null,
+    rawFecha: item.date || '',
     capitulosRecientes: [],
   };
 };
@@ -112,7 +112,7 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
 // ---------------------------------------------------------------------------
 // Mapper para respuesta del endpoint /catalog y /manga/{id}
 // ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const mapearMangaCatalog = (item: any): MangaCapitulo => {
   const genres: string[] = Array.isArray(item.genres) ? item.genres : [];
   let genero: 'Hombre' | 'Mujer' | null = item.genero === 'Hombre' ? 'Hombre'
@@ -126,7 +126,7 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
   }
 
   // Poblar capitulosRecientes desde firstChapterId cuando exista
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const caps: MangaCapitulo['capitulosRecientes'] = (Array.isArray(item.capitulosRecientes) && item.capitulosRecientes.length > 0)
     ? item.capitulosRecientes
     : item.firstChapterId
@@ -172,38 +172,6 @@ export const getUltimosCapitulos = async (): Promise<MangaCapitulo[]> => {
 // ---------------------------------------------------------------------------
 // 2. ÚLTIMAS ACTUALIZACIONES — MUJERES
 // ---------------------------------------------------------------------------
-export const getLatestWomenMangas = async (): Promise<MangaCapitulo[]> => {
-  try {
-    const res = await fetch(`${API_URL}?_embed&per_page=60&_fields=${CAMPOS_SOLICITADOS}`);
-    if (!res.ok) throw new Error('Error API');
-    const data: WPManga[] = await res.json();
-
-    const filtrado = IDS_GENEROS_MUJER.length === 0
-      ? data
-      : data.filter((item: any) =>
-          (item.categories || []).some((id: number) => IDS_GENEROS_MUJER.includes(id)));
-
-    const seriesVistas = new Set<number>();
-    const unicos: WPManga[] = [];
-
-    for (const item of filtrado) {
-      const idSerie = item.ero_seri
-        ? Number(item.ero_seri)
-        : (item.categories?.[0] ?? item.id);
-      if (!seriesVistas.has(idSerie)) {
-        seriesVistas.add(idSerie);
-        unicos.push(item);
-      }
-      if (unicos.length >= 18) break;
-    }
-
-    return unicos.map((item) => mapearManga(item));
-  } catch (error) {
-    console.error('Error getLatestWomenMangas:', error);
-    return [];
-  }
-};
-
 // ---------------------------------------------------------------------------
 // 3. ÚLTIMAS ACTUALIZACIONES — HOMBRES
 // ---------------------------------------------------------------------------
@@ -242,54 +210,12 @@ export const getLatestMenMangas = async (): Promise<MangaCapitulo[]> => {
 // ---------------------------------------------------------------------------
 // 4. POPULARES — MUJERES (Hero + PopularCarousel)
 // ---------------------------------------------------------------------------
-export const getPopularWomenMangas = async (filtroTiempo = 'Histórico'): Promise<MangaCapitulo[]> => {
-  try {
-    let dateParam = '';
-    if (filtroTiempo === 'Semanal') {
-      const d = new Date(); d.setDate(d.getDate() - 7);
-      dateParam = `&after=${d.toISOString()}`;
-    } else if (filtroTiempo === 'Mensual') {
-      const d = new Date(); d.setDate(d.getDate() - 30);
-      dateParam = `&after=${d.toISOString()}`;
-    }
-
-    const res = await fetch(
-      `${API_URL}?_embed&per_page=100&orderby=date&order=desc${dateParam}&_fields=${CAMPOS_SOLICITADOS}`
-    );
-    const data: WPManga[] = res.ok ? await res.json() : [];
-
-    const filtrado = IDS_GENEROS_MUJER.length === 0
-      ? data
-      : data.filter((item: any) =>
-          (item.categories || []).some((id: number) => IDS_GENEROS_MUJER.includes(id)));
-
-    const seriesVistas = new Set<number>();
-    const unicos: WPManga[] = [];
-
-    for (const item of filtrado) {
-      const idSerie = item.ero_seri
-        ? Number(item.ero_seri)
-        : (item.categories?.[0] ?? item.id);
-      if (!seriesVistas.has(idSerie)) {
-        seriesVistas.add(idSerie);
-        unicos.push(item as WPManga);
-      }
-      if (unicos.length >= 12) break;
-    }
-
-    return unicos.map((item) => mapearManga(item));
-  } catch (error) {
-    console.error('Error getPopularWomenMangas:', error);
-    return [];
-  }
-};
-
 // ---------------------------------------------------------------------------
 // 5. NUEVOS LANZAMIENTOS
 // ---------------------------------------------------------------------------
 export const getNewReleases = async (): Promise<MangaCapitulo[]> => {
   try {
-    const url = `${API_URL}?_embed&per_page=15&orderby=date&order=desc&_fields=${CAMPOS_SOLICITADOS}&t=${Date.now()}`;
+    const url = `${API_URL}?_embed&per_page=20&orderby=date&order=desc&_fields=${CAMPOS_SOLICITADOS}&t=${Date.now()}`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Error API: ${res.status}`);
     const rawData: WPManga[] = await res.json();
@@ -322,7 +248,7 @@ export const getMangaById = async (id: number | string): Promise<MangaCapitulo |
   try {
     const res = await fetch(`${MM_API}/manga/${id}`);
     if (!res.ok) return null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const item: any = await res.json();
     if (!item.success) return null;
     return mapearMangaCatalog(item);
@@ -363,61 +289,79 @@ export const getChaptersBySeries = async (eroSeri: number | string): Promise<Ser
 // ---------------------------------------------------------------------------
 // 9. CAPÍTULOS POR CATEGORÍA (fallback — pagina hasta 100 por página)
 // ---------------------------------------------------------------------------
-export const getChaptersByCategory = async (categoryId: number): Promise<Array<{ id: number; numero: string; esGratis: boolean; precio: number; fecha: string; titulo: string; }>> => {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let todos: any[] = [];
-    let pagina = 1;
-    let hayMas = true;
-
-    while (hayMas) {
-      const res = await fetch(
-        `${API_URL}?categories=${categoryId}&per_page=100&page=${pagina}&_fields=${CAMPOS_SOLICITADOS}`
-      );
-      if (!res.ok) break;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any[] = await res.json();
-      if (data.length === 0) { hayMas = false; }
-      else { todos = [...todos, ...data]; pagina++; }
-    }
-
-    return todos.map(c => {
-      const mmInfo = c.mm_chapter_info;
-      const esGratis = mmInfo
-        ? !mmInfo.is_paid
-        : (!c.myCRED_sell_content || c.myCRED_sell_content.status === 'disabled' || parseFloat(String(c.myCRED_sell_content.price)) === 0);
-      const precio = mmInfo ? (mmInfo.price || 0) : 0;
-      return {
-        id: c.id,
-        numero: String(c.ero_chapter || c.title?.rendered.replace(/[^0-9]/g, '') || '0'),
-        esGratis,
-        precio,
-        fecha: new Date(c.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
-        titulo: c.title?.rendered || ''
-      };
-    });
-  } catch (error) {
-    console.error('Error getChaptersByCategory:', error);
-    return [];
-  }
-};
-
 // ---------------------------------------------------------------------------
 // 10. POPULARES MUJERES POR VISITAS (semanal / mensual / histórico)
 // ---------------------------------------------------------------------------
-export const getPopularWomenByViews = async (period: 'weekly' | 'monthly' | 'historical' = 'historical'): Promise<MangaCapitulo[]> => {
-  try {
-    const res = await fetch(`${MM_API}/popular-women?period=${period}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = await res.json();
-    if (!data.success || !Array.isArray(data.mangas)) return [];
-    return data.mangas.map(mapearMangaCatalog);
-  } catch (error) {
-    console.error('Error getPopularWomenByViews:', error);
-    return [];
-  }
+type PopularPeriod = 'weekly' | 'monthly' | 'historical';
+type PopularAudience = 'women' | 'men';
+
+interface PopularCacheEntry {
+  data: MangaCapitulo[];
+  expiresAt: number;
+}
+
+const POPULAR_CACHE_TTL = 5 * 60 * 1000;
+const popularCache: Record<PopularAudience, Map<PopularPeriod, PopularCacheEntry>> = {
+  women: new Map(),
+  men: new Map(),
 };
+const popularRequests: Record<PopularAudience, Map<PopularPeriod, Promise<MangaCapitulo[]>>> = {
+  women: new Map(),
+  men: new Map(),
+};
+
+const getPopularByViews = async (
+  audience: PopularAudience,
+  period: PopularPeriod,
+  forceRefresh: boolean,
+): Promise<MangaCapitulo[]> => {
+  const cached = popularCache[audience].get(period);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached.data;
+
+  const pending = popularRequests[audience].get(period);
+  if (!forceRefresh && pending) return pending;
+
+  const endpoint = audience === 'women' ? 'popular-women' : 'popular-men';
+  const refreshQuery = forceRefresh ? `&refresh=1&t=${Date.now()}` : '';
+  const request = fetch(`${MM_API}/${endpoint}?period=${period}${refreshQuery}`, {
+    cache: forceRefresh ? 'no-store' : 'default',
+  })
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: { success?: boolean; mangas?: unknown[] } = await res.json();
+      if (!data.success || !Array.isArray(data.mangas)) return [];
+      const mapped = data.mangas.map(mapearMangaCatalog);
+      if (mapped.length > 0) {
+        popularCache[audience].set(period, {
+          data: mapped,
+          expiresAt: Date.now() + POPULAR_CACHE_TTL,
+        });
+      }
+      return mapped;
+    })
+    .catch((error) => {
+      console.error(`Error getPopular${audience === 'women' ? 'Women' : 'Men'}ByViews:`, error);
+      return [];
+    })
+    .finally(() => {
+      if (popularRequests[audience].get(period) === request) {
+        popularRequests[audience].delete(period);
+      }
+    });
+
+  popularRequests[audience].set(period, request);
+  return request;
+};
+
+export const getPopularWomenByViews = async (
+  period: PopularPeriod = 'historical',
+  forceRefresh = true
+): Promise<MangaCapitulo[]> => getPopularByViews('women', period, forceRefresh);
+
+export const getPopularMenByViews = async (
+  period: PopularPeriod = 'historical',
+  forceRefresh = true
+): Promise<MangaCapitulo[]> => getPopularByViews('men', period, forceRefresh);
 
 // ---------------------------------------------------------------------------
 // 11. ÚLTIMAS ACTUALIZACIONES MUJERES con datos de capítulo
@@ -426,12 +370,26 @@ export const getLatestWomenUpdates = async (limit = 18): Promise<MangaCapitulo[]
   try {
     const res = await fetch(`${MM_API}/latest-women?limit=${limit}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const data: any = await res.json();
     if (!data.success || !Array.isArray(data.mangas)) return [];
     return data.mangas.map(mapearMangaCatalog);
   } catch (error) {
     console.error('Error getLatestWomenUpdates:', error);
+    return [];
+  }
+};
+
+export const getLatestMenUpdates = async (limit = 18): Promise<MangaCapitulo[]> => {
+  try {
+    const res = await fetch(`${MM_API}/latest-men?limit=${limit}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+     
+    const data: any = await res.json();
+    if (!data.success || !Array.isArray(data.mangas)) return [];
+    return data.mangas.map(mapearMangaCatalog);
+  } catch (error) {
+    console.error('Error getLatestMenUpdates:', error);
     return [];
   }
 };
@@ -453,7 +411,7 @@ export const getRelatedMangas = async (mangaId: number | string, limit = 10): Pr
   try {
     const res = await fetch(`${MM_API}/related/${mangaId}?limit=${limit}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const data: any = await res.json();
     if (!data.success || !Array.isArray(data.mangas)) return [];
     return data.mangas as RelatedManga[];

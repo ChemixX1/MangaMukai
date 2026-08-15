@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Environment and local backups
+.env
+*_quarantine_/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -27,6 +31,9 @@ dist-ssr
 .env
 *.php
 *.json
+!server/
+!server/**/*.php
+!server/**/*.json
 !package.json
 !package-lock.json
 !tsconfig.json

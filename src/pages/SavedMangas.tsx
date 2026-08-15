@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bookmark, Trash2, BookOpen, Ghost, ArrowRight, Loader2 } from "lucide-react";
-import { Footer } from "../components/Footer";
-import { getInteractions, toggleBookmark } from "../utils/interactions";
+import { Footer } from "../components/layout";
+import { getInteractions, toggleBookmark } from "../services/interactionsService";
 import { getMangaById } from "../services/mangaService";
-import { getStoredUser } from "../utils/auth";
-import type { MMUser } from "../utils/auth";
+import { getStoredUser } from "../services/authService";
+import type { MMUser } from "../services/authService";
 
 // Interfaces
 interface SavedItem {

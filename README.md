@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# MangaMukai Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend editable de MangaMukai, construido con React, TypeScript, Vite y Tailwind CSS. Consume el backend de WordPress mediante una URL centralizada y conserva los parches PHP necesarios para producción.
 
-Currently, two official plugins are available:
+## Arquitectura
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```text
+MangaMukai-WebSite1/
+├── public/                  # Archivos estáticos servidos sin procesar
+├── scripts/                 # Automatización del build
+├── server/                  # Backend y parches de WordPress
+│   ├── backend-patches/
+│   └── wp-content/mu-plugins/
+├── src/
+│   ├── assets/              # Imágenes agrupadas por uso
+│   │   ├── banners/
+│   │   └── modals/
+│   ├── components/          # Componentes reutilizables por dominio
+│   │   ├── collections/
+│   │   ├── common/
+│   │   ├── home/
+│   │   ├── layout/
+│   │   ├── manga/
+│   │   └── modals/
+│   ├── config/              # Variables y rutas compartidas
+│   ├── context/             # Estado global de React
+│   ├── hooks/               # Hooks reutilizables
+│   ├── pages/               # Pantallas asociadas a las rutas
+│   ├── services/            # API, autenticación y persistencia
+│   └── types/               # Tipos compartidos
+├── .env.example
+└── package.json
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`src/config/api.ts` es el único punto de configuración de la conexión con WordPress. `npm run build` compila el frontend y copia `server/` dentro de `dist/` para generar el paquete completo de despliegue.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Desarrollo
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
+
+Vite inicia normalmente en `http://localhost:5173`. Si ese puerto está ocupado, selecciona otro libre y lo muestra en la terminal.
+
+## Variables de entorno
+
+Copia `.env.example` como `.env` si necesitas apuntar a otra instalación de WordPress:
+
+```env
+VITE_WORDPRESS_URL=https://tu-wordpress.com
+```
+
+Sin esa variable, el frontend utiliza `https://mangamukai.com`.
+
+## Validación y build
+
+```bash
+npm run lint
+npm run build
+npm run preview
+```
+
+- `lint` comprueba la calidad del código TypeScript/React.
+- `build` genera el frontend y agrega el backend de `server/`.
+- `preview` sirve localmente el contenido final de `dist/`.

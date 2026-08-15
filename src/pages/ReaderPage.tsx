@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getStoredUser, getStoredToken, buyChapter, refreshUser, getUnlockedChapters } from "../utils/auth";
+import { getStoredUser, getStoredToken, buyChapter, refreshUser, getUnlockedChapters } from "../services/authService";
 import {
   ArrowLeft, Loader2, ChevronLeft, ChevronRight,
   Home, Coins, Instagram, Github, Send,
@@ -11,10 +11,10 @@ import {
 import { trackChapterView } from "../services/mangaService";
 import { motion, AnimatePresence } from "framer-motion";
 import React from "react";
+import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from "../config/api";
 
 // MODALES
-import { CoinMarketModal } from "../components/CoinMarketModal";
-import { SubscriptionModal } from "../components/SubscriptionModal";
+import { CoinMarketModal, SubscriptionModal } from "../components/modals";
 
 // --- INTERFACES ---
 interface ChapterImage {
@@ -76,7 +76,7 @@ const formatTime = (time: number) => {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
-export const SpotifyPlayer = ({ 
+const SpotifyPlayer = ({ 
   currentTrack, isPlaying, toggleAudio, handleNext, handlePrev, 
   showPlaylist, setShowPlaylist, playlist, playTrack, coverFallback,
   currentTime, duration, onSeek, audioError,
@@ -398,8 +398,8 @@ export const ReaderPage = () => {
     setLoading(true);
     setError(null);
 
-    const WP_API = 'https://mangamukai.com/wp-json/wp/v2/posts';
-    const MM_API = 'https://mangamukai.com/wp-json/mangamukai/v1';
+    const WP_API = WORDPRESS_POSTS_API;
+    const MM_API = MANGAMUKAI_API;
 
     const fetchChapterData = async () => {
       if (!chapterId) return;
@@ -451,7 +451,7 @@ export const ReaderPage = () => {
           if (sibRes.ok) {
             const sibData = await sibRes.json();
             if (sibData.success && Array.isArray(sibData.chapters) && sibData.chapters.length > 0) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+               
               const siblings: any[] = sibData.chapters; // ya vienen ordenados por chapter_number ASC
               const idx = siblings.findIndex((c: any) => String(c.id) === String(chapterId));
               if (idx > 0)        prevId = String(siblings[idx - 1].id);
@@ -472,7 +472,7 @@ export const ReaderPage = () => {
             `${WP_API}?categories=${categoryId}&per_page=100&_fields=id,ero_chapter,myCRED_sell_content,mm_chapter_info`
           );
           if (sibRes.ok) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const siblings: any[] = await sibRes.json();
             siblings.sort((a: any, b: any) => Number(a.ero_chapter) - Number(b.ero_chapter));
             const idx = siblings.findIndex((c: any) => String(c.id) === String(chapterId));

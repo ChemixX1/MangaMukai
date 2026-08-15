@@ -1,0 +1,1 @@
+export { CollectionLanding } from './CollectionLanding';

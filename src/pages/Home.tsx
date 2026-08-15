@@ -1,68 +1,29 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; 
+import { Moon, Sun } from 'lucide-react';
 
 // --- SERVICIOS Y TIPOS (CONEXIÓN HOSTINGER) ---
 // (Ya no necesitamos importar el servicio aquí, porque Latest se encarga solo)
 
 // --- COMPONENTES UI ---
-import AngledHeroCarousel from "../components/Hero";
-import FilterStrip from '../components/FilterStrip'; 
-import { Footer } from '../components/Footer';
+import {
+  FilterStrip,
+  Hero,
+  Latest,
+  LatestUpdates,
+  NewReleases,
+  News,
+  PopularCarousel,
+  YouthCarousel,
+  YouthLatest,
+} from '../components/home';
+import { Footer } from '../components/layout';
+import { HomeDataProvider, useHomeData } from '../context/HomeDataContext';
+import { useTheme } from '../hooks/useTheme';
 
-// --- SECCIONES DE CONTENIDO (ORIGINALES / ROSADAS) ---
-import { PopularCarousel } from '../components/PopularCarousel';
-import { Latest } from '../components/Latest'; 
-import { LatestUpdates } from '../components/LatestMen'; 
-import News from "../components/News";
-import { NewReleases } from '../components/NewReleases';
-
-// --- SECCIONES NUEVAS (JUVENILES / CELESTES) ---
-import { YouthCarousel } from '../components/YouthCarousel'; 
-import { YouthLatest } from '../components/LatestYouth'; 
-
-// --- CONFIGURACIÓN DE ESTRELLAS (FONDO) ---
-const generateStars = (count: number) => {
-  return Array.from({ length: count })
-    .map(() => `${Math.random() * 2500}px ${Math.random() * 8000}px #FFF`) 
-    .join(',');
-};
-
-const starsSmall = generateStars(1000); 
-const starsMedium = generateStars(300);
-const starsBig = generateStars(100);
-
-const starAnimationStyles = `
-  @keyframes move-stars-vertical { 
-    from { transform: translateY(0px); } 
-    to { transform: translateY(-1000px); } 
-  }
-  .star-layer {
-    background: transparent;
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
-`;
-
-export default function Home() {
+function HomeContent() {
   const navigate = useNavigate();
-
-  // 🗑️ ELIMINADO: Ya no necesitamos useState ni useEffect para 'mangas' aquí.
-  // El componente <Latest /> ahora es inteligente y busca sus propios datos.
-
-  // Inyectar estilos de animación de estrellas
-  useEffect(() => {
-    const styleSheet = document.createElement("style");
-    styleSheet.type = "text/css";
-    styleSheet.innerText = starAnimationStyles;
-    styleSheet.id = "star-animation-styles"; 
-    document.head.appendChild(styleSheet);
-    return () => { 
-        const styleElement = document.getElementById("star-animation-styles");
-        if(styleElement) document.head.removeChild(styleElement); 
-    };
-  }, []);
+  const { theme, toggleTheme } = useTheme();
+  const { isReady } = useHomeData();
 
   // Manejador del FilterStrip
   const handleCategoryClick = (category: string) => {
@@ -72,67 +33,90 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#02040a] overflow-x-hidden font-sans selection:bg-red-600 selection:text-white flex flex-col"> 
-      
-      {/* 1. HERO SECTION */}
-      <section className="relative z-40 bg-black">
-        <AngledHeroCarousel />
-      </section>
+    <div className={`home-shell min-h-screen overflow-x-hidden font-sans selection:bg-red-600 selection:text-white flex flex-col home-theme-${theme} ${isReady ? 'home-data-ready' : 'home-data-pending'}`}>
+      <div className="home-stage flex-1 flex flex-col transition-colors duration-300">
+        {/* 1. HERO SECTION */}
+        <section className="home-block home-block-hero relative z-40 bg-black">
+          <Hero />
+        </section>
 
-      <div className="relative z-10 w-full pt-10 pb-20 flex-grow">
+        <div className="home-main relative z-10 w-full pt-10 pb-20 flex-grow bg-[#050505] transition-colors duration-300">
         
-        {/* Fondo Gradiente y Estrellas */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#000000_0%,#02040a_10%,#1B2735_50%,#02040a_90%,#000000_100%)] z-0"></div>
-        <div className="star-layer w-[1px] h-[1px]" style={{ boxShadow: starsSmall, animation: 'move-stars-vertical 100s linear infinite' }}></div>
-        <div className="star-layer w-[2px] h-[2px] opacity-70" style={{ boxShadow: starsMedium, animation: 'move-stars-vertical 150s linear infinite' }}></div>
-        <div className="star-layer w-[3px] h-[3px] opacity-50" style={{ boxShadow: starsBig, animation: 'move-stars-vertical 200s linear infinite' }}></div>
+          <div className={`absolute inset-0 z-0 transition-colors duration-300 ${theme === 'light' ? 'bg-[linear-gradient(180deg,#f5f6f8_0%,#eef2f7_100%)]' : 'bg-black'}`} />
 
         {/* Contenido Vertical */}
         <div className="relative z-20 flex flex-col gap-24">
             
             {/* Tira de Filtros */}
-            <FilterStrip 
-                activeCategory={null} 
-                onCategoryChange={handleCategoryClick} 
-            />
+            <section className="home-block home-block-filter">
+              <FilterStrip activeCategory={null} onCategoryChange={handleCategoryClick} />
+            </section>
 
             {/* Bloque 1: Popular (Rosado) */}
-            <section><PopularCarousel /></section>
+            <section className="home-block home-block-popular"><PopularCarousel /></section>
             
             {/* Bloque 2: Noticias */}
-            <section><News /></section>
+            <section className="home-block home-block-news"><News /></section>
             
             {/* Bloque 3: Últimos General (Rosado) */}
             {/* ✅ SOLUCIÓN: Usamos Latest sin props, porque él busca sus propios datos */}
-            <section>
+            <section className="home-block home-block-latest">
                 <Latest />
             </section>
             
             {/* Bloque 4: Lista de Actualizaciones (Manhwa/Etc) */}
-            <section className="relative z-30">
+            <section className="home-block home-block-men relative z-30 -mt-10 md:-mt-14 lg:-mt-16">
                 <LatestUpdates />
             </section>
 
             {/* --- BLOQUE JUVENIL (CELESTE) --- */}
             
             {/* Carrusel Juvenil */}
-            <section>
+            <section className="home-block home-block-youth">
                 <YouthCarousel />
             </section>
 
+            {/* Noticias para la rama juvenil, debajo de sus mangas populares */}
+            <section className="home-block home-block-youth-news">
+                <News />
+            </section>
+
             {/* Grilla Juvenil (Copia de Latest pero azul) */}
-            <section>
+            <section className="home-block home-block-youth-latest">
                 <YouthLatest />
             </section>
 
             {/* --- FIN BLOQUE JUVENIL --- */}
 
             {/* Bloque Final: Nuevos Lanzamientos */}
-            <section><NewReleases /></section>
+            <section className="home-block home-block-releases"><NewReleases /></section>
         </div>
+        </div>
+
+        <Footer />
       </div>
 
-      <Footer /> 
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
+        title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+        className={`fixed bottom-4 right-4 z-[90] grid h-9 w-9 place-items-center rounded-full border opacity-40 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#38BDF8] md:bottom-6 md:right-6 ${
+          theme === 'light'
+            ? 'border-zinc-300/70 bg-white/65 text-zinc-600 hover:text-zinc-950'
+            : 'border-white/10 bg-black/35 text-white/55 hover:border-white/25 hover:text-white'
+        }`}
+      >
+        {theme === 'light' ? <Moon size={16} strokeWidth={2} /> : <Sun size={16} strokeWidth={2} />}
+      </button>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <HomeDataProvider>
+      <HomeContent />
+    </HomeDataProvider>
   );
 }

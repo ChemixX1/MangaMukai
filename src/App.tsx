@@ -1,21 +1,21 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { migrateOldDataToSupabase } from './utils/migration';
-import { HomeDataProvider, useHomeData } from './context/HomeDataContext';
-import { GlobalLoader } from './components/GlobalLoader';
+import { migrateOldDataToWordPress } from './services/migrationService';
+import { GlobalLoader } from './components/common';
+import { Navbar } from './components/layout';
 
-// --- PÁGINAS Y COMPONENTES ---
-import Home from './pages/Home';
-import { MangaDetail } from './pages/MangaDetail';
-import { Navbar } from './components/Navbar';
-import { Catalog } from './pages/Catalog';
-import { AboutSection } from './components/AboutSection';
-import { ContactSection } from './components/ContactSection';
-import { ProfilePage } from './pages/ProfilePage';
-import { TermsAndPrivacy } from './pages/TermsAndPrivacy';
-import { SavedMangas } from './pages/SavedMangas';
-import { ReaderPage } from './pages/ReaderPage';
-import { PaymentSuccess } from './pages/PaymentSuccess';
+const Home = lazy(() => import('./pages/Home'));
+const MangaBlackWhite = lazy(() => import('./pages/MangaBlackWhite'));
+const MangaAdult = lazy(() => import('./pages/MangaAdult'));
+const MangaDetail = lazy(() => import('./pages/MangaDetail').then(({ MangaDetail: Page }) => ({ default: Page })));
+const Catalog = lazy(() => import('./pages/Catalog').then(({ Catalog: Page }) => ({ default: Page })));
+const AboutPage = lazy(() => import('./pages/AboutPage').then(({ AboutPage: Page }) => ({ default: Page })));
+const ContactPage = lazy(() => import('./pages/ContactPage').then(({ ContactPage: Page }) => ({ default: Page })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(({ ProfilePage: Page }) => ({ default: Page })));
+const TermsAndPrivacy = lazy(() => import('./pages/TermsAndPrivacy').then(({ TermsAndPrivacy: Page }) => ({ default: Page })));
+const SavedMangas = lazy(() => import('./pages/SavedMangas').then(({ SavedMangas: Page }) => ({ default: Page })));
+const ReaderPage = lazy(() => import('./pages/ReaderPage').then(({ ReaderPage: Page }) => ({ default: Page })));
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess').then(({ PaymentSuccess: Page }) => ({ default: Page })));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -26,41 +26,39 @@ const ScrollToTop = () => {
 };
 
 function AppInner() {
-  const { isReady } = useHomeData();
-
   useEffect(() => {
-    migrateOldDataToSupabase().catch(console.error);
+    migrateOldDataToWordPress().catch(console.error);
   }, []);
 
   return (
     <Router>
-      <GlobalLoader isLoaded={isReady} />
+      <GlobalLoader />
       <ScrollToTop />
       <Navbar />
-      <div className="min-h-screen bg-[#02040a] text-white font-sans transition-colors duration-300">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/nosotros" element={<AboutSection />} />
-          <Route path="/contacto" element={<ContactSection />} />
-          <Route path="/perfil" element={<ProfilePage />} />
-          <Route path="/saved" element={<SavedMangas />} />
-          <Route path="/legal" element={<TermsAndPrivacy />} />
-          <Route path="/catalog" element={<Catalog />} />
-          <Route path="/manga/:id" element={<MangaDetail />} />
-          <Route path="/read/:chapterId" element={<ReaderPage />} />
-          <Route path="/pago-exitoso" element={<PaymentSuccess />} />
-        </Routes>
+      <div className="min-h-screen bg-black text-white font-sans transition-colors duration-300">
+        <Suspense fallback={<div className="min-h-screen bg-black" />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/nosotros" element={<AboutPage />} />
+            <Route path="/contacto" element={<ContactPage />} />
+            <Route path="/perfil" element={<ProfilePage />} />
+            <Route path="/saved" element={<SavedMangas />} />
+            <Route path="/legal" element={<TermsAndPrivacy />} />
+            <Route path="/catalog" element={<Catalog />} />
+            <Route path="/manga/:id" element={<MangaDetail />} />
+            <Route path="/read/:chapterId" element={<ReaderPage />} />
+            <Route path="/pago-exitoso" element={<PaymentSuccess />} />
+            <Route path="/manga-bn" element={<MangaBlackWhite />} />
+            <Route path="/manga-19" element={<MangaAdult />} />
+          </Routes>
+        </Suspense>
       </div>
     </Router>
   );
 }
 
 function App() {
-  return (
-    <HomeDataProvider>
-      <AppInner />
-    </HomeDataProvider>
-  );
+  return <AppInner />;
 }
 
 export default App;

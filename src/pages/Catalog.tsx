@@ -1,21 +1,14 @@
 import { useState, useEffect } from "react";
 import { Search, X, BookOpen, Star, Tag, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { Footer } from "../components/Footer";
+import { Footer } from "../components/layout";
+import { MangaMetaBar } from "../components/common";
 import { getUltimosCapitulos } from "../services/mangaService";
 import type { MangaCapitulo } from "../types/manga";
 
-// Generación de estrellas (fondo)
-const generateStars = (count: number) => Array.from({ length: count }).map(() => `${Math.random() * 2500}px ${Math.random() * 8000}px #FFF`).join(',');
-const starsSmall = generateStars(1000);
-const starsMedium = generateStars(300);
-const starsBig = generateStars(100);
-
-const starAnimationStyles = `
-  @keyframes move-stars-vertical { from { transform: translateY(0px); } to { transform: translateY(-1000px); } }
-  .star-layer { background: transparent; position: absolute; top: 0; left: 0; right: 0; z-index: 0; pointer-events: none; }
+const catalogStyles = `
   ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-track { background: #02040a; }
+  ::-webkit-scrollbar-track { background: #000; }
   ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: #FF4D88; }
 `;
@@ -24,7 +17,7 @@ export const Catalog = () => {
   useEffect(() => {
     const styleSheet = document.createElement("style");
     styleSheet.type = "text/css";
-    styleSheet.innerText = starAnimationStyles;
+    styleSheet.innerText = catalogStyles;
     document.head.appendChild(styleSheet);
     return () => { document.head.removeChild(styleSheet); };
   }, []);
@@ -49,6 +42,7 @@ export const Catalog = () => {
   // Manejar navegación desde Home y SearchModal
   useEffect(() => {
     if (location.state?.searchTerm) setSearchTerm(location.state.searchTerm);
+    if (location.state?.filterCategory) setSelectedTag(location.state.filterCategory);
     window.history.replaceState({}, document.title);
   }, [location]);
 
@@ -105,15 +99,7 @@ export const Catalog = () => {
   const formattedTime = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
-    <div className="min-h-screen bg-[#02040a] font-sans flex flex-col relative overflow-hidden text-gray-100">
-
-      {/* Fondo de Estrellas */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[#02040a]"></div>
-        <div className="star-layer w-[1px] h-[1px]" style={{ boxShadow: starsSmall, animation: 'move-stars-vertical 100s linear infinite' }}></div>
-        <div className="star-layer w-[2px] h-[2px] opacity-70" style={{ boxShadow: starsMedium, animation: 'move-stars-vertical 150s linear infinite' }}></div>
-        <div className="star-layer w-[3px] h-[3px] opacity-50" style={{ boxShadow: starsBig, animation: 'move-stars-vertical 200s linear infinite' }}></div>
-      </div>
+    <div className="min-h-screen bg-black font-sans flex flex-col relative overflow-hidden text-gray-100">
 
       <div className="relative z-10 flex flex-col flex-grow">
 
@@ -216,9 +202,11 @@ export const Catalog = () => {
                 <button onClick={clearFilters} className="text-blue-500 hover:text-blue-400 text-xs underline">Limpiar búsqueda</button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
-                {items.map((manga) => (
-                  <Link to={`/manga/${manga.id}`} key={manga.id} className="group flex flex-col relative">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+                {items.map((manga) => {
+                  const chapter = manga.capitulosRecientes[0];
+                  return (
+                  <Link to={`/manga/${manga.id}`} key={manga.id} className="group relative flex flex-col overflow-hidden rounded-lg bg-[#0f1115] ring-1 ring-white/10">
                     <div className="relative aspect-[2/3] w-full rounded-lg overflow-hidden bg-[#111] shadow-2xl transition-all duration-500 group-hover:-translate-y-2 group-hover:shadow-blue-900/20">
                       <img
                         src={manga.portada}
@@ -238,9 +226,6 @@ export const Catalog = () => {
                         <span>{manga.tipo}</span>
                       </div>
                       <div className="absolute top-2 left-2 flex flex-col gap-1">
-                        {manga.esGratis && (
-                          <span className="w-2 h-2 bg-green-500 rounded-full shadow-[0_0_5px_#22c55e] block"></span>
-                        )}
                         {manga.genero === 'Mujer' && (
                           <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-pink-600/80 text-white leading-tight">♀</span>
                         )}
@@ -249,18 +234,20 @@ export const Catalog = () => {
                         )}
                       </div>
                     </div>
-                    <div className="mt-3 px-1">
-                      <h3 className="text-xs md:text-sm font-[800] text-gray-200 uppercase tracking-tight leading-tight line-clamp-2 group-hover:text-blue-400 transition-colors">
+                    <div className="flex h-[3rem] items-center justify-center px-3">
+                      <h3 className="line-clamp-2 text-center text-xs font-[800] uppercase leading-tight tracking-tight text-gray-200 transition-colors group-hover:text-blue-400 md:text-sm">
                         {manga.titulo}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] font-mono text-zinc-500">{manga.capitulosRecientes.length} Caps</span>
-                        <span className="text-[10px] text-zinc-600">•</span>
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase">{manga.tipo}</span>
-                      </div>
                     </div>
+                    <MangaMetaBar
+                      chapter={chapter?.numero ?? manga.capitulosRecientes.length}
+                      isFree={chapter?.esGratis ?? manga.esGratis}
+                      date={chapter?.fecha ?? manga.fecha}
+                      accentClassName={manga.genero === 'Mujer' ? 'text-[#FF4D88]' : 'text-[#00C2FF]'}
+                    />
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </main>
