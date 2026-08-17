@@ -242,7 +242,7 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
           <div className="w-full max-w-[340px] mx-auto">
             <header className="mb-8 text-center">
               <motion.h1 layout className={`text-3xl font-[1000] uppercase italic tracking-tighter ${isLightMode ? 'text-black' : 'text-white'}`}>
-                {isLoginView ? "Iniciar sesión" : "Crear Perfil"}
+                {isLoginView ? "Bienvenido de nuevo" : "Crear Nueva Cuenta"}
               </motion.h1>
               <div className="w-8 h-1 bg-[#FF4D88] mx-auto mt-3 rounded-full"></div>
             </header>
@@ -251,7 +251,7 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
             {isLoginView && (
               <div className={`mb-6 flex items-start gap-2.5 rounded-xl border p-3.5 ${isLightMode ? 'border-blue-200 bg-blue-50' : 'border-blue-400/20 bg-blue-500/10'}`}>
                 <Info size={15} className="text-blue-500 mt-0.5 shrink-0" />
-                <p className={`text-[11px] font-semibold leading-snug ${isLightMode ? 'text-blue-700' : 'text-blue-200'}`}>
+                <p className={`text-[12px] font-semibold leading-snug ${isLightMode ? 'text-zinc-900' : 'text-blue-200'}`}>
                   El acceso con Google y Discord fue desactivado. Tu cuenta sigue activa —{" "}
                   <a
                     href={wordpressUrl('wp-login.php?action=lostpassword')}
@@ -354,12 +354,12 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
               <button
                 type="submit"
                 disabled={loading}
-                className={`noto-sans-myanmar-auth mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#FF4D88] py-[1.05rem] text-[12px] uppercase tracking-normal text-white shadow-lg shadow-[#FF4D88]/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:text-[13px] ${isLightMode ? 'hover:bg-black' : 'hover:bg-white hover:text-black'}`}
+                className={`Poppins mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#FF4D88] py-[1.05rem] text-[12px] capitalize tracking-normal text-white shadow-lg shadow-[#FF4D88]/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:text-[13px] ${isLightMode ? 'hover:bg-black' : 'hover:bg-white hover:text-black'}`}
               >
                 {loading ? (
                   <Loader2 size={18} className="animate-spin" />
                 ) : (
-                  <>{isLoginView ? "INGRESAR" : "REGISTRARME"}</>
+                  <>{isLoginView ? "INGRESAR" : "Registro"}</>
                 )}
               </button>
             </form>
