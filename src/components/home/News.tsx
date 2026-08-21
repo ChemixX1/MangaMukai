@@ -1,12 +1,13 @@
 import { useState, useEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, Heart, X, Check, ChevronRight, ChevronLeft, Zap, Gamepad2, ShieldAlert } from "lucide-react";
 
 // Assets
 import renewalBackdrop from '../../assets/banners/mythical-dragon-beast-anime-style.jpg';
 import premiumBackdrop from '../../assets/banners/anime-style-mythical-dragon-creature.jpg';
 import subscriptionBackdrop from '../../assets/banners/illustration-anime-character-rain.jpg';
-import { AuthModal, CoinMarketModal, SubscriptionModal } from '../modals';
+import { CoinMarketModal, SubscriptionModal } from '../modals';
 import {
   AUTH_CHANGED_EVENT,
   AUTH_SESSION_EXPIRED_EVENT,
@@ -114,13 +115,18 @@ const supportThemes = [
   }
 ];
 
-export default function News() {
+type NewsProps = {
+  variant?: "default" | "youth";
+};
+
+export default function News({ variant = "default" }: NewsProps) {
+  const navigate = useNavigate();
   const { theme } = useTheme();
+  const isYouthNews = variant === "youth";
   const [showDonateModal, setShowDonateModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCoinModal, setShowCoinModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<MMUser | null>(getAuthenticatedUser);
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredToken()));
   const [donationAmount, setDonationAmount] = useState("5.00");
@@ -231,7 +237,9 @@ export default function News() {
 
   const handleAction = (action: string | null, link: string | null) => {
     if ((action === "coins" || action === "vip") && !isAuthenticated) {
-      setShowAuthModal(true);
+      navigate('/auth/login', {
+        state: { returnTo: `${window.location.pathname}${window.location.search}` },
+      });
       return;
     }
 
@@ -440,12 +448,12 @@ export default function News() {
             ))}
 
             {/* CONTROLES / INDICADORES (Manga Style) */}
-            <div className="absolute bottom-4 left-6 md:left-20 z-30 flex gap-3">
+            <div className={`absolute left-6 z-30 flex gap-3 md:left-20 ${isYouthNews ? 'bottom-7 md:bottom-8' : 'bottom-4'}`}>
               {slides.map((s, idx) => (
                 <button 
                   key={idx}
                   onClick={() => setCurrentSlide(idx)}
-                  className={`h-2 transition-all duration-300 -skew-x-12 ${currentSlide === idx ? 'w-10' : 'w-4 bg-white/30 hover:bg-white/60'}`}
+                  className={`h-2 -skew-x-12 transition-all duration-300 ${isYouthNews ? 'home-youth-news-slide-dot border' : ''} ${currentSlide === idx ? 'w-10' : 'w-4 bg-white/30 hover:bg-white/60'}`}
                   style={{ backgroundColor: currentSlide === idx ? s.color : undefined, boxShadow: currentSlide === idx ? `0 0 10px ${s.color}` : 'none' }}
                 />
               ))}
@@ -733,11 +741,6 @@ export default function News() {
       <SubscriptionModal
         isOpen={showSubscriptionModal}
         onClose={() => setShowSubscriptionModal(false)}
-      />
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        initialView="login"
       />
     </section>
   );

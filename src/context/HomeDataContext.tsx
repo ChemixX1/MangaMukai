@@ -8,6 +8,7 @@ import {
   getNewReleases,
 } from '../services/mangaService';
 import { preloadImages } from '../utils/preloadImages';
+import { seedSharedAuthCovers } from '../utils/authCoverCache';
 
 interface HomeData {
   popularWeekly: MangaCapitulo[];
@@ -35,7 +36,7 @@ const emitLoadingProgress = (progress: number, complete = false) => {
 };
 
 const preloadCriticalImages = async (payload: HomeDataPayload) => {
-  const sources = [
+  const criticalMangas = [
     ...payload.popularWeekly,
     ...payload.popularMenWeekly,
     ...payload.popularHistorical.slice(0, 3),
@@ -43,7 +44,9 @@ const preloadCriticalImages = async (payload: HomeDataPayload) => {
     ...payload.latestWomen.slice(0, 2),
     ...payload.latestMen.slice(0, 2),
     ...payload.newReleases.slice(0, 1),
-  ].map(manga => manga.portada).filter(Boolean);
+  ];
+  const authCovers = seedSharedAuthCovers(criticalMangas);
+  const sources = authCovers.map(cover => cover.src);
 
   await preloadImages(sources);
 };

@@ -16,6 +16,7 @@ import { Footer } from "../components/layout";
 import { PaginationControls } from "../components/common";
 import { useTheme } from "../hooks/useTheme";
 import { getUltimosCapitulos } from "../services/mangaService";
+import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from "../utils/globalLoading";
 import { preloadImages } from "../utils/preloadImages";
 import type { MangaCapitulo } from "../types/manga";
 
@@ -139,7 +140,7 @@ const BibliotecaClock = ({ isLight }: { isLight: boolean }) => {
           <FlipClockTile key={part.label} {...part} isLight={isLight} />
         ))}
       </div>
-      <p className={`anta-library-date mt-2 text-center text-[10px] capitalize sm:text-[11px] ${isLight ? "text-zinc-700" : "text-white/80"}`}>
+      <p className={`anta-library-date mt-2 text-center text-[11px] capitalize sm:text-xs ${isLight ? "text-zinc-700" : "text-white/80"}`}>
         {dateLabel}
       </p>
     </div>
@@ -197,22 +198,39 @@ export const Biblioteca = () => {
     let cancelled = false;
 
     const loadLibrary = async () => {
+      startGlobalLoading(10);
       setLoading(true);
-      const data = await getUltimosCapitulos();
-      if (cancelled) return;
+      try {
+        const data = await getUltimosCapitulos();
+        if (cancelled) return;
 
-      setAllItems(data);
-      const tags = new Set<string>();
-      data.forEach((manga) => {
-        (manga.genres || []).forEach((genre) => { if (genre) tags.add(genre); });
-        if (manga.tipo) tags.add(manga.tipo);
-      });
-      setAvailableTags(Array.from(tags).sort((a, b) => a.localeCompare(b, "es")));
-      setLoading(false);
+        const tags = new Set<string>();
+        data.forEach((manga) => {
+          (manga.genres || []).forEach((genre) => { if (genre) tags.add(genre); });
+          if (manga.tipo) tags.add(manga.tipo);
+        });
+
+        updateGlobalLoading(78);
+        await preloadImages(data.slice(0, 8).map((manga) => manga.portada).filter(Boolean));
+        if (cancelled) return;
+
+        setAllItems(data);
+        setAvailableTags(Array.from(tags).sort((a, b) => a.localeCompare(b, "es")));
+        setLoading(false);
+        window.requestAnimationFrame(finishGlobalLoading);
+      } catch (error) {
+        console.error("Biblioteca preload error:", error);
+        if (cancelled) return;
+        setLoading(false);
+        finishGlobalLoading();
+      }
     };
 
     void loadLibrary();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      finishGlobalLoading();
+    };
   }, []);
 
   const items = useMemo(() => {
@@ -313,10 +331,7 @@ export const Biblioteca = () => {
             : `radial-gradient(circle at 50% -20%, ${isMasculine ? "rgba(0,194,255,.16)" : "rgba(255,77,136,.15)"}, transparent 40%)`,
         }}
       >
-        <div className="desktop-content-shell relative mx-auto w-full px-4 pb-7 pt-28 text-center sm:px-8 sm:pb-8 sm:pt-36 lg:px-16">
-          <div className={`mb-5 inline-flex items-center rounded-full border px-4 py-2 font-['Poppins'] text-xs font-[800] normal-case tracking-normal sm:text-sm ${isLight ? "border-black/10 bg-white/75 text-black/65 shadow-sm" : "border-white/10 bg-white/[0.04] text-white/70"}`}>
-            Todo lo mejor para ti
-          </div>
+        <div className="desktop-content-shell relative mx-auto w-full px-4 pb-4 pt-28 text-center sm:px-8 sm:pb-5 sm:pt-36 lg:px-16 lg:pb-2 lg:pt-40">
           <h1 className={`mx-auto flex max-w-full flex-wrap items-baseline justify-center gap-x-[0.2em] text-[clamp(1.85rem,8.2vw,2.45rem)] font-[1000] uppercase italic leading-[0.92] tracking-[-0.065em] drop-shadow-lg sm:text-[clamp(3rem,7vw,5.35rem)] ${isLight ? "text-zinc-950" : "text-white"}`}>
             <span>Biblioteca</span>
             <span className={isMasculine ? "pr-[0.08em] text-[#00C2FF]" : "pr-[0.08em] text-[#FF4D88]"}>Mukai</span>
@@ -327,12 +342,12 @@ export const Biblioteca = () => {
         </div>
       </section>
 
-      <div className="desktop-content-shell mx-auto grid w-full flex-1 gap-7 px-4 pb-16 pt-4 sm:px-8 lg:grid-cols-[270px_minmax(0,1fr)] lg:gap-9 lg:px-16 lg:pt-6">
-        <aside id="filtros" className="scroll-mt-24 lg:self-start">
-          <div className={`space-y-5 rounded-3xl border p-4 transition-colors duration-300 sm:p-5 lg:sticky lg:top-6 ${isLight ? "border-black/[0.09] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.09)]" : "border-white/[0.08] bg-[#0b0b0e] shadow-[0_24px_70px_rgba(0,0,0,0.28)]"}`}>
-            <div className={`flex items-center justify-between border-b pb-4 ${isLight ? "border-black/[0.08]" : "border-white/[0.07]"}`}>
-              <h2 className={`audiowide-library text-xl leading-tight ${isLight ? "text-zinc-950" : "text-white"}`}>Busca tu manga favorito</h2>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border" style={{ color: accentColor, borderColor: `${accentColor}40`, backgroundColor: `${accentColor}16` }}>
+      <div className="desktop-content-shell mx-auto flex w-full flex-1 flex-col px-4 pb-16 pt-2 sm:px-8 sm:pt-3 lg:px-16 lg:pt-2">
+        <aside id="filtros" className="scroll-mt-24">
+          <div className={`grid items-center gap-4 rounded-3xl border p-4 transition-colors duration-300 sm:p-5 lg:grid-cols-[minmax(200px,0.85fr)_190px_minmax(160px,1.1fr)_minmax(245px,1.2fr)] lg:gap-5 ${isLight ? "border-black/[0.09] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.09)]" : "border-white/[0.08] bg-[#0b0b0e] shadow-[0_24px_70px_rgba(0,0,0,0.28)]"}`}>
+            <div className={`relative flex items-center justify-center border-b pb-4 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5 ${isLight ? "border-black/[0.08]" : "border-white/[0.07]"}`}>
+              <h2 className={`audiowide-library w-full px-11 text-center text-xl leading-tight lg:px-0 lg:text-lg xl:text-xl ${isLight ? "text-zinc-950" : "text-white"}`}>Busca tu manga favorito</h2>
+              <div className="absolute right-0 flex h-10 w-10 items-center justify-center rounded-xl border lg:hidden" style={{ color: accentColor, borderColor: `${accentColor}40`, backgroundColor: `${accentColor}16` }}>
                 <Clock size={18} />
               </div>
             </div>
@@ -365,7 +380,7 @@ export const Biblioteca = () => {
               )}
             </label>
 
-            <div>
+            <div className="space-y-4 lg:contents">
               <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"
@@ -377,6 +392,31 @@ export const Biblioteca = () => {
                   <span className="flex items-center gap-2"><SlidersHorizontal size={16} style={{ color: accentColor }} /> Filtros</span>
                   <ChevronDown size={15} className={`transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`} />
                 </button>
+                {([
+                  { audience: "Hombre" as const, label: "Masculino", icon: Mars, color: "#00C2FF" },
+                  { audience: "Mujer" as const, label: "Femenino", icon: Venus, color: "#FF4D88" },
+                ]).map(({ audience, label, icon: AudienceIcon, color }) => {
+                  const isActive = selectedAudience === audience;
+                  return (
+                    <button
+                      key={audience}
+                      type="button"
+                      aria-label={label}
+                      title={label}
+                      aria-pressed={isActive}
+                      onClick={() => selectAudience(audience)}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition duration-200 hover:-translate-y-0.5"
+                      style={{
+                        borderColor: isActive ? color : isLight ? "rgba(0,0,0,.09)" : "rgba(255,255,255,.08)",
+                        backgroundColor: isLight ? "#fafafa" : "rgba(255,255,255,.035)",
+                        color,
+                        boxShadow: isActive ? `0 0 0 2px ${color}45, 0 9px 22px ${color}20` : "none",
+                      }}
+                    >
+                      <AudienceIcon size={20} strokeWidth={3.5} />
+                    </button>
+                  );
+                })}
                 <button
                   type="button"
                   onClick={clearFilters}
@@ -390,44 +430,10 @@ export const Biblioteca = () => {
               </div>
 
               {filtersOpen && (
-                <div id="biblioteca-filter-options" className={`mt-4 max-h-[320px] space-y-5 overflow-y-auto overscroll-contain border-t pr-1 pt-4 [scrollbar-width:thin] sm:max-h-[380px] lg:max-h-[430px] ${isLight ? "border-black/[0.08]" : "border-white/[0.07]"}`}>
-                  <div className="grid grid-cols-2 gap-2">
-                    {([
-                      { audience: "Hombre" as const, label: "Masculino", icon: Mars, color: "#00C2FF" },
-                      { audience: "Mujer" as const, label: "Femenino", icon: Venus, color: "#FF4D88" },
-                    ]).map(({ audience, label, icon: AudienceIcon, color }) => {
-                      const isActive = selectedAudience === audience;
-                      return (
-                        <button
-                          key={audience}
-                          type="button"
-                          aria-label={label}
-                          title={label}
-                          aria-pressed={isActive}
-                          onClick={() => selectAudience(audience)}
-                          className="flex min-h-12 items-center justify-center rounded-xl border transition duration-200 hover:-translate-y-0.5"
-                          style={isActive
-                            ? {
-                              borderColor: color,
-                              backgroundColor: isLight ? "#111216" : "#ffffff",
-                              color: isLight ? "#ffffff" : "#111216",
-                              boxShadow: `0 0 0 2px ${color}45, 0 9px 22px ${color}2e`,
-                            }
-                            : {
-                              borderColor: `${color}70`,
-                              backgroundColor: `${color}${isLight ? "16" : "20"}`,
-                              color,
-                            }}
-                        >
-                          <AudienceIcon size={22} strokeWidth={3.5} />
-                        </button>
-                      );
-                    })}
-                  </div>
-
+                <div id="biblioteca-filter-options" className={`max-h-[165px] touch-pan-y overflow-y-auto overscroll-contain border-t pr-2 pt-4 [scrollbar-gutter:stable] [scrollbar-width:thin] lg:col-span-4 ${isLight ? "border-black/[0.08]" : "border-white/[0.07]"}`}>
                   {availableTags.length > 0 && (
                     <div>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:[grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
                         {sortedTags.map((tag) => {
                           const isActive = selectedTag === tag;
                           return (
@@ -439,7 +445,7 @@ export const Biblioteca = () => {
                                 setSelectedTag(isActive ? null : tag);
                                 setCurrentPage(1);
                               }}
-                              className={`open-sans-library-filters flex min-h-11 items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-bold normal-case leading-tight tracking-normal transition ${isActive ? "" : isLight ? "border-black/[0.09] bg-zinc-50 text-zinc-600 hover:border-black/20 hover:text-black" : "border-white/[0.08] bg-white/[0.035] text-zinc-400 hover:border-white/20 hover:text-white"}`}
+                              className={`open-sans-library-filters flex h-11 items-center justify-center overflow-hidden rounded-lg border px-2 py-2 text-center text-xs font-bold normal-case leading-tight tracking-normal transition ${isActive ? "" : isLight ? "border-black/[0.09] bg-zinc-50 text-zinc-600 hover:border-black/20 hover:text-black" : "border-white/[0.08] bg-white/[0.035] text-zinc-400 hover:border-white/20 hover:text-white"}`}
                               style={isActive ? { borderColor: accentColor, backgroundColor: accentColor, color: isMasculine ? "#001018" : "#fff", boxShadow: `0 8px 24px ${accentColor}30` } : undefined}
                             >
                               {tag}
@@ -456,7 +462,7 @@ export const Biblioteca = () => {
           </div>
         </aside>
 
-        <main id="biblioteca-anchor" className="min-w-0 scroll-mt-24">
+        <main id="biblioteca-anchor" className="mt-12 min-w-0 scroll-mt-24 sm:mt-14 lg:mt-16">
           <div className={`mb-5 border-b pb-5 text-center ${isLight ? "border-black/[0.08]" : "border-white/[0.08]"}`}>
             <h2 className={`google-sans-library text-2xl font-black uppercase tracking-tight sm:text-3xl ${isLight ? "text-zinc-950" : "text-white"}`}>
               {resultsTitle}
@@ -464,13 +470,13 @@ export const Biblioteca = () => {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="mx-auto grid w-full max-w-[1180px] grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
               {Array.from({ length: 10 }).map((_, index) => (
                 <div key={index} className={`aspect-[2/3] animate-pulse rounded-2xl ${isLight ? "bg-black/[0.06]" : "bg-white/[0.06]"}`} />
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className={`flex min-h-[420px] flex-col items-center justify-center gap-4 rounded-3xl border border-dashed px-6 text-center ${isLight ? "border-black/10 bg-zinc-50" : "border-white/10 bg-white/[0.02]"}`}>
+            <div className={`mx-auto flex min-h-[420px] w-full max-w-[1180px] flex-col items-center justify-center gap-4 rounded-3xl border border-dashed px-6 text-center ${isLight ? "border-black/10 bg-zinc-50" : "border-white/10 bg-white/[0.02]"}`}>
               <div className={`flex h-16 w-16 items-center justify-center rounded-2xl border ${isLight ? "border-black/10 bg-white" : "border-white/10 bg-white/[0.04]"}`}>
                 <BookOpen size={28} className={isLight ? "text-black/30" : "text-white/25"} />
               </div>
@@ -484,15 +490,15 @@ export const Biblioteca = () => {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+              <div className="mx-auto grid w-full max-w-[1180px] grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
                 {pageItems.map((manga, index) => (
                   <Link
                     to={`/manga/${manga.id}`}
                     key={manga.id}
-                    className={`group relative block min-w-0 overflow-hidden rounded-2xl border shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition duration-300 hover:-translate-y-1 ${isLight ? "border-black/10 bg-white" : "border-white/[0.09] bg-[#0d0d11]"}`}
+                    className="biblioteca-cover-card group relative block min-w-0"
                     style={{ "--card-accent": accentColor } as CSSProperties}
                   >
-                    <div className="relative aspect-[2/3] w-full overflow-hidden bg-zinc-900">
+                    <div className={`biblioteca-cover-card-surface relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_14px_34px_rgba(0,0,0,0.18)] ${isLight ? "biblioteca-cover-card-light" : "biblioteca-cover-card-dark"}`}>
                       <img
                         src={manga.portada}
                         alt={manga.titulo}
@@ -501,6 +507,7 @@ export const Biblioteca = () => {
                         decoding="async"
                       />
                       <div className={isLight ? "absolute inset-x-0 bottom-0 h-[36%] bg-gradient-to-t from-white via-white/85 to-transparent" : "absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent opacity-90 transition-opacity duration-300"} />
+                      <div className={`biblioteca-cover-top-shade ${isLight ? "biblioteca-cover-top-shade-light" : "biblioteca-cover-top-shade-dark"}`} />
                       <div className={`absolute left-2 top-2 flex items-center gap-1 rounded-md border px-1.5 py-1 text-[8px] font-black shadow-lg backdrop-blur-md sm:left-2.5 sm:top-2.5 sm:text-[9px] ${isLight ? "border-black/10 bg-white/85 text-zinc-950" : "border-white/15 bg-black/70 text-white"}`}>
                         <Star size={10} className="fill-yellow-400 text-yellow-400" /> 10
                       </div>

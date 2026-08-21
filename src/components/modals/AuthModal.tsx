@@ -299,6 +299,7 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
                     exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                     transition={{ duration: 0.3 }}
                   >
+          
                     <div className={inputContainerClass}>
                       <User className={iconClass} size={18} strokeWidth={2.5} />
                       <input
@@ -308,7 +309,7 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
                         onChange={e => setUsername(e.target.value)}
                         className={inputClass}
                       />
-                    </div>
+                    </div>- 
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -324,13 +325,24 @@ export const AuthModal = ({ isOpen, onClose, initialView }: AuthModalProps) => {
                   required
                 />
               </div>
+              <div className={inputContainerClass}>
+                <Mail className={iconClass} size={18} strokeWidth={2.5} />
+                <input
+                  type="email"
+                  placeholder="Contreseña"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className={inputClass}
+                  required
+                />
+              </div>
 
               <div>
                 <div className={inputContainerClass}>
                   <Lock className={iconClass} size={18} strokeWidth={2.5} />
                   <input
                     type="password"
-                    placeholder="Contraseña"
+                    placeholder="Fecha de Nacimiento"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     className={inputClass}

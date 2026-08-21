@@ -32,11 +32,11 @@ const FilterStrip = ({ activeCategory, onCategoryChange, id, className = '', bea
         }
 
         .scan-top {
-          animation: scanline 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          animation: scanline 2.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         }
 
         .scan-bottom {
-          animation: scanline 3s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;
+          animation: scanline 2.7s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;
         }
 
         /* Ocultar scrollbar pero permitir scroll */
@@ -57,7 +57,7 @@ const FilterStrip = ({ activeCategory, onCategoryChange, id, className = '', bea
       >
         
         {/* === LÁSER SUPERIOR === */}
-        <div className="absolute top-0 left-0 w-full h-[0px] z-50">
+        <div className="absolute top-0 left-0 w-full h-[2.58px] z-50">
             <div className="beam scan-top"></div>
         </div>
 

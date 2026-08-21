@@ -1,13 +1,12 @@
-import { useState } from "react"; // NUEVO
 import { motion } from "framer-motion";
 import { Users, Zap, Shield, Target, ArrowRight } from "lucide-react";
-import { AuthModal } from "../components/modals";
+import { useNavigate } from "react-router-dom";
 import { Footer } from "../components/layout";
 
 const FEATURES = [
   {
     title: "Comunidad Global",
-    desc: "Conectamos talentos de todo el mundo en un solo universo digital, uniendo artistas, creadores y lectores que comparten la misma pasión por el manga y las grandes historias",
+    desc: "Una comunidad que reúne a artistas, creadores y lectores de distintas partes del mundo para descubrir nuevos talentos, compartir ideas y disfrutar juntos de la pasión por el manga, el arte y las grandes historias.",
     icon: Users,
     colSpan: "md:col-span-2",
     bg: "bg-black text-white"
@@ -36,8 +35,7 @@ const FEATURES = [
 ];
 
 export const AboutPage = () => {
-  // NUEVO: Estado para controlar el modal dentro de esta sección
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <>
@@ -56,9 +54,6 @@ export const AboutPage = () => {
                 viewport={{ once: true }}
                 transition={{ duration: 0.8 }}
               >
-                <h2 className="text-sm font-black tracking-[0.3em] uppercase text-[#FF4D88] mb-4">
-                  Quiénes Somos
-                </h2>
                 <h3 className="text-5xl md:text-7xl font-[1000] uppercase italic tracking-tighter leading-[0.9] text-black">
                   NO SEGUIMOS <br />
                   TENDENCIAS <br />
@@ -115,36 +110,26 @@ export const AboutPage = () => {
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="mt-6 w-full bg-black rounded-[2rem] p-12 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left"
+            className="mt-6 w-full bg-black rounded-[2rem] p-10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left"
           >
-              {/* Efecto de fondo abstracto */}
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-[#FF4D88] rounded-full blur-[120px] opacity-20 pointer-events-none"></div>
 
               <div className="relative z-10">
                 <h4 className="text-white text-3xl font-[1000] italic uppercase tracking-tighter">
                   ¿Listo para empezar?
                 </h4>
-                <p className="text-zinc-400 mt-2 font-medium">Únete a más de 100,000 usuarios hoy.</p>
+                <p className="text-zinc-00 mt-2 font-medium">Únete a más de 100,000 usuarios hoy.</p>
               </div>
 
-              {/* NUEVO: Botón conectado al estado del modal */}
               <button 
-                onClick={() => setIsModalOpen(true)}
-                className="relative z-10 px-8 py-4 bg-white text-black text-xs font-[1000] uppercase tracking-[0.2em] rounded-xl hover:bg-[#FF4D88] hover:text-white transition-colors duration-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,77,136,0.6)]"
+                onClick={() => navigate('/auth/register')}
+                className="relative z-10 rounded-xl bg-white px-8 py-4 text-xs font-bold capitalize tracking-normal text-black transition-colors duration-300 hover:bg-[#FF4D88] hover:text-white"
               >
-                Crear Cuenta Gratis
+                Crear cuenta gratis
               </button>
           </motion.div>
 
         </div>
       </section>
-
-      {/* NUEVO: Renderizado del Modal */}
-      <AuthModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        initialView="register" 
-      />
 
       {/* Footer Integrado al final */}
       <Footer />

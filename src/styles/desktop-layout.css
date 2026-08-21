@@ -10,6 +10,7 @@
   :root {
     --desktop-layout-width: 1366px;
     --desktop-layout-gutter: 3rem;
+    --home-popular-layout-width: 1480px;
   }
 
   .desktop-content-shell {
@@ -17,6 +18,10 @@
     width: 100%;
     max-width: var(--desktop-layout-width) !important;
     margin-inline: auto;
+  }
+
+  .desktop-content-shell.home-popular-shell {
+    max-width: min(100vw, var(--home-popular-layout-width)) !important;
   }
 
   /* El hero mantiene la misma composicion en monitores 16:9 y 16:10. */
@@ -43,6 +48,6 @@
 
   /* Las tarjetas del marquee ya no cambian de escala entre monitores. */
   .home-popular-marquee-card {
-    width: calc((min(100vw, var(--desktop-layout-width)) - 6rem) / 6);
+    width: calc((min(100vw, var(--home-popular-layout-width)) - 4rem) / 6);
   }
 }

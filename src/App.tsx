@@ -16,6 +16,7 @@ const TermsAndPrivacy = lazy(() => import('./pages/TermsAndPrivacy').then(({ Ter
 const SavedMangas = lazy(() => import('./pages/SavedMangas').then(({ SavedMangas: Page }) => ({ default: Page })));
 const ReaderPage = lazy(() => import('./pages/ReaderPage').then(({ ReaderPage: Page }) => ({ default: Page })));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess').then(({ PaymentSuccess: Page }) => ({ default: Page })));
+const AuthPage = lazy(() => import('./pages/AuthPage'));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -45,6 +46,10 @@ function AppInner() {
             <Route path="/saved" element={<SavedMangas />} />
             <Route path="/legal" element={<TermsAndPrivacy />} />
             <Route path="/biblioteca" element={<Biblioteca />} />
+            <Route path="/auth/:view" element={<AuthPage />} />
+            <Route path="/login" element={<Navigate to="/auth/login" replace />} />
+            <Route path="/register" element={<Navigate to="/auth/register" replace />} />
+            <Route path="/registro" element={<Navigate to="/auth/register" replace />} />
             <Route path="/catalog" element={<Navigate to="/biblioteca" replace />} />
             <Route path="/catalogo" element={<Navigate to="/biblioteca" replace />} />
             <Route path="/manga/:id" element={<MangaDetail />} />

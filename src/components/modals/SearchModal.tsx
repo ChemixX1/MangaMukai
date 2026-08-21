@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, Search, CalendarDays, Flame, ChevronRight, Zap, LayoutGrid } from "lucide-react";
+import { X, Search, CalendarDays, Flame, ChevronRight, LayoutGrid } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { getLatestMenUpdates, getLatestWomenUpdates, searchMangas } from '../../services/mangaService';
@@ -213,18 +213,9 @@ export const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                       </div>
 
                       <div className="flex-1 min-w-0 flex flex-col gap-1 z-10">
-                        <h4 className={`w-full truncate text-sm font-[800] uppercase italic tracking-tight transition-colors group-hover:text-[#FF4D88] ${isLight ? 'text-zinc-950' : 'text-white'}`}>
+                        <h4 className={`line-clamp-2 w-full text-sm font-[800] uppercase italic leading-snug tracking-tight transition-colors group-hover:text-[#FF4D88] ${isLight ? 'text-zinc-950' : 'text-white'}`}>
                           {manga.titulo}
                         </h4>
-                        <div className="flex items-center gap-2">
-                          <span className={`rounded px-1.5 py-0.5 text-[8px] font-bold uppercase ${isLight ? 'bg-pink-50 text-pink-700' : 'bg-pink-500/20 text-pink-400'}`}>
-                            {manga.tipo}
-                          </span>
-                          <div className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[9px] font-bold ${isLight ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-yellow-500/10 bg-yellow-500/10 text-yellow-400'}`}>
-                            <Zap size={10} fill="currentColor" />
-                            {manga.esGratis ? 'Gratis' : 'Pago'}
-                          </div>
-                        </div>
                         <div className={`search-release-date mt-1 flex w-fit items-center gap-1.5 rounded-md border border-[#FF4D88]/30 bg-[#FF4D88]/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide ${isLight ? 'text-zinc-900' : 'text-white'}`}>
                           <CalendarDays size={13} className="shrink-0 text-[#FF4D88]" strokeWidth={2.4} />
                           <span className="truncate">Subido {manga.fecha}</span>

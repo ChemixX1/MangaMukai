@@ -178,10 +178,8 @@ export const LatestUpdates = () => {
               transition={{ duration: 1 }} 
               className="absolute inset-0"
             >
-              <img src={activeItem.backgroundHero} alt="background" className="home-theme-backdrop-image h-full w-full object-cover opacity-55 brightness-[0.48] saturate-[0.8]" />
-               <div className="absolute inset-0 bg-black/40" />
-               <div className="home-theme-backdrop-mask absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/85 via-[#0a0a0a]/35 to-[#0a0a0a]/55" />
-               <div className="home-theme-backdrop-mask absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/70 via-transparent to-[#0a0a0a]/85" />
+              <img src={activeItem.backgroundHero} alt="" className="home-hero-backdrop-image home-men-backdrop-image home-theme-backdrop-image h-full w-full object-cover" />
+              <div aria-hidden="true" className="home-section-theme-scrim absolute inset-0" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -304,7 +302,7 @@ export const LatestUpdates = () => {
                     `}>
                         
                         <div className="relative h-full w-full overflow-hidden">
-                            <img src={item.coverImage} alt={item.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                            <img src={item.coverImage} alt={item.title} className="home-showcase-cover-image h-full w-full object-cover" loading="lazy" decoding="async" />
                             <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-md border border-white/15 bg-black/70 px-2 py-1 text-[10px] font-black text-yellow-400" aria-label={`Valoración ${item.rating}`}>
                               <Star size={11} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
                               {item.rating}

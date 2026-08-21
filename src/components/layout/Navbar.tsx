@@ -1,12 +1,16 @@
 import { lazy, Suspense, useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Menu, Search, ChevronDown, X, AlarmClock, ChevronRight, LogOut, User as UserIcon, Bookmark, ShoppingCart, Moon, Sun, BookOpen, Flame, ArrowUpRight } from "lucide-react";
-import { AlarmAlert, AuthModal, CoinMarketModal, SearchModal, TimerModal } from "../modals";
+import { flushSync } from "react-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Menu, Search, ChevronDown, X, AlarmClock, ChevronRight, LogOut, User as UserIcon, Bookmark, ShoppingCart, Moon, Sun, Flame } from "lucide-react";
+import { AlarmAlert, CoinMarketModal, SearchModal, TimerModal } from "../modals";
 import { useTheme } from "../../hooks/useTheme";
 import { getUltimosCapitulos } from "../../services/mangaService";
 import { lockPageScroll } from "../../utils/scrollLock";
 import modernCoinIcon from "../../assets/icons/modern-coin.svg";
 import premiumCrownIcon from "../../assets/icons/premium-crown.svg";
+import authPopoverBackground from "../../assets/modals/auth-login.webp";
+import { preloadImages } from "../../utils/preloadImages";
+import { seedSharedAuthCovers } from "../../utils/authCoverCache";
 import {
   AUTH_CHANGED_EVENT,
   AUTH_SESSION_EXPIRED_EVENT,
@@ -27,6 +31,19 @@ const MOBILE_NAV_LINKS = [
   { name: "Mangas B&N", href: "/manga-bn" },
   { name: "Mangas +19", href: "/manga-19", isAdult: true },
 ];
+
+const NavbarFire = ({ size = 16 }: { size?: number }) => (
+  <span
+    aria-hidden="true"
+    className="navbar-fire-stack"
+    style={{ width: size, height: Math.round(size * 1.18) }}
+  >
+    <Flame className="navbar-fire-outer" size={size} strokeWidth={2.25} />
+    <Flame className="navbar-fire-core" size={Math.round(size * 0.62)} strokeWidth={2.6} />
+    <span className="navbar-fire-ember navbar-fire-ember-one" />
+    <span className="navbar-fire-ember navbar-fire-ember-two" />
+  </span>
+);
 
 const FacebookIcon = ({ size = 20, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
@@ -59,82 +76,27 @@ const MOBILE_SOCIAL_LINKS = [
   { name: "WhatsApp", href: "https://wa.me/51926615198", icon: WhatsAppIcon },
 ];
 
-const DAILY_ROUTE_LIMIT = 8;
-const DAILY_ROUTE_REFRESH_MS = 24 * 60 * 60 * 1000;
-const FALLBACK_QUICK_ROUTES = [
-  "Romance",
-  "Drama",
-  "Reencarnación",
-  "Manhwa",
-  "Romance obsesivo",
-  "Comedia",
-  "Venganza",
-  "Magia",
-];
-
-const HIDDEN_QUICK_ROUTE_TAGS = new Set([
-  "manga",
-  "mujer",
-  "hombre",
-  "b/n",
-  "+15",
-  "+16",
-  "+18",
-  "+19",
-]);
-
-const buildDailyQuickRoutes = (mangas: Awaited<ReturnType<typeof getUltimosCapitulos>>) => {
-  const occurrences = new Map<string, number>();
-
-  mangas.forEach((manga) => {
-    new Set(manga.genres || []).forEach((tag) => {
-      const cleanTag = tag.trim();
-      if (!cleanTag || HIDDEN_QUICK_ROUTE_TAGS.has(cleanTag.toLocaleLowerCase('es'))) return;
-      occurrences.set(cleanTag, (occurrences.get(cleanTag) || 0) + 1);
-    });
-  });
-
-  const availableTags = [...occurrences.entries()]
-    .filter(([, count]) => count >= 3)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))
-    .map(([tag]) => tag);
-
-  if (availableTags.length < DAILY_ROUTE_LIMIT) return FALLBACK_QUICK_ROUTES;
-
-  const today = new Date();
-  const localDayNumber = Math.floor(
-    new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() / DAILY_ROUTE_REFRESH_MS
-  );
-  const start = (localDayNumber * DAILY_ROUTE_LIMIT) % availableTags.length;
-
-  return Array.from(
-    { length: DAILY_ROUTE_LIMIT },
-    (_, index) => availableTags[(start + index) % availableTags.length]
-  );
-};
-
 const getCurrentStoredUser = () => (getStoredToken() ? getStoredUser() : null);
 
 export const Navbar = () => {
   
   // --- LÓGICA DE COLOR (DARK/LIGHT MODE) ---
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const isAuthRoute = location.pathname.startsWith('/auth/');
   const isLightMode = location.pathname === '/nosotros'
     || location.pathname === '/contacto'
-    || (location.pathname === '/biblioteca' && theme === 'light');
+    || ((location.pathname === '/' || location.pathname === '/biblioteca' || isAuthRoute) && theme === 'light');
 
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [authView, setAuthView] = useState<'login' | 'register'>('login');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const headerUsesDarkText = isLightMode && !isMobileMenuOpen;
+  const headerUsesDarkText = isLightMode;
   const [currentUser, setCurrentUser] = useState<MMUser | null>(getCurrentStoredUser);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isCoinModalOpen, setIsCoinModalOpen] = useState(false);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [sessionNotice, setSessionNotice] = useState(false);
-  const [quickRoutes, setQuickRoutes] = useState(FALLBACK_QUICK_ROUTES);
   const [isMobileScrolled, setIsMobileScrolled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -144,6 +106,10 @@ export const Navbar = () => {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    void preloadImages([authPopoverBackground]);
+  }, []);
 
   useEffect(() => {
     if (!isMobileMenuOpen) return;
@@ -214,24 +180,32 @@ export const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    if (!window.matchMedia('(min-width: 1024px)').matches) return;
+    if (currentUser || (!showUserMenu && !isMobileMenuOpen)) return;
 
-    let cancelled = false;
+    void getUltimosCapitulos().then((mangas) => {
+      const covers = seedSharedAuthCovers(mangas);
+      void preloadImages(covers.slice(0, 24).map((cover) => cover.src));
+    });
+    void import('../../pages/AuthPage');
+  }, [currentUser, isMobileMenuOpen, showUserMenu]);
 
-    const updateQuickRoutes = async () => {
-      const mangas = await getUltimosCapitulos();
-      if (!cancelled && mangas.length > 0) {
-        setQuickRoutes(buildDailyQuickRoutes(mangas));
-      }
+  const handleThemeToggle = () => {
+    const root = document.documentElement;
+    const viewTransitionDocument = document as Document & {
+      startViewTransition?: (callback: () => void) => { finished: Promise<void> };
     };
 
-    updateQuickRoutes();
-    const refreshTimer = window.setInterval(updateQuickRoutes, DAILY_ROUTE_REFRESH_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(refreshTimer);
-    };
-  }, []);
+    if (!viewTransitionDocument.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      toggleTheme();
+      return;
+    }
+
+    root.classList.add('theme-transition-capture');
+    const transition = viewTransitionDocument.startViewTransition(() => {
+      flushSync(() => toggleTheme());
+    });
+    void transition.finished.finally(() => root.classList.remove('theme-transition-capture'));
+  };
 
   // Refrescar monedas desde el servidor al cargar y cada 60s
   useEffect(() => {
@@ -263,9 +237,10 @@ export const Navbar = () => {
     setIsMobileMenuOpen(false);
   };
 
-  const openModal = (view: 'login' | 'register') => {
+  const openAuthPage = (view: 'login' | 'register') => {
     setSessionNotice(false);
-    setAuthView(view); setIsAuthModalOpen(true); setIsMobileMenuOpen(false);
+    setIsMobileMenuOpen(false);
+    navigate(`/auth/${view}`);
   };
 
   const handleLogoClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
@@ -286,101 +261,33 @@ export const Navbar = () => {
 
   return (
     <>
-      <header className={`${isMobileMenuOpen ? 'fixed lg:absolute' : 'absolute'} left-0 top-0 z-[100] w-full bg-transparent py-4 sm:py-6`}>
+      <header className={`${isMobileMenuOpen ? 'fixed lg:absolute' : 'absolute'} ${isAuthRoute || location.pathname === '/' ? 'auth-navbar-gradient' : 'bg-transparent'} left-0 top-0 z-[100] w-full py-4 sm:py-6`}>
         <div className="desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16 flex justify-between items-center">
             
             {/* 1. IZQUIERDA */}
             <div className="flex items-center gap-4 lg:gap-10"> 
-              <Link to="/" onClick={handleLogoClick} className="block group" aria-label="Volver al inicio de MangaMukai">
-                <span className={`text-2xl sm:text-3xl font-[1000] tracking-tighter uppercase italic select-none transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+              <Link to="/" onClick={handleLogoClick} className="group flex h-10 items-center" aria-label="Volver al inicio de MangaMukai">
+                <span className={`select-none text-2xl font-[1000] uppercase italic leading-none tracking-tighter transition-colors sm:text-3xl ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                     MANGA<span className="text-[#FF4D88]">MUKAI</span>
                 </span>
               </Link>
 
-              <nav className="hidden lg:flex items-center gap-8">
-                <Link to="/" className={`text-xs font-[900] hover:text-[#FF4D88] uppercase tracking-[0.15em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+              <nav className="hidden h-10 items-center gap-8 lg:flex">
+                <Link to="/" className={`raleway-navbar inline-flex h-full items-center text-[14px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Inicio
                 </Link>
 
-                <div className="group relative">
-                  <button className={`text-xs font-[900] hover:text-[#FF4D88] uppercase tracking-[0.15em] transition-colors flex items-center gap-1.5 ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
-                    Mangas
-                    <ChevronDown size={14} strokeWidth={3} className="opacity-70 transition-transform group-hover:rotate-180" />
-                  </button>
+                <Link to="/biblioteca" className={`raleway-navbar inline-flex h-full items-center text-[14px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                  Biblioteca
+                </Link>
 
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 opacity-0 -translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto transition-all duration-200">
-                    <div className="relative w-[700px] overflow-hidden rounded-lg border border-white/10 bg-[#050505] shadow-[0_24px_70px_rgba(0,0,0,0.62)]">
-                      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FF4D88] to-transparent" />
-                      <div className="grid grid-cols-[245px_1fr]">
-                        <div className="relative flex min-h-[390px] flex-col overflow-hidden border-r border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,77,136,0.16),rgba(255,77,136,0.025)_58%,transparent)] p-7">
-                          <span aria-hidden="true" className="absolute -bottom-14 -right-5 text-[190px] font-black italic leading-none text-white/[0.025]">M</span>
-                          <div className="relative">
-                            <h3 className="mt-2 text-[28px] font-black uppercase italic leading-[1.08] tracking-[-0.045em] text-white">
-                              Tu próxima<br />historia<br /><span className="text-[#FF4D88]">empieza aquí</span>
-                            </h3>
-                            <p className="mt-5 max-w-[180px] text-[11px] font-medium leading-relaxed text-white/45">
-                              Explora tus mangas favoritos y déjate llevar por las maravillosas historias que te esperan.
-                            </p>
-                          </div>
-                          <Link
-                            to="/biblioteca"
-                            className="relative mt-auto flex w-full items-center justify-between border-y border-[#FF4D88]/30 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white transition-colors hover:text-[#FF4D88]"
-                          >
-                            Abrir biblioteca <ArrowUpRight size={15} strokeWidth={2.5} />
-                          </Link>
-                        </div>
-
-                        <div className="p-6">
-                          <div className="mb-3 flex items-center">
-                        <p className="text-[9px] font-black uppercase tracking-normal text-[#FF4D88]">Colecciones</p>
-                          </div>
-
-                          <div className="border-t border-white/[0.08]">
-                            {[
-                              { label: 'Blanco & Negro', detail: 'Edición tradicional', href: '/manga-bn', icon: <BookOpen size={18} /> },
-                              { label: 'Mangas +19', detail: 'Selección adulta', href: '/manga-19', icon: <Flame size={18} /> },
-                            ].map((entry) => (
-                              <Link key={entry.href} to={entry.href} className="grid grid-cols-[38px_1fr_auto] items-center gap-3 border-b border-white/[0.08] py-4">
-                                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/45">{entry.icon}</span>
-                                <span>
-                                  <strong className="block text-[11px] font-black uppercase tracking-wide text-white">{entry.label}</strong>
-                                  <small className="mt-0.5 block text-[9px] text-white/35">{entry.detail}</small>
-                                </span>
-                                <ChevronRight size={14} className="text-white/20" />
-                              </Link>
-                            ))}
-                          </div>
-
-                          <div className="mt-6">
-                        <p className="mb-3 text-[9px] font-black uppercase tracking-normal text-[#FF4D88]">Filtros rápidos</p>
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                              {quickRoutes.map((genre) => (
-                                <Link
-                                  key={genre}
-                                  to="/biblioteca"
-                                  state={{ filterCategory: genre }}
-                                  className="group/genre flex min-w-0 items-center gap-2 border-b border-white/[0.05] py-2 text-[9px] font-bold uppercase tracking-wide text-white/45 transition-colors hover:text-white"
-                                  title={genre}
-                                >
-                                  <span className="h-px w-3 shrink-0 bg-white/15 transition-all group-hover/genre:w-5 group-hover/genre:bg-[#FF4D88]" />
-                                  <span className="truncate">{genre}</span>
-                                </Link>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link to="/manga-bn" className={`text-xs font-[900] hover:text-[#FF4D88] uppercase tracking-[0.15em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/manga-bn" className={`raleway-navbar inline-flex h-full items-center text-[14px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Mangas B&N
                 </Link>
-                <Link to="/manga-19" className={`text-xs font-[900] hover:text-[#FF4D88] uppercase tracking-[0.15em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Flame aria-hidden="true" size={15} strokeWidth={2.5} className="navbar-fire" />
-                    Mangas +19
+                <Link to="/manga-19" className={`raleway-navbar navbar-adult-link inline-flex h-full items-center text-[14px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                  <span className="navbar-adult-option inline-flex items-center gap-1.5">
+                    <NavbarFire size={17} />
+                    <span className="navbar-adult-label">Mangas <span className="navbar-adult-number">+19</span></span>
                   </span>
                 </Link>
               </nav>
@@ -430,10 +337,10 @@ export const Navbar = () => {
                         />
                     </div>
 
-                    {(location.pathname === '/' || location.pathname === '/biblioteca') && (
+                    {(location.pathname === '/' || location.pathname === '/biblioteca' || isAuthRoute) && (
                       <button
                         type="button"
-                        onClick={toggleTheme}
+                        onClick={handleThemeToggle}
                         title={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
                         aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
                         className={`transition-colors p-2 rounded-full ${headerUsesDarkText ? 'text-zinc-700 hover:text-[#FF4D88] hover:bg-zinc-100' : 'text-white hover:text-white/75 hover:bg-white/10'}`}
@@ -547,12 +454,45 @@ export const Navbar = () => {
                   </div>
                 ) : (
                   /* ── Sin sesión ── */
-                  <div className={`hidden sm:flex items-center ${headerUsesDarkText ? 'bg-zinc-100 border-zinc-200' : 'bg-[#0F1115] border-white/10'} rounded-full p-1 border`}>
-                    <button onClick={() => openModal('login')} className={`px-5 py-2 text-[10px] sm:text-[11px] font-black ${headerUsesDarkText ? 'text-black' : 'text-white'} uppercase tracking-widest hover:text-[#FF4D88] transition-colors`}>Ingresar</button>
-                    <button onClick={() => openModal('register')} className="flex items-center gap-2 px-5 py-2 bg-white text-black rounded-full hover:bg-[#FF4D88] hover:text-white transition-colors shadow-sm">
-                      <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest">Crear Cuenta</span>
-                      <ChevronRight size={14} strokeWidth={3} />
+                  <div className="auth-google-sans relative hidden sm:block" ref={userMenuRef}>
+                    <button
+                      type="button"
+                      aria-label="Abrir opciones de acceso"
+                      aria-expanded={showUserMenu}
+                      onClick={() => setShowUserMenu((visible) => !visible)}
+                      className={`flex h-10 w-10 items-center justify-center rounded-full border bg-transparent transition-colors ${headerUsesDarkText ? 'border-black/10 text-zinc-800 hover:border-[#FF4D88] hover:text-[#FF4D88]' : 'border-white/15 text-white hover:border-[#FF4D88] hover:text-[#FF4D88]'}`}
+                    >
+                      <UserIcon size={20} strokeWidth={2.4} />
                     </button>
+
+                    {showUserMenu && (
+                      <div className={`auth-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} absolute right-0 mt-3 w-[300px] overflow-hidden rounded-[24px] border p-4 shadow-[0_22px_60px_rgba(0,0,0,0.22)] ${headerUsesDarkText ? 'border-black/10 bg-white text-zinc-950' : 'border-white/10 bg-[#0a0a0d] text-white'}`}>
+                        <img src={authPopoverBackground} alt="" aria-hidden="true" className="auth-user-popover-background absolute inset-0 h-full w-full object-cover" />
+                        <div aria-hidden="true" className="auth-user-popover-scrim absolute inset-0" />
+                        <div className="relative z-10">
+                          <div className="mb-5 flex flex-col items-center px-3 pt-1 text-center">
+                            <span aria-hidden="true" className="mb-3 block h-14 w-14 shrink-0 opacity-0" />
+                            <p className={`text-[13px] font-normal leading-relaxed ${headerUsesDarkText ? 'text-zinc-700' : 'text-zinc-200'}`}>
+                              Listo para disfrutar de lo mejor en mangas
+                            </p>
+                          </div>
+                          <Link
+                            to="/auth/login"
+                            onClick={() => setShowUserMenu(false)}
+                            className="audiowide-library flex min-h-12 items-center justify-center rounded-[14px] bg-[#FF4D88] px-4 text-[12px] font-normal tracking-normal text-white transition-colors hover:bg-[#ff347b]"
+                          >
+                            Iniciar sesión
+                          </Link>
+                          <Link
+                            to="/auth/register"
+                            onClick={() => setShowUserMenu(false)}
+                            className={`audiowide-library mt-2 flex min-h-12 items-center justify-center rounded-[14px] border px-4 text-[12px] font-normal tracking-normal transition-colors ${headerUsesDarkText ? 'border-black/15 bg-white/45 text-zinc-900 hover:border-[#FF4D88] hover:text-[#FF4D88]' : 'border-white/15 bg-black/20 text-zinc-100 hover:border-[#FF4D88] hover:text-[#FF4D88]'}`}
+                          >
+                            Crear cuenta
+                          </Link>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -578,7 +518,7 @@ export const Navbar = () => {
             <p className="text-xs text-white/70">Ingresa otra vez para usar monedas, guardados y compras.</p>
           </div>
           <button
-            onClick={() => openModal('login')}
+            onClick={() => openAuthPage('login')}
             className="shrink-0 rounded-lg bg-yellow-400 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-black hover:bg-yellow-300"
           >
             Ingresar
@@ -598,7 +538,7 @@ export const Navbar = () => {
           role="dialog"
           aria-modal="true"
           aria-label="Menú principal"
-          className="fixed inset-0 z-[90] isolate overflow-hidden bg-[#02040a]/90 backdrop-blur-[24px] backdrop-saturate-125 lg:hidden"
+          className={`fixed inset-0 z-[90] isolate overflow-hidden lg:hidden ${isLightMode ? 'bg-white text-black' : 'bg-black text-white'}`}
         >
           <div aria-hidden="true" className="absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-[#FF4D88]/10 blur-[90px]" />
           <div aria-hidden="true" className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[#6d28d9]/10 blur-[90px]" />
@@ -613,10 +553,10 @@ export const Navbar = () => {
                     to={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`mobile-nav-michroma group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.2rem,6vw,1.55rem)] font-black uppercase tracking-tight transition-colors ${isActive ? 'text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
+                    className={`raleway-navbar group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.35rem,6.5vw,1.7rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
                   >
-                    <span className="inline-flex items-center justify-center gap-2">
-                      {link.isAdult && <Flame aria-hidden="true" size={21} strokeWidth={2.5} className="navbar-fire" />}
+                    <span className={`inline-flex items-center justify-center gap-2 ${link.isAdult ? 'navbar-adult-option' : ''}`}>
+                      {link.isAdult && <NavbarFire size={22} />}
                       {link.name}
                     </span>
                     <span aria-hidden="true" className={`absolute bottom-2 left-1/2 h-0.5 -translate-x-1/2 bg-[#FF4D88] transition-all duration-300 ${isActive ? 'w-20' : 'w-0 group-hover:w-20 group-focus-visible:w-20'}`} />
@@ -625,11 +565,11 @@ export const Navbar = () => {
               })}
 
               {!currentUser && (
-                <div className="mt-4 grid w-full max-w-sm grid-cols-2 gap-2 border-t border-white/10 pt-5">
-                  <button onClick={() => openModal('login')} className="michroma-regular h-12 rounded-xl border border-white/20 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-white/5">
+                <div className={`mt-4 grid w-full max-w-sm grid-cols-2 gap-2 border-t pt-5 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
+                  <button onClick={() => openAuthPage('login')} className={`audiowide-library h-[52px] rounded-xl border text-[12px] font-normal uppercase tracking-normal transition-colors ${isLightMode ? 'border-black/20 text-black hover:bg-black/5' : 'border-white/20 text-white hover:bg-white/5'}`}>
                     Ingresar
                   </button>
-                  <button onClick={() => openModal('register')} className="michroma-regular h-12 rounded-xl bg-[#FF4D88] text-[10px] font-black uppercase tracking-widest text-white shadow-[0_0_20px_rgba(255,77,136,0.28)]">
+                  <button onClick={() => openAuthPage('register')} className="audiowide-library h-[52px] rounded-xl bg-[#FF4D88] text-[12px] font-normal uppercase tracking-normal text-white shadow-[0_0_20px_rgba(255,77,136,0.28)]">
                     Crear Cuenta
                   </button>
                 </div>
@@ -639,7 +579,7 @@ export const Navbar = () => {
             {currentUser && (
               <div className="shrink-0 pt-2">
                 <div className="mb-4 flex flex-col gap-3">
-                    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <div className={`flex items-center gap-3 rounded-xl border p-3 ${isLightMode ? 'border-black/10 bg-white/35' : 'border-white/10 bg-white/[0.03]'}`}>
                       {currentUser.avatar ? (
                         <img src={currentUser.avatar} alt="avatar" className="h-10 w-10 rounded-full object-cover ring-2 ring-[#FF4D88]/40" />
                       ) : (
@@ -648,8 +588,8 @@ export const Navbar = () => {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-white">{currentUser.username}</p>
-                        <p className="truncate text-[10px] text-white/40">{currentUser.email}</p>
+                        <p className={`truncate text-sm font-black ${isLightMode ? 'text-black' : 'text-white'}`}>{currentUser.username}</p>
+                        <p className={`truncate text-[10px] ${isLightMode ? 'text-black/50' : 'text-white/40'}`}>{currentUser.email}</p>
                       </div>
                       <button
                         type="button"
@@ -668,7 +608,7 @@ export const Navbar = () => {
                           <img src={modernCoinIcon} alt="" aria-hidden="true" className="h-10 w-10 object-contain" />
                         </div>
                         <div className="min-w-0">
-                          <p className="mobile-account-label truncate text-[9px] font-bold uppercase tracking-normal text-white">Monedas disponibles</p>
+                          <p className={`mobile-account-label truncate text-[9px] font-bold uppercase tracking-normal ${isLightMode ? 'text-black' : 'text-white'}`}>Monedas disponibles</p>
                           <p className="text-sm font-black leading-tight text-[#FF4D88]">{currentUser.coins ?? 0}</p>
                         </div>
                       </div>
@@ -691,7 +631,7 @@ export const Navbar = () => {
                           <img src={premiumCrownIcon} alt="" aria-hidden="true" className="h-10 w-10 object-contain" />
                         </span>
                         <span className="min-w-0">
-                          <span className="mobile-account-label block truncate text-[9px] font-bold uppercase tracking-normal text-white">Suscripción</span>
+                          <span className={`mobile-account-label block truncate text-[9px] font-bold uppercase tracking-normal ${isLightMode ? 'text-black' : 'text-white'}`}>Suscripción</span>
                           <span className="block text-sm font-black leading-tight text-[#FF4D88]">Mukai PRO</span>
                         </span>
                       </span>
@@ -699,10 +639,10 @@ export const Navbar = () => {
                     </button>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <Link to="/perfil" onClick={() => setIsMobileMenuOpen(false)} className="flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/70">
+                      <Link to="/perfil" onClick={() => setIsMobileMenuOpen(false)} className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-[10px] font-black uppercase tracking-wider ${isLightMode ? 'border-black/10 text-black/70' : 'border-white/10 text-white/70'}`}>
                         <UserIcon size={15} className="text-[#FF4D88]" /> Mi Perfil
                       </Link>
-                      <Link to="/saved" onClick={() => setIsMobileMenuOpen(false)} className="flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/70">
+                      <Link to="/saved" onClick={() => setIsMobileMenuOpen(false)} className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-[10px] font-black uppercase tracking-wider ${isLightMode ? 'border-black/10 text-black/70' : 'border-white/10 text-white/70'}`}>
                         <Bookmark size={15} className="text-[#FF4D88]" /> Guardados
                       </Link>
                     </div>
@@ -711,7 +651,7 @@ export const Navbar = () => {
             )}
 
             <div className="mt-auto shrink-0 pt-4">
-              {currentUser && <div aria-hidden="true" className="mx-auto mb-4 h-px w-full max-w-xs bg-white/15" />}
+              {currentUser && <div aria-hidden="true" className={`mx-auto mb-4 h-px w-full max-w-xs ${isLightMode ? 'bg-black/15' : 'bg-white/15'}`} />}
 
               <div className="mx-auto grid w-full max-w-xs grid-cols-4 gap-2" aria-label="Redes sociales principales">
                 {MOBILE_SOCIAL_LINKS.map(({ name, href, icon: SocialIcon }) => (
@@ -722,9 +662,9 @@ export const Navbar = () => {
                     rel="noreferrer"
                     aria-label={name}
                     title={name}
-                    className="flex h-12 items-center justify-center rounded-xl border border-white/20 bg-transparent text-white transition-colors hover:border-white/40"
+                    className={`flex h-12 items-center justify-center rounded-xl border bg-transparent transition-colors ${isLightMode ? 'border-black/20 text-black hover:border-black/40' : 'border-white/20 text-white hover:border-white/40'}`}
                   >
-                    <SocialIcon size={20} className="text-white" />
+                    <SocialIcon size={20} />
                   </a>
                 ))}
               </div>
@@ -733,7 +673,6 @@ export const Navbar = () => {
         </div>
       )}
 
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} initialView={authView} />
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <AlarmAlert isOpen={isAlarmAlertOpen} onClose={() => setIsAlarmAlertOpen(false)} />
       <CoinMarketModal 

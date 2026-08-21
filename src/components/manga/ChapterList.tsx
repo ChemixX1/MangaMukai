@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ListMusic, Lock, Unlock, Coins, Clock, ChevronDown, ChevronUp, Layers, Zap, CheckCircle2 } from "lucide-react";
-import { AuthModal, CoinMarketModal, PurchaseModal } from "../modals";
+import { CoinMarketModal, PurchaseModal } from "../modals";
 import { Countdown } from "../common";
 import { buyChapter } from "../../services/authService";
 
@@ -30,7 +30,6 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
 
   // Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCoinModalOpen, setIsCoinModalOpen] = useState(false);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -73,8 +72,10 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
 
     // El capítulo es de PAGO → necesita sesión
     if (!userInfo.id) {
-      // Sin sesión → mostrar modal de login
-      setIsAuthModalOpen(true);
+      // Sin sesión → llevar a la página de acceso y regresar después al manga.
+      navigate('/auth/login', {
+        state: { returnTo: `${window.location.pathname}${window.location.search}` },
+      });
       return;
     }
 
@@ -298,12 +299,6 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
         userBalance={userCoins}
         loading={isProcessing}
         freeAt={selectedChapter?.free_at || null}
-      />
-
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        initialView="login"
       />
 
       <CoinMarketModal

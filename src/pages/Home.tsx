@@ -18,6 +18,7 @@ import {
 import { Footer } from '../components/layout';
 import { HomeDataProvider, useHomeData } from '../context/HomeDataContext';
 import { useTheme } from '../hooks/useTheme';
+import { startGlobalLoading } from '../utils/globalLoading';
 
 function HomeContent() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ function HomeContent() {
 
   // Manejador del FilterStrip
   const handleCategoryClick = (category: string) => {
+    startGlobalLoading();
     navigate('/biblioteca#filtros', {
       state: { filterCategory: category }
     });
@@ -77,7 +79,7 @@ function HomeContent() {
 
             {/* Noticias para la rama juvenil, debajo de sus mangas populares */}
             <section className="home-block home-block-youth-news">
-                <News />
+                <News variant="youth" />
             </section>
 
             {/* Grilla Juvenil (Copia de Latest pero azul) */}

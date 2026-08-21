@@ -132,7 +132,7 @@ export const ContactPage = () => {
                   </div>
                   <div>
                     <p className="text-[10px] text-zinc-400 uppercase font-black tracking-wider">Ubicación</p>
-                    <span className="text-lg font-bold text-black">Perú, Lima (Manga-Digital)</span>
+                    <span className="text-lg font-bold text-black">Perú 🇵🇪 (Manga-Digital)</span>
                   </div>
                 </div>
               </div>

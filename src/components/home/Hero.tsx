@@ -209,19 +209,15 @@ export default function Hero() {
   if (!loading && items.length === 0) return null;
 
   return (
-    <div className="home-hero relative h-[930px] w-full overflow-hidden bg-[#121212] text-white sm:h-[970px] lg:h-[690px]" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
+    <div className="home-hero relative h-[930px] w-full overflow-hidden bg-[#121212] text-white sm:h-[970px] lg:h-[710px]" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
       
       {/* BACKGROUND */}
       <div className="home-hero-backdrop home-theme-backdrop-base absolute inset-0 z-0 bg-[#121212]">
         <AnimatePresence initial={false} mode="popLayout">
           {!loading && activeItem && (
             <motion.div key={activeItem.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.2 }} className="absolute inset-0">
-              <img src={activeItem.backgroundHero} alt="bg" className="home-hero-backdrop-image home-theme-backdrop-image w-full h-full object-cover grayscale-[0.95] brightness-[0.45] contrast-[1.2] blur-sm" />
-              <div className="home-hero-backdrop-tint absolute inset-0 bg-neutral-800/10 mix-blend-color" />
-              <div className="home-hero-backdrop-bottom home-theme-backdrop-mask absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent" />
-              <div className="home-hero-backdrop-side home-theme-backdrop-mask absolute inset-0 bg-gradient-to-r from-[#121212] via-[#121212]/30 to-transparent hidden lg:block" />
-              <div className="home-hero-backdrop-radial home-theme-backdrop-mask absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(18,18,18,0.8)_100%)]" />
-              <div className="home-hero-noise home-theme-noise absolute inset-0 opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+              <img src={activeItem.backgroundHero} alt="" className="home-hero-backdrop-image home-theme-backdrop-image h-full w-full object-cover" />
+              <div aria-hidden="true" className="home-hero-theme-scrim absolute inset-0" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -267,9 +263,9 @@ export default function Hero() {
 
               <div className="flex items-stretch max-w-2xl w-full">
                 <div className="w-1 bg-[#FF4D88] shrink-0 z-10 hidden lg:block" />
-                <div className="relative flex-grow bg-white/[0.03] backdrop-blur-md border border-white/5 lg:border-l-0 py-4 px-6 min-h-[110px] flex items-center rounded-lg lg:rounded-none">
+                <div className="home-hero-description-panel relative flex-grow bg-white/[0.03] backdrop-blur-md border border-white/5 lg:border-l-0 py-4 px-6 min-h-[110px] flex items-center rounded-lg lg:rounded-none">
                   <AnimatePresence mode="wait">
-                    <motion.p key={activeItem?.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="text-white text-[14px] lg:text-[16px] font-medium leading-relaxed text-justify line-clamp-5">
+                    <motion.p key={activeItem?.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="home-hero-description text-white text-[14px] lg:text-[16px] font-medium leading-relaxed text-justify line-clamp-5">
                       {activeItem?.description}
                     </motion.p>
                   </AnimatePresence>
@@ -301,7 +297,7 @@ export default function Hero() {
 
         {/* CARDS DERECHA (3D SLIDER CON SKELETON) */}
         <div className="home-hero-cards relative z-40 order-1 flex h-[400px] w-full items-center justify-center sm:h-[450px] lg:order-2 lg:h-[500px] lg:w-[50%]" style={{ perspective: '1200px' }}>
-          <div className="relative w-full h-full flex items-center justify-center mt-4 lg:mt-32 lg:translate-x-10 scale-[0.77] lg:scale-90" style={{ transformStyle: 'preserve-3d' }}>
+          <div className="relative mt-4 flex h-full w-full scale-[0.79] items-center justify-center sm:scale-[0.92] lg:mt-24 lg:translate-x-10 lg:scale-[0.94]" style={{ transformStyle: 'preserve-3d' }}>
             {carouselSlides.map(({ item, relativeIndex, itemIndex }) => {
               const isCenter = relativeIndex === 0;
               const distance = Math.abs(relativeIndex);
@@ -318,7 +314,7 @@ export default function Hero() {
                 <motion.div
                   key={item.id}
                   data-position={relativeIndex}
-                  className={`hero-carousel-slide group absolute left-1/2 top-1/2 h-[275px] w-[185px] sm:h-[300px] sm:w-[200px] lg:h-[350px] lg:w-[250px] ${isAdjacent && !loading ? 'cursor-pointer' : 'cursor-default'}`}
+                  className={`hero-carousel-slide group absolute left-1/2 top-1/2 h-[285px] w-[192px] sm:h-[310px] sm:w-[207px] lg:h-[365px] lg:w-[260px] ${isAdjacent && !loading ? 'cursor-pointer' : 'cursor-default'}`}
                   style={{
                     transformStyle: 'preserve-3d',
                     zIndex,
@@ -362,7 +358,7 @@ export default function Hero() {
                     ) : (
                         // REAL CARD
                         <>
-                            <img src={item.coverImage} alt={item.title} className="w-full h-full object-cover" />
+                            <img src={item.coverImage} alt={item.title} className="home-showcase-cover-image h-full w-full object-cover" />
                             <div className="absolute bottom-4 left-4">
                                 <span className="px-2 py-1 bg-[#FF4D88] text-[10px] font-black rounded uppercase shadow-md">{item.type}</span>
                             </div>
@@ -401,9 +397,9 @@ export default function Hero() {
       
       {/* PUNTOS DE NAVEGACION */}
       {!loading && (
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+        <div className="absolute bottom-11 left-1/2 z-20 flex -translate-x-1/2 gap-2 sm:bottom-5 lg:bottom-8">
             {items.map((_, i) => (
-            <button key={i} onClick={() => setCurrentIndex(i)} className={`h-1.5 transition-all duration-500 transform -skew-x-12 ${i === currentIndex ? "w-10 bg-[#FF4D88] border border-white" : "w-4 bg-neutral-700 hover:bg-neutral-500"}`} />
+            <button key={i} onClick={() => setCurrentIndex(i)} className={`h-1.5 -skew-x-12 transition-all duration-500 ${i === currentIndex ? "w-10 bg-[#FF4D88]" : "w-4 bg-neutral-700 hover:bg-neutral-500"}`} />
             ))}
         </div>
       )}

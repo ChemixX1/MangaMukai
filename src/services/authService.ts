@@ -20,7 +20,7 @@ export interface MMUser {
 
 export const getStoredUser = (): MMUser | null => {
   try {
-    const raw = localStorage.getItem('mm_user');
+    const raw = localStorage.getItem('mm_user') || sessionStorage.getItem('mm_user');
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -28,7 +28,7 @@ export const getStoredUser = (): MMUser | null => {
 };
 
 export const getStoredToken = (): string | null =>
-  localStorage.getItem('mm_token');
+  localStorage.getItem('mm_token') || sessionStorage.getItem('mm_token');
 
 const emitAuthChanged = () => {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
@@ -37,6 +37,8 @@ const emitAuthChanged = () => {
 export const clearStoredAuth = (reason?: 'expired') => {
   localStorage.removeItem('mm_token');
   localStorage.removeItem('mm_user');
+  sessionStorage.removeItem('mm_token');
+  sessionStorage.removeItem('mm_user');
   emitAuthChanged();
 
   if (reason === 'expired') {
@@ -44,9 +46,15 @@ export const clearStoredAuth = (reason?: 'expired') => {
   }
 };
 
-export const saveAuth = (token: string, user: MMUser) => {
-  localStorage.setItem('mm_token', token);
-  localStorage.setItem('mm_user', JSON.stringify(user));
+export const saveAuth = (token: string, user: MMUser, persist?: boolean) => {
+  const shouldPersist = persist ?? sessionStorage.getItem('mm_token') === null;
+  const storage = shouldPersist ? localStorage : sessionStorage;
+  const staleStorage = shouldPersist ? sessionStorage : localStorage;
+
+  staleStorage.removeItem('mm_token');
+  staleStorage.removeItem('mm_user');
+  storage.setItem('mm_token', token);
+  storage.setItem('mm_user', JSON.stringify(user));
   emitAuthChanged();
 };
 

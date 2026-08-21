@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useTheme } from '../../hooks/useTheme';
+import { GLOBAL_LOADING_EVENT, type GlobalLoadingDetail } from '../../utils/globalLoading';
 import { lockPageScroll } from '../../utils/scrollLock';
 
 const HOME_LOADING_EVENT = 'mangamukai:home-loading';
@@ -14,6 +15,8 @@ export const GlobalLoader = () => {
   const startedAtRef = useRef(0);
   const finishingRef = useRef(false);
   const finishTimerRef = useRef<number | null>(null);
+  const maximumTimerRef = useRef<number | null>(null);
+  const routeLoadingRef = useRef(false);
   const reduceMotion = useReducedMotion();
   const { theme } = useTheme();
   const isLightMode = theme === 'light';
@@ -26,22 +29,52 @@ export const GlobalLoader = () => {
   useEffect(() => {
     // El fondo crítico del HTML permanece hasta que este overlay ya fue pintado.
     document.documentElement.classList.remove('app-preloading');
-    startedAtRef.current = performance.now();
-    finishingRef.current = false;
-    finishTimerRef.current = null;
-    releaseScrollRef.current = lockPageScroll();
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 
-    const finish = () => {
+    const clearFinishTimer = () => {
+      if (finishTimerRef.current === null) return;
+      window.clearTimeout(finishTimerRef.current);
+      finishTimerRef.current = null;
+    };
+
+    const clearMaximumTimer = () => {
+      if (maximumTimerRef.current === null) return;
+      window.clearTimeout(maximumTimerRef.current);
+      maximumTimerRef.current = null;
+    };
+
+    const finish = (force = false) => {
+      if (routeLoadingRef.current && !force) return;
       if (finishingRef.current) return;
       finishingRef.current = true;
+      clearMaximumTimer();
       setProgress(100);
       const elapsed = performance.now() - startedAtRef.current;
       const remaining = Math.max(220, MINIMUM_VISIBLE_TIME - elapsed);
       finishTimerRef.current = window.setTimeout(() => setShow(false), remaining);
     };
 
+    const begin = (initialProgress = 6, isRouteLoading = false) => {
+      clearFinishTimer();
+      clearMaximumTimer();
+      routeLoadingRef.current = isRouteLoading || routeLoadingRef.current;
+      startedAtRef.current = performance.now();
+      finishingRef.current = false;
+      setProgress(initialProgress);
+      setShow(true);
+
+      if (!releaseScrollRef.current) releaseScrollRef.current = lockPageScroll();
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
+      maximumTimerRef.current = window.setTimeout(() => {
+        routeLoadingRef.current = false;
+        finish(true);
+      }, MAXIMUM_VISIBLE_TIME);
+    };
+
+    begin();
+
     const handleHomeProgress = (event: Event) => {
+      if (routeLoadingRef.current) return;
       const detail = (event as CustomEvent<{ progress?: number; complete?: boolean }>).detail;
       if (typeof detail?.progress === 'number') {
         setProgress(previous => Math.max(previous, Math.min(100, detail.progress!)));
@@ -49,28 +82,62 @@ export const GlobalLoader = () => {
       if (detail?.complete) finish();
     };
 
+    const handleGlobalLoading = (event: Event) => {
+      const detail = (event as CustomEvent<GlobalLoadingDetail>).detail;
+      if (!detail) return;
+
+      if (detail.status === 'start') {
+        begin(detail.progress ?? 8, true);
+        return;
+      }
+
+      if (typeof detail.progress === 'number') {
+        setProgress(previous => Math.max(previous, Math.min(100, detail.progress!)));
+      }
+
+      if (detail.status === 'complete') {
+        routeLoadingRef.current = false;
+        finish();
+      }
+    };
+
+    const handleLibraryLink = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null;
+      if (!target || target.target === '_blank' || target.hasAttribute('download')) return;
+
+      const destination = new URL(target.href, window.location.href);
+      if (destination.origin !== window.location.origin || destination.pathname !== '/biblioteca') return;
+      if (window.location.pathname === '/biblioteca') return;
+      begin(8, true);
+    };
+
+    const handleWindowLoad = () => finish();
+
     window.addEventListener(HOME_LOADING_EVENT, handleHomeProgress);
+    window.addEventListener(GLOBAL_LOADING_EVENT, handleGlobalLoading);
+    document.addEventListener('click', handleLibraryLink, true);
 
     const driftTimer = window.setInterval(() => {
       setProgress(previous => previous >= 90 ? previous : Math.min(90, previous + (previous < 35 ? 4 : 1)));
     }, 180);
 
-    const maximumTimer = window.setTimeout(finish, MAXIMUM_VISIBLE_TIME);
-
     if (window.location.pathname !== '/') {
       if (document.readyState === 'complete') {
         finish();
       } else {
-        window.addEventListener('load', finish, { once: true });
+        window.addEventListener('load', handleWindowLoad, { once: true });
       }
     }
 
     return () => {
       window.removeEventListener(HOME_LOADING_EVENT, handleHomeProgress);
-      window.removeEventListener('load', finish);
+      window.removeEventListener(GLOBAL_LOADING_EVENT, handleGlobalLoading);
+      window.removeEventListener('load', handleWindowLoad);
+      document.removeEventListener('click', handleLibraryLink, true);
       window.clearInterval(driftTimer);
-      window.clearTimeout(maximumTimer);
-      if (finishTimerRef.current !== null) window.clearTimeout(finishTimerRef.current);
+      clearFinishTimer();
+      clearMaximumTimer();
       restoreScroll();
     };
   }, []);

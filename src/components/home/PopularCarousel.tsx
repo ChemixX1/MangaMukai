@@ -178,7 +178,7 @@ export const PopularCarousel = () => {
         }
       `}</style>
 
-      <div className="desktop-content-shell w-full max-w-[1600px] mx-auto relative z-20 px-6 lg:px-12">
+      <div className="desktop-content-shell home-popular-shell relative z-20 mx-auto w-full max-w-[1600px] px-4 sm:px-5 lg:px-8">
         
         {/* CABECERA */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-4 gap-6">
