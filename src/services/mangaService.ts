@@ -192,6 +192,11 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     status:      item.status || '',
     totalViews:  item.totalViews || 0,
     rawFecha:    item.fecha || '',
+    tituloOriginal: item.titulo_original || '',
+    fechaManga:  item.fecha_manga || '',
+    studio:      item.studio || '',
+    platform:    item.platform || '',
+    publishedAt: item.published_at || item.fecha || '',
     capitulosRecientes: caps,
   };
 };

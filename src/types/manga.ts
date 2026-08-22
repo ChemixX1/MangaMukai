@@ -65,6 +65,11 @@ export interface MangaCapitulo {
   status?: string;
   totalViews?: number;
   rawFecha?: string;
+  tituloOriginal?: string;
+  fechaManga?: string;
+  studio?: string;
+  platform?: string;
+  publishedAt?: string;
   capitulosRecientes: Array<{
     id: number;
     numero: string;

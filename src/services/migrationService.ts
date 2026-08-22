@@ -10,8 +10,8 @@ const stopIfUnauthorized = (res: Response): boolean => {
 };
 
 /**
- * Migra los marcadores y el historial de lectura almacenados localmente 
- * por el antiguo tema WordPress ('mangareader') a la base de datos de WordPress.
+ * Migra únicamente los marcadores manuales del antiguo tema WordPress.
+ * El historial legado se descarta para que una visita no termine en el perfil.
  */
 export const migrateOldDataToWordPress = async () => {
     // 1. Verificar si el usuario está autenticado en WP
@@ -47,32 +47,6 @@ export const migrateOldDataToWordPress = async () => {
         }
     }
 
-    // 3. Migrar Historial (History)
-    const oldHistoryRaw = localStorage.getItem('ts_mangareader_history');
-    if (oldHistoryRaw) {
-        try {
-            const oldHistory = JSON.parse(oldHistoryRaw);
-            if (typeof oldHistory === 'object' && oldHistory !== null) {
-                for (const mangaId in oldHistory) {
-                    const item = oldHistory[mangaId];
-                    if (item && item.time) {
-                        const res = await fetch(`${MANGAMUKAI_API}/history`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'Authorization': `Bearer ${token}`
-                            },
-                            body: `manga_id=${mangaId}`
-                        });
-                        if (stopIfUnauthorized(res)) return;
-                    }
-                }
-                localStorage.removeItem('ts_mangareader_history');
-            } else {
-                localStorage.removeItem('ts_mangareader_history');
-            }
-        } catch (_error) {
-            localStorage.removeItem('ts_mangareader_history');
-        }
-    }
+    // No migrar mangas vistos automáticamente; solo conservar Guardar/Bookmark.
+    localStorage.removeItem('ts_mangareader_history');
 };

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
-import { BookOpen, CalendarDays, Coins, Flame, Ticket } from 'lucide-react';
+import { BookOpen, CalendarDays, Flame } from 'lucide-react';
+import { DetailCoin3DIcon, DetailTicket3DIcon } from './MangaDetailIcons';
 
 interface MangaMetaBarProps {
   chapter: number | string;
@@ -94,9 +95,15 @@ export const MangaMetaBar = ({
 
         <div className={`flex shrink-0 items-center gap-[0.3em] ${isFree ? 'text-white' : 'text-yellow-400'}`}>
           {isFree ? (
-            <Ticket className="h-[1.05em] w-[1.05em] shrink-0" />
+            <DetailTicket3DIcon
+              size={21}
+              className="-my-1 h-[21px] w-[21px] shrink-0 scale-110 object-contain drop-shadow-[0_4px_5px_rgba(180,83,9,0.22)]"
+            />
           ) : (
-            <Coins className="h-[1.32em] w-[1.32em] shrink-0" strokeWidth={2.35} aria-hidden="true" />
+            <DetailCoin3DIcon
+              size={21}
+              className="-my-1 h-[21px] w-[21px] shrink-0 scale-110 object-contain drop-shadow-[0_4px_5px_rgba(180,83,9,0.3)]"
+            />
           )}
           <span>{isFree ? 'Gratis' : 'Pago'}</span>
         </div>

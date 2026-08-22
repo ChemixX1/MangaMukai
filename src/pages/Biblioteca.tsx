@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Footer } from "../components/layout";
-import { PaginationControls } from "../components/common";
+import { BibliotecaClock, DepthText, PaginationControls } from "../components/common";
 import { useTheme } from "../hooks/useTheme";
 import { getUltimosCapitulos } from "../services/mangaService";
 import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from "../utils/globalLoading";
@@ -44,107 +44,6 @@ type IdleWindow = Window & typeof globalThis & {
 
 type NetworkNavigator = Navigator & {
   connection?: { saveData?: boolean; effectiveType?: string };
-};
-
-type FlipClockTileProps = {
-  isLight: boolean;
-  label: string;
-  previousValue: string;
-  value: string;
-};
-
-const FlipClockTile = ({ isLight, label, previousValue, value }: FlipClockTileProps) => {
-  const hasChanged = previousValue !== value;
-  const digitClassName = `absolute inset-x-0 flex h-[200%] items-center justify-center font-mono text-[clamp(1.55rem,8vw,2.25rem)] font-black leading-none tracking-[-0.1em] lg:text-[1.95rem] ${isLight ? "text-zinc-950" : "text-white"}`;
-  const topFace = isLight ? "bg-white" : "bg-[#303034]";
-  const bottomFace = isLight ? "bg-[#d9d9dc]" : "bg-[#202024]";
-
-  return (
-    <div
-      role="img"
-      aria-label={`${label}: ${value}`}
-      className={`library-flip-tile relative aspect-[1.25] min-w-0 overflow-hidden rounded-[10px] border transition-colors duration-300 ${isLight ? "border-black/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_5px_10px_rgba(15,23,42,.1)]" : "border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,.11),0_6px_12px_rgba(0,0,0,.28)]"}`}
-    >
-      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1/2 overflow-hidden ${topFace}`}>
-        <span className={`${digitClassName} top-0`}>{value}</span>
-      </span>
-      <span aria-hidden="true" className={`absolute inset-x-0 bottom-0 h-1/2 overflow-hidden ${bottomFace}`}>
-        <span className={`${digitClassName} bottom-0`}>{value}</span>
-      </span>
-
-      {hasChanged && (
-        <>
-          <span aria-hidden="true" className={`library-flip-old-bottom absolute inset-x-0 bottom-0 h-1/2 overflow-hidden ${bottomFace}`}>
-            <span className={`${digitClassName} bottom-0`}>{previousValue}</span>
-          </span>
-          <span key={`top-${label}-${value}`} aria-hidden="true" className={`library-flip-top-out absolute inset-x-0 top-0 h-1/2 overflow-hidden ${topFace}`}>
-            <span className={`${digitClassName} top-0`}>{previousValue}</span>
-            <span className="library-flip-top-shadow absolute inset-0" />
-          </span>
-          <span key={`bottom-${label}-${value}`} aria-hidden="true" className={`library-flip-bottom-in absolute inset-x-0 bottom-0 h-1/2 overflow-hidden ${bottomFace}`}>
-            <span className={`${digitClassName} bottom-0`}>{value}</span>
-            <span className="library-flip-bottom-shadow absolute inset-0" />
-          </span>
-        </>
-      )}
-
-      <span aria-hidden="true" className={`absolute inset-x-0 top-1/2 z-10 h-px ${isLight ? "bg-black/20 shadow-[0_1px_0_rgba(255,255,255,.65)]" : "bg-black/70 shadow-[0_1px_0_rgba(255,255,255,.05)]"}`} />
-    </div>
-  );
-};
-
-const BibliotecaClock = ({ isLight }: { isLight: boolean }) => {
-  const [clockTime, setClockTime] = useState(() => {
-    const initialTime = new Date();
-    return { current: initialTime, previous: initialTime };
-  });
-
-  useEffect(() => {
-    let timer = 0;
-    const tick = () => {
-      setClockTime(({ current }) => ({ current: new Date(), previous: current }));
-      timer = window.setTimeout(tick, 1000 - (Date.now() % 1000));
-    };
-
-    timer = window.setTimeout(tick, 1000 - (Date.now() % 1000));
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  const timeParts = [
-    {
-      label: "Horas",
-      previousValue: clockTime.previous.getHours().toString().padStart(2, "0"),
-      value: clockTime.current.getHours().toString().padStart(2, "0"),
-    },
-    {
-      label: "Minutos",
-      previousValue: clockTime.previous.getMinutes().toString().padStart(2, "0"),
-      value: clockTime.current.getMinutes().toString().padStart(2, "0"),
-    },
-    {
-      label: "Segundos",
-      previousValue: clockTime.previous.getSeconds().toString().padStart(2, "0"),
-      value: clockTime.current.getSeconds().toString().padStart(2, "0"),
-    },
-  ];
-  const dateLabel = clockTime.current.toLocaleDateString("es-PE", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
-  return (
-    <div className={`rounded-[18px] border p-2 transition-colors duration-300 ${isLight ? "border-black/10 bg-[#f1f1f3] shadow-[0_0_0_2px_rgba(251,146,60,.12),0_12px_26px_rgba(15,23,42,.11)]" : "border-white/10 bg-[#050505] shadow-[0_0_0_2px_rgba(251,146,60,.18),0_14px_30px_rgba(0,0,0,.3)]"}`}>
-      <div className="grid grid-cols-3 gap-1.5">
-        {timeParts.map((part) => (
-          <FlipClockTile key={part.label} {...part} isLight={isLight} />
-        ))}
-      </div>
-      <p className={`anta-library-date mt-2 text-center text-[11px] capitalize sm:text-xs ${isLight ? "text-zinc-700" : "text-white/80"}`}>
-        {dateLabel}
-      </p>
-    </div>
-  );
 };
 
 export const Biblioteca = () => {
@@ -332,9 +231,35 @@ export const Biblioteca = () => {
         }}
       >
         <div className="desktop-content-shell relative mx-auto w-full px-4 pb-4 pt-28 text-center sm:px-8 sm:pb-5 sm:pt-36 lg:px-16 lg:pb-2 lg:pt-40">
-          <h1 className={`mx-auto flex max-w-full flex-wrap items-baseline justify-center gap-x-[0.2em] text-[clamp(1.85rem,8.2vw,2.45rem)] font-[1000] uppercase italic leading-[0.92] tracking-[-0.065em] drop-shadow-lg sm:text-[clamp(3rem,7vw,5.35rem)] ${isLight ? "text-zinc-950" : "text-white"}`}>
-            <span>Biblioteca</span>
-            <span className={isMasculine ? "pr-[0.08em] text-[#00C2FF]" : "pr-[0.08em] text-[#FF4D88]"}>Mukai</span>
+          <h1 className="mx-auto flex max-w-full justify-center pr-[0.08em]">
+            <DepthText
+              text="Biblioteca Mukai"
+              parts={[
+                {
+                  text: "Biblioteca",
+                  faceColor: isLight ? "#000000" : "#ffffff",
+                  depthColor: isLight ? "#c7c7c7" : "#403d46",
+                  faceBlend: isLight ? 0 : undefined,
+                },
+                {
+                  text: "Mukai",
+                  faceColor: accentColor,
+                  depthColor: isMasculine ? "#006d99" : "#8f184e",
+                },
+              ]}
+              layers={34}
+              depth={2.4}
+              depthColor={isLight ? "#c7c7c7" : "#403d46"}
+              tilt={7.5}
+              pointerTracking
+              smoothing={0.14}
+              perspective={900}
+              autoOrbit
+              orbitSpeed={0.35}
+              fontSize="clamp(1.85rem, 8.2vw, 5.35rem)"
+              fontWeight={1000}
+              shadow
+            />
           </h1>
           <p className={`mx-auto mt-5 max-w-2xl text-sm leading-relaxed sm:text-base ${isLight ? "text-zinc-600" : "text-zinc-400"}`}>
             Busca por título, explora géneros y encuentra tu próxima historia en un solo lugar

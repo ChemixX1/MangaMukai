@@ -34,6 +34,18 @@ const emitAuthChanged = () => {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 };
 
+export const updateStoredUser = (patch: Partial<MMUser>): MMUser | null => {
+  const current = getStoredUser();
+  const token = getStoredToken();
+  if (!current || !token) return null;
+
+  const next = { ...current, ...patch };
+  const storage = localStorage.getItem('mm_token') ? localStorage : sessionStorage;
+  storage.setItem('mm_user', JSON.stringify(next));
+  emitAuthChanged();
+  return next;
+};
+
 export const clearStoredAuth = (reason?: 'expired') => {
   localStorage.removeItem('mm_token');
   localStorage.removeItem('mm_user');

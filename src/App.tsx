@@ -12,6 +12,7 @@ const Biblioteca = lazy(() => import('./pages/Biblioteca').then(({ Biblioteca: P
 const AboutPage = lazy(() => import('./pages/AboutPage').then(({ AboutPage: Page }) => ({ default: Page })));
 const ContactPage = lazy(() => import('./pages/ContactPage').then(({ ContactPage: Page }) => ({ default: Page })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(({ ProfilePage: Page }) => ({ default: Page })));
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(({ PublicProfilePage: Page }) => ({ default: Page })));
 const TermsAndPrivacy = lazy(() => import('./pages/TermsAndPrivacy').then(({ TermsAndPrivacy: Page }) => ({ default: Page })));
 const SavedMangas = lazy(() => import('./pages/SavedMangas').then(({ SavedMangas: Page }) => ({ default: Page })));
 const ReaderPage = lazy(() => import('./pages/ReaderPage').then(({ ReaderPage: Page }) => ({ default: Page })));
@@ -43,6 +44,7 @@ function AppInner() {
             <Route path="/nosotros" element={<AboutPage />} />
             <Route path="/contacto" element={<ContactPage />} />
             <Route path="/perfil" element={<ProfilePage />} />
+            <Route path="/usuarios/:id" element={<PublicProfilePage />} />
             <Route path="/saved" element={<SavedMangas />} />
             <Route path="/legal" element={<TermsAndPrivacy />} />
             <Route path="/biblioteca" element={<Biblioteca />} />

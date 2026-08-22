@@ -12,6 +12,8 @@ import { trackChapterView } from "../services/mangaService";
 import { motion, AnimatePresence } from "framer-motion";
 import React from "react";
 import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from "../config/api";
+import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from "../utils/globalLoading";
+import { preloadImages } from "../utils/preloadImages";
 
 // MODALES
 import { CoinMarketModal, SubscriptionModal } from "../components/modals";
@@ -392,6 +394,7 @@ export const ReaderPage = () => {
 
   // 3. FETCH CAPÍTULO (desde WordPress API)
   useEffect(() => {
+    startGlobalLoading(10);
     window.scrollTo(0, 0);
     setImages([]);
     setNavData(null);
@@ -402,7 +405,11 @@ export const ReaderPage = () => {
     const MM_API = MANGAMUKAI_API;
 
     const fetchChapterData = async () => {
-      if (!chapterId) return;
+      if (!chapterId) {
+        setLoading(false);
+        finishGlobalLoading();
+        return;
+      }
 
       try {
         const token = getStoredToken();
@@ -413,6 +420,7 @@ export const ReaderPage = () => {
         );
         if (!res.ok) throw new Error("Capítulo no encontrado");
         const wpChapter = await res.json();
+        updateGlobalLoading(32);
 
         const chapterNum  = Number(wpChapter.ero_chapter) || 0;
         const mangaPostId = wpChapter.ero_seri ? String(wpChapter.ero_seri) : '';
@@ -432,6 +440,8 @@ export const ReaderPage = () => {
             page_number: idx + 1,
           }));
           setImages(extractedImages);
+          updateGlobalLoading(68);
+          await preloadImages(extractedImages.map((image) => image.image_url));
         } else if (contentData.locked) {
           setError(contentData.message || 'Este capítulo requiere ser desbloqueado.');
         } else if (contentData.success && (!contentData.images || contentData.images.length === 0)) {
@@ -520,15 +530,18 @@ export const ReaderPage = () => {
 
         setPlaylist([]);
         setCurrentTrack(null);
+        updateGlobalLoading(92);
 
       } catch (err: unknown) {
         console.error("Error cargando lector:", err);
         setError("No se pudo cargar el capítulo.");
       } finally {
         setLoading(false);
+        finishGlobalLoading();
       }
     };
-    fetchChapterData();
+    void fetchChapterData();
+    return () => finishGlobalLoading();
   }, [chapterId]);
 
 
@@ -572,7 +585,7 @@ export const ReaderPage = () => {
     }
   };
 
-  if (loading) return (<div className="min-h-screen bg-black flex flex-col items-center justify-center text-white"><Loader2 className="w-12 h-12 animate-spin text-[#FF4D88] mb-4" /></div>);
+  if (loading) return <div className="min-h-screen bg-black" />;
   if (error) return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white gap-6 px-4">
       <Lock className="w-16 h-16 text-yellow-400" />

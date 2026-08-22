@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ListMusic, Lock, Unlock, Coins, Clock, ChevronDown, ChevronUp, Layers, Zap, CheckCircle2 } from "lucide-react";
+import { Lock, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { CoinMarketModal, PurchaseModal } from "../modals";
-import { Countdown } from "../common";
+import {
+  Countdown,
+  DetailBook3DIcon,
+  DetailCoin3DIcon,
+  DetailPurchasedIcon,
+  DetailTicket3DIcon,
+} from "../common";
 import { buyChapter } from "../../services/authService";
 
 export interface Chapter {
@@ -21,9 +27,10 @@ interface ChapterListProps {
   userCoins: number;
   userInfo: { id: string; username: string };
   onPurchaseSuccess: () => void;
+  isLight?: boolean;
 }
 
-export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess }: ChapterListProps) => {
+export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, isLight = false }: ChapterListProps) => {
   const navigate = useNavigate();
 
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
@@ -48,7 +55,12 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
   const purchasedChapters = chapters.filter(isChapterPurchased).length;
   const paidChapters = totalChapters - freeChapters;
 
-  const visibleChapters = showAll ? chapters : chapters.slice(0, 5);
+  const orderedChapters = [...chapters].sort((a, b) => {
+    const chapterDifference = Number(b.chapter_number) - Number(a.chapter_number);
+    if (chapterDifference !== 0) return chapterDifference;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+  const visibleChapters = showAll ? orderedChapters : orderedChapters.slice(0, 5);
 
   const isChapterLocked = (chapter: Chapter) => {
     if (!chapter.is_paid) return false;
@@ -111,45 +123,54 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
 
   return (
     <>
-      <div className="w-[94%] mx-auto mb-32 relative z-20">
+      <div className={`manga-chapter-list relative z-20 w-full ${isLight ? 'is-light' : 'is-dark'}`}>
 
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 border-b border-white/5 pb-4 gap-4 md:gap-0">
-          <h3 className="text-xl font-black italic uppercase text-white flex items-center gap-3 tracking-tighter border-l-2 border-pink-600 pl-4">
-            <ListMusic size={20} className="text-pink-500" /> Capítulos
-          </h3>
+        <div className="manga-chapter-header mb-7 flex flex-col justify-between gap-4 border-b border-white/[0.07] pb-5 md:flex-row md:items-end">
+          <h2 className="manga-chapter-heading flex items-center gap-3 text-xl font-black uppercase italic tracking-tight text-white md:text-2xl">
+            <span className="h-8 w-1 rounded-full bg-[#FF4D88] shadow-[0_0_18px_rgba(255,77,136,0.6)]" />
+            <DetailBook3DIcon
+              size={31}
+              className="h-[31px] w-[31px] object-contain drop-shadow-[0_7px_9px_rgba(255,77,136,0.3)]"
+              style={{ filter: 'grayscale(1) sepia(1) saturate(12) hue-rotate(300deg) brightness(1.04)' }}
+            /> Capítulos
+          </h2>
 
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111] border border-white/5">
-              <Layers size={12} className="text-white/40" />
-              <span className="text-[10px] font-bold text-white uppercase tracking-wider whitespace-nowrap">
+          <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
+            <div className="manga-chapter-stat manga-chapter-stat-total flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.035] px-3 py-2">
+              <DetailBook3DIcon
+                size={23}
+                className="h-[23px] w-[23px] object-contain"
+                style={{ filter: 'grayscale(1) sepia(1) saturate(12) hue-rotate(300deg) brightness(1.04)' }}
+              />
+              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
                 {totalChapters} Cap.
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
-              <Zap size={12} className="text-yellow-500" />
-              <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider whitespace-nowrap">
+            <div className="manga-chapter-stat manga-chapter-stat-paid flex items-center gap-1.5 rounded-lg border border-yellow-500/15 bg-yellow-500/[0.06] px-3 py-2">
+              <DetailCoin3DIcon size={23} className="h-[23px] w-[23px] object-contain" />
+              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
                 {paidChapters} Pago
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-              <Unlock size={12} className="text-emerald-400" />
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider whitespace-nowrap">
-                {purchasedChapters} Comprado
+            <div className="manga-chapter-stat manga-chapter-stat-free flex items-center gap-1.5 rounded-lg border border-[#FF4D88]/20 bg-[#FF4D88]/[0.07] px-3 py-2">
+              <DetailTicket3DIcon size={23} className="h-[23px] w-[23px] object-contain" />
+              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
+                {freeChapters} Gratis
               </span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-              <CheckCircle2 size={12} className="text-emerald-500" />
-              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider whitespace-nowrap">
-                {freeChapters} Gratis
+            <div className="manga-chapter-stat manga-chapter-stat-purchased flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.035] px-3 py-2">
+              <DetailPurchasedIcon size={16} />
+              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
+                {purchasedChapters} Comprado
               </span>
             </div>
           </div>
         </div>
 
         {/* LISTA */}
-        <div className="bg-[#0A0A0A] border-y border-white/5">
-          <div className="hidden md:grid grid-cols-12 bg-[#111] py-3 px-4 text-[9px] uppercase font-bold text-white/30 tracking-[0.2em]">
+        <div className="manga-chapter-surface overflow-hidden rounded-2xl border border-white/[0.07] bg-black shadow-[0_20px_55px_rgba(0,0,0,0.25)]">
+          <div className="manga-chapter-table-head hidden grid-cols-12 border-b border-white/[0.06] bg-white/[0.035] px-5 py-4 text-[11px] font-semibold md:grid">
             <div className="col-span-1">Nro</div>
             <div className="col-span-5">Título</div>
             <div className="col-span-4 text-center">Estado</div>
@@ -157,7 +178,16 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
           </div>
 
           <div className="flex flex-col">
-            {visibleChapters.map((chapter) => {
+            {totalChapters === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-center">
+                <DetailBook3DIcon
+                  size={42}
+                  className="h-[42px] w-[42px] object-contain opacity-45"
+                  style={{ filter: 'grayscale(1) sepia(1) saturate(12) hue-rotate(300deg) brightness(1.04)' }}
+                />
+                <p className="text-xs font-semibold text-white/35">Sin capítulos disponibles</p>
+              </div>
+            ) : visibleChapters.map((chapter) => {
               const locked = isChapterLocked(chapter);
               const isPurchased = isChapterPurchased(chapter);
               const isFutureFree = !!chapter.free_at && new Date(chapter.free_at) > new Date();
@@ -168,26 +198,23 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                   ? "Gratis"
                   : "Premium";
               const statusClass = isPurchased
-                ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                ? "text-gray-400 bg-white/[0.045] border-white/10"
                 : statusLabel === "Gratis"
-                  ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                  ? "text-[#FF4D88] bg-[#FF4D88]/10 border-[#FF4D88]/20"
                   : "text-yellow-400 bg-yellow-500/10 border-yellow-500/20";
 
               return (
                 <div
                   key={chapter.id}
                   onClick={() => handleChapterClick(chapter)}
-                  className={`
+                  className={`manga-chapter-row
                           flex flex-col md:grid md:grid-cols-12 
-                          px-4 py-4 md:py-3.5 
-                          border-b border-white/[0.03] 
-                          transition-colors duration-200 group 
+                          px-4 py-4 md:px-5 md:py-4
+                          border-b border-white/[0.045] last:border-b-0
+                          transition-all duration-200 group
                           items-start md:items-center 
                           text-sm cursor-pointer
-                          ${locked
-                      ? 'hover:bg-red-500/[0.02] opacity-90 hover:opacity-100'
-                      : 'hover:bg-white/[0.02]'
-                    }
+                          ${locked ? 'opacity-90 hover:opacity-100' : ''}
                         `}
                 >
                   {/* Contenido Fila */}
@@ -197,7 +224,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                       <span className="text-xs opacity-50 mr-0.5 hidden md:inline">#</span>{chapter.chapter_number}
                     </div>
 
-                    <div className="md:col-span-5 text-gray-400 group-hover:text-gray-200 font-medium truncate w-full pl-2 md:pl-0 text-left">
+                    <div className="manga-chapter-row-title w-full truncate pl-2 text-left text-gray-400 transition-colors group-hover:text-white md:col-span-5 md:pl-0">
                       {chapter.title || "Sin título"}
                     </div>
 
@@ -205,10 +232,11 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                       {locked ? (
                         <Lock size={14} className="text-white/40" />
                       ) : (
-                        isPurchased ? <Unlock size={14} className="text-emerald-500" /> : <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                        isPurchased ? <DetailPurchasedIcon size={15} className="text-gray-400" /> : null
                       )}
                       {!locked && (
-                        <span className={`text-[9px] font-black uppercase tracking-wider ${isPurchased ? 'text-emerald-400' : 'text-emerald-500'}`}>
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider ${isPurchased ? 'text-gray-400' : 'text-[#FF4D88]'}`}>
+                          {!isPurchased && <DetailTicket3DIcon size={14} className="h-[14px] w-[14px] object-contain" />}
                           {statusLabel}
                         </span>
                       )}
@@ -232,19 +260,20 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                     {locked ? (
                       <>
                         <span className="font-mono font-bold text-xs flex items-center gap-1.5 text-yellow-400 bg-yellow-400/5 px-2 py-0.5 rounded">
-                          <Coins size={10} /> {chapter.price_coins}
+                          <DetailCoin3DIcon size={18} className="h-[18px] w-[18px] object-contain" /> {chapter.price_coins}
                         </span>
                         <Lock size={14} className="text-white/20 group-hover:text-white/40 transition-colors" />
                       </>
                     ) : (
                       <>
                         {isPurchased ? (
-                          <span className="inline-flex items-center gap-1.5 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-400">
-                            <Unlock size={12} /> Comprado
+                          <span className="inline-flex items-center gap-1.5 rounded bg-white/[0.045] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                            <DetailPurchasedIcon size={14} /> Comprado
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-400">
-                            <CheckCircle2 size={12} /> Gratis
+                          <span className="inline-flex items-center gap-1.5 rounded bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#FF4D88]">
+                            <DetailTicket3DIcon size={17} className="h-[17px] w-[17px] object-contain" />
+                            Gratis
                           </span>
                         )}
                       </>
@@ -259,14 +288,17 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                           <Clock size={10} /> Gratis en: <Countdown targetDate={chapter.free_at!} />
                         </div>
                       ) : !locked ? (
-                        <span className={isPurchased ? "text-emerald-400" : "text-emerald-500"}>{statusLabel}</span>
+                        <span className={`inline-flex items-center gap-1 ${isPurchased ? "text-gray-400" : "text-[#FF4D88]"}`}>
+                          {!isPurchased && <DetailTicket3DIcon size={14} className="h-[14px] w-[14px] object-contain" />}
+                          {statusLabel}
+                        </span>
                       ) : (
                         <span>{new Date(chapter.created_at).toLocaleDateString()}</span>
                       )}
                     </div>
                     {locked && (
                       <div className="flex items-center gap-1 text-yellow-500 text-[10px] font-bold bg-yellow-500/10 px-2 py-0.5 rounded">
-                        <Coins size={10} /> {chapter.price_coins}
+                        <DetailCoin3DIcon size={18} className="h-[18px] w-[18px] object-contain" /> {chapter.price_coins}
                       </div>
                     )}
                   </div>
@@ -278,9 +310,9 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
           {totalChapters > 5 && (
             <button
               onClick={() => setShowAll(!showAll)}
-              className="w-full py-4 bg-[#111] hover:bg-[#161616] text-white/40 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest border-t border-white/5"
+              className="manga-chapter-toggle flex w-full items-center justify-center gap-2 border-t border-white/[0.06] bg-white/[0.025] py-4 text-xs font-semibold text-white/40 transition-all duration-300 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]"
             >
-              {showAll ? (<> <ChevronUp size={14} /> Mostrar Menos </>) : (<> <ChevronDown size={14} /> Mostrar Todos ({totalChapters - 5} más) </>)}
+              {showAll ? (<> <ChevronUp size={14} /> Mostrar menos </>) : (<> <ChevronDown size={14} /> Mostrar todos </>)}
             </button>
           )}
         </div>

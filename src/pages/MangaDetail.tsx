@@ -1,126 +1,244 @@
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
-  ArrowLeft, BookOpen, Star, Clock, CheckCircle, Loader2,
-  Play, Bookmark, BookMarked, Eye, Flame
-} from "lucide-react";
-import { motion } from "framer-motion";
+  Activity,
+  Bookmark,
+  BookMarked,
+  BookOpen,
+  ChevronDown,
+  Flame,
+  Heart,
+  Loader2,
+  Share2,
+  Star,
+} from 'lucide-react';
 
-import { getMangaById, getChaptersBySeries, trackChapterView, getRelatedMangas } from "../services/mangaService";
-import type { MangaCapitulo } from "../types/manga";
-import type { SeriesChapter, RelatedManga } from "../services/mangaService";
-import { ChapterList } from "../components/manga";
-import { getStoredUser, getStoredToken, getUnlockedChapters, refreshUser } from "../services/authService";
+import {
+  getChaptersBySeries,
+  getMangaById,
+  getRelatedMangas,
+  trackChapterView,
+  type RelatedManga,
+  type SeriesChapter,
+} from '../services/mangaService';
+import {
+  getInteractions,
+  toggleBookmarkWithTotal,
+  toggleMangaLike,
+  trackMangaShare,
+} from '../services/interactionsService';
+import {
+  getStoredToken,
+  getStoredUser,
+  getUnlockedChapters,
+  refreshUser,
+} from '../services/authService';
+import type { MangaCapitulo } from '../types/manga';
+import {
+  DetailCalendarIcon,
+  DetailCollectionIcon,
+  DetailOpenBook3DIcon,
+  DetailPlatformIcon,
+  DetailPublicationIcon,
+  DetailStudioIcon,
+  MangaDetailClock,
+} from '../components/common';
+import { ChapterList, MangaComments, MangaMusicCard } from '../components/manga';
+import { Footer } from '../components/layout';
+import { FOOTER_SOCIALS } from '../components/layout/Footer';
+import { useTheme } from '../hooks/useTheme';
+import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from '../utils/globalLoading';
+import { preloadImages } from '../utils/preloadImages';
 
-const getTypeColor = (type: string) => {
-  const t = type?.toLowerCase() || "";
-  if (t.includes("manhwa")) return "bg-purple-600";
-  if (t.includes("manhua")) return "bg-green-600";
-  if (t.includes("novel")) return "bg-blue-600";
-  return "bg-[#FF4D88]";
+const MANGA_DETAIL_REFERENCE_TIME = Date.now();
+
+const formatCompactNumber = (value: number) => new Intl.NumberFormat('es-PE', {
+  notation: value >= 1000 ? 'compact' : 'standard',
+  maximumFractionDigits: 1,
+}).format(value);
+
+const formatDate = (value?: string, fallback = 'N/A') => {
+  if (!value) return fallback;
+  const normalized = value.includes(' ') ? value.replace(' ', 'T') : value;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
 };
 
-// ── Componente: Lecturas Relacionadas ─────────────────────────────────────────
-function RelatedSection({ related, currentId }: { related: RelatedManga[]; currentId: number | string }) {
+const cleanSynopsis = (title: string, synopsis?: string) => {
+  const trimmed = synopsis?.trim() || '';
+  if (!trimmed) return '';
+  if (trimmed.toLocaleLowerCase('es').startsWith(title.trim().toLocaleLowerCase('es'))) {
+    return trimmed.slice(title.trim().length).trim();
+  }
+  return trimmed;
+};
+
+function MetaItem({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="pt-4 pb-8">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-l-4 border-[#FF4D88] pl-4 mb-6">
-        <h2 className="text-xl md:text-2xl font-[900] text-white uppercase italic tracking-tighter flex items-center gap-2">
-          <BookOpen size={20} className="text-[#FF4D88]" strokeWidth={3} />
-          LECTURAS <span className="text-[#FF4D88]">RELACIONADAS</span>
-        </h2>
-      </div>
-
-      {/* Carrusel horizontal */}
-      <div className="relative">
-        {/* Fades laterales */}
-        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
-
-        <div
-          className="flex gap-3 overflow-x-auto pb-3 scroll-smooth"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {related
-            .filter(r => String(r.id) !== String(currentId))
-            .map((manga, i) => (
-              <RelatedCard key={manga.id} manga={manga} delay={i * 0.04} />
-            ))}
-        </div>
+    <div className="manga-detail-meta-item group flex min-h-[72px] min-w-0 items-center gap-4 border-b border-white/10 px-5 py-4 last:border-b-0">
+      <span className="manga-detail-meta-icon shrink-0 text-white/55 transition-colors group-hover:text-[#FF4D88] [&>svg]:h-7 [&>svg]:w-7">{icon}</span>
+      <div className="min-w-0">
+        <p className="manga-detail-meta-label manga-detail-ui-label text-[10px] uppercase text-white/50">{label}</p>
+        <p className="manga-detail-meta-value manga-detail-ui-label mt-1 truncate text-[13px] text-white/85">{value || 'N/A'}</p>
       </div>
     </div>
   );
 }
 
-function RelatedCard({ manga, delay }: { manga: RelatedManga; delay: number }) {
-  const sharedLabel = manga.sharedGenres > 1
-    ? `${manga.sharedGenres} géneros en común`
-    : "1 género en común";
+function EngagementCard({
+  icon,
+  label,
+  value,
+  active = false,
+  onClick,
+  progressClassName = 'from-[#FF4D88] to-[#ff8bb1]',
+  progressDelay = 0.2,
+  accentColor = '#FF4D88',
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  active?: boolean;
+  onClick?: () => void;
+  progressClassName?: string;
+  progressDelay?: number;
+  accentColor?: string;
+}) {
+  const progressPercent = value > 0
+    ? Math.min(94, 18 + Math.log10(value + 1) * 48)
+    : 0;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.35 }}
-      className="flex-shrink-0 w-[130px] sm:w-[148px] group"
-    >
-      <Link to={`/manga/${manga.id}`} className="block">
-        {/* Portada */}
-        <div className="relative aspect-[3/4.2] rounded-lg overflow-hidden mb-2 border border-white/5 bg-[#111] shadow-lg group-hover:shadow-[#FF4D88]/20 group-hover:shadow-xl transition-all duration-300 group-hover:-translate-y-1">
-          <img
-            src={manga.portada}
-            alt={manga.titulo}
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-          {/* Overlay oscuro en hover */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300" />
-
-          {/* Badge tipo */}
-          <div className="absolute top-1.5 right-1.5">
-            <span className={`${getTypeColor(manga.tipo)} text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow`}>
-              {manga.tipo}
-            </span>
-          </div>
-
-          {/* Badge géneros en común */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 pt-4 pb-1.5 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-            <p className="text-[8px] text-[#FF4D88] font-bold uppercase tracking-wider leading-tight">
-              {sharedLabel}
-            </p>
-          </div>
-        </div>
-
-        {/* Título */}
-        <p className="text-[11px] sm:text-[12px] font-[700] text-white/80 group-hover:text-[#FF4D88] transition-colors leading-snug line-clamp-2 uppercase tracking-tight text-center px-0.5">
-          {manga.titulo}
-        </p>
-
-        {/* Géneros principales */}
-        {(manga.genres ?? []).slice(0, 2).map((g, i) => (
-          <span
-            key={i}
-            className="inline-block text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded mr-1 mt-1"
+  const content = (
+    <>
+      <div className="min-w-0 flex-1 pr-3">
+        <p className="manga-detail-engagement-label text-[10px] uppercase text-white/55">{label}</p>
+        <p className="manga-detail-engagement-value mt-1.5 font-mono text-xl font-black text-white">{formatCompactNumber(value)}</p>
+        <div className="manga-detail-engagement-progress mt-2.5 h-3.5 w-full overflow-hidden rounded-full p-[2px]">
+          <motion.span
+            key={`${label}-${value}`}
+            aria-hidden="true"
+            className={`relative block h-full overflow-hidden rounded-full bg-gradient-to-r ${progressClassName}`}
+            initial={{ opacity: 0.35, width: 0 }}
+            animate={{ opacity: 1, width: `${progressPercent}%` }}
+            transition={{ delay: progressDelay, duration: 1.15, ease: [0.22, 1, 0.36, 1] }}
           >
-            {g}
-          </span>
-        ))}
-      </Link>
-    </motion.div>
+            <motion.span
+              aria-hidden="true"
+              className="absolute inset-y-0 -left-1/2 w-1/2 skew-x-[-18deg] bg-white/55 blur-[1px]"
+              initial={{ x: '0%' }}
+              animate={{ x: '320%' }}
+              transition={{ delay: progressDelay + 0.35, duration: 0.9, ease: 'easeOut' }}
+            />
+          </motion.span>
+        </div>
+      </div>
+      <span className="manga-detail-engagement-icon flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.07] bg-white/[0.035] text-white/30 transition-all">
+        {icon}
+      </span>
+    </>
+  );
+
+  const className = 'manga-detail-engagement group flex min-h-[96px] w-full items-center justify-between rounded-xl border border-white/[0.07] bg-black/50 px-3 py-4 text-left shadow-[0_14px_35px_rgba(0,0,0,0.16)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-[#FF4D88]/20 hover:bg-black';
+
+  return onClick ? (
+    <button type="button" onClick={onClick} className={className} aria-pressed={active} style={{ '--engagement-accent': accentColor } as CSSProperties}>{content}</button>
+  ) : (
+    <div className={className} style={{ '--engagement-accent': accentColor } as CSSProperties}>{content}</div>
   );
 }
 
-const getStatusLabel = (status: string) => {
-  const s = status?.toLowerCase() || "";
-  if (s.includes("complet") || s === "finished") return { label: "Completado", color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" };
-  if (s.includes("cancel") || s.includes("drop")) return { label: "Cancelado", color: "text-red-400 bg-red-400/10 border-red-400/20" };
-  return { label: "En Curso", color: "text-blue-400 bg-blue-400/10 border-blue-400/20" };
-};
+function RelatedCard({ manga, isLight, isClone = false }: { manga: RelatedManga; isLight: boolean; isClone?: boolean }) {
+  return (
+    <article
+      className="biblioteca-cover-card group min-w-0"
+      style={{ '--card-accent': '#FF4D88' } as CSSProperties}
+    >
+      <Link to={`/manga/${manga.id}`} tabIndex={isClone ? -1 : undefined} className="block">
+        <div className={`biblioteca-cover-card-surface relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_14px_34px_rgba(0,0,0,0.18)] ${isLight ? 'biblioteca-cover-card-light' : 'biblioteca-cover-card-dark'}`}>
+          <img
+            src={manga.portada}
+            alt={manga.titulo}
+            loading="eager"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
+          />
+          <div className={isLight ? 'absolute inset-x-0 bottom-0 h-[36%] bg-gradient-to-t from-white via-white/85 to-transparent' : 'absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent opacity-90 transition-opacity duration-300'} />
+          <div className={`biblioteca-cover-top-shade ${isLight ? 'biblioteca-cover-top-shade-light' : 'biblioteca-cover-top-shade-dark'}`} />
+
+          <span className={`absolute left-2 top-2 flex items-center gap-1 rounded-md border px-1.5 py-1 text-[8px] font-black shadow-lg backdrop-blur-md sm:left-2.5 sm:top-2.5 sm:text-[9px] ${isLight ? 'border-black/10 bg-white/85 text-zinc-950' : 'border-white/15 bg-black/70 text-white'}`}>
+            <Star size={10} className="shrink-0 fill-[#FF4D88] text-[#FF4D88]" />
+            10
+          </span>
+          {manga.tipo && (
+            <span className={`absolute right-2 top-2 max-w-[34%] truncate rounded-md border px-1.5 py-1 text-[8px] font-black uppercase shadow-lg backdrop-blur-md sm:right-2.5 sm:top-2.5 sm:text-[9px] ${isLight ? 'border-black/10 bg-white/85 text-zinc-950' : 'border-white/15 bg-black/70 text-white'}`}>
+              {manga.tipo}
+            </span>
+          )}
+          <div className="absolute inset-x-0 bottom-0 px-3 pb-3 pt-12 sm:px-4 sm:pb-4">
+            <h3 className={`line-clamp-2 text-center text-[11px] font-[900] uppercase leading-snug tracking-tight transition-colors group-hover:text-[var(--card-accent)] sm:text-xs ${isLight ? 'text-zinc-950 [text-shadow:0_1px_10px_rgba(255,255,255,.95)]' : 'text-white [text-shadow:0_2px_12px_rgba(0,0,0,.95)]'}`}>
+              {manga.titulo}
+            </h3>
+          </div>
+        </div>
+      </Link>
+    </article>
+  );
+}
+
+function RelatedSection({ related, currentId, isLight }: { related: RelatedManga[]; currentId: number | string; isLight: boolean }) {
+  const [isTouchPaused, setIsTouchPaused] = useState(false);
+  const items = related.filter((item) => String(item.id) !== String(currentId));
+  const marqueeItems = items.length === 0
+    ? []
+    : Array.from({ length: Math.max(12, items.length) }, (_, index) => items[index % items.length]);
+  if (items.length === 0) return null;
+
+  return (
+    <section className="relative left-1/2 w-[calc(100%+2rem)] -translate-x-1/2 py-12 md:w-[calc(100%+4rem)] md:py-16 xl:w-[calc(100%+6.5rem)]" aria-labelledby="related-title">
+      <div className="mb-3 flex items-end justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="h-8 w-1 rounded-full bg-[#FF4D88] shadow-[0_0_18px_rgba(255,77,136,0.65)]" />
+          <Flame size={21} className="text-[#FF4D88]" fill="currentColor" />
+          <h2 id="related-title" className={`text-xl font-black uppercase italic tracking-tight md:text-2xl ${isLight ? 'text-black' : 'text-white'}`}>
+            Lecturas relacionadas
+          </h2>
+        </div>
+      </div>
+
+      <div
+        className="-mx-2 touch-pan-y overflow-hidden py-4"
+        aria-label="Lecturas relacionadas en movimiento continuo"
+        onTouchStart={() => setIsTouchPaused(true)}
+        onTouchEnd={() => setIsTouchPaused(false)}
+        onTouchCancel={() => setIsTouchPaused(false)}
+      >
+        <div className="home-popular-marquee-track" style={isTouchPaused ? { animationPlayState: 'paused' } : undefined}>
+          {[0, 1].map((copyIndex) => (
+            <div key={`related-sequence-${copyIndex}`} className="home-popular-marquee-sequence" aria-hidden={copyIndex === 1 ? true : undefined}>
+              {marqueeItems.map((manga, index) => (
+                <div key={`${copyIndex}-${manga.id}-${index}`} className="home-popular-marquee-card">
+                  <RelatedCard manga={manga} isLight={isLight} isClone={copyIndex === 1} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export const MangaDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isLightMode = theme === 'light';
 
   const [manga, setManga] = useState<MangaCapitulo | null>(null);
   const [chapters, setChapters] = useState<SeriesChapter[]>([]);
@@ -128,12 +246,16 @@ export const MangaDetail = () => {
   const [loading, setLoading] = useState(true);
   const [chaptersLoading, setChaptersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
 
-  // Auth
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [userCoins, setUserCoins] = useState(0);
-  const [userInfo, setUserInfo] = useState<{ id: string; username: string }>({ id: "", username: "" });
+  const [userInfo, setUserInfo] = useState<{ id: string; username: string }>({ id: '', username: '' });
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [interactionBusy, setInteractionBusy] = useState<'bookmark' | 'like' | ''>('');
+  const [shareFeedback, setShareFeedback] = useState('');
+  const [engagement, setEngagement] = useState({ online: 0, bookmarks: 0, likes: 0, shares: 0 });
 
   const loadUser = useCallback(async () => {
     const stored = getStoredUser();
@@ -142,24 +264,40 @@ export const MangaDetail = () => {
       setUserInfo({ id: String(stored.id), username: stored.username });
       setUserCoins(stored.coins || 0);
     } else {
-      setUserInfo({ id: "", username: "" });
+      setUserInfo({ id: '', username: '' });
       setUserCoins(0);
     }
-    if (token) {
-      const [fresh, unlocked] = await Promise.all([refreshUser(), getUnlockedChapters()]);
-      if (fresh) {
-        setUserInfo({ id: String(fresh.id), username: fresh.username });
-        setUserCoins(fresh.coins || 0);
-      } else if (!getStoredToken()) {
-        setUserInfo({ id: "", username: "" });
-        setUserCoins(0);
-        setPurchasedIds(new Set<string>());
-        return;
-      }
-      setPurchasedIds(unlocked);
-    } else {
-      setPurchasedIds(new Set<string>());
+
+    if (!token) {
+      setPurchasedIds(new Set());
+      return;
     }
+
+    const [fresh, unlocked] = await Promise.all([refreshUser(), getUnlockedChapters()]);
+    if (fresh) {
+      setUserInfo({ id: String(fresh.id), username: fresh.username });
+      setUserCoins(fresh.coins || 0);
+    } else if (!getStoredToken()) {
+      setUserInfo({ id: '', username: '' });
+      setUserCoins(0);
+      setPurchasedIds(new Set());
+      return;
+    }
+    setPurchasedIds(unlocked);
+  }, []);
+
+  const loadInteractions = useCallback(async (mangaId: string) => {
+    const interactions = await getInteractions(mangaId);
+    if (!interactions) return;
+
+    setIsBookmarked(interactions.bookmarks?.some((item) => String(item) === mangaId) || false);
+    setIsLiked(interactions.likes?.some((item) => String(item) === mangaId) || false);
+    setEngagement({
+      online: Number(interactions.online_readers || 0),
+      bookmarks: Number(interactions.manga_bookmarks || 0),
+      likes: Number(interactions.manga_likes || 0),
+      shares: Number(interactions.manga_shares || 0),
+    });
   }, []);
 
   useEffect(() => {
@@ -168,250 +306,371 @@ export const MangaDetail = () => {
 
   useEffect(() => {
     if (!id) return;
+    let active = true;
+    startGlobalLoading(10);
     setLoading(true);
     setError(null);
+    setManga(null);
     setChapters([]);
     setRelated([]);
+    setSynopsisExpanded(false);
+    setChaptersLoading(true);
+    setEngagement({ online: 0, bookmarks: 0, likes: 0, shares: 0 });
 
     const fetchData = async () => {
       try {
         const mangaData = await getMangaById(id);
+        if (!active) return;
         if (!mangaData) {
-          setError("Manga no encontrado.");
+          setError('Manga no encontrado.');
           setLoading(false);
           setChaptersLoading(false);
+          finishGlobalLoading();
           return;
         }
-        setManga(mangaData);
-        setLoading(false);
 
+        setManga(mangaData);
+        updateGlobalLoading(36);
         const mangaPostId = mangaData.eroSeri || mangaData.id;
 
-        // Capítulos + relacionados en paralelo
-        setChaptersLoading(true);
         const [chapterData, relatedData] = await Promise.all([
           getChaptersBySeries(mangaPostId),
-          getRelatedMangas(mangaPostId, 12),
+          getRelatedMangas(mangaPostId, 18),
+          loadInteractions(String(mangaData.id)),
         ]);
+        if (!active) return;
+        updateGlobalLoading(74);
+        await preloadImages([
+          mangaData.portada,
+          ...relatedData.slice(0, 10).map((item) => item.portada),
+        ]);
+        if (!active) return;
         setChapters(chapterData);
         setRelated(relatedData);
-      } catch (err) {
-        console.error("Error MangaDetail:", err);
-        setError("No se pudo cargar el manga.");
         setLoading(false);
-      } finally {
         setChaptersLoading(false);
+        finishGlobalLoading();
+      } catch (requestError) {
+        console.error('Error MangaDetail:', requestError);
+        if (active) {
+          setError('No se pudo cargar el manga.');
+          setLoading(false);
+          setChaptersLoading(false);
+          finishGlobalLoading();
+        }
       }
     };
-    fetchData();
-  }, [id]);
+
+    void fetchData();
+    return () => {
+      active = false;
+      finishGlobalLoading();
+    };
+  }, [id, loadInteractions]);
+
+  const firstChapter = useMemo(() => [...chapters].sort((a, b) => a.chapter_number - b.chapter_number)[0], [chapters]);
+
+  const goToLogin = () => {
+    navigate('/auth/login', {
+      state: { returnTo: `${window.location.pathname}${window.location.search}` },
+    });
+  };
 
   const handleReadFirst = () => {
-    if (chapters.length === 0) return;
-    const first = chapters[0];
-    if (manga?.id && first?.id) {
-      trackChapterView(first.id, manga.id);
+    if (!manga || !firstChapter) return;
+    void trackChapterView(firstChapter.id, manga.id);
+    navigate(`/read/${firstChapter.id}`);
+  };
+
+  const handleBookmark = async () => {
+    if (!manga || interactionBusy) return;
+    if (!getStoredToken()) {
+      goToLogin();
+      return;
     }
-    navigate(`/read/${chapters[0].id}`);
+
+    setInteractionBusy('bookmark');
+    const result = await toggleBookmarkWithTotal(String(manga.id));
+    if (result) {
+      setIsBookmarked(result.action === 'added');
+      setEngagement((current) => ({ ...current, bookmarks: result.total }));
+    }
+    setInteractionBusy('');
+  };
+
+  const handleLike = async () => {
+    if (!manga || interactionBusy) return;
+    if (!getStoredToken()) {
+      goToLogin();
+      return;
+    }
+
+    setInteractionBusy('like');
+    const result = await toggleMangaLike(String(manga.id));
+    if (result) {
+      setIsLiked(result.action === 'added');
+      setEngagement((current) => ({ ...current, likes: result.total }));
+    }
+    setInteractionBusy('');
+  };
+
+  const handleShare = async () => {
+    if (!manga) return;
+    const shareData = {
+      title: manga.titulo,
+      text: `Lee ${manga.titulo} en MangaMukai`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        setShareFeedback('Compartido');
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setShareFeedback('Enlace copiado');
+      }
+      const total = await trackMangaShare(String(manga.id));
+      if (total !== null) setEngagement((current) => ({ ...current, shares: total }));
+      window.setTimeout(() => setShareFeedback(''), 2400);
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === 'AbortError') return;
+      setShareFeedback('No se pudo copiar');
+      window.setTimeout(() => setShareFeedback(''), 2400);
+    }
   };
 
   const handlePurchaseSuccess = useCallback(() => {
-    loadUser();
+    void loadUser();
   }, [loadUser]);
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-      <Loader2 className="w-10 h-10 text-[#FF4D88] animate-spin" />
-    </div>
-  );
+  if (loading) {
+    return <div className="min-h-screen bg-[#02040a]" />;
+  }
 
-  if (error || !manga) return (
-    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4 text-white px-4">
-      <BookOpen size={48} className="text-white/20" />
-      <p className="text-white/60 text-sm">{error || "Manga no encontrado."}</p>
-      <button onClick={() => navigate(-1)} className="px-6 py-2 bg-[#FF4D88] text-white font-bold rounded-lg text-sm">
-        Volver
-      </button>
-    </div>
-  );
+  if (error || !manga) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#02040a] px-4 text-center text-white">
+        <BookOpen size={52} className="text-white/15" />
+        <div>
+          <h1 className="text-2xl font-black uppercase italic">Historia no disponible</h1>
+          <p className="mt-2 text-sm text-white/45">{error || 'Manga no encontrado.'}</p>
+        </div>
+        <button onClick={() => navigate(-1)} className="rounded-xl bg-[#FF4D88] px-6 py-3 text-xs font-black uppercase tracking-wider text-white">
+          Volver
+        </button>
+      </div>
+    );
+  }
 
-  const statusConfig = getStatusLabel(manga.status || "");
-  const totalCh   = chapters.length;
-  const now       = new Date();
-  const freeCh    = chapters.filter(c => !c.is_paid || (!!c.free_at && new Date(c.free_at) <= now)).length;
-  const paidCh    = totalCh - freeCh;
-  const genres    = manga.genres || [];
+  const genres = manga.genres || [];
+  const synopsis = cleanSynopsis(manga.titulo, manga.descripcion);
+  const publishedDate = manga.publishedAt || manga.rawFecha;
+  const releaseDate = manga.fechaManga || formatDate(manga.rawFecha, manga.fecha);
+  const releaseTime = manga.rawFecha ? new Date(manga.rawFecha.replace(' ', 'T')).getTime() : 0;
+  const isNewRelease = releaseTime > 0 && MANGA_DETAIL_REFERENCE_TIME - releaseTime < 1000 * 60 * 60 * 24 * 45;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-
-      {/* ── HERO BANNER ──────────────────────────────────────────────────────── */}
-      <div className="relative w-full h-[520px] lg:h-[560px] overflow-hidden">
-        {/* Fondo borroso */}
-        <div className="absolute inset-0 z-0">
+    <main className={`manga-detail-page min-h-screen overflow-hidden transition-colors duration-500 ${isLightMode ? 'manga-detail-theme-light home-theme-light bg-white text-black' : 'manga-detail-theme-dark home-theme-dark bg-black text-white'}`}>
+      <section className="manga-detail-hero relative isolate overflow-hidden border-b border-white/[0.06] pb-20 pt-24 transition-colors duration-700 md:pb-28 md:pt-32">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src={manga.portada}
             alt=""
-            className="w-full h-full object-cover grayscale brightness-[0.3] blur-sm scale-110"
+            aria-hidden="true"
+            className="manga-detail-backdrop-image home-theme-backdrop-image absolute inset-0 h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/80 via-transparent to-transparent hidden lg:block" />
+          <div aria-hidden="true" className="home-hero-theme-scrim absolute inset-0" />
         </div>
 
-        {/* Back button */}
-        <button
-          onClick={() => navigate(-1)}
-          className="absolute top-24 left-4 lg:left-10 z-30 w-10 h-10 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center hover:bg-[#FF4D88] transition-colors"
-        >
-          <ArrowLeft size={18} />
-        </button>
-
-        {/* Contenido hero */}
-        <div className="absolute inset-0 z-20 flex items-end">
-          <div className="desktop-content-shell w-full max-w-[1400px] mx-auto px-4 lg:px-10 pb-8 flex flex-col lg:flex-row items-end gap-6">
-
-            {/* Portada */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="hidden lg:block shrink-0 w-[160px] h-[240px] xl:w-[200px] xl:h-[290px] rounded-xl overflow-hidden shadow-2xl border-2 border-white/20"
-            >
-              <img src={manga.portada} alt={manga.titulo} className="w-full h-full object-cover" />
-            </motion.div>
-
-            {/* Info */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="flex-1 space-y-3"
-            >
-              {/* Badges tipo + status */}
-              <div className="flex flex-wrap gap-2">
-                <span className={`${getTypeColor(manga.tipo)} text-white text-[10px] font-black px-2.5 py-1 rounded uppercase tracking-wider`}>
-                  {manga.tipo}
-                </span>
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded border uppercase tracking-wider ${statusConfig.color}`}>
-                  {statusConfig.label}
-                </span>
-                {(manga.totalViews ?? 0) > 0 && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded border border-white/10 bg-white/5 text-white/60 uppercase">
-                    <Eye size={10} /> {manga.totalViews?.toLocaleString()} vistas
-                  </span>
-                )}
+        <div className="desktop-content-shell relative z-10 mx-auto w-full max-w-[1400px] px-4 md:px-8">
+          <div className="manga-detail-hero-utilities mb-7 flex flex-col gap-5 border-b border-white/[0.08] pb-5 sm:flex-row sm:items-end sm:justify-between lg:mb-9">
+            <div className="mx-auto w-full max-w-[278px] sm:mx-0 lg:max-w-[250px] xl:max-w-[278px]">
+              <MangaDetailClock isLight={isLightMode} />
+            </div>
+            <div className="flex flex-col items-center sm:max-w-[360px]">
+              <p className="manga-detail-social-prompt mb-1 text-[13px] text-white/75">¡No olvides seguirnos!</p>
+              <div className="flex flex-wrap items-center justify-center gap-1" aria-label="Redes sociales de MangaMukai">
+                {FOOTER_SOCIALS.map(({ name, href, icon: SocialIcon }) => (
+                  <a
+                    key={name}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={name}
+                    title={name}
+                    className="manga-detail-social-link flex h-10 w-8 items-center justify-center bg-transparent text-white transition-all hover:-translate-y-0.5 hover:text-[#FF4D88]"
+                  >
+                    <SocialIcon size={22} />
+                  </a>
+                ))}
               </div>
+            </div>
+          </div>
 
-              {/* Título */}
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-[900] italic uppercase tracking-tighter leading-tight text-white drop-shadow-lg line-clamp-3">
+          <div className="manga-detail-layout relative grid gap-7 md:gap-9 lg:min-h-[800px] lg:content-start lg:grid-cols-[minmax(0,1fr)_270px] lg:grid-rows-[auto_auto_auto] lg:items-start lg:gap-x-7 lg:gap-y-4 lg:pl-[277px] xl:grid-cols-[minmax(0,1fr)_310px] xl:gap-x-10 xl:pl-[318px]">
+            <motion.header
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.04, duration: 0.5 }}
+              className="manga-detail-info-header order-1 min-w-0 border-b border-white/10 pb-5 lg:col-[1/3] lg:row-start-1 lg:self-start"
+            >
+              <h1 className="manga-detail-title line-clamp-2 max-w-5xl text-[clamp(1.5rem,3.2vw,3.2rem)] font-black uppercase italic leading-[0.95] tracking-[-0.04em] text-white [text-wrap:balance]">
                 {manga.titulo}
               </h1>
-
-              {/* Géneros */}
               {genres.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {genres.slice(0, 8).map((g, i) => (
-                    <span key={i} className="text-[10px] font-semibold text-white/60 bg-white/5 border border-white/10 px-2 py-0.5 rounded">
-                      {g}
-                    </span>
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <span aria-hidden="true" className="manga-detail-genre-hash -mr-1 text-lg font-black leading-none text-[#FF4D88]">#</span>
+                  {genres.slice(0, 10).map((genre) => (
+                    <Link
+                      key={genre}
+                      to={`/biblioteca?genre=${encodeURIComponent(genre)}`}
+                      className="manga-detail-genre rounded-md border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-[9px] font-bold uppercase text-white backdrop-blur-sm transition-all hover:border-[#FF4D88]/35 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]"
+                    >
+                      {genre}
+                    </Link>
                   ))}
                 </div>
               )}
 
-              {/* Estadísticas rápidas */}
-              <div className="flex flex-wrap gap-3 text-[11px] font-bold text-white/50 uppercase tracking-wider">
-                <span className="flex items-center gap-1"><BookOpen size={12} /> {totalCh} Capítulos</span>
-                <span className="flex items-center gap-1 text-emerald-400"><CheckCircle size={12} /> {freeCh} Gratis</span>
-                {paidCh > 0 && <span className="flex items-center gap-1 text-yellow-400"><Star size={12} /> {paidCh} Premium</span>}
-                <span className="flex items-center gap-1"><Clock size={12} /> {manga.fecha}</span>
+              <div className="manga-detail-original-slot mt-4 w-full max-w-5xl rounded-xl border border-white/[0.08] bg-black/25 px-4 py-3 backdrop-blur-sm">
+                <p className="manga-detail-original-slot-label text-[11px] font-semibold text-white/65">Título Original</p>
+                <div aria-hidden="true" className="mt-2 min-h-5" />
+              </div>
+            </motion.header>
+
+            <motion.aside
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="order-2 mx-auto w-full max-w-[278px] lg:absolute lg:left-0 lg:top-0 lg:mx-0 lg:w-[250px] xl:w-[278px]"
+            >
+              <div className="manga-detail-cover relative aspect-[3/4.38] overflow-hidden rounded-2xl">
+                <img src={manga.portada} alt={`Portada de ${manga.titulo}`} className="h-full w-full object-cover" />
+                <div className="manga-detail-cover-shadow absolute inset-x-0 bottom-0 h-28" />
+                <div className="manga-detail-ui-label absolute left-0 top-1/2 flex -translate-y-1/2 flex-col items-start gap-1.5 text-xs uppercase text-white">
+                  <span className="rotate-180 rounded-l-md bg-violet-600 px-2.5 py-3 shadow-lg [text-orientation:mixed] [writing-mode:vertical-rl]">Color</span>
+                  <span className="rotate-180 rounded-l-md bg-[#FF4D88] px-2.5 py-3 shadow-lg [text-orientation:mixed] [writing-mode:vertical-rl]">{manga.tipo || 'Manga'}</span>
+                </div>
+                {isNewRelease && (
+                  <span className="absolute right-3 top-3 w-fit rounded-md bg-[#FF4D88] px-2 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-white shadow-xl">
+                    Estreno
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLike}
+                  disabled={interactionBusy !== ''}
+                  aria-label={isLiked ? 'Quitar Me gusta' : 'Me gusta'}
+                  title={isLiked ? 'Quitar Me gusta' : 'Me gusta'}
+                  className={`absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-full border shadow-xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 disabled:cursor-wait disabled:opacity-60 ${isLiked ? 'border-[#FF4D88]/60 bg-[#FF4D88] text-white' : 'border-white/20 bg-black/55 text-white hover:border-[#FF4D88]/60 hover:text-[#FF4D88]'}`}
+                >
+                  {interactionBusy === 'like' ? <Loader2 size={19} className="animate-spin" /> : <Heart size={19} fill={isLiked ? 'currentColor' : 'none'} />}
+                </button>
               </div>
 
-              {/* Botones */}
-              <div className="flex flex-wrap gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleReadFirst}
+                disabled={chaptersLoading || !firstChapter}
+                className="manga-detail-ui-label mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#e71f69] to-[#FF4D88] px-5 py-3.5 text-[11px] uppercase text-white shadow-[0_16px_35px_rgba(255,77,136,0.24)] transition-all hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <DetailOpenBook3DIcon
+                  size={24}
+                  className="h-6 w-6 shrink-0 object-contain"
+                />
+                Comenzar lectura
+              </button>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <button
-                  onClick={handleReadFirst}
-                  disabled={chaptersLoading || chapters.length === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#FF4D88] hover:bg-pink-600 text-white font-black uppercase tracking-wider text-sm rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-[#FF4D88]/20"
+                  type="button"
+                  onClick={handleBookmark}
+                  className={`manga-detail-secondary-button manga-detail-ui-label flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-[9px] uppercase transition-all ${isBookmarked ? 'border-[#FF4D88]/35 bg-[#FF4D88]/15 text-[#FF4D88]' : 'border-white/10 bg-white text-black hover:bg-[#FF4D88] hover:text-white'}`}
                 >
-                  <Play size={16} fill="currentColor" /> Leer Ahora
+                  {interactionBusy === 'bookmark' ? <Loader2 size={15} className="animate-spin" /> : isBookmarked ? <BookMarked size={15} /> : <Bookmark size={15} />}
+                  {isBookmarked ? 'Guardado' : 'Guardar'}
                 </button>
                 <button
-                  onClick={() => setIsBookmarked(p => !p)}
-                  className={`flex items-center gap-2 px-5 py-2.5 font-black uppercase tracking-wider text-sm rounded-lg border transition-all active:scale-95 ${isBookmarked ? 'bg-white/10 border-white text-white' : 'bg-transparent border-white/20 text-white/70 hover:bg-white/5'}`}
+                  type="button"
+                  onClick={handleShare}
+                  className="manga-detail-secondary-button manga-detail-ui-label flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white px-3 py-3 text-[9px] uppercase text-black transition-all hover:bg-[#FF4D88] hover:text-white"
                 >
-                  {isBookmarked ? <BookMarked size={16} /> : <Bookmark size={16} />}
-                  {isBookmarked ? "Guardado" : "Guardar"}
+                  <Share2 size={15} /> {shareFeedback || 'Compartir'}
                 </button>
               </div>
+
+              <div className="mt-5">
+                <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />
+              </div>
+            </motion.aside>
+
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+              className="order-3 min-w-0 lg:col-start-1 lg:row-start-2 lg:w-[calc(100%+14px)] xl:w-[calc(100%+18px)]"
+            >
+              {synopsis && (
+                <div className={`manga-detail-synopsis relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-[#05070b]/80 shadow-[0_24px_65px_rgba(0,0,0,0.3)] backdrop-blur-md ${synopsisExpanded ? 'min-h-[290px]' : 'h-[320px] lg:h-[290px]'}`}>
+                  <div className="manga-detail-synopsis-header flex items-center gap-2 border-b border-white/[0.06] px-5 py-4">
+                    <span className="h-4 w-1 rounded-full bg-[#FF4D88]" />
+                    <h2 className="manga-detail-synopsis-title manga-detail-ui-label text-xs uppercase text-white/80">Sinopsis</h2>
+                  </div>
+                  <div className="relative flex flex-1 flex-col px-5 pb-4 pt-3 sm:px-6">
+                    <p className={`manga-detail-synopsis-copy text-justify text-sm leading-7 text-white/60 md:text-[15px] ${synopsisExpanded ? '' : 'line-clamp-[7]'}`}>
+                      {synopsis}
+                    </p>
+                    {!synopsisExpanded && <div className="manga-detail-synopsis-fade pointer-events-none absolute inset-x-0 bottom-0 h-24" />}
+                    {synopsis.length > 330 && (
+                      <button
+                        type="button"
+                        onClick={() => setSynopsisExpanded((current) => !current)}
+                        className={`manga-detail-ui-label z-10 flex items-center gap-2 text-[10px] text-[#FF4D88] transition-colors hover:text-white ${synopsisExpanded ? 'relative mx-auto mt-5' : 'absolute bottom-6 left-1/2 -translate-x-1/2'}`}
+                      >
+                        {synopsisExpanded ? 'Ver menos' : 'Leer completo'}
+                        <ChevronDown size={14} className={`transition-transform ${synopsisExpanded ? 'rotate-180' : 'animate-bounce'}`} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </motion.div>
 
-          </div>
-        </div>
-      </div>
-
-      {/* ── CUERPO ─────────────────────────────────────────────────────────── */}
-      <div className="desktop-content-shell w-full max-w-[1400px] mx-auto px-4 lg:px-10 py-8 space-y-8">
-
-        {/* Portada móvil */}
-        <div className="flex lg:hidden justify-center -mt-16 relative z-20">
-          <div className="w-[130px] h-[190px] rounded-xl overflow-hidden shadow-2xl border-2 border-white/20">
-            <img src={manga.portada} alt={manga.titulo} className="w-full h-full object-cover" />
-          </div>
-        </div>
-
-        {/* Sinopsis */}
-        {manga.descripcion && (
-          <div className="border-l-4 border-[#FF4D88] pl-4">
-            <h2 className="text-xs font-black uppercase tracking-widest text-[#FF4D88] mb-2">Sinopsis</h2>
-            <p className="text-white/70 text-[14px] leading-relaxed">{manga.descripcion}</p>
-          </div>
-        )}
-
-        {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { icon: <BookOpen size={16} />, label: "Total", value: `${totalCh} Cap.`, color: "text-white" },
-            { icon: <CheckCircle size={16} />, label: "Gratis", value: `${freeCh}`, color: "text-emerald-400" },
-            { icon: <Star size={16} />, label: "Premium", value: `${paidCh}`, color: "text-yellow-400" },
-            { icon: <Flame size={16} />, label: "Estado", value: statusConfig.label, color: "text-blue-400" },
-          ].map((stat, i) => (
-            <div key={i} className="bg-[#111] border border-white/5 rounded-xl px-4 py-3 flex items-center gap-3">
-              <span className={`${stat.color} opacity-70`}>{stat.icon}</span>
-              <div>
-                <p className="text-[10px] text-white/30 uppercase tracking-wider font-bold">{stat.label}</p>
-                <p className={`text-sm font-black ${stat.color}`}>{stat.value}</p>
+            <motion.aside
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.16, duration: 0.5 }}
+              className="manga-detail-dashboard order-5 overflow-hidden rounded-2xl border border-white/[0.07] bg-black shadow-[0_24px_65px_rgba(0,0,0,0.24)] lg:col-start-2 lg:row-start-2"
+            >
+              <div className="manga-detail-meta grid grid-cols-1 gap-0">
+                <MetaItem icon={<DetailCalendarIcon size={30} />} label="Fecha" value={releaseDate} />
+                <MetaItem icon={<DetailStudioIcon size={30} />} label="Estudio" value={manga.studio || 'N/A'} />
+                <MetaItem icon={<DetailPlatformIcon size={30} />} label="Plataforma" value={manga.platform || 'N/A'} />
+                <MetaItem icon={<DetailPublicationIcon size={30} />} label="Publicación" value={formatDate(publishedDate)} />
               </div>
-            </div>
-          ))}
+            </motion.aside>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.45 }}
+              className="order-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:col-[1/3] lg:row-start-3"
+            >
+              <EngagementCard icon={<Activity size={17} />} label="Lectores en línea" value={engagement.online} progressClassName="from-[#FF4D88] to-[#ff8bb1] group-hover:from-[#FF4D88] group-hover:to-[#ff8bb1]" progressDelay={0.2} accentColor="#FF4D88" />
+              <EngagementCard icon={<DetailCollectionIcon size={19} />} label="En colección" value={engagement.bookmarks} active={isBookmarked} onClick={handleBookmark} progressClassName="from-[#FF4D88] to-[#ff8bb1] group-hover:from-violet-500 group-hover:to-purple-300" progressDelay={0.32} accentColor="#a78bfa" />
+              <EngagementCard icon={<Heart size={17} fill={isLiked ? 'currentColor' : 'none'} />} label="Likes" value={engagement.likes} active={isLiked} onClick={handleLike} progressClassName="from-[#FF4D88] to-[#ff8bb1] group-hover:from-lime-500 group-hover:to-green-400" progressDelay={0.44} accentColor="#65a30d" />
+              <EngagementCard icon={<Share2 size={17} />} label="Compartidos" value={engagement.shares} onClick={handleShare} progressClassName="from-[#FF4D88] to-[#ff8bb1] group-hover:from-sky-500 group-hover:to-cyan-300" progressDelay={0.56} accentColor="#38bdf8" />
+            </motion.div>
+          </div>
         </div>
+      </section>
 
-        {/* Géneros expandidos */}
-        {genres.length > 0 && (
-          <div>
-            <h2 className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">Géneros</h2>
-            <div className="flex flex-wrap gap-2">
-              {genres.map((g, i) => (
-                <Link
-                  key={i}
-                  to={`/biblioteca?genre=${encodeURIComponent(g)}`}
-                  className="text-[11px] font-semibold text-[#FF4D88] bg-[#FF4D88]/10 border border-[#FF4D88]/20 px-3 py-1 rounded-full hover:bg-[#FF4D88]/20 transition-colors"
-                >
-                  {g}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Lista de capítulos */}
+      <section className="manga-detail-chapters desktop-content-shell mx-auto w-full max-w-[1400px] px-4 py-14 md:px-8 md:py-20">
         {chaptersLoading ? (
-          <div className="flex items-center justify-center py-16 gap-3 text-white/30">
+          <div className="flex items-center justify-center gap-3 py-20 text-white/30">
             <Loader2 className="animate-spin" size={20} />
-            <span className="text-sm font-bold uppercase tracking-widest">Cargando capítulos...</span>
-          </div>
-        ) : chapters.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-white/30">
-            <BookOpen size={36} />
-            <p className="text-sm font-bold uppercase tracking-widest">Sin capítulos disponibles</p>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Cargando capítulos</span>
           </div>
         ) : (
           <ChapterList
@@ -420,15 +679,15 @@ export const MangaDetail = () => {
             userCoins={userCoins}
             userInfo={userInfo}
             onPurchaseSuccess={handlePurchaseSuccess}
+            isLight={isLightMode}
           />
         )}
 
-        {/* ── LECTURAS RELACIONADAS ──────────────────────────────────────── */}
-        {related.length > 0 && (
-          <RelatedSection related={related} currentId={manga.id} />
-        )}
+        <RelatedSection related={related} currentId={manga.id} isLight={isLightMode} />
+      </section>
 
-      </div>
-    </div>
+      <MangaComments mangaId={String(manga.id)} isLight={isLightMode} />
+      <Footer />
+    </main>
   );
 };

@@ -294,10 +294,7 @@ export const AuthPage = () => {
   const { theme } = useTheme();
   const isLight = theme === "light";
   const isLogin = location.pathname.endsWith("/login");
-  const requestedReturnTo = (location.state as { returnTo?: string } | null)?.returnTo;
-  const returnTo = requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//")
-    ? requestedReturnTo
-    : "/perfil";
+  const returnTo = "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -483,7 +480,6 @@ export const AuthPage = () => {
                         <Cake className={`pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 ${fieldIconClass}`} size={18} />
                         <input
                           value={formatBirthDate(birthDate)}
-                          onClick={openBirthDatePicker}
                           type="text"
                           inputMode="none"
                           autoComplete="bday"
@@ -491,7 +487,7 @@ export const AuthPage = () => {
                           readOnly
                           required
                           aria-label="Fecha de nacimiento"
-                          className={`min-h-[50px] w-full cursor-pointer rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
+                          className={`min-h-[50px] w-full cursor-default rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
                         />
                         <input
                           ref={birthDatePickerRef}
@@ -502,7 +498,7 @@ export const AuthPage = () => {
                           max={new Date().toISOString().slice(0, 10)}
                           tabIndex={-1}
                           aria-hidden="true"
-                          className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0"
+                          className="auth-birth-date-native pointer-events-none opacity-0"
                         />
                         <button
                           type="button"

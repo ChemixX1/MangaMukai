@@ -1,11 +1,26 @@
 import {
   clearStoredAuth,
   getStoredToken,
+  getStoredUser,
+  updateStoredUser,
   type MMUser,
 } from './authService';
 import { MANGAMUKAI_API } from '../config/api';
 
 const WP_API = MANGAMUKAI_API;
+
+export const PROFILE_UPDATED_EVENT = 'mm_profile_updated';
+
+export interface ProfileUpdatedDetail {
+  userId: string;
+  username?: string;
+  avatarUrl?: string;
+  bannerUrl?: string;
+}
+
+const emitProfileUpdated = (detail: ProfileUpdatedDetail) => {
+  window.dispatchEvent(new CustomEvent<ProfileUpdatedDetail>(PROFILE_UPDATED_EVENT, { detail }));
+};
 
 export interface ProfileSocialLinks {
   facebook: string;
@@ -81,6 +96,31 @@ const readJson = async <T>(res: Response): Promise<T | null> => {
   }
 };
 
+const optimizeProfileImage = async (file: File, type: 'avatar' | 'banner'): Promise<File> => {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml' || file.size < 320_000) {
+    return file;
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxWidth = type === 'avatar' ? 900 : 1920;
+    const maxHeight = type === 'avatar' ? 900 : 1080;
+    const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', type === 'avatar' ? 0.86 : 0.88));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webp`, { type: 'image/webp' });
+  } catch {
+    return file;
+  }
+};
+
 export const getWordPressProfile = async (
   user: MMUser
 ): Promise<WordPressProfile> => {
@@ -131,10 +171,18 @@ export const saveWordPressProfile = async (
     }
 
     const data = await readJson<ApiResponse>(res);
-    return {
+    const result = {
       success: !!data?.success,
       message: data?.message || '',
     };
+    if (result.success) {
+      const user = getStoredUser();
+      if (user) {
+        updateStoredUser({ username: profile.username, display_name: profile.username });
+        emitProfileUpdated({ userId: String(user.id), username: profile.username, avatarUrl: profile.avatar_url, bannerUrl: profile.banner_url });
+      }
+    }
+    return result;
   } catch {
     return { success: false, message: 'No se pudo guardar el perfil.' };
   }
@@ -144,11 +192,10 @@ export const uploadWordPressProfileImage = async (
   file: File,
   type: 'avatar' | 'banner'
 ): Promise<{ success: boolean; url: string; message: string }> => {
-  const body = new FormData();
-  body.append('file', file);
-  body.append('type', type);
-
   try {
+    const body = new FormData();
+    body.append('file', await optimizeProfileImage(file, type));
+    body.append('type', type);
     const res = await fetch(`${WP_API}/profile/image`, {
       method: 'POST',
       headers: authHeaders(),
@@ -160,11 +207,22 @@ export const uploadWordPressProfileImage = async (
     }
 
     const data = await readJson<ApiResponse>(res);
-    return {
+    const result = {
       success: !!data?.success && !!data.url,
       url: data?.url || '',
       message: data?.message || '',
     };
+    if (result.success) {
+      const user = getStoredUser();
+      if (user) {
+        if (type === 'avatar') updateStoredUser({ avatar: result.url });
+        emitProfileUpdated({
+          userId: String(user.id),
+          ...(type === 'avatar' ? { avatarUrl: result.url } : { bannerUrl: result.url }),
+        });
+      }
+    }
+    return result;
   } catch {
     return { success: false, url: '', message: 'No se pudo subir la imagen.' };
   }

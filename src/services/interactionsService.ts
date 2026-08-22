@@ -1,5 +1,6 @@
 import { clearStoredAuth, getStoredToken } from './authService';
 import { MANGAMUKAI_API } from '../config/api';
+import { syncMangaSubscriptions } from './socialService';
 
 const WP_AUTH = MANGAMUKAI_API;
 
@@ -17,6 +18,13 @@ export interface UserInteractions {
   likes: string[];
   history: { manga_id: string; time: number }[];
   manga_likes?: number;
+  manga_bookmarks?: number;
+  manga_shares?: number;
+}
+
+export interface ToggleInteractionResult {
+  action: 'added' | 'removed';
+  total: number;
 }
 
 /** Obtiene las interacciones (bookmarks, likes, historial) del usuario actual, y lectores online */
@@ -40,7 +48,7 @@ export const getInteractions = async (mangaId?: string): Promise<UserInteraction
 };
 
 /** Alterna el estado de guardado (bookmark) de un manga */
-export const toggleBookmark = async (mangaId: string): Promise<'added' | 'removed' | null> => {
+export const toggleBookmarkWithTotal = async (mangaId: string): Promise<ToggleInteractionResult | null> => {
   const token = getStoredToken();
   if (!token) return null;
 
@@ -51,11 +59,64 @@ export const toggleBookmark = async (mangaId: string): Promise<'added' | 'remove
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': `Bearer ${token}`
       },
-      body: `manga_id=${mangaId}`
+      body: new URLSearchParams({ manga_id: mangaId, _token: token }).toString()
     });
     if (clearIfUnauthorized(res)) return null;
     const data = await res.json();
-    if (data.success) return data.action;
+    if (data.success) {
+      void syncMangaSubscriptions({ mangaId, action: data.action }).catch(() => undefined);
+      return {
+        action: data.action,
+        total: Number(data.total_bookmarks ?? 0),
+      };
+    }
   } catch { /* silent */ }
   return null;
+};
+
+/** Compatibilidad con las vistas que solo necesitan saber si se agregó o retiró. */
+export const toggleBookmark = async (mangaId: string): Promise<'added' | 'removed' | null> => {
+  const result = await toggleBookmarkWithTotal(mangaId);
+  return result?.action ?? null;
+};
+
+/** Alterna el like del usuario autenticado y devuelve el total actualizado. */
+export const toggleMangaLike = async (mangaId: string): Promise<ToggleInteractionResult | null> => {
+  const token = getStoredToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${WP_AUTH}/like`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: new URLSearchParams({ manga_id: mangaId, _token: token }).toString(),
+    });
+    if (clearIfUnauthorized(res)) return null;
+    const data = await res.json();
+    if (data.success) {
+      return {
+        action: data.action,
+        total: Number(data.total_likes ?? 0),
+      };
+    }
+  } catch { /* silent */ }
+  return null;
+};
+
+/** Registra un compartido y devuelve el total actualizado. */
+export const trackMangaShare = async (mangaId: string): Promise<number | null> => {
+  try {
+    const res = await fetch(`${WP_AUTH}/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ manga_id: mangaId }).toString(),
+    });
+    const data = await res.json();
+    return data.success ? Number(data.total_shares ?? 0) : null;
+  } catch {
+    return null;
+  }
 };
