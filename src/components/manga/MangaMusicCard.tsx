@@ -144,9 +144,9 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }
 
   return (
     <>
-      <aside className={`group relative flex w-full flex-col overflow-hidden rounded-[24px] border shadow-2xl transition-colors duration-500 ${compactHeight ? 'h-[145px] lg:h-[235px]' : 'h-[150px] lg:h-[250px]'} ${isLight ? 'bg-white' : 'bg-black'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
+      <aside className={`manga-music-card group relative flex w-full flex-col overflow-hidden rounded-[24px] border shadow-2xl transition-colors duration-500 ${compactHeight ? 'h-[145px] lg:h-[235px]' : 'h-[150px] lg:h-[250px]'} ${isLight ? 'bg-white' : 'bg-black'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
         {!loading && !canPlay && (
-          <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center backdrop-blur-[6px] transition-all duration-500 ${isLight ? 'bg-white/75' : 'bg-black/60'}`}>
+          <div className={`manga-music-lock-overlay absolute inset-0 z-50 flex flex-col items-center justify-center transition-colors duration-500 ${isLight ? 'bg-white' : 'bg-black'}`}>
             <div className="flex animate-in flex-col items-center p-6 text-center duration-500 fade-in zoom-in">
               <div className="relative mb-3">
                 <div className="absolute inset-0 rounded-full bg-[#FF4D88] opacity-20 blur-xl" />
@@ -159,7 +159,7 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }
           </div>
         )}
 
-        {loading && <div className={`absolute inset-0 z-50 flex items-center justify-center backdrop-blur-md ${isLight ? 'bg-white/65' : 'bg-black/55'}`}><Loader2 size={22} className={`animate-spin ${isLight ? 'text-black/50' : 'text-white/50'}`} /></div>}
+        {loading && <div className={`absolute inset-0 z-50 flex items-center justify-center ${isLight ? 'bg-white' : 'bg-black'}`}><Loader2 size={22} className={`animate-spin ${isLight ? 'text-black/50' : 'text-white/50'}`} /></div>}
 
         <div className="absolute inset-0 z-0 overflow-hidden rounded-[24px]">
           {displayImage ? <img src={displayImage} className={`h-full w-full scale-110 object-cover ${isLight ? 'opacity-[0.08]' : 'opacity-20'}`} alt="" aria-hidden="true" /> : <div className={`h-full w-full ${isLight ? 'bg-zinc-100' : 'bg-zinc-900/50'}`} />}

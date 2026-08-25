@@ -1,15 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { BadgeCheck, BookOpen, ChevronDown, ChevronUp, Clock, Flame, Heart, LockKeyhole, MessageCircle } from "lucide-react";
 import { CoinMarketModal, PurchaseModal } from "../modals";
 import {
   Countdown,
-  DetailBook3DIcon,
   DetailCoin3DIcon,
-  DetailPurchasedIcon,
-  DetailTicket3DIcon,
 } from "../common";
-import { buyChapter } from "../../services/authService";
+import { buyChapter, getStoredToken } from "../../services/authService";
+import { getChapterPreviewImage } from "../../services/mangaService";
 
 export interface Chapter {
   id: number | string;
@@ -28,9 +26,194 @@ interface ChapterListProps {
   userInfo: { id: string; username: string };
   onPurchaseSuccess: () => void;
   isLight?: boolean;
+  sortOrder?: 'asc' | 'desc';
 }
 
-export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, isLight = false }: ChapterListProps) => {
+const formatChapterAge = (createdAt: string): string => {
+  const published = new Date(createdAt).getTime();
+  if (!Number.isFinite(published)) return '';
+
+  const elapsedDays = Math.max(0, Math.floor((Date.now() - published) / 86_400_000));
+  if (elapsedDays === 0) return 'Hoy';
+  if (elapsedDays === 1) return '1 día';
+  return `${elapsedDays} días`;
+};
+
+const isRecentChapter = (createdAt: string): boolean => {
+  const published = new Date(createdAt).getTime();
+  if (!Number.isFinite(published)) return false;
+  const elapsedDays = Math.max(0, Math.floor((Date.now() - published) / 86_400_000));
+  return elapsedDays <= 14;
+};
+
+const CHAPTER_FACE_FOCUS_POINTS = [
+  { x: 32, y: 28 },
+  { x: 68, y: 28 },
+  { x: 50, y: 36 },
+  { x: 28, y: 50 },
+  { x: 72, y: 50 },
+  { x: 50, y: 60 },
+] as const;
+
+const getChapterFocusPoint = (chapter: Chapter, imageUrl: string) => {
+  const seedSource = `${chapter.id}:${chapter.chapter_number}:${imageUrl}`;
+  const seed = Array.from(seedSource).reduce(
+    (total, character) => ((total * 31) + character.charCodeAt(0)) >>> 0,
+    0,
+  );
+  return CHAPTER_FACE_FOCUS_POINTS[seed % CHAPTER_FACE_FOCUS_POINTS.length];
+};
+
+const findDetailedColorFocus = (
+  image: HTMLImageElement,
+  fallback: (typeof CHAPTER_FACE_FOCUS_POINTS)[number],
+) => {
+  try {
+    const canvas = document.createElement('canvas');
+    const aspect = image.naturalHeight / Math.max(1, image.naturalWidth);
+    canvas.width = 96;
+    canvas.height = Math.max(96, Math.min(160, Math.round(96 * aspect)));
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return fallback;
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const luminanceAt = (x: number, y: number) => {
+      const offset = ((y * canvas.width) + x) * 4;
+      return (pixels[offset] * 0.299) + (pixels[offset + 1] * 0.587) + (pixels[offset + 2] * 0.114);
+    };
+
+    let bestPoint = fallback;
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    CHAPTER_FACE_FOCUS_POINTS.forEach((point) => {
+      const centerX = Math.round((point.x / 100) * (canvas.width - 1));
+      const centerY = Math.round((point.y / 100) * (canvas.height - 1));
+      const radiusX = Math.max(8, Math.round(canvas.width * 0.14));
+      const radiusY = Math.max(8, Math.round(canvas.height * 0.1));
+      let score = 0;
+      let samples = 0;
+
+      for (let y = Math.max(1, centerY - radiusY); y < Math.min(canvas.height - 1, centerY + radiusY); y += 2) {
+        for (let x = Math.max(1, centerX - radiusX); x < Math.min(canvas.width - 1, centerX + radiusX); x += 2) {
+          const offset = ((y * canvas.width) + x) * 4;
+          const red = pixels[offset];
+          const green = pixels[offset + 1];
+          const blue = pixels[offset + 2];
+          const saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
+          const edge = Math.abs(luminanceAt(x, y) - luminanceAt(x + 1, y))
+            + Math.abs(luminanceAt(x, y) - luminanceAt(x, y + 1));
+          const skinLike = red > 90 && green > 35 && blue > 20 && red > green && red > blue
+            ? 18
+            : 0;
+          score += (saturation * 1.25) + (edge * 0.72) + skinLike;
+          samples += 1;
+        }
+      }
+
+      const averageScore = samples > 0 ? score / samples : 0;
+      if (averageScore > bestScore) {
+        bestScore = averageScore;
+        bestPoint = point;
+      }
+    });
+
+    return bestPoint;
+  } catch {
+    // En desarrollo las imágenes remotas pueden bloquear la lectura del canvas.
+    // El encuadre determinista sigue funcionando como alternativa ligera.
+    return fallback;
+  }
+};
+
+function ChapterThumbnail({ chapter }: { chapter: Chapter }) {
+  const [imageUrl, setImageUrl] = useState('');
+  const [detectedFocus, setDetectedFocus] = useState<(typeof CHAPTER_FACE_FOCUS_POINTS)[number] | null>(null);
+  const fallbackFocus = getChapterFocusPoint(chapter, imageUrl);
+  const focusPoint = detectedFocus ?? fallbackFocus;
+
+  useEffect(() => {
+    setImageUrl('');
+    setDetectedFocus(null);
+    let active = true;
+    void getChapterPreviewImage(chapter.id, chapter.chapter_number, getStoredToken()).then((preview) => {
+      if (active && preview) setImageUrl(preview);
+    });
+    return () => {
+      active = false;
+    };
+  }, [chapter.chapter_number, chapter.id]);
+
+  return (
+    <div className="relative flex h-[52px] w-[68px] items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/[0.04] shadow-[0_7px_16px_rgba(0,0,0,.18)] md:h-[58px] md:w-[74px]">
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+          onLoad={(event) => setDetectedFocus(findDetailedColorFocus(event.currentTarget, fallbackFocus))}
+          onError={() => {
+            setDetectedFocus(null);
+            setImageUrl('');
+          }}
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
+          style={{ objectPosition: `${focusPoint.x}% ${focusPoint.y}%` }}
+        />
+      ) : (
+        <span className="h-full w-full animate-pulse bg-gradient-to-br from-[#FF4D88]/15 via-white/[0.04] to-violet-500/15" aria-hidden="true" />
+      )}
+      <span className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/[0.04]" aria-hidden="true" />
+    </div>
+  );
+}
+
+function ChapterEngagement({
+  commentActive,
+  liked,
+  onToggleComment,
+  onToggleLike,
+}: {
+  commentActive: boolean;
+  liked: boolean;
+  onToggleComment: () => void;
+  onToggleLike: () => void;
+}) {
+  const handleAction = (event: MouseEvent<HTMLButtonElement>, action: () => void) => {
+    event.stopPropagation();
+    action();
+  };
+
+  return (
+    <span className="manga-chapter-engagement" aria-label={`0 comentarios y ${liked ? 1 : 0} me gusta`}>
+      <button
+        type="button"
+        className={`manga-chapter-engagement-item ${commentActive ? 'is-active' : ''}`}
+        title="Comentarios"
+        aria-label="Comentarios del capítulo"
+        aria-pressed={commentActive}
+        onClick={(event) => handleAction(event, onToggleComment)}
+      >
+        <MessageCircle className="manga-chapter-engagement-icon" strokeWidth={1.8} aria-hidden="true" />
+        <span className="tabular-nums">0</span>
+      </button>
+      <button
+        type="button"
+        className={`manga-chapter-engagement-item ${liked ? 'is-active' : ''}`}
+        title="Me gusta"
+        aria-label="Me gusta este capítulo"
+        aria-pressed={liked}
+        onClick={(event) => handleAction(event, onToggleLike)}
+      >
+        <Heart className="manga-chapter-engagement-icon" strokeWidth={1.8} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
+        <span className="tabular-nums">{liked ? 1 : 0}</span>
+      </button>
+    </span>
+  );
+}
+
+export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, isLight = false, sortOrder = 'desc' }: ChapterListProps) => {
   const navigate = useNavigate();
 
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
@@ -42,23 +225,38 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [localUnlocked, setLocalUnlocked] = useState<Set<string>>(new Set());
+  const [activeCommentChapterIds, setActiveCommentChapterIds] = useState<Set<string>>(new Set());
+  const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
 
-  const now = new Date();
+  const toggleChapterAction = (
+    chapterId: number | string,
+    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
+  ) => {
+    const id = String(chapterId);
+    setter((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const isChapterPurchased = (chapter: Chapter) => {
     const idStr = String(chapter.id);
     return purchasedChapterIds.has(idStr) || localUnlocked.has(idStr);
   };
 
   const totalChapters = chapters.length;
-  const freeChapters = chapters.filter(c => !c.is_paid || (!!c.free_at && new Date(c.free_at) <= now)).length;
-  const purchasedChapters = chapters.filter(isChapterPurchased).length;
-  const paidChapters = totalChapters - freeChapters;
 
   const orderedChapters = [...chapters].sort((a, b) => {
-    const chapterDifference = Number(b.chapter_number) - Number(a.chapter_number);
+    const chapterDifference = sortOrder === 'asc'
+      ? Number(a.chapter_number) - Number(b.chapter_number)
+      : Number(b.chapter_number) - Number(a.chapter_number);
     if (chapterDifference !== 0) return chapterDifference;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return sortOrder === 'asc'
+      ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
   const visibleChapters = showAll ? orderedChapters : orderedChapters.slice(0, 5);
 
@@ -125,182 +323,127 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
     <>
       <div className={`manga-chapter-list relative z-20 w-full ${isLight ? 'is-light' : 'is-dark'}`}>
 
-        {/* HEADER */}
-        <div className="manga-chapter-header mb-7 flex flex-col justify-between gap-4 border-b border-white/[0.07] pb-5 md:flex-row md:items-end">
-          <h2 className="manga-chapter-heading flex items-center gap-3 text-xl font-black uppercase italic tracking-tight text-white md:text-2xl">
-            <span className="h-8 w-1 rounded-full bg-[#FF4D88] shadow-[0_0_18px_rgba(255,77,136,0.6)]" />
-            <DetailBook3DIcon
-              size={31}
-              className="h-[31px] w-[31px] object-contain drop-shadow-[0_7px_9px_rgba(255,77,136,0.3)]"
-              style={{ filter: 'grayscale(1) sepia(1) saturate(12) hue-rotate(300deg) brightness(1.04)' }}
-            /> Capítulos
-          </h2>
-
-          <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
-            <div className="manga-chapter-stat manga-chapter-stat-total flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.035] px-3 py-2">
-              <DetailBook3DIcon
-                size={23}
-                className="h-[23px] w-[23px] object-contain"
-                style={{ filter: 'grayscale(1) sepia(1) saturate(12) hue-rotate(300deg) brightness(1.04)' }}
-              />
-              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
-                {totalChapters} Cap.
-              </span>
-            </div>
-            <div className="manga-chapter-stat manga-chapter-stat-paid flex items-center gap-1.5 rounded-lg border border-yellow-500/15 bg-yellow-500/[0.06] px-3 py-2">
-              <DetailCoin3DIcon size={23} className="h-[23px] w-[23px] object-contain" />
-              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
-                {paidChapters} Pago
-              </span>
-            </div>
-            <div className="manga-chapter-stat manga-chapter-stat-free flex items-center gap-1.5 rounded-lg border border-[#FF4D88]/20 bg-[#FF4D88]/[0.07] px-3 py-2">
-              <DetailTicket3DIcon size={23} className="h-[23px] w-[23px] object-contain" />
-              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
-                {freeChapters} Gratis
-              </span>
-            </div>
-            <div className="manga-chapter-stat manga-chapter-stat-purchased flex items-center gap-1.5 rounded-lg border border-white/[0.07] bg-white/[0.035] px-3 py-2">
-              <DetailPurchasedIcon size={16} />
-              <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wider">
-                {purchasedChapters} Comprado
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* LISTA */}
         <div className="manga-chapter-surface overflow-hidden rounded-2xl border border-white/[0.07] bg-black shadow-[0_20px_55px_rgba(0,0,0,0.25)]">
-          <div className="manga-chapter-table-head hidden grid-cols-12 border-b border-white/[0.06] bg-white/[0.035] px-5 py-4 text-[11px] font-semibold md:grid">
-            <div className="col-span-1">Nro</div>
-            <div className="col-span-5">Título</div>
-            <div className="col-span-4 text-center">Estado</div>
-            <div className="col-span-2 text-right">Acceso</div>
-          </div>
-
           <div className="flex flex-col">
             {totalChapters === 0 ? (
               <div className="flex flex-col items-center justify-center gap-3 px-5 py-16 text-center">
-                <DetailBook3DIcon
-                  size={42}
-                  className="h-[42px] w-[42px] object-contain opacity-45"
-                  style={{ filter: 'grayscale(1) sepia(1) saturate(12) hue-rotate(300deg) brightness(1.04)' }}
-                />
+                <BookOpen size={42} className="text-[#FF4D88]/45" strokeWidth={1.8} />
                 <p className="text-xs font-semibold text-white/35">Sin capítulos disponibles</p>
               </div>
             ) : visibleChapters.map((chapter) => {
               const locked = isChapterLocked(chapter);
               const isPurchased = isChapterPurchased(chapter);
               const isFutureFree = !!chapter.free_at && new Date(chapter.free_at) > new Date();
-              const isExpiredFree = !!chapter.free_at && new Date(chapter.free_at) <= new Date();
-              const statusLabel = isPurchased
-                ? "Comprado"
-                : (!chapter.is_paid || isExpiredFree)
-                  ? "Gratis"
-                  : "Premium";
-              const statusClass = isPurchased
-                ? "text-gray-400 bg-white/[0.045] border-white/10"
-                : statusLabel === "Gratis"
-                  ? "text-[#FF4D88] bg-[#FF4D88]/10 border-[#FF4D88]/20"
-                  : "text-yellow-400 bg-yellow-500/10 border-yellow-500/20";
+              const isNewChapter = isRecentChapter(chapter.created_at);
+              const chapterId = String(chapter.id);
+              const commentActive = activeCommentChapterIds.has(chapterId);
+              const liked = likedChapterIds.has(chapterId);
 
               return (
                 <div
                   key={chapter.id}
-                  onClick={() => handleChapterClick(chapter)}
-                  className={`manga-chapter-row
-                          flex flex-col md:grid md:grid-cols-12 
-                          px-4 py-4 md:px-5 md:py-4
-                          border-b border-white/[0.045] last:border-b-0
-                          transition-all duration-200 group
-                          items-start md:items-center 
-                          text-sm cursor-pointer
-                          ${locked ? 'opacity-90 hover:opacity-100' : ''}
-                        `}
+                  className={`manga-chapter-row group relative grid w-full grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-white/[0.045] px-4 py-3 text-left text-sm transition-all duration-200 last:border-b-0 md:grid-cols-[84px_minmax(0,1fr)_118px_minmax(230px,auto)] md:gap-x-3 md:px-5 ${locked ? 'opacity-90 hover:opacity-100' : ''}`}
                 >
-                  {/* Contenido Fila */}
-                  <div className="flex w-full justify-between items-center md:contents">
-                    <div className="md:col-span-1 font-mono font-bold text-pink-600 group-hover:text-pink-500 transition-colors text-xs md:text-sm mb-1 md:mb-0">
-                      <span className="text-white/30 mr-1 md:hidden">Cap</span>
-                      <span className="text-xs opacity-50 mr-0.5 hidden md:inline">#</span>{chapter.chapter_number}
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() => handleChapterClick(chapter)}
+                    className="manga-chapter-row-action absolute inset-0 z-0 h-full w-full"
+                    aria-label={`Abrir capítulo ${chapter.chapter_number}`}
+                  />
 
-                    <div className="manga-chapter-row-title w-full truncate pl-2 text-left text-gray-400 transition-colors group-hover:text-white md:col-span-5 md:pl-0">
-                      {chapter.title || "Sin título"}
-                    </div>
-
-                    <div className="md:hidden pl-2 flex items-center gap-1.5">
-                      {locked ? (
-                        <Lock size={14} className="text-white/40" />
-                      ) : (
-                        isPurchased ? <DetailPurchasedIcon size={15} className="text-gray-400" /> : null
-                      )}
-                      {!locked && (
-                        <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider ${isPurchased ? 'text-gray-400' : 'text-[#FF4D88]'}`}>
-                          {!isPurchased && <DetailTicket3DIcon size={14} className="h-[14px] w-[14px] object-contain" />}
-                          {statusLabel}
-                        </span>
-                      )}
-                    </div>
+                  <div className="pointer-events-none relative z-[1]">
+                    <ChapterThumbnail chapter={chapter} />
                   </div>
 
-                  <div className="hidden md:flex col-span-4 justify-center items-center">
+                  <div className="manga-chapter-row-title pointer-events-none relative z-[1] min-w-0 text-left transition-colors group-hover:text-white md:pr-4">
+                    <strong className="manga-chapter-title-copy block truncate text-[13px] font-semibold leading-tight md:text-[14px]">
+                      Capítulo {chapter.chapter_number}
+                    </strong>
+                    <span className="manga-chapter-date mt-1.5 flex min-h-[17px] items-center text-[12px] font-normal text-white/35">
+                      {isNewChapter ? (
+                        <span className="manga-chapter-new inline-flex items-center gap-1 text-[11px] font-medium uppercase text-[#FF4D88]">
+                          <Flame className="manga-chapter-new-flame" size={15} fill="currentColor" strokeWidth={1.8} aria-hidden="true" /> New
+                        </span>
+                      ) : (
+                        <span>{formatChapterAge(chapter.created_at)}</span>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="pointer-events-none relative z-[1] flex items-center justify-end md:hidden">
+                    {locked
+                      ? <LockKeyhole size={16} strokeWidth={1.8} className="manga-chapter-access-icon" />
+                      : isPurchased
+                        ? <BadgeCheck size={17} className="text-gray-400" />
+                        : null}
+                  </div>
+
+                  <div className="pointer-events-none relative z-[1] hidden items-center justify-center md:flex">
                     {locked && isFutureFree ? (
                       <div className="flex items-center gap-1.5 text-pink-400 bg-pink-500/10 px-2 py-1 rounded border border-pink-500/20">
                         <Clock size={10} />
                         <Countdown targetDate={chapter.free_at!} />
                       </div>
-                    ) : (
-                      <span className={`text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded border ${statusClass}`}>
-                        {statusLabel}
+                    ) : locked ? (
+                      <span className="rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-yellow-400">
+                        Premium
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
-                  <div className="hidden md:flex col-span-2 text-right justify-end items-center gap-3">
+                  <div className="pointer-events-none relative z-[1] hidden items-center justify-end gap-4 text-right md:flex">
                     {locked ? (
-                      <>
-                        <span className="font-mono font-bold text-xs flex items-center gap-1.5 text-yellow-400 bg-yellow-400/5 px-2 py-0.5 rounded">
+                      <span className="flex shrink-0 items-center gap-3">
+                        <span className="manga-chapter-coin-value flex items-center gap-1.5 text-yellow-400">
                           <DetailCoin3DIcon size={18} className="h-[18px] w-[18px] object-contain" /> {chapter.price_coins}
                         </span>
-                        <Lock size={14} className="text-white/20 group-hover:text-white/40 transition-colors" />
-                      </>
+                        <LockKeyhole size={17} strokeWidth={1.8} className="manga-chapter-access-icon shrink-0" />
+                      </span>
                     ) : (
-                      <>
+                      <span className="shrink-0">
                         {isPurchased ? (
                           <span className="inline-flex items-center gap-1.5 rounded bg-white/[0.045] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-gray-400">
-                            <DetailPurchasedIcon size={14} /> Comprado
+                            <BadgeCheck size={16} strokeWidth={2.1} /> Comprado
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#FF4D88]">
-                            <DetailTicket3DIcon size={17} className="h-[17px] w-[17px] object-contain" />
-                            Gratis
-                          </span>
+                          <span className="manga-chapter-free-access">Gratis</span>
                         )}
-                      </>
+                      </span>
                     )}
+                    <ChapterEngagement
+                      commentActive={commentActive}
+                      liked={liked}
+                      onToggleComment={() => toggleChapterAction(chapter.id, setActiveCommentChapterIds)}
+                      onToggleLike={() => toggleChapterAction(chapter.id, setLikedChapterIds)}
+                    />
                   </div>
 
-                  {/* Info Móvil */}
-                  <div className="md:hidden w-full flex justify-between items-center mt-2 pl-8">
-                    <div className="text-[10px] text-white/30 font-mono">
+                  <div className="pointer-events-none relative z-[1] col-span-2 col-start-2 mt-2 flex min-w-0 items-center justify-between md:hidden">
+                    <div className="min-w-0 text-[10px] text-white/30">
                       {locked && isFutureFree ? (
                         <div className="flex items-center gap-1 text-pink-400">
                           <Clock size={10} /> Gratis en: <Countdown targetDate={chapter.free_at!} />
                         </div>
-                      ) : !locked ? (
-                        <span className={`inline-flex items-center gap-1 ${isPurchased ? "text-gray-400" : "text-[#FF4D88]"}`}>
-                          {!isPurchased && <DetailTicket3DIcon size={14} className="h-[14px] w-[14px] object-contain" />}
-                          {statusLabel}
-                        </span>
+                      ) : isPurchased ? (
+                        <span className="text-gray-400">Comprado</span>
                       ) : (
-                        <span>{new Date(chapter.created_at).toLocaleDateString()}</span>
+                        locked ? <span>{new Date(chapter.created_at).toLocaleDateString()}</span> : null
                       )}
                     </div>
-                    {locked && (
-                      <div className="flex items-center gap-1 text-yellow-500 text-[10px] font-bold bg-yellow-500/10 px-2 py-0.5 rounded">
-                        <DetailCoin3DIcon size={18} className="h-[18px] w-[18px] object-contain" /> {chapter.price_coins}
-                      </div>
-                    )}
+                    <div className="flex shrink-0 items-center gap-3">
+                      {locked ? (
+                        <div className="manga-chapter-coin-value flex items-center gap-1 text-yellow-500">
+                          <DetailCoin3DIcon size={18} className="h-[18px] w-[18px] object-contain" /> {chapter.price_coins}
+                        </div>
+                      ) : !isPurchased ? <span className="manga-chapter-free-access">Gratis</span> : null}
+                      <ChapterEngagement
+                        commentActive={commentActive}
+                        liked={liked}
+                        onToggleComment={() => toggleChapterAction(chapter.id, setActiveCommentChapterIds)}
+                        onToggleLike={() => toggleChapterAction(chapter.id, setLikedChapterIds)}
+                      />
+                    </div>
                   </div>
                 </div>
               );
@@ -310,7 +453,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
           {totalChapters > 5 && (
             <button
               onClick={() => setShowAll(!showAll)}
-              className="manga-chapter-toggle flex w-full items-center justify-center gap-2 border-t border-white/[0.06] bg-white/[0.025] py-4 text-xs font-semibold text-white/40 transition-all duration-300 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]"
+              className="manga-chapter-toggle flex w-full items-center justify-center gap-2 border-t border-white/[0.06] bg-white/[0.025] py-4 text-xs font-semibold text-white/40 transition-colors duration-300 hover:bg-white/[0.045] hover:text-white/65"
             >
               {showAll ? (<> <ChevronUp size={14} /> Mostrar menos </>) : (<> <ChevronDown size={14} /> Mostrar todos </>)}
             </button>

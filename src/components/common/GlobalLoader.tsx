@@ -10,6 +10,11 @@ const MINIMUM_VISIBLE_TIME = 720;
 const MAXIMUM_VISIBLE_TIME = 10000;
 const LOADER_RING_RADIUS = 48;
 const LOADER_RING_CIRCUMFERENCE = 2 * Math.PI * LOADER_RING_RADIUS;
+const isAuthViewTransition = (from: string, to: string) => {
+  const fromPath = from.split('?')[0];
+  const toPath = to.split('?')[0];
+  return fromPath.startsWith('/auth/') && toPath.startsWith('/auth/');
+};
 
 export const GlobalLoader = () => {
   const [show, setShow] = useState(true);
@@ -125,6 +130,7 @@ export const GlobalLoader = () => {
       const currentRoute = `${window.location.pathname}${window.location.search}`;
       const destinationRoute = `${destination.pathname}${destination.search}`;
       if (currentRoute === destinationRoute) return;
+      if (isAuthViewTransition(currentRoute, destinationRoute)) return;
       explicitLoadingRef.current = false;
       begin(8, true);
     };
@@ -167,8 +173,15 @@ export const GlobalLoader = () => {
       previousRouteRef.current = route;
       return;
     }
-    if (previousRouteRef.current === route) return;
+    const previousRoute = previousRouteRef.current;
+    if (previousRoute === route) return;
     previousRouteRef.current = route;
+
+    if (isAuthViewTransition(previousRoute, route)) {
+      explicitLoadingRef.current = false;
+      routeLoadingRef.current = false;
+      return;
+    }
 
     if (!routeLoadingRef.current) {
       explicitLoadingRef.current = false;

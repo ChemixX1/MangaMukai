@@ -339,6 +339,104 @@ export interface SeriesChapter {
   free_at: string | null;
 }
 
+const chapterPreviewCache = new Map<string, string | null>();
+const chapterPreviewRequests = new Map<string, Promise<string | null>>();
+
+const normalizeChapterPreviewUrl = (imageUrl: string): string => imageUrl.replace(/&amp;/g, '&');
+
+const pickChapterScene = (images: string[], chapterNumber: number): string | null => {
+  const validImages = images.filter((image): image is string => typeof image === 'string' && image.length > 0);
+  if (validImages.length === 0) return null;
+
+  // Salta las aperturas cuando hay suficientes páginas y rota la escena elegida
+  // para que capítulos consecutivos no se vean idénticos.
+  const firstStoryPage = validImages.length > 4 ? 3 : 0;
+  const candidateCount = Math.min(8, validImages.length - firstStoryPage);
+  const selectedIndex = firstStoryPage + Math.abs(Math.round(chapterNumber * 7)) % candidateCount;
+  return normalizeChapterPreviewUrl(validImages[selectedIndex]);
+};
+
+export const getChapterPreviewImage = async (
+  chapterId: number | string,
+  chapterNumber: number,
+  token?: string | null,
+): Promise<string | null> => {
+  const cacheKey = `${chapterId}:${token ? 'authenticated' : 'public'}`;
+  if (chapterPreviewCache.has(cacheKey)) return chapterPreviewCache.get(cacheKey) ?? null;
+
+  const pending = chapterPreviewRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const fetchPreview = async (accessToken?: string | null): Promise<string | null> => {
+    const response = await fetch(`${MM_API}/chapters/content?id=${chapterId}`, accessToken ? {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    } : undefined);
+    if (!response.ok) return null;
+
+    const data = await response.json() as { success?: boolean; images?: unknown };
+    if (!data.success || !Array.isArray(data.images)) return null;
+    return pickChapterScene(data.images, chapterNumber);
+  };
+
+  const fetchPublicWordPressPreview = async (): Promise<string | null> => {
+    const response = await fetch(`${API_URL}/${chapterId}?_fields=content,aioseo_head_json,yoast_head_json`);
+    if (!response.ok) return null;
+
+    const data = await response.json() as {
+      content?: { rendered?: string };
+      aioseo_head_json?: {
+        schema?: { '@graph'?: Array<{ image?: { url?: string } }> };
+      };
+      yoast_head_json?: { og_image?: Array<{ url?: string }> };
+    };
+
+    const renderedContent = data.content?.rendered || '';
+    const galleryCandidates = Array.from(renderedContent.matchAll(/<img\b[^>]*>/gi))
+      .map(([tag]) => {
+        const source = tag.match(/\bsrc=["']([^"']+)["']/i)?.[1] || '';
+        const width = Number(tag.match(/\bwidth=["']?(\d+)/i)?.[1] || 0);
+        const height = Number(tag.match(/\bheight=["']?(\d+)/i)?.[1] || 1);
+        return { source: normalizeChapterPreviewUrl(source), aspect: width / height };
+      })
+      .filter(({ source }) => source.includes('/wp-content/uploads/'));
+
+    if (galleryCandidates.length > 0) {
+      const storyCandidates = galleryCandidates.length > 6
+        ? galleryCandidates.slice(3, Math.min(galleryCandidates.length, 32))
+        : galleryCandidates;
+      const faceFriendlyPool = [...storyCandidates]
+        .sort((first, second) => second.aspect - first.aspect)
+        .slice(0, Math.min(6, storyCandidates.length));
+      const selectedIndex = Math.abs(Math.round(chapterNumber * 5)) % faceFriendlyPool.length;
+      return faceFriendlyPool[selectedIndex].source;
+    }
+
+    const schemaGraph = data.aioseo_head_json?.schema?.['@graph'] || [];
+    const schemaImage = schemaGraph
+      .map((entry) => entry.image?.url)
+      .find((image): image is string => typeof image === 'string' && image.includes('/wp-content/uploads/'));
+    if (schemaImage) return normalizeChapterPreviewUrl(schemaImage);
+
+    const yoastImage = data.yoast_head_json?.og_image?.find((image) => image.url)?.url;
+    return yoastImage ? normalizeChapterPreviewUrl(yoastImage) : null;
+  };
+
+  const request = fetchPublicWordPressPreview()
+    .then(async (preview) => preview ?? fetchPreview(token))
+    .then(async (preview) => preview ?? (token ? fetchPreview(null) : null))
+    .catch(() => null)
+    .then((preview) => {
+      if (preview) chapterPreviewCache.set(cacheKey, preview);
+      return preview;
+    })
+    .finally(() => {
+      chapterPreviewRequests.delete(cacheKey);
+    });
+
+  chapterPreviewRequests.set(cacheKey, request);
+  return request;
+};
+
 // ---------------------------------------------------------------------------
 // 8. CAPÍTULOS POR SERIE (usa endpoint propio — consulta por ero_seri meta)
 // ---------------------------------------------------------------------------
@@ -473,6 +571,7 @@ export interface RelatedManga {
   genres: string[];
   totalViews: number;
   sharedGenres: number;
+  chapterCount?: number;
 }
 
 export const getRelatedMangas = async (mangaId: number | string, limit = 10): Promise<RelatedManga[]> => {

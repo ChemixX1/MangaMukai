@@ -271,18 +271,18 @@ export const Navbar = () => {
               </Link>
 
               <nav className="hidden h-10 items-center gap-8 lg:translate-y-0.5 lg:flex">
-                <Link to="/" className={`share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Inicio
                 </Link>
 
-                <Link to="/biblioteca" className={`share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/biblioteca" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Biblioteca
                 </Link>
 
-                <Link to="/manga-bn" className={`share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/manga-bn" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Mangas B&N
                 </Link>
-                <Link to="/manga-19" className={`share-tech-regular navbar-adult-link inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/manga-19" className={`navbar-primary-link share-tech-regular navbar-adult-link inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   <span className="navbar-adult-option inline-flex items-center gap-1.5">
                     <NavbarFire size={17} />
                     <span className="navbar-adult-label">Mangas <span className="navbar-adult-number">+19</span></span>
@@ -474,7 +474,7 @@ export const Navbar = () => {
                     to={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`share-tech-regular group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.35rem,6.5vw,1.7rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
+                    className={`navbar-primary-link share-tech-regular group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.35rem,6.5vw,1.7rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
                   >
                     <span className={`inline-flex items-center justify-center gap-2 ${link.isAdult ? 'navbar-adult-option' : ''}`}>
                       {link.isAdult && <NavbarFire size={22} />}

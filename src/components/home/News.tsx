@@ -7,6 +7,7 @@ import { ArrowUpRight, Heart, X, Check, ChevronRight, ChevronLeft, Zap, Gamepad2
 import renewalBackdrop from '../../assets/banners/mythical-dragon-beast-anime-style.jpg';
 import premiumBackdrop from '../../assets/banners/anime-style-mythical-dragon-creature.jpg';
 import subscriptionBackdrop from '../../assets/banners/illustration-anime-character-rain.jpg';
+import donationBackdrop from '../../assets/modals/auth-login.jpg';
 import { CoinMarketModal, SubscriptionModal } from '../modals';
 import {
   AUTH_CHANGED_EVENT,
@@ -514,13 +515,13 @@ export default function News({ variant = "default" }: NewsProps) {
             <span className="news-support-surface card-clip relative flex h-[80px] items-center justify-between overflow-hidden px-5 transition-colors duration-500 md:h-[100px] md:px-6">
               <span className="news-support-glow absolute inset-y-0 right-0 w-2/5 transition-colors duration-500" />
               <span className="relative z-10 flex min-w-0 items-center gap-3">
-                <span className="news-support-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors duration-500 md:h-12 md:w-12">
-                  <Heart size={21} fill="currentColor" />
+                <span className="news-support-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors duration-500 md:h-11 md:w-11">
+                  <Heart size={19} fill="currentColor" />
                 </span>
-                <span className="min-w-0 text-[16px] font-black uppercase italic leading-none tracking-tight text-white md:text-xl">Apoyar proyecto</span>
+                <span className="min-w-0 whitespace-nowrap text-[14px] font-black uppercase italic leading-none tracking-tight text-white md:text-[15px]">Apoyar proyecto</span>
               </span>
-              <span className="relative z-10 ml-3 shrink-0 rounded-lg bg-white px-2.5 py-2">
-                <PayPalLogo className="h-5 w-auto md:h-6" />
+              <span className="relative z-10 ml-2 shrink-0 rounded-lg bg-white px-2 py-1.5">
+                <PayPalLogo className="h-4 w-auto md:h-5" />
               </span>
             </span>
           </button>
@@ -582,6 +583,13 @@ export default function News({ variant = "default" }: NewsProps) {
                 boxShadow: `0 30px 90px -42px ${currentSupportTheme.accent}`
               }}
             >
+              <img
+                src={donationBackdrop}
+                alt=""
+                aria-hidden="true"
+                className={`pointer-events-none absolute inset-0 h-full w-full object-cover object-center ${isLightTheme ? "opacity-[0.13]" : "opacity-[0.2]"}`}
+              />
+              <span className={`pointer-events-none absolute inset-0 ${isLightTheme ? "bg-white/75" : "bg-black/70"}`} aria-hidden="true" />
               <span
                 aria-hidden="true"
                 className={`pointer-events-none absolute inset-0 ${isLightTheme ? "opacity-45" : "opacity-60"}`}

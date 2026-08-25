@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Footer } from "../components/layout";
+import { Particles } from "../components/backgrounds/Particles";
 import { BibliotecaClock, DepthText, PaginationControls } from "../components/common";
 import { useTheme } from "../hooks/useTheme";
 import { getUltimosCapitulos } from "../services/mangaService";
@@ -21,6 +22,7 @@ import { preloadImages } from "../utils/preloadImages";
 import type { MangaCapitulo } from "../types/manga";
 
 const ITEMS_PER_PAGE = 30;
+const BIBLIOTECA_PARTICLE_COLORS = ["#ffffff"];
 type Audience = "Hombre" | "Mujer";
 
 const normalizeSearchValue = (value: string) => value
@@ -221,9 +223,24 @@ export const Biblioteca = () => {
   };
 
   return (
-    <div className={`relative flex min-h-screen flex-col overflow-x-clip font-sans transition-colors duration-300 ${isLight ? "bg-white text-zinc-950" : "bg-black text-gray-100"}`}>
+    <div className={`biblioteca-page relative flex min-h-screen flex-col overflow-x-clip font-sans transition-colors duration-300 ${isLight ? "biblioteca-theme-light bg-white text-zinc-950" : "biblioteca-theme-dark bg-black text-gray-100"}`}>
+      {!isLight && (
+        <div className="pointer-events-none fixed inset-0 z-0 opacity-60" aria-hidden="true">
+          <Particles
+            particleColors={BIBLIOTECA_PARTICLE_COLORS}
+            particleCount={200}
+            particleSpread={10}
+            speed={0.1}
+            particleBaseSize={100}
+            moveParticlesOnHover
+            alphaParticles={false}
+            disableRotation={false}
+            pixelRatio={1}
+          />
+        </div>
+      )}
       <section
-        className="relative transition-colors duration-300"
+        className="relative z-10 transition-colors duration-300"
         style={{
           backgroundImage: isLight
             ? `radial-gradient(circle at 50% -20%, ${isMasculine ? "rgba(0,194,255,.15)" : "rgba(255,77,136,.13)"}, transparent 40%)`
@@ -251,10 +268,10 @@ export const Biblioteca = () => {
               depth={2.4}
               depthColor={isLight ? "#c7c7c7" : "#403d46"}
               tilt={7.5}
-              pointerTracking
+              pointerTracking={false}
               smoothing={0.14}
               perspective={900}
-              autoOrbit
+              autoOrbit={false}
               orbitSpeed={0.35}
               fontSize="clamp(1.85rem, 8.2vw, 5.35rem)"
               fontWeight={1000}
@@ -267,7 +284,7 @@ export const Biblioteca = () => {
         </div>
       </section>
 
-      <div className="desktop-content-shell mx-auto flex w-full flex-1 flex-col px-4 pb-16 pt-2 sm:px-8 sm:pt-3 lg:px-16 lg:pt-2">
+      <div className="desktop-content-shell relative z-10 mx-auto flex w-full flex-1 flex-col px-4 pb-16 pt-2 sm:px-8 sm:pt-3 lg:px-16 lg:pt-2">
         <aside id="filtros" className="scroll-mt-24">
           <div className={`grid items-center gap-4 rounded-3xl border p-4 transition-colors duration-300 sm:p-5 lg:grid-cols-[minmax(200px,0.85fr)_190px_minmax(160px,1.1fr)_minmax(245px,1.2fr)] lg:gap-5 ${isLight ? "border-black/[0.09] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.09)]" : "border-white/[0.08] bg-[#0b0b0e] shadow-[0_24px_70px_rgba(0,0,0,0.28)]"}`}>
             <div className={`relative flex items-center justify-center border-b pb-4 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5 ${isLight ? "border-black/[0.08]" : "border-white/[0.07]"}`}>
