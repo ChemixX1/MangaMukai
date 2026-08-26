@@ -61,6 +61,7 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }
   }, []);
 
   const canPlay = Boolean(currentTrack?.url && !currentTrack.is_locked);
+  const isLocked = !loading && !canPlay;
   const displayImage = currentTrack?.cover_url || cover;
   const progressPercent = duration ? (currentTime / duration) * 100 : 0;
 
@@ -144,16 +145,16 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }
 
   return (
     <>
-      <aside className={`manga-music-card group relative flex w-full flex-col overflow-hidden rounded-[24px] border shadow-2xl transition-colors duration-500 ${compactHeight ? 'h-[145px] lg:h-[235px]' : 'h-[150px] lg:h-[250px]'} ${isLight ? 'bg-white' : 'bg-black'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
-        {!loading && !canPlay && (
-          <div className={`manga-music-lock-overlay absolute inset-0 z-50 flex flex-col items-center justify-center transition-colors duration-500 ${isLight ? 'bg-white' : 'bg-black'}`}>
+      <aside className={`manga-music-card group relative flex w-full flex-col overflow-hidden rounded-[24px] border shadow-2xl ${isLocked ? 'is-locked' : ''} ${compactHeight ? 'h-[215px] lg:h-[235px]' : 'h-[220px] lg:h-[250px]'} ${isLight ? 'bg-white' : 'bg-black'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
+        {isLocked && (
+          <div className={`manga-music-lock-overlay absolute inset-0 z-50 flex flex-col items-center justify-center ${isLight ? 'bg-white/[0.97]' : 'bg-black/[0.94]'}`}>
             <div className="flex animate-in flex-col items-center p-6 text-center duration-500 fade-in zoom-in">
               <div className="relative mb-3">
                 <div className="absolute inset-0 rounded-full bg-[#FF4D88] opacity-20 blur-xl" />
                 <div className={`relative z-10 rounded-full border p-3 ${isLight ? 'border-black/10 bg-zinc-100 text-zinc-600' : 'border-white/10 bg-zinc-900 text-zinc-400'}`}><Lock size={20} /></div>
               </div>
               <h3 className={`mb-1 text-lg font-black uppercase italic tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Mukai <span className="text-[#FF4D88]">Music</span></h3>
-              <p className={`mb-4 hidden max-w-[200px] text-[10px] font-medium leading-relaxed md:block ${isLight ? 'text-zinc-600' : 'text-zinc-400'}`}>Desbloquea los Soundtracks y escucha música mientras lees.</p>
+              <p className={`mb-4 max-w-[230px] text-[10px] font-medium leading-relaxed ${isLight ? 'text-zinc-600' : 'text-zinc-400'}`}>Desbloquea los Soundtracks y escucha música mientras lees.</p>
               <button type="button" onClick={() => setShowSubscription(true)} className={`manga-detail-ui-label group relative flex items-center gap-2 rounded-full px-6 py-2 text-[10px] uppercase transition-all hover:bg-[#FF4D88] hover:text-white hover:shadow-[0_0_20px_rgba(255,77,136,0.4)] ${isLight ? 'bg-black text-white shadow-[0_0_15px_rgba(0,0,0,0.12)]' : 'bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.1)]'}`}>Desbloquear</button>
             </div>
           </div>

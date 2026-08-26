@@ -295,7 +295,7 @@ export const Navbar = () => {
             <div className="flex items-center gap-1 sm:gap-6 lg:translate-y-0.5">
                 
                 {/* Herramientas (Buscador y RELOJ) */}
-                <div className={`relative flex items-center gap-0 sm:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} border-r pr-1 sm:mr-1 sm:pr-6`}>
+                <div className={`relative hidden items-center gap-0 min-[360px]:flex sm:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} border-r pr-1 sm:mr-1 sm:pr-6`}>
                     <button 
                         onClick={() => setIsSearchOpen(true)}
                         aria-label="Buscar mangas"

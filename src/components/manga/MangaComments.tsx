@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { EmojiClickData, EmojiStyle, Theme } from 'emoji-picker-react';
 import {
   ChevronDown,
   ChevronUp,
-  Heart,
   Loader2,
   MessageSquareText,
   Reply,
   Send,
+  SmilePlus,
+  Sticker,
+  X,
 } from 'lucide-react';
 import {
   getMangaComments,
+  notifyCommentReaction,
   postMangaComment,
   toggleCommentLike,
   type MangaComment,
@@ -23,17 +28,72 @@ interface MangaCommentsProps {
   isLight?: boolean;
 }
 
-type SortMode = 'recent' | 'popular';
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
+
+const COMMENT_REACTIONS = [
+  { id: 'fire', symbol: '🔥', label: 'Fuego' },
+  { id: 'love', symbol: '❤️', label: 'Me encanta' },
+  { id: 'like', symbol: '👍', label: 'Me gusta' },
+  { id: 'haha', symbol: '😂', label: 'Me divierte' },
+  { id: 'sad', symbol: '😢', label: 'Me entristece' },
+] as const;
+
+type CommentReactionId = (typeof COMMENT_REACTIONS)[number]['id'];
+type CommentReactionCounts = Record<CommentReactionId, number>;
+
+const createCommentReactionCounts = (): CommentReactionCounts => ({
+  fire: 0,
+  love: 0,
+  like: 0,
+  haha: 0,
+  sad: 0,
+});
+
+const COMMENT_STICKERS = [
+  { id: 'mm-party', names: ['fiesta', 'celebrar', 'party'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f389.svg' },
+  { id: 'mm-sparkles', names: ['brillos', 'magia', 'sparkles'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/2728.svg' },
+  { id: 'mm-rocket', names: ['cohete', 'increible', 'rocket'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f680.svg' },
+  { id: 'mm-crown', names: ['corona', 'rey', 'reina'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f451.svg' },
+  { id: 'mm-fire', names: ['fuego', 'epico', 'fire'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f525.svg' },
+  { id: 'mm-heart-eyes', names: ['amor', 'encanta', 'gato'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f63b.svg' },
+  { id: 'mm-ghost', names: ['fantasma', 'sorpresa', 'ghost'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f47b.svg' },
+  { id: 'mm-star', names: ['estrella', 'favorito', 'star'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/2b50.svg' },
+  { id: 'mm-heart-hands', names: ['corazon', 'manos', 'amor'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1faf6.svg' },
+  { id: 'mm-melting', names: ['derretido', 'mood', 'calor'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1fae0.svg' },
+  { id: 'mm-skull', names: ['calavera', 'morir de risa', 'meme'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f480.svg' },
+  { id: 'mm-clown', names: ['payaso', 'meme', 'broma'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f921.svg' },
+  { id: 'mm-hundred', names: ['cien', 'real', 'perfecto'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f4af.svg' },
+  { id: 'mm-nails', names: ['unas', 'slay', 'iconico'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f485.svg' },
+  { id: 'mm-cold', names: ['frio', 'congelado', 'cool'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f976.svg' },
+  { id: 'mm-mind-blown', names: ['impactado', 'mente', 'increible'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f92f.svg' },
+  { id: 'mm-crying', names: ['llorando', 'emocion', 'mood'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f62d.svg' },
+  { id: 'mm-purple-heart', names: ['corazon morado', 'amor', 'aesthetic'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f49c.svg' },
+  { id: 'mm-hug', names: ['abrazo', 'carino', 'apoyo'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f917.svg' },
+  { id: 'mm-cool', names: ['lentes', 'cool', 'genial'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f60e.svg' },
+];
+
+const COMMENT_SUCCESS_MESSAGE = 'Tu comentario ya forma parte de la conversación.';
 
 const formatCommentDate = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Ahora';
   return new Intl.DateTimeFormat('es-PE', {
-    day: 'numeric',
-    month: 'short',
+    day: '2-digit',
+    month: '2-digit',
     year: 'numeric',
   }).format(date);
 };
+
+const renderCommentContent = (value: string) => value
+  .split(/(\[sticker:https:\/\/[^\]]+\])/g)
+  .filter(Boolean)
+  .map((part, index) => {
+    const match = part.match(/^\[sticker:(https:\/\/[^\]]+)\]$/);
+    const sticker = match ? COMMENT_STICKERS.find(({ imgUrl }) => imgUrl === match[1]) : null;
+    return sticker
+      ? <img key={`${sticker.id}-${index}`} src={sticker.imgUrl} alt={sticker.names[0]} className="manga-comment-sticker" loading="lazy" />
+      : <span key={`comment-text-${index}`}>{part}</span>;
+  });
 
 export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) => {
   const navigate = useNavigate();
@@ -41,10 +101,16 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [content, setContent] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [visibleCount, setVisibleCount] = useState(3);
   const [replyTo, setReplyTo] = useState<MangaComment | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [replyPosting, setReplyPosting] = useState(false);
   const [message, setMessage] = useState('');
+  const [composerTool, setComposerTool] = useState<'emojis' | 'stickers' | null>(null);
+  const [selectedSticker, setSelectedSticker] = useState<(typeof COMMENT_STICKERS)[number] | null>(null);
+  const [commentReactionSelections, setCommentReactionSelections] = useState<Record<number, CommentReactionId | null>>({});
+  const [commentReactionCounts, setCommentReactionCounts] = useState<Record<number, CommentReactionCounts>>({});
+  const [reactionBursts, setReactionBursts] = useState<Record<number, { id: CommentReactionId; key: number }>>({});
 
   const token = getStoredToken();
   const user = getStoredUser();
@@ -54,7 +120,11 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
     setLoading(true);
     getMangaComments(mangaId)
       .then((items) => {
-        if (active) setComments(items);
+        if (!active) return;
+        setComments(items);
+        setCommentReactionSelections(Object.fromEntries(
+          items.filter((comment) => comment.is_liked_by_user).map((comment) => [comment.id, 'like']),
+        ));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -83,13 +153,6 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, updateProfile);
   }, []);
 
-  const topLevelComments = useMemo(() => {
-    const topLevel = comments.filter((comment) => !comment.parent_id);
-    return [...topLevel].sort((a, b) => sortMode === 'popular'
-      ? b.likes - a.likes
-      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [comments, sortMode]);
-
   const repliesByParent = useMemo(() => {
     const replies = new Map<number, MangaComment[]>();
     comments.forEach((comment) => {
@@ -100,6 +163,16 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
     });
     return replies;
   }, [comments]);
+
+  const topLevelComments = useMemo(() => {
+    const topLevel = comments.filter((comment) => !comment.parent_id);
+    return [...topLevel].sort((a, b) => {
+      const aScore = a.likes + (repliesByParent.get(a.id)?.length || 0);
+      const bScore = b.likes + (repliesByParent.get(b.id)?.length || 0);
+      if (bScore !== aScore) return bScore - aScore;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [comments, repliesByParent]);
 
   const goToLogin = () => {
     navigate('/auth/login', {
@@ -114,38 +187,114 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
       return;
     }
     const trimmed = content.trim();
-    if (!trimmed || posting) return;
+    if ((!trimmed && !selectedSticker) || posting) return;
+    const publishedContent = [
+      trimmed,
+      selectedSticker ? `[sticker:${selectedSticker.imgUrl}]` : '',
+    ].filter(Boolean).join('\n');
 
     setPosting(true);
     setMessage('');
-    const posted = await postMangaComment(mangaId, trimmed, replyTo?.id ?? null);
+    const posted = await postMangaComment(mangaId, publishedContent, null);
     if (posted) {
       setComments((current) => [posted, ...current]);
       setContent('');
-      setReplyTo(null);
-      setMessage('Tu comentario ya forma parte de la conversación.');
+      setSelectedSticker(null);
+      setComposerTool(null);
+      setMessage(COMMENT_SUCCESS_MESSAGE);
     } else {
       setMessage('No pudimos publicar el comentario. Inténtalo otra vez.');
     }
     setPosting(false);
   };
 
-  const handleLike = async (comment: MangaComment) => {
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setContent((current) => `${current}${emojiData.emoji}`.slice(0, 500));
+    setComposerTool(null);
+  };
+
+  const handleStickerClick = (sticker: (typeof COMMENT_STICKERS)[number]) => {
+    setSelectedSticker(sticker);
+    setComposerTool(null);
+  };
+
+  const handleReplySubmit = async (event: FormEvent, comment: MangaComment) => {
+    event.preventDefault();
+    if (!token) {
+      goToLogin();
+      return;
+    }
+    const trimmed = replyContent.trim();
+    if (!trimmed || replyPosting) return;
+
+    setReplyPosting(true);
+    const posted = await postMangaComment(mangaId, trimmed, comment.id);
+    if (posted) {
+      setComments((current) => [...current, posted]);
+      setReplyContent('');
+      setReplyTo(null);
+    } else {
+      setMessage('No pudimos publicar la respuesta. Inténtalo otra vez.');
+    }
+    setReplyPosting(false);
+  };
+
+  const handleCommentReaction = async (comment: MangaComment, reactionId: CommentReactionId) => {
     if (!token) {
       goToLogin();
       return;
     }
 
-    const snapshot = comments;
-    setComments((current) => current.map((item) => item.id === comment.id
-      ? {
-          ...item,
-          likes: item.is_liked_by_user ? Math.max(0, item.likes - 1) : item.likes + 1,
-          is_liked_by_user: !item.is_liked_by_user,
-        }
-      : item));
-    const success = await toggleCommentLike(comment.id);
-    if (!success) setComments(snapshot);
+    const previousSelection = commentReactionSelections[comment.id]
+      || (comment.is_liked_by_user ? 'like' : null);
+    const nextSelection = previousSelection === reactionId ? null : reactionId;
+    const commentsSnapshot = comments;
+    const selectionsSnapshot = commentReactionSelections;
+    const countsSnapshot = commentReactionCounts;
+
+    setCommentReactionSelections((current) => ({ ...current, [comment.id]: nextSelection }));
+    setCommentReactionCounts((current) => {
+      const nextCounts = { ...(current[comment.id] || createCommentReactionCounts()) };
+      if (previousSelection && previousSelection !== 'like') {
+        nextCounts[previousSelection] = Math.max(0, nextCounts[previousSelection] - 1);
+      }
+      if (nextSelection && nextSelection !== 'like') {
+        nextCounts[nextSelection] += 1;
+      }
+      return { ...current, [comment.id]: nextCounts };
+    });
+    setReactionBursts((current) => ({
+      ...current,
+      [comment.id]: { id: reactionId, key: Date.now() },
+    }));
+
+    const likeStateChanged = (previousSelection === 'like') !== (nextSelection === 'like');
+
+    if (likeStateChanged) {
+      const nextLiked = nextSelection === 'like';
+      setComments((current) => current.map((item) => item.id === comment.id
+        ? {
+            ...item,
+            likes: nextLiked ? item.likes + 1 : Math.max(0, item.likes - 1),
+            is_liked_by_user: nextLiked,
+          }
+        : item));
+    }
+
+    const notificationTasks: Promise<boolean>[] = [];
+    if (likeStateChanged) notificationTasks.push(toggleCommentLike(comment.id));
+    if (previousSelection && previousSelection !== 'like' && (!nextSelection || nextSelection === 'like')) {
+      notificationTasks.push(notifyCommentReaction(comment.id, null));
+    }
+    if (nextSelection && nextSelection !== 'like') {
+      notificationTasks.push(notifyCommentReaction(comment.id, nextSelection));
+    }
+    const results = await Promise.all(notificationTasks);
+    if (results.some((success) => !success)) {
+      setComments(commentsSnapshot);
+      setCommentReactionSelections(selectionsSnapshot);
+      setCommentReactionCounts(countsSnapshot);
+    }
   };
 
   const selectReply = (comment: MangaComment) => {
@@ -154,16 +303,24 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
       return;
     }
     setReplyTo(comment);
-    document.getElementById('manga-comment-input')?.focus();
+    setReplyContent('');
+    window.setTimeout(() => document.getElementById(`manga-inline-reply-${comment.id}`)?.focus(), 0);
   };
 
-  const renderComment = (comment: MangaComment, isReply = false) => (
-    <article
-      key={comment.id}
-      className={`rounded-2xl border p-4 transition-colors sm:p-5 ${isLight ? 'border-black/[0.08] bg-zinc-50' : 'border-white/[0.07] bg-[#080808]'} ${isReply ? 'ml-6 border-l-[#FF4D88]/35 sm:ml-12' : ''}`}
-    >
-      <div className="flex gap-3">
-        <Link to={`/usuarios/${comment.user_id}`} aria-label={`Ver perfil de ${comment.profiles?.username || 'usuario'}`} className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-gradient-to-br from-[#FF4D88]/30 text-sm font-black transition-transform hover:scale-105 ${isLight ? 'border-black/10 to-black/[0.03] text-black' : 'border-white/10 to-white/[0.03] text-white'}`}>
+  const renderComment = (comment: MangaComment, isReply = false) => {
+    const selectedReaction = commentReactionSelections[comment.id]
+      || (comment.is_liked_by_user ? 'like' : null);
+    const localCounts = commentReactionCounts[comment.id] || createCommentReactionCounts();
+    const burst = reactionBursts[comment.id];
+    const burstReaction = burst ? COMMENT_REACTIONS.find(({ id }) => id === burst.id) : null;
+
+    return (
+      <article key={comment.id} className={`manga-comment-entry ${isReply ? 'is-reply' : ''}`}>
+        <Link
+          to={`/usuarios/${comment.user_id}`}
+          aria-label={`Ver perfil de ${comment.profiles?.username || 'usuario'}`}
+          className={`manga-comment-avatar flex shrink-0 items-center justify-center overflow-hidden border bg-gradient-to-br from-[#FF4D88]/30 text-sm font-black transition-transform hover:scale-105 ${isLight ? 'border-black/10 to-black/[0.03] text-black' : 'border-white/10 to-white/[0.03] text-white'}`}
+        >
           {comment.profiles?.avatar_url ? (
             <img src={comment.profiles.avatar_url} alt="" className="h-full w-full object-cover" loading="lazy" />
           ) : (
@@ -171,114 +328,232 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
           )}
         </Link>
 
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Link to={`/usuarios/${comment.user_id}`} className={`text-xs font-black transition-colors hover:text-[#FF4D88] ${isLight ? 'text-black' : 'text-white'}`}>
-              {comment.profiles?.username || 'Usuario MangaMukai'}
-            </Link>
-            {comment.profiles?.is_pro && (
-              <span className="rounded-full bg-[#FF4D88]/15 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-[#FF4D88]">
-                Pro
+        <div className={`manga-comment-card relative min-w-0 overflow-hidden border p-4 transition-colors sm:p-5 ${isLight ? 'border-black/[0.09] bg-white/90' : 'border-white/[0.08] bg-[#080808]/90'}`}>
+          <AnimatePresence>
+            {burst && burstReaction && (
+              <motion.div key={burst.key} className="manga-comment-reaction-burst" aria-hidden="true">
+                {Array.from({ length: 14 }, (_, index) => (
+                  <motion.span
+                    key={`${burst.key}-${index}`}
+                    className="manga-comment-reaction-particle"
+                    style={{ left: `${2 + index * 7.25}%` }}
+                    initial={{ opacity: 0, scale: 0.2, x: 0, y: 70, rotate: 0 }}
+                    animate={{
+                      opacity: [0, 0.08, 0.52, 0.5, 0],
+                      scale: [0.2, 0.5, 0.9, 1.05, 0.86],
+                      x: [0, (index % 2 === 0 ? -1 : 1) * 12, (index - 6.5) * 10],
+                      y: [90, 38, -24 - (index % 3) * 14, -155 - (index % 4) * 22, -325 - (index % 2) * 35],
+                      rotate: [0, (index % 2 === 0 ? -1 : 1) * 10, (index - 6.5) * 8],
+                    }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 3.35, delay: index * 0.025, times: [0, 0.16, 0.38, 0.74, 1], ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    {burstReaction.symbol}
+                  </motion.span>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="relative z-10">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Link to={`/usuarios/${comment.user_id}`} className={`poppins-bold truncate text-[14px] transition-colors hover:text-[#FF4D88] sm:text-[15px] ${isLight ? 'text-black' : 'text-white'}`}>
+                  {comment.profiles?.username || 'Usuario MangaMukai'}
+                </Link>
+                {comment.profiles?.is_pro && (
+                  <span className="rounded-full bg-[#FF4D88]/15 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-[#FF4D88]">
+                    Pro
+                  </span>
+                )}
+              </div>
+              <span className={`google-sans-library ml-auto shrink-0 text-right text-[12px] font-medium sm:text-[13px] ${isLight ? 'text-black' : 'text-white'}`}>
+                {formatCommentDate(comment.created_at)}
               </span>
-            )}
-            <span className={`text-[10px] font-medium uppercase tracking-wider ${isLight ? 'text-black/35' : 'text-white/25'}`}>
-              {formatCommentDate(comment.created_at)}
-            </span>
-          </div>
+            </div>
 
-          <p className={`whitespace-pre-wrap text-sm leading-relaxed ${isLight ? 'text-black/70' : 'text-white/65'}`}>{comment.content}</p>
+            <div className={`whitespace-pre-wrap text-sm leading-relaxed ${isLight ? 'text-black/72' : 'text-white/70'}`}>{renderCommentContent(comment.content)}</div>
 
-          <div className="mt-3 flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => handleLike(comment)}
-              className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider transition-colors ${comment.is_liked_by_user ? 'text-[#FF4D88]' : isLight ? 'text-black/35 hover:text-[#FF4D88]' : 'text-white/30 hover:text-[#FF4D88]'}`}
-              aria-label={comment.is_liked_by_user ? 'Quitar me gusta' : 'Dar me gusta'}
-            >
-              <Heart size={13} fill={comment.is_liked_by_user ? 'currentColor' : 'none'} />
-              {comment.likes}
-            </button>
-            {!isReply && (
-              <button
-                type="button"
-                onClick={() => selectReply(comment)}
-                className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider transition-colors ${isLight ? 'text-black/35 hover:text-black' : 'text-white/30 hover:text-white'}`}
-              >
-                <Reply size={13} /> Responder
-              </button>
-            )}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="manga-comment-reaction-list flex w-[95%] flex-nowrap items-center justify-between" aria-label="Reacciones al comentario">
+                {COMMENT_REACTIONS.map((reaction) => {
+                  const isSelected = selectedReaction === reaction.id;
+                  const count = reaction.id === 'like' ? comment.likes : localCounts[reaction.id];
+                  return (
+                    <motion.button
+                      key={reaction.id}
+                      type="button"
+                      onClick={() => handleCommentReaction(comment, reaction.id)}
+                      whileHover={{ y: -2, scale: 1.08 }}
+                      whileTap={{ scale: 0.88 }}
+                      aria-label={`${reaction.label}: ${count}`}
+                      aria-pressed={isSelected}
+                      title={reaction.label}
+                      className={`manga-comment-reaction-button ${isSelected ? 'is-selected' : ''} ${isLight ? 'is-light' : 'is-dark'}`}
+                    >
+                      <span className="manga-comment-reaction-emoji" aria-hidden="true">
+                        {reaction.symbol}
+                      </span>
+                      <span className="manga-comment-reaction-count tabular-nums">{count}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {!isReply && (
+                <button
+                  type="button"
+                  onClick={() => selectReply(comment)}
+                  className={`manga-comment-reply-button ml-auto inline-flex items-center gap-1.5 font-[Montserrat] text-[12px] font-semibold transition-colors sm:text-[13px] ${isLight ? 'is-light text-black/60 hover:text-black' : 'is-dark text-white/55 hover:text-white'}`}
+                >
+                  <Reply size={15} /> Responder
+                </button>
+              )}
+            </div>
+
+            <AnimatePresence initial={false}>
+              {!isReply && replyTo?.id === comment.id && (
+                <motion.form
+                  key={`inline-reply-${comment.id}`}
+                  onSubmit={(event) => handleReplySubmit(event, comment)}
+                  className={`manga-inline-reply mt-4 border-t pt-4 ${isLight ? 'border-black/[0.08]' : 'border-white/[0.08]'}`}
+                  initial={{ opacity: 0, height: 0, y: -6 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -4 }}
+                  transition={{ duration: 0.22 }}
+                >
+                  <textarea
+                    id={`manga-inline-reply-${comment.id}`}
+                    value={replyContent}
+                    onChange={(event) => setReplyContent(event.target.value.slice(0, 500))}
+                    placeholder={`Responder a ${comment.profiles?.username || 'este lector'}...`}
+                    className={`min-h-24 w-full resize-y rounded-xl border px-3 py-3 font-[Montserrat] text-sm outline-none transition-colors focus:border-[#FF4D88]/55 ${isLight ? 'border-black/10 bg-black/[0.035] text-black placeholder:text-black/35' : 'border-white/10 bg-white/[0.045] text-white placeholder:text-white/30'}`}
+                  />
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className={`font-[Montserrat] text-[10px] font-semibold ${isLight ? 'text-black/35' : 'text-white/30'}`}>{replyContent.length}/500</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => setReplyTo(null)} className={`rounded-lg px-3 py-2 font-[Montserrat] text-[10px] font-semibold ${isLight ? 'text-black/50 hover:bg-black/5' : 'text-white/45 hover:bg-white/5'}`}>Cancelar</button>
+                      <button type="submit" disabled={!replyContent.trim() || replyPosting} className="inline-flex items-center gap-1.5 rounded-lg bg-[#FF4D88] px-3 py-2 font-[Montserrat] text-[10px] font-semibold text-white disabled:opacity-35">
+                        {replyPosting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                        Responder
+                      </button>
+                    </div>
+                  </div>
+                </motion.form>
+              )}
+            </AnimatePresence>
           </div>
         </div>
-      </div>
-    </article>
-  );
+      </article>
+    );
+  };
 
   return (
-    <section className={`manga-comments desktop-content-shell relative mx-auto mb-28 mt-10 w-full max-w-[1400px] px-4 transition-colors md:px-8 ${isLight ? 'text-black' : 'text-white'}`} aria-labelledby="comments-title">
-      <div className={`mb-6 flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between ${isLight ? 'border-black/[0.08]' : 'border-white/[0.07]'}`}>
-        <div className="flex items-center gap-3">
-          <span className="h-8 w-1 rounded-full bg-[#FF4D88] shadow-[0_0_16px_rgba(255,77,136,0.55)]" />
-          <MessageSquareText size={22} className="text-[#FF4D88]" />
-          <h2 id="comments-title" className={`text-xl font-black uppercase italic tracking-tight md:text-2xl ${isLight ? 'text-black' : 'text-white'}`}>
-            Comunidad
+    <section className={`manga-comments desktop-content-shell relative mx-auto mb-28 mt-4 w-full max-w-[1400px] px-4 transition-colors md:px-8 ${isLight ? 'text-black' : 'text-white'}`} aria-labelledby="comments-title">
+      <div className={`mb-7 flex items-center justify-center border-b pb-5 ${isLight ? 'border-black/[0.08]' : 'border-white/[0.07]'}`}>
+        <div className="flex items-center justify-center gap-3 text-center">
+          <MessageSquareText size={28} className="text-[#FF4D88] md:h-8 md:w-8" />
+          <h2 id="comments-title" className={`text-2xl font-black uppercase italic tracking-tight md:text-[28px] ${isLight ? 'text-black' : 'text-white'}`}>
+            Comentarios
           </h2>
-        </div>
-
-        <div className={`flex w-fit rounded-xl border p-1 ${isLight ? 'border-black/10 bg-black/[0.035]' : 'border-white/10 bg-white/[0.035]'}`}>
-          {(['recent', 'popular'] as SortMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setSortMode(mode)}
-              className={`rounded-lg px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] transition-all ${sortMode === mode ? isLight ? 'bg-black text-white' : 'bg-white text-black' : isLight ? 'text-black/40 hover:text-black' : 'text-white/35 hover:text-white'}`}
-            >
-              {mode === 'recent' ? 'Recientes' : 'Populares'}
-            </button>
-          ))}
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <form onSubmit={handleSubmit} className={`h-fit rounded-3xl border p-5 shadow-2xl transition-colors lg:sticky lg:top-24 ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-[#080808]'}`}>
-          <div className="mb-4 flex items-center gap-2">
-            <Send size={15} className="text-[#FF4D88]" />
-            <span className={`text-[10px] font-black uppercase tracking-[0.16em] ${isLight ? 'text-black/55' : 'text-white/45'}`}>
-              Escribe un comentario
-            </span>
+      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-7">
+        <form onSubmit={handleSubmit} className={`manga-comment-form rounded-3xl border p-4 transition-colors sm:p-5 ${isLight ? 'border-black/10 bg-white/88' : 'border-white/10 bg-[#080808]/88'}`}>
+          <div className={`manga-comment-composer-box relative overflow-hidden rounded-2xl border transition-colors focus-within:border-[#FF4D88]/50 ${isLight ? 'border-black/10 bg-zinc-50' : 'border-white/10 bg-black/30'}`}>
+            <textarea
+              id="manga-comment-input"
+              value={content}
+              onChange={(event) => setContent(event.target.value.slice(0, 500))}
+              onClick={() => {
+                if (!token) goToLogin();
+              }}
+              readOnly={!token}
+              placeholder={token ? `¿Qué te pareció, ${user?.username || 'lector'}?` : 'Inicia sesión para comentar...'}
+              className={`min-h-28 w-full resize-y border-0 bg-transparent p-4 text-sm leading-relaxed outline-none sm:min-h-32 ${selectedSticker ? 'pb-[76px]' : ''} ${isLight ? 'text-black placeholder:text-black/30' : 'text-white placeholder:text-white/20'}`}
+            />
+
+            {selectedSticker && (
+              <div className={`manga-comment-composer-sticker-row absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-xl border px-2 py-1.5 ${isLight ? 'border-black/[0.08] bg-white/92' : 'border-white/[0.08] bg-black/85'}`}>
+                <img
+                  src={selectedSticker.imgUrl}
+                  alt={selectedSticker.names[0]}
+                  className="manga-comment-composer-sticker"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedSticker(null)}
+                  aria-label="Quitar sticker"
+                  className={`flex h-6 w-6 items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-black/[0.06] hover:text-black' : 'text-white/45 hover:bg-white/[0.07] hover:text-white'}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
 
-          {replyTo && (
-            <div className="mb-3 flex items-center justify-between rounded-lg bg-[#FF4D88]/10 px-3 py-2 text-[10px] text-[#FF4D88]">
-              <span>Respondiendo a {replyTo.profiles?.username || 'un lector'}</span>
-              <button type="button" onClick={() => setReplyTo(null)} className="font-black uppercase">Cancelar</button>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="relative flex min-w-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setComposerTool((current) => current === 'emojis' ? null : 'emojis')}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-[Montserrat] text-[11px] font-semibold transition-colors ${composerTool === 'emojis' ? 'border-[#FF4D88]/55 text-[#FF4D88]' : isLight ? 'border-black/10 text-black/55 hover:text-black' : 'border-white/10 text-white/50 hover:text-white'}`}
+                aria-expanded={composerTool === 'emojis'}
+                aria-label="Abrir emojis"
+              >
+                <SmilePlus size={15} />
+                Emojis
+              </button>
+              <button
+                type="button"
+                onClick={() => setComposerTool((current) => current === 'stickers' ? null : 'stickers')}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-[Montserrat] text-[11px] font-semibold transition-colors ${composerTool === 'stickers' ? 'border-[#FF4D88]/55 text-[#FF4D88]' : isLight ? 'border-black/10 text-black/55 hover:text-black' : 'border-white/10 text-white/50 hover:text-white'}`}
+                aria-expanded={composerTool === 'stickers'}
+                aria-label="Abrir stickers"
+              >
+                <Sticker size={15} />
+                Stickers
+              </button>
+              {composerTool === 'emojis' && (
+                <div className="manga-comment-emoji-picker absolute bottom-full left-0 z-30 mb-2">
+                  <Suspense fallback={<div className={`flex h-[420px] w-full items-center justify-center rounded-2xl border ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-[#101010]'}`}><Loader2 size={22} className="animate-spin text-[#FF4D88]" /></div>}>
+                    <EmojiPicker
+                      onEmojiClick={handleEmojiClick}
+                      theme={(isLight ? 'light' : 'dark') as Theme}
+                      emojiStyle={'native' as EmojiStyle}
+                      lazyLoadEmojis
+                      searchPlaceHolder="Buscar emoji"
+                      previewConfig={{ showPreview: false }}
+                      width="100%"
+                      height={420}
+                    />
+                  </Suspense>
+                </div>
+              )}
+              {composerTool === 'stickers' && (
+                <div className={`manga-comment-sticker-picker absolute bottom-full left-0 z-30 mb-2 max-h-[360px] overflow-y-auto rounded-2xl border p-3 ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-[#101010]'}`}>
+                  <div className="grid grid-cols-4 gap-2">
+                    {COMMENT_STICKERS.map((sticker) => (
+                      <button key={sticker.id} type="button" onClick={() => handleStickerClick(sticker)} title={sticker.names[0]} className={`flex aspect-square items-center justify-center rounded-xl border p-2 transition-colors hover:border-[#FF4D88]/55 ${isLight ? 'border-black/[0.07] bg-black/[0.025]' : 'border-white/[0.07] bg-white/[0.035]'}`}>
+                        <img src={sticker.imgUrl} alt={sticker.names[0]} className="h-full w-full object-contain" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-
-          <textarea
-            id="manga-comment-input"
-            value={content}
-            onChange={(event) => setContent(event.target.value.slice(0, 500))}
-            onClick={() => {
-              if (!token) goToLogin();
-            }}
-            readOnly={!token}
-            placeholder={token ? `¿Qué te pareció, ${user?.username || 'lector'}?` : 'Inicia sesión para comentar...'}
-            className={`min-h-36 w-full resize-none rounded-2xl border p-4 text-sm leading-relaxed outline-none transition-colors focus:border-[#FF4D88]/50 ${isLight ? 'border-black/10 bg-zinc-50 text-black placeholder:text-black/30' : 'border-white/10 bg-black/30 text-white placeholder:text-white/20'}`}
-          />
-
-          <div className="mt-3 flex items-center justify-between">
-            <span className={`font-mono text-[9px] ${isLight ? 'text-black/35' : 'text-white/25'}`}>{content.length}/500</span>
             <button
               type="submit"
-              disabled={posting || (Boolean(token) && !content.trim())}
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#FF4D88] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.14em] text-white transition-all hover:bg-[#ff2f78] disabled:cursor-not-allowed disabled:opacity-35"
+              disabled={posting || (Boolean(token) && !content.trim() && !selectedSticker)}
+              className="google-sans-library ml-auto flex items-center justify-center gap-2.5 rounded-xl bg-[#FF4D88] px-6 py-3 text-[13px] font-bold tracking-normal text-white transition-colors hover:bg-[#ff2f78] disabled:cursor-not-allowed disabled:opacity-35 sm:px-7 sm:text-[14px]"
             >
-              {posting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+              {posting ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
               {token ? 'Publicar' : 'Iniciar sesión'}
             </button>
           </div>
 
-          {message && <p className={`mt-3 text-center text-[10px] leading-relaxed ${isLight ? 'text-black/55' : 'text-white/45'}`}>{message}</p>}
+          {message && <p className={`mt-3 text-center text-[10px] leading-relaxed ${message === COMMENT_SUCCESS_MESSAGE ? 'lg:hidden' : ''} ${isLight ? 'text-black/55' : 'text-white/45'}`}>{message}</p>}
         </form>
 
         <div className="min-h-72">
@@ -297,11 +572,15 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="manga-comments-thread-list space-y-4">
               {topLevelComments.slice(0, visibleCount).map((comment) => (
-                <div key={comment.id} className="space-y-3">
+                <div key={comment.id} className={`manga-comment-thread space-y-3 ${(repliesByParent.get(comment.id)?.length || 0) > 0 ? 'has-replies' : ''}`}>
                   {renderComment(comment)}
-                  {(repliesByParent.get(comment.id) || []).map((reply) => renderComment(reply, true))}
+                  {(repliesByParent.get(comment.id)?.length || 0) > 0 && (
+                    <div className="manga-comment-replies space-y-3">
+                      {(repliesByParent.get(comment.id) || []).map((reply) => renderComment(reply, true))}
+                    </div>
+                  )}
                 </div>
               ))}
 

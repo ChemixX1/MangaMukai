@@ -429,6 +429,42 @@ function mm_social_record_comment($comment, $fallback_manga_id = '') {
     ], ['%d', '%d', '%s', '%s']);
 }
 
+function mm_social_notify_comment_reaction(WP_REST_Request $request) {
+    $comment_id = absint($request->get_param('comment_id'));
+    $reaction = sanitize_key((string) $request->get_param('reaction'));
+    $active = filter_var($request->get_param('active'), FILTER_VALIDATE_BOOLEAN);
+    $allowed = ['fire', 'love', 'haha', 'sad'];
+    if (!$comment_id || ($active && !in_array($reaction, $allowed, true))) {
+        return new WP_Error('mm_social_invalid_reaction', 'Reaccion no valida.', ['status' => 400]);
+    }
+
+    global $wpdb;
+    $reference = $wpdb->get_row($wpdb->prepare(
+        'SELECT user_id,manga_id FROM ' . mm_social_table('comment_refs') . ' WHERE comment_id=%d',
+        $comment_id
+    ));
+    $owner = $reference ? (int) $reference->user_id : 0;
+    $manga_id = $reference ? (string) $reference->manga_id : '';
+    if (!$owner) {
+        $comment = get_comment($comment_id);
+        if ($comment) $owner = (int) $comment->user_id;
+    }
+
+    $actor = get_current_user_id();
+    $dedupe = 'comment_reaction:' . $comment_id . ':' . $actor;
+    if ($active && $owner) {
+        mm_social_create_notification($owner, $actor, 'comment_reaction', $comment_id, [
+            'comment_id' => $comment_id,
+            'manga_id' => $manga_id,
+            'reaction' => $reaction,
+        ], $dedupe);
+    } else {
+        $wpdb->delete(mm_social_table('notifications'), ['dedupe_key' => $dedupe], ['%s']);
+    }
+
+    return rest_ensure_response(['success' => true, 'active' => $active, 'reaction' => $active ? $reaction : '']);
+}
+
 add_filter('rest_request_after_callbacks', static function ($response, $handler, $request) {
     if (!$request instanceof WP_REST_Request || is_wp_error($response)) return $response;
     $route = $request->get_route();
@@ -454,16 +490,40 @@ add_filter('rest_request_after_callbacks', static function ($response, $handler,
         $comments = $data['comments'] ?? ($data['comment'] ?? $data);
         if (is_array($comments) && isset($comments['id'])) $comments = [$comments];
         if (is_array($comments)) foreach ($comments as $comment) mm_social_record_comment($comment, $request->get_param('manga_id'));
+        if ($method === 'POST' && get_current_user_id() && is_array($comments) && !empty($comments[0])) {
+            global $wpdb;
+            $posted = $comments[0];
+            $payload = $request->get_json_params();
+            if (!is_array($payload)) $payload = [];
+            $parent_id = absint($posted['parent_id'] ?? ($payload['parent_id'] ?? 0));
+            $comment_id = absint($posted['id'] ?? 0);
+            if ($parent_id && $comment_id) {
+                $parent_ref = $wpdb->get_row($wpdb->prepare(
+                    'SELECT user_id,manga_id FROM ' . mm_social_table('comment_refs') . ' WHERE comment_id=%d',
+                    $parent_id
+                ));
+                $owner = $parent_ref ? (int) $parent_ref->user_id : 0;
+                if (!$owner) { $parent_comment = get_comment($parent_id); if ($parent_comment) $owner = (int) $parent_comment->user_id; }
+                $manga_id = (string) ($posted['manga_id'] ?? ($payload['manga_id'] ?? ($parent_ref->manga_id ?? '')));
+                if ($owner) mm_social_create_notification($owner, get_current_user_id(), 'comment_reply', $comment_id, [
+                    'comment_id' => $comment_id,
+                    'parent_comment_id' => $parent_id,
+                    'manga_id' => $manga_id,
+                ], 'comment_reply:' . $comment_id);
+            }
+        }
     }
     if ($route === '/mangamukai/v1/comments/like' && $method === 'POST' && get_current_user_id() && !empty($data['success'])) {
         global $wpdb;
         $comment_id = absint($request->get_param('comment_id'));
-        $owner = (int) $wpdb->get_var($wpdb->prepare('SELECT user_id FROM ' . mm_social_table('comment_refs') . ' WHERE comment_id=%d', $comment_id));
+        $reference = $wpdb->get_row($wpdb->prepare('SELECT user_id,manga_id FROM ' . mm_social_table('comment_refs') . ' WHERE comment_id=%d', $comment_id));
+        $owner = $reference ? (int) $reference->user_id : 0;
+        $manga_id = $reference ? (string) $reference->manga_id : '';
         if (!$owner) { $comment = get_comment($comment_id); if ($comment) $owner = (int) $comment->user_id; }
         $action = sanitize_key((string) ($data['action'] ?? 'liked'));
         $liked = isset($data['liked']) ? (bool) $data['liked'] : !in_array($action, ['removed', 'unliked'], true);
         $dedupe = 'comment_like:' . $comment_id . ':' . get_current_user_id();
-        if ($liked && $owner) mm_social_create_notification($owner, get_current_user_id(), 'comment_like', $comment_id, ['comment_id' => $comment_id], $dedupe);
+        if ($liked && $owner) mm_social_create_notification($owner, get_current_user_id(), 'comment_like', $comment_id, ['comment_id' => $comment_id, 'manga_id' => $manga_id], $dedupe);
         elseif (!$liked) $wpdb->delete(mm_social_table('notifications'), ['dedupe_key' => $dedupe], ['%s']);
     }
     return $response;
@@ -483,5 +543,6 @@ add_action('rest_api_init', static function () {
     register_rest_route('mangamukai/v1', '/social/messages', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_send_message', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/notifications', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_notifications', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/notifications/read', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_mark_notifications_read', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/comments/reaction', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_notify_comment_reaction', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/manga-subscriptions', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_sync_manga_subscriptions', 'permission_callback' => $auth]);
 });

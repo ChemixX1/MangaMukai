@@ -100,6 +100,11 @@ export const MessagesPanel = ({ isOpen, isLight, onClose, onUnreadChange }: Pane
 const notificationCopy = (notification: SocialNotification) => {
   const actor = notification.actor?.username || 'Alguien';
   if (notification.type === 'comment_like') return { icon: Heart, text: `${actor} indicó que le gusta tu comentario.` };
+  if (notification.type === 'comment_reaction') {
+    const reaction = ({ fire: '🔥', love: '❤️', haha: '😂', sad: '😢' } as Record<string, string>)[notification.payload.reaction || ''] || '✨';
+    return { icon: Heart, text: `${actor} reaccionó ${reaction} a tu comentario.` };
+  }
+  if (notification.type === 'comment_reply') return { icon: MessageCircle, text: `${actor} respondió a tu comentario.` };
   if (notification.type === 'friend_request') return { icon: UserPlus, text: `${actor} te envió una solicitud de amistad.` };
   if (notification.type === 'friend_accepted') return { icon: Check, text: `${actor} aceptó tu solicitud de amistad.` };
   return { icon: BookOpen, text: `${notification.payload.title || 'Un manga guardado'} tiene una actualización.` };
@@ -134,7 +139,8 @@ export const NotificationsPanel = ({ isOpen, isLight, onClose, onUnreadChange }:
       onUnreadChange?.(Math.max(0, notifications.filter((item) => !item.read).length - 1));
     }
     onClose();
-    if (notification.type === 'manga_update' && notification.payload.manga_id) navigate(`/manga/${notification.payload.manga_id}`);
+    if ((notification.type === 'comment_like' || notification.type === 'comment_reaction' || notification.type === 'comment_reply') && notification.payload.manga_id) navigate(`/manga/${notification.payload.manga_id}#comentarios`);
+    else if (notification.type === 'manga_update' && notification.payload.manga_id) navigate(`/manga/${notification.payload.manga_id}`);
     else if (notification.actor) navigate(`/usuarios/${notification.actor.id}`);
   };
 

@@ -16,6 +16,7 @@ import {
   Loader2,
   MessageSquareText,
   MonitorPlay,
+  Palette,
   Search,
   Star,
   Users,
@@ -98,10 +99,10 @@ const createReactionCounts = (): Record<MangaReactionId, number> => Object.fromE
 
 function SidebarMetaRow({ icon, label, value, isLight, valueDotColor }: { icon: ReactNode; label: string; value: string; isLight: boolean; valueDotColor?: string }) {
   return (
-    <div className="flex min-h-[42px] min-w-0 items-center gap-2 py-1">
-      <span className={`shrink-0 [&>svg]:h-6 [&>svg]:w-6 ${isLight ? 'text-black' : 'text-white'}`}>{icon}</span>
-      <span className={`shrink-0 text-[13px] font-bold ${isLight ? 'text-black' : 'text-white'}`}>{label}</span>
-      <span className={`ml-auto inline-flex max-w-[64%] items-center justify-end gap-2 overflow-visible text-right font-[Montserrat] text-[14px] font-normal ${isLight ? 'text-black/75' : 'text-white/75'}`}>
+    <div className="google-sans-library flex min-h-[35px] min-w-0 items-center gap-1.5 sm:min-h-[40px] sm:gap-2 sm:py-0.5">
+      <span className={`shrink-0 [&>svg]:h-[23px] [&>svg]:w-[23px] sm:[&>svg]:h-6 sm:[&>svg]:w-6 ${isLight ? 'text-black' : 'text-white'}`}>{icon}</span>
+      <span className={`shrink-0 text-[15px] font-bold sm:text-[16px] ${isLight ? 'text-black' : 'text-white'}`}>{label}</span>
+      <span className={`ml-auto inline-flex max-w-[64%] items-center justify-end gap-1.5 overflow-visible text-right text-[15px] font-normal sm:text-[16px] ${isLight ? 'text-black/75' : 'text-white/75'}`}>
         {valueDotColor && <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true"><span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-55" style={{ backgroundColor: valueDotColor }} /><span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: valueDotColor, boxShadow: `0 0 12px ${valueDotColor}` }} /></span>}
         <span className="truncate">{value || 'N/A'}</span>
       </span>
@@ -115,7 +116,7 @@ function RelatedSidebar({ related, currentId, isLight }: { related: RelatedManga
 
   return (
     <aside className={`rounded-2xl border p-3 backdrop-blur-xl ${isLight ? 'border-black/10 bg-white/75' : 'border-white/10 bg-black/55'}`} aria-labelledby="related-title">
-      <h2 id="related-title" className={`mb-3 px-1 text-center text-sm font-black uppercase tracking-[0.05em] ${isLight ? 'text-black' : 'text-white'}`}>Series similares</h2>
+      <h2 id="related-title" className={`mb-3 px-1 text-center text-sm font-black uppercase tracking-[0.05em] ${isLight ? 'text-black' : 'text-white'}`}>Mangas similares</h2>
       <div className="manga-related-marquee relative h-[570px] overflow-hidden rounded-xl xl:h-[calc(100vh-16rem)] xl:min-h-[500px] xl:max-h-[680px]">
         <div className="manga-related-marquee-track">
           {[0, 1].map((copyIndex) => (
@@ -124,7 +125,7 @@ function RelatedSidebar({ related, currentId, isLight }: { related: RelatedManga
                 <Link key={`${copyIndex}-${manga.id}`} to={`/manga/${manga.id}`} tabIndex={copyIndex === 1 ? -1 : undefined} className={`group flex min-w-0 gap-3 rounded-xl border p-2 transition-colors hover:border-[#FF4D88]/40 ${isLight ? 'border-black/[0.07] bg-white/80' : 'border-white/[0.07] bg-white/[0.035]'}`}>
                   <img src={manga.portada} alt={copyIndex === 0 ? toTitleCase(manga.titulo) : ''} loading="lazy" className="h-[92px] w-[68px] shrink-0 rounded-lg object-cover" />
                   <span className="flex min-h-[92px] min-w-0 flex-1 flex-col py-0.5">
-                    <strong className={`line-clamp-3 font-[Montserrat] text-[13px] font-bold uppercase leading-[1.38] transition-colors group-hover:text-[#FF4D88] ${isLight ? 'text-black/85' : 'text-white/85'}`}>{manga.titulo.toLocaleUpperCase('es')}</strong>
+                    <span className={`manga-related-item-title line-clamp-3 font-[Montserrat] text-[13px] font-normal normal-case leading-[1.38] transition-colors group-hover:text-[#FF4D88] ${isLight ? 'text-black/85' : 'text-white/85'}`}>{toTitleCase(manga.titulo)}</span>
                     <span className={`mt-auto flex items-center gap-3 pb-0.5 text-[12px] ${isLight ? 'text-black/55' : 'text-white/50'}`}>
                       <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold"><Star size={17} className="manga-related-star fill-[#facc15] text-[#facc15]" />10</span>
                       <span className="truncate font-semibold">{typeof manga.chapterCount === 'number' ? `${manga.chapterCount} capítulos` : 'Calculando capítulos'}</span>
@@ -147,6 +148,9 @@ export const MangaDetail = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isLightMode = theme === 'light';
+  const [isDesktopMusicPlacement, setIsDesktopMusicPlacement] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  ));
 
   const [manga, setManga] = useState<MangaCapitulo | null>(null);
   const [chapters, setChapters] = useState<SeriesChapter[]>([]);
@@ -165,6 +169,17 @@ export const MangaDetail = () => {
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [userCoins, setUserCoins] = useState(0);
   const [userInfo, setUserInfo] = useState<{ id: string; username: string }>({ id: '', username: '' });
+
+  useEffect(() => {
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
+    const updateMusicPlacement = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsDesktopMusicPlacement(event.matches);
+    };
+
+    updateMusicPlacement(desktopMedia);
+    desktopMedia.addEventListener('change', updateMusicPlacement);
+    return () => desktopMedia.removeEventListener('change', updateMusicPlacement);
+  }, []);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [interactionBusy, setInteractionBusy] = useState<'bookmark' | 'like' | ''>('');
@@ -423,25 +438,32 @@ export const MangaDetail = () => {
   const releaseTime = manga.rawFecha ? new Date(manga.rawFecha.replace(' ', 'T')).getTime() : 0;
   const isNewRelease = releaseTime > 0 && MANGA_DETAIL_REFERENCE_TIME - releaseTime < 1000 * 60 * 60 * 24 * 45;
   const engagementStats = [
-    { label: 'Likes', description: 'Aprobación de lectores', value: engagement.likes, icon: Heart },
-    { label: 'Guardados', description: 'Añadido a colecciones', value: engagement.bookmarks, icon: Bookmark },
-    { label: 'En línea', description: 'Lectores conectados', value: engagement.online, icon: Users },
+    { label: 'Likes', value: engagement.likes, icon: Heart },
+    { label: 'Guardados', value: engagement.bookmarks, icon: Bookmark },
+    { label: 'Lectores conectados', value: engagement.online, icon: Users },
   ];
   const activeEngagementStat = engagementStats[activeEngagementIndex] || engagementStats[0];
   const ActiveEngagementIcon = activeEngagementStat.icon;
+  const onlineReaderRemainder = engagement.online % 50;
+  const onlineReaderProgress = engagement.online > 0 && onlineReaderRemainder === 0
+    ? 100
+    : (onlineReaderRemainder / 50) * 100;
+  const engagementProgress = activeEngagementStat.label === 'Lectores conectados'
+    ? onlineReaderProgress
+    : ((activeEngagementIndex + 1) / engagementStats.length) * 100;
   const typeIndicatorColor = /manhwa|manhua/i.test(manga.tipo || '') ? '#8b5cf6' : '#FF4D88';
 
   return (
     <main className={`manga-detail-page relative min-h-screen overflow-x-clip transition-colors duration-500 ${isLightMode ? 'manga-detail-theme-light bg-white text-black' : 'manga-detail-theme-dark bg-black text-white'}`}>
       <div className="fixed inset-0 z-0" aria-hidden="true">
-        <img src={manga.portada} alt="" className="h-full w-full scale-105 object-cover object-center blur-[2px]" />
-        <div className={`absolute inset-0 ${isLightMode ? 'bg-[linear-gradient(90deg,rgba(255,255,255,.94),rgba(255,255,255,.84)_52%,rgba(255,255,255,.92))]' : 'bg-[linear-gradient(90deg,rgba(0,0,0,.9),rgba(0,0,0,.74)_52%,rgba(0,0,0,.88))]'}`} />
-        <div className={`absolute inset-0 bg-gradient-to-b ${isLightMode ? 'from-white/30 via-transparent to-white' : 'from-black/30 via-transparent to-black'}`} />
+        <img src={manga.portada} alt="" className="h-full w-full origin-top scale-105 object-cover object-top blur-[2px]" />
+        <div className={`absolute inset-0 ${isLightMode ? 'bg-[linear-gradient(90deg,rgba(255,255,255,.97),rgba(255,255,255,.91)_52%,rgba(255,255,255,.96))]' : 'bg-[linear-gradient(90deg,rgba(0,0,0,.95),rgba(0,0,0,.84)_52%,rgba(0,0,0,.94))]'}`} />
+        <div className={`absolute inset-0 bg-gradient-to-b ${isLightMode ? 'from-white/45 via-transparent to-white' : 'from-black/45 via-transparent to-black'}`} />
       </div>
 
       <section className="relative z-10 pb-20 pt-28 md:pt-32">
-        <div className="desktop-content-shell mx-auto w-full max-w-[1720px] px-3 sm:px-5 lg:px-6 2xl:px-8">
-          <div className="mb-2 grid items-center xl:grid-cols-[290px_minmax(0,1fr)_330px] xl:gap-10">
+        <div className="desktop-content-shell mx-auto w-full max-w-[1780px] px-3 sm:px-5 lg:px-4 2xl:px-6">
+          <div className="mb-2 grid items-center xl:grid-cols-[290px_minmax(0,1fr)_330px] xl:gap-8">
             <div className="text-center xl:col-start-3">
               <p className={`manga-detail-social-prompt text-[13px] ${isLightMode ? 'text-black/60' : 'text-white/60'}`}>¡No olvides seguirnos!</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5" aria-label="Redes sociales de MangaMukai">
@@ -455,7 +477,7 @@ export const MangaDetail = () => {
           </div>
           <div className={`mb-5 h-px w-full bg-gradient-to-r from-transparent via-current to-transparent ${isLightMode ? 'text-black/20' : 'text-white/20'}`} aria-hidden="true" />
 
-          <div className="grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[290px_minmax(0,1fr)_330px] xl:gap-10">
+          <div className="grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[290px_minmax(0,1fr)_330px] xl:gap-8">
             <motion.aside
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -466,8 +488,13 @@ export const MangaDetail = () => {
                 <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} className="h-full w-full object-cover" />
                 {isNewRelease && <span className="absolute right-3 top-3 rounded-md bg-[#FF4D88] px-2 py-1 text-[8px] font-black uppercase text-white">Estreno</span>}
                 <div className="absolute left-0 top-1/2 flex -translate-y-1/2 flex-col items-start gap-1.5 text-[10px] font-bold uppercase text-white">
-                  <span className="rotate-180 rounded-l-md bg-violet-600 px-2.5 py-3 shadow-lg [text-orientation:mixed] [writing-mode:vertical-rl]">Color</span>
-                  <span className="rotate-180 rounded-l-md bg-[#FF4D88] px-2.5 py-3 shadow-lg [text-orientation:mixed] [writing-mode:vertical-rl]">{manga.tipo || 'Manga'}</span>
+                  <span className="rotate-180 rounded-l-md bg-violet-600 px-2 py-2.5 shadow-lg">
+                    <span className="flex flex-col items-center gap-1">
+                      <span className="[text-orientation:mixed] [writing-mode:vertical-rl]">Color</span>
+                      <Palette size={13} strokeWidth={2.3} className="rotate-180 text-white" aria-hidden="true" />
+                    </span>
+                  </span>
+                  <span className="rotate-180 rounded-l-md bg-[#FF4D88] px-2.5 py-3 shadow-lg [text-orientation:mixed] [writing-mode:vertical-rl]">Estreno</span>
                 </div>
                 <button
                   type="button"
@@ -489,54 +516,43 @@ export const MangaDetail = () => {
                 </button>
               </div>
 
-              <div className={`manga-detail-stat-carousel relative mt-4 overflow-hidden rounded-xl border shadow-sm ${isLightMode ? 'border-black/10 bg-white/85 shadow-black/[0.04]' : 'border-white/10 bg-black/75 shadow-black/20'}`} aria-label="Estadísticas del manga" aria-live="polite">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={activeEngagementStat.label}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                    className="px-4 pb-3 pt-4"
-                  >
-                    <div className="grid grid-cols-[1fr_auto] items-start gap-3">
-                      <div>
-                        <span className={`block font-[Montserrat] text-[11px] font-medium ${isLightMode ? 'text-black/50' : 'text-white/50'}`}>{activeEngagementStat.label}</span>
-                        <strong className={`mt-1 block font-[Montserrat] text-[32px] font-semibold leading-none tracking-[-0.04em] tabular-nums ${isLightMode ? 'text-black' : 'text-white'}`}>{formatCompactNumber(activeEngagementStat.value)}</strong>
+              <div className="manga-detail-stat-carousel manga-cyber-stat-card relative mt-4" aria-label="Estadísticas del manga" aria-live="polite">
+                <div className="manga-cyber-stat-content">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={activeEngagementStat.label}
+                      className="manga-cyber-stat-slide"
+                      initial={{ opacity: 0, x: 16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -16 }}
+                      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                      aria-label={`${activeEngagementStat.label}: ${formatCompactNumber(activeEngagementStat.value)}`}
+                    >
+                      <div className="manga-cyber-stat-copy">
+                        <strong className="manga-cyber-stat-value tabular-nums">{formatCompactNumber(activeEngagementStat.value)}</strong>
+                        <span className={`manga-cyber-stat-label ${activeEngagementStat.label === 'Lectores conectados' ? 'is-long' : ''}`}>{activeEngagementStat.label}</span>
                       </div>
-                      <span className={`flex h-9 w-9 items-center justify-center rounded-full border ${isLightMode ? 'border-black/10 text-black/55' : 'border-white/10 text-white/55'}`}>
-                        <ActiveEngagementIcon size={17} strokeWidth={1.8} />
+                      <span className={`manga-cyber-stat-icon ${activeEngagementStat.label === 'Likes' ? 'is-heart' : ''}`}>
+                        <ActiveEngagementIcon size={22} strokeWidth={2.15} />
                       </span>
-                    </div>
-                    <div className={`mt-4 flex items-center justify-between border-t pt-3 ${isLightMode ? 'border-black/[0.07]' : 'border-white/[0.08]'}`}>
-                      <span className={`text-[10px] ${isLightMode ? 'text-black/40' : 'text-white/35'}`}>{activeEngagementStat.description}</span>
-                      <span className={`font-[Montserrat] text-[9px] tabular-nums ${isLightMode ? 'text-black/35' : 'text-white/30'}`}>{activeEngagementIndex + 1} / {engagementStats.length}</span>
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-                <div className="flex items-center gap-1.5 px-4 pb-3" aria-label="Seleccionar estadística">
-                  {engagementStats.map((stat, index) => (
-                    <button
-                      key={stat.label}
-                      type="button"
-                      onClick={() => setActiveEngagementIndex(index)}
-                      aria-label={`Mostrar ${stat.label}`}
-                      aria-pressed={activeEngagementIndex === index}
-                      className={`h-1 rounded-full transition-[width,background-color] duration-300 ${activeEngagementIndex === index ? 'w-8 bg-[#FF4D88]' : isLightMode ? 'w-3 bg-black/15 hover:bg-black/30' : 'w-3 bg-white/15 hover:bg-white/30'}`}
+                    </motion.div>
+                  </AnimatePresence>
+                  <div className="manga-cyber-progress-track">
+                    <span className="manga-cyber-progress-track-inner" />
+                    <motion.span
+                      key={`stat-progress-${activeEngagementIndex}`}
+                      aria-hidden="true"
+                      className="manga-cyber-progress-fill"
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: engagementProgress / 100 }}
+                      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
                     />
-                  ))}
+                    <strong className="manga-cyber-progress-percentage tabular-nums">{Math.round(engagementProgress)}%</strong>
+                  </div>
                 </div>
-                <motion.span
-                  key={`stat-progress-${activeEngagementIndex}`}
-                  aria-hidden="true"
-                  className="absolute inset-x-0 bottom-0 h-px origin-left bg-[#FF4D88]"
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ duration: 3.6, ease: 'linear' }}
-                />
               </div>
 
-              <div className="mt-3 px-1">
+              <div className="mt-2 px-1">
                 <SidebarMetaRow icon={<BookType />} label="Tipo" value={manga.tipo || 'Manga'} isLight={isLightMode} valueDotColor={typeIndicatorColor} />
                 <SidebarMetaRow icon={<Building2 />} label="Estudio" value={manga.studio || 'N/A'} isLight={isLightMode} />
                 <SidebarMetaRow icon={<MonitorPlay />} label="Plataforma" value={manga.platform || 'N/A'} isLight={isLightMode} />
@@ -545,37 +561,42 @@ export const MangaDetail = () => {
             </motion.aside>
 
             <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.5 }} className="order-2 min-w-0 xl:col-start-2 xl:row-start-1 xl:px-1">
+              {!isDesktopMusicPlacement && (
+                <div className="mx-auto mb-6 w-full max-w-[340px]">
+                  <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />
+                </div>
+              )}
               <header className={`border-b pb-5 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                <h1 className={`text-center font-[Montserrat] text-[clamp(1.3rem,2vw,2rem)] font-bold uppercase leading-[1.16] tracking-[-0.025em] ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</h1>
+                <h1 className={`text-center font-[Montserrat] text-[clamp(1.2rem,1.6vw,1.72rem)] font-bold uppercase leading-[1.16] tracking-[-0.025em] ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</h1>
                 {genres.length > 0 && (
-                  <div className="no-scrollbar mt-4 flex flex-nowrap items-center justify-start gap-2 overflow-x-auto whitespace-nowrap px-1 pb-1 sm:justify-center sm:overflow-hidden">
+                  <div className="no-scrollbar mt-4 flex flex-nowrap items-center justify-start gap-2 overflow-x-auto whitespace-nowrap px-1 pb-1 sm:mx-auto sm:w-fit sm:max-w-full sm:justify-center sm:overflow-hidden">
                     <span className="shrink-0 text-lg font-black text-[#FF4D88]">#</span>
-                    {genres.map((genre) => (
-                      <Link key={genre} to={`/biblioteca?genre=${encodeURIComponent(genre)}`} className={`shrink-0 rounded-md border px-3 py-1.5 text-[11px] font-bold transition hover:border-[#FF4D88] hover:text-[#FF4D88] ${isLightMode ? 'border-black/10 bg-white/60 text-black/60' : 'border-white/10 bg-black/35 text-white/60'}`}>{genre}</Link>
+                    {genres.map((genre, index) => (
+                      <Link key={genre} to={`/biblioteca?genre=${encodeURIComponent(genre)}`} className={`shrink-0 rounded-md border px-3 py-1.5 text-[11px] font-bold transition hover:border-[#FF4D88] hover:text-[#FF4D88] ${index >= 4 ? 'sm:hidden' : ''} ${isLightMode ? 'border-black/10 bg-white/60 text-black/60' : 'border-white/10 bg-black/35 text-white/60'}`}>{genre}</Link>
                     ))}
                   </div>
                 )}
               </header>
 
-              <nav className={`mt-4 grid grid-cols-3 rounded-full border p-1 backdrop-blur-xl ${isLightMode ? 'border-black/10 bg-white/70' : 'border-white/10 bg-white/[0.07]'}`} aria-label="Secciones del manga">
-                <button type="button" onClick={() => setActiveContent('chapters')} className={`manga-detail-section-tab flex items-center justify-center gap-2 rounded-full px-3 py-2 text-[10px] transition sm:text-[12px] xl:text-[13px] ${activeContent === 'chapters' ? 'bg-[#FF4D88] text-white' : isLightMode ? 'text-black/55 hover:text-[#FF4D88]' : 'text-white/55 hover:text-[#FF4D88]'}`}><List className="h-4 w-4 sm:h-[17px] sm:w-[17px]" />Capítulos ({chapters.length})</button>
-                <button type="button" onClick={() => setActiveContent('synopsis')} className={`manga-detail-section-tab flex items-center justify-center gap-2 rounded-full px-3 py-2 text-[10px] transition sm:text-[12px] xl:text-[13px] ${activeContent === 'synopsis' ? 'bg-[#FF4D88] text-white' : isLightMode ? 'text-black/55 hover:text-[#FF4D88]' : 'text-white/55 hover:text-[#FF4D88]'}`}><BookOpen className="h-4 w-4 sm:h-[17px] sm:w-[17px]" />Sinopsis</button>
-                <a href="#comunidad" className={`manga-detail-section-tab flex items-center justify-center gap-2 rounded-full px-3 py-2 text-[10px] transition hover:text-[#FF4D88] sm:text-[12px] xl:text-[13px] ${isLightMode ? 'text-black/55' : 'text-white/55'}`}><MessageSquareText className="h-4 w-4 sm:h-[17px] sm:w-[17px]" />Comunidad</a>
+              <nav className={`mt-4 grid grid-cols-[1.12fr_.88fr_1fr] rounded-full border p-1 backdrop-blur-xl ${isLightMode ? 'border-black/10 bg-white/70' : 'border-white/10 bg-black/60'}`} aria-label="Secciones del manga">
+                <button type="button" onClick={() => setActiveContent('chapters')} className={`manga-detail-section-tab flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-1 py-2 text-[12px] transition sm:gap-2 sm:px-3 sm:text-[13px] xl:text-[14px] ${activeContent === 'chapters' ? 'bg-[#FF4D88] text-white' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white/70 hover:text-white'}`}><List className="h-[18px] w-[18px] sm:h-[18px] sm:w-[18px]" />Capítulos ({chapters.length})</button>
+                <button type="button" onClick={() => setActiveContent('synopsis')} className={`manga-detail-section-tab flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-1 py-2 text-[12px] transition sm:gap-2 sm:px-3 sm:text-[13px] xl:text-[14px] ${activeContent === 'synopsis' ? 'bg-[#FF4D88] text-white' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white/70 hover:text-white'}`}><BookOpen className="h-[18px] w-[18px] sm:h-[18px] sm:w-[18px]" />Sinopsis</button>
+                <a href="#comentarios" className={`manga-detail-section-tab flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-1 py-2 text-[12px] transition sm:gap-2 sm:px-3 sm:text-[13px] xl:text-[14px] ${isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white/70 hover:text-white'}`}><MessageSquareText className="h-[18px] w-[18px] sm:h-[18px] sm:w-[18px]" />Comentarios</a>
               </nav>
 
               {activeContent === 'chapters' ? (
                 <section id="capitulos" className="mt-5 scroll-mt-28">
                   <div className="mb-6 flex items-center gap-2">
-                    <label className={`relative flex h-11 min-w-0 flex-1 items-center overflow-hidden rounded-xl border backdrop-blur-xl ${isLightMode ? 'border-black/10 bg-white/75' : 'border-white/10 bg-black/55'}`}>
+                    <label className={`relative flex h-11 min-w-0 flex-1 items-center overflow-hidden rounded-xl border ${isLightMode ? 'border-black/10 bg-white/[0.34]' : 'border-white/10 bg-black/25'}`}>
                       <Search size={16} className={`ml-4 shrink-0 ${isLightMode ? 'text-black/35' : 'text-white/35'}`} />
-                      <input type="search" aria-label="Buscar capítulo o título" value={chapterSearch} onChange={(event) => setChapterSearch(event.target.value)} placeholder="Buscar capítulo o título" className={`h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none ${isLightMode ? 'text-black placeholder:text-black/30' : 'text-white placeholder:text-white/30'}`} />
+                      <input type="search" aria-label="Buscar por número de capítulo o título" value={chapterSearch} onChange={(event) => setChapterSearch(event.target.value)} placeholder="Buscar por número de capítulo o título" className={`h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none ${isLightMode ? 'text-black placeholder:text-black/30' : 'text-white placeholder:text-white/30'}`} />
                     </label>
                     <button
                       type="button"
                       onClick={() => setChapterSortOrder((current) => current === 'desc' ? 'asc' : 'desc')}
                       aria-label={chapterSortOrder === 'desc' ? 'Ordenar capítulos del menor al mayor' : 'Ordenar capítulos del mayor al menor'}
                       title={chapterSortOrder === 'desc' ? 'Actualmente: mayor a menor' : 'Actualmente: menor a mayor'}
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center gap-0 rounded-xl border backdrop-blur-xl transition hover:border-[#FF4D88] hover:text-[#FF4D88] ${isLightMode ? 'border-black/10 bg-white/75 text-black' : 'border-white/10 bg-black/55 text-white'}`}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center gap-0 rounded-xl border transition hover:border-[#FF4D88] hover:text-[#FF4D88] ${isLightMode ? 'border-black/10 bg-white/[0.34] text-black' : 'border-white/10 bg-black/25 text-white'}`}
                     >
                       <ArrowUp strokeWidth={2.2} className={`manga-chapter-sort-arrow ${chapterSortOrder === 'asc' ? 'opacity-100' : 'opacity-30'}`} />
                       <ArrowDown strokeWidth={2.2} className={`manga-chapter-sort-arrow ${chapterSortOrder === 'desc' ? 'opacity-100' : 'opacity-30'}`} />
@@ -597,7 +618,7 @@ export const MangaDetail = () => {
                 </section>
               )}
 
-              <div className={`mt-7 rounded-2xl border px-4 py-4 backdrop-blur-xl ${isLightMode ? 'border-black/10 bg-white/70' : 'border-white/10 bg-black/50'}`} aria-label="Reacciones del manga">
+              <div className={`mt-7 rounded-2xl border px-4 py-4 ${isLightMode ? 'border-black/10 bg-white/[0.28]' : 'border-white/10 bg-black/20'}`} aria-label="Reacciones del manga">
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   {MANGA_REACTIONS.map((reaction) => (
                     <div key={reaction.id} className="flex flex-col items-center gap-1.5">
@@ -607,9 +628,11 @@ export const MangaDetail = () => {
                         aria-label={reaction.label}
                         aria-pressed={selectedReaction === reaction.id}
                         title={reaction.label}
-                        className={`group flex h-[76px] w-[76px] items-center justify-center rounded-full border transition-all hover:-translate-y-1 hover:scale-105 ${selectedReaction === reaction.id ? 'border-[#FF4D88] bg-[#FF4D88]/15' : isLightMode ? 'border-black/10 bg-white/80' : 'border-white/10 bg-white/[0.05]'}`}
+                        className={`group flex h-[76px] w-[76px] items-center justify-center rounded-full border transition-colors ${selectedReaction === reaction.id ? 'border-[#FF4D88] bg-[#FF4D88]/15' : isLightMode ? 'border-transparent bg-white/80 shadow-[0_0_8px_rgba(0,0,0,0.5)]' : 'border-transparent bg-white/[0.05] shadow-[0_0_8px_rgba(255,255,255,0.48)]'}`}
                       >
-                        <span className="text-[36px] leading-none transition-transform group-hover:scale-110" aria-hidden="true">{reaction.symbol}</span>
+                        <span className="text-[36px] leading-none" aria-hidden="true">
+                          {reaction.symbol}
+                        </span>
                       </button>
                       <span className="manga-reaction-count tabular-nums">{formatCompactNumber(reactionCounts[reaction.id])}</span>
                     </div>
@@ -619,14 +642,14 @@ export const MangaDetail = () => {
             </motion.section>
 
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="order-3 flex flex-col gap-5 lg:col-[1/3] xl:col-start-3 xl:row-start-1 xl:self-start">
-              <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />
+              {isDesktopMusicPlacement && <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />}
               <RelatedSidebar related={related} currentId={manga.id} isLight={isLightMode} />
             </motion.div>
           </div>
         </div>
       </section>
 
-      <div id="comunidad" className="relative z-10 scroll-mt-28">
+      <div id="comentarios" className="relative z-10 scroll-mt-28">
         <MangaComments mangaId={String(manga.id)} isLight={isLightMode} />
       </div>
       <Footer />

@@ -40,6 +40,8 @@ export interface Conversation extends ChatMessage {
 
 export type SocialNotificationType =
   | 'comment_like'
+  | 'comment_reaction'
+  | 'comment_reply'
   | 'friend_request'
   | 'friend_accepted'
   | 'manga_update';
@@ -48,7 +50,7 @@ export interface SocialNotification {
   id: number;
   type: SocialNotificationType;
   entity_id: string;
-  payload: { comment_id?: number; manga_id?: number; title?: string };
+  payload: { comment_id?: number; parent_comment_id?: number; manga_id?: number; reaction?: string; title?: string };
   actor: FriendUser | null;
   created_at: string;
   read: boolean;
