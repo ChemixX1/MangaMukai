@@ -7,3 +7,4 @@ export { NewReleases } from './NewReleases';
 export { default as News } from './News';
 export { PopularCarousel } from './PopularCarousel';
 export { YouthCarousel } from './YouthCarousel';
+export { HomePageFrame } from './HomePageFrame';

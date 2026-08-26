@@ -115,9 +115,9 @@ function RelatedSidebar({ related, currentId, isLight }: { related: RelatedManga
   if (items.length === 0) return null;
 
   return (
-    <aside className={`rounded-2xl border p-3 backdrop-blur-xl ${isLight ? 'border-black/10 bg-white/75' : 'border-white/10 bg-black/55'}`} aria-labelledby="related-title">
+    <aside className={`rounded-2xl border p-3 backdrop-blur-xl xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-hidden ${isLight ? 'border-black/10 bg-white/75' : 'border-white/10 bg-black/55'}`} aria-labelledby="related-title">
       <h2 id="related-title" className={`mb-3 px-1 text-center text-sm font-black uppercase tracking-[0.05em] ${isLight ? 'text-black' : 'text-white'}`}>Mangas similares</h2>
-      <div className="manga-related-marquee relative h-[570px] overflow-hidden rounded-xl xl:h-[calc(100vh-16rem)] xl:min-h-[500px] xl:max-h-[680px]">
+      <div className="manga-related-marquee relative h-[570px] overflow-hidden rounded-xl xl:h-auto xl:min-h-0 xl:max-h-none xl:flex-1">
         <div className="manga-related-marquee-track">
           {[0, 1].map((copyIndex) => (
             <div key={`related-sequence-${copyIndex}`} className="manga-related-marquee-sequence" aria-hidden={copyIndex === 1 ? true : undefined}>
@@ -475,14 +475,15 @@ export const MangaDetail = () => {
               </div>
             </div>
           </div>
-          <div className={`mb-5 h-px w-full bg-gradient-to-r from-transparent via-current to-transparent ${isLightMode ? 'text-black/20' : 'text-white/20'}`} aria-hidden="true" />
+          <div data-testid="manga-detail-social-divider" className={`mb-5 h-px w-full bg-gradient-to-r from-transparent via-current to-transparent ${isLightMode ? 'text-black/20' : 'text-white/20'}`} aria-hidden="true" />
 
           <div className="grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[290px_minmax(0,1fr)_330px] xl:gap-8">
             <motion.aside
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45 }}
-              className="order-1 mx-auto w-full max-w-[300px] lg:sticky lg:top-24 lg:max-w-none xl:col-start-1 xl:row-start-1"
+              data-testid="manga-detail-left-column"
+              className="manga-detail-sticky-column no-scrollbar order-1 mx-auto w-full max-w-[300px] lg:max-w-none xl:col-start-1 xl:row-start-1 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto xl:overscroll-contain"
             >
               <div className={`manga-detail-cover relative aspect-[3/4.35] overflow-hidden rounded-[8px] border ${isLightMode ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
                 <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} className="h-full w-full object-cover" />
@@ -628,20 +629,20 @@ export const MangaDetail = () => {
                         aria-label={reaction.label}
                         aria-pressed={selectedReaction === reaction.id}
                         title={reaction.label}
-                        className={`group flex h-[76px] w-[76px] items-center justify-center rounded-full border transition-colors ${selectedReaction === reaction.id ? 'border-[#FF4D88] bg-[#FF4D88]/15' : isLightMode ? 'border-transparent bg-white/80 shadow-[0_0_8px_rgba(0,0,0,0.5)]' : 'border-transparent bg-white/[0.05] shadow-[0_0_8px_rgba(255,255,255,0.48)]'}`}
+                        className={`group flex h-[76px] w-[76px] items-center justify-center rounded-full transition-colors ${selectedReaction === reaction.id ? 'border-2 border-[#FF4D88] bg-transparent shadow-[0_0_13px_rgba(255,77,136,0.42)]' : isLightMode ? 'border border-transparent bg-white/80 shadow-[0_0_7px_rgba(0,0,0,0.24)]' : 'border border-transparent bg-white/[0.05] shadow-[0_0_7px_rgba(255,255,255,0.22)]'}`}
                       >
-                        <span className="text-[36px] leading-none" aria-hidden="true">
+                        <span className="text-[36px] leading-none transition-transform duration-200 ease-out group-hover:scale-110" aria-hidden="true">
                           {reaction.symbol}
                         </span>
                       </button>
-                      <span className="manga-reaction-count tabular-nums">{formatCompactNumber(reactionCounts[reaction.id])}</span>
+                      <span className={`manga-reaction-count tabular-nums ${selectedReaction === reaction.id ? 'is-selected' : ''}`}>{formatCompactNumber(reactionCounts[reaction.id])}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </motion.section>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="order-3 flex flex-col gap-5 lg:col-[1/3] xl:col-start-3 xl:row-start-1 xl:self-start">
+            <motion.div data-testid="manga-detail-right-column" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="manga-detail-sticky-column order-3 flex flex-col gap-5 lg:col-[1/3] xl:col-start-3 xl:row-start-1 xl:h-[calc(100vh-2.5rem)] xl:min-h-0">
               {isDesktopMusicPlacement && <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />}
               <RelatedSidebar related={related} currentId={manga.id} isLight={isLightMode} />
             </motion.div>

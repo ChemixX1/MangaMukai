@@ -422,8 +422,9 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                     ) : (
                       <span className="shrink-0">
                         {isPurchased ? (
-                          <span className="manga-chapter-purchased-status inline-flex items-center justify-center" aria-label="Comprado" title="Comprado">
+                          <span className="manga-chapter-purchased-status inline-flex items-center justify-center gap-1.5" aria-label="Comprado" title="Comprado">
                             <BadgeCheck className="manga-chapter-purchased-icon" strokeWidth={2.3} />
+                            <span className="font-[Montserrat] text-[11px] font-semibold">Comprado</span>
                           </span>
                         ) : (
                           <span className="manga-chapter-free-access">Gratis</span>
@@ -462,7 +463,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
           setIsModalOpen(false);
           setIsCoinModalOpen(true);
         }}
-        chapterTitle={selectedChapter?.title || `Capítulo ${selectedChapter?.chapter_number}`}
+        chapterNumber={selectedChapter?.chapter_number ?? ''}
         price={selectedChapter?.price_coins || 0}
         userBalance={userCoins}
         loading={isProcessing}

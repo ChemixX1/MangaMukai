@@ -1,14 +1,18 @@
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Coins, X, Lock, AlertCircle, Clock, Sparkles, Zap } from "lucide-react";
-import { Countdown } from "../common";
+import { X, Lock, AlertCircle, Clock, Sparkles, Zap } from "lucide-react";
+import { Countdown, DetailCoin3DIcon } from "../common";
 import logoModal from "../../assets/modals/purchase-logo.webp";
+import { useTheme } from "../../hooks/useTheme";
+import { lockPageScroll } from "../../utils/scrollLock";
 
 interface PurchaseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   onRecharge: () => void;
-  chapterTitle: string;
+  chapterNumber: string | number;
   price: number;
   userBalance: number;
   loading: boolean;
@@ -17,49 +21,65 @@ interface PurchaseModalProps {
 
 export const PurchaseModal = ({
   isOpen, onClose, onConfirm, onRecharge,
-  chapterTitle, price, userBalance, loading, freeAt
+  chapterNumber, price, userBalance, loading, freeAt
 }: PurchaseModalProps) => {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+
+  useEffect(() => {
+    if (!isOpen) return;
+    return lockPageScroll();
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const canAfford = userBalance >= price;
   const isFutureFree = freeAt && new Date(freeAt) > new Date();
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{
-          background: 'radial-gradient(ellipse at center, rgba(234, 179, 8, 0.1) 0%, rgba(0, 0, 0, 0.95) 70%)',
-          backdropFilter: 'blur(12px)'
-        }}
+        className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="purchase-modal-title"
       >
+        <div
+          className={`absolute inset-0 backdrop-blur-md ${isLight ? 'bg-white/45' : 'bg-black/65'}`}
+          onClick={() => {
+            if (!loading) onClose();
+          }}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(234,179,8,0.18)_0%,rgba(234,179,8,0.055)_34%,transparent_68%)]" />
+
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-sm md:max-w-md" // En móvil más angosto, en PC normal
+          className="relative z-10 w-full max-w-sm md:max-w-md"
+          onClick={(event) => event.stopPropagation()}
         >
           {/* Glow Effect */}
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 via-transparent to-purple-500/20 rounded-2xl blur-3xl" />
           
           {/* Main Container */}
-          <div className="relative bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+          <div className="relative overflow-hidden rounded-2xl border border-yellow-200/15 bg-gradient-to-br from-[#1a1a1a] to-[#0a0a0a] shadow-[0_28px_80px_rgba(0,0,0,0.52)]">
             {/* Animated Border Gradient */}
             <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 via-purple-500/20 to-yellow-500/20 opacity-50 animate-pulse" style={{ clipPath: 'inset(0 0 99.5% 0)' }} />
             
             {/* Header con gradiente - Padding reducido en móvil */}
             <div className="relative bg-gradient-to-br from-[#1f1f1f] to-[#141414] p-6 md:p-8 pb-5 text-center border-b border-white/5 overflow-hidden">
               {/* Background Image */}
-              <div className="absolute inset-0 opacity-40">
+              <div className="absolute inset-0 opacity-70">
                 <div 
                   className="w-full h-full bg-cover bg-center"
                   style={{ backgroundImage: `url('${logoModal}')` }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/95" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/88" />
               </div>
 
               {/* Decorative elements */}
@@ -90,13 +110,14 @@ export const PurchaseModal = ({
                 </div>
               </motion.div>
 
-              <motion.h3 
+              <motion.h3
+                id="purchase-modal-title"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="relative z-10 text-xl md:text-2xl font-bold bg-gradient-to-r from-white via-white to-white/80 bg-clip-text text-transparent mb-1"
               >
-                Desbloquear Capítulo
+                Desbloquear capítulo {chapterNumber}
               </motion.h3>
 
               {/* CONTADOR PEQUEÑO */}
@@ -115,14 +136,6 @@ export const PurchaseModal = ({
                 </motion.div>
               )}
 
-              <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="relative z-10 text-white/50 text-[10px] md:text-xs px-4 font-medium tracking-wide uppercase truncate"
-              >
-                {chapterTitle}
-              </motion.p>
             </div>
 
             {/* Body - Padding ajustado */}
@@ -144,8 +157,8 @@ export const PurchaseModal = ({
                       Costo
                     </p>
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                        <Coins size={14} className="text-yellow-400 md:w-[18px] md:h-[18px]" />
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-yellow-500/10 md:h-8 md:w-8">
+                        <DetailCoin3DIcon size={22} className="h-[22px] w-[22px] object-contain md:h-6 md:w-6" />
                       </div>
                       {/* Texto responsive */}
                       <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent font-mono">
@@ -246,7 +259,7 @@ export const PurchaseModal = ({
                     className="relative py-3 md:py-4 rounded-xl text-xs md:text-sm font-bold uppercase tracking-wider overflow-hidden bg-gradient-to-br from-white/10 to-white/5 border border-white/20 hover:border-white/30 text-white transition-all duration-300"
                   >
                     <span className="flex items-center justify-center gap-2">
-                      <Coins size={14} className="md:w-4 md:h-4" />
+                      <DetailCoin3DIcon size={20} className="h-5 w-5 object-contain" />
                       Recargar
                     </span>
                   </motion.button>
@@ -256,6 +269,7 @@ export const PurchaseModal = ({
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };

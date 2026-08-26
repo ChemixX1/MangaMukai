@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { EmojiClickData, EmojiStyle, Theme } from 'emoji-picker-react';
+import { getFluentEmojiCDN } from '@lobehub/fluent-emoji';
 import {
   ChevronDown,
   ChevronUp,
@@ -30,12 +31,14 @@ interface MangaCommentsProps {
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
+const getFluentStickerUrl = (emoji: string) => getFluentEmojiCDN(emoji, { cdn: 'unpkg', type: '3d' });
+
 const COMMENT_REACTIONS = [
-  { id: 'fire', symbol: '🔥', label: 'Fuego' },
-  { id: 'love', symbol: '❤️', label: 'Me encanta' },
-  { id: 'like', symbol: '👍', label: 'Me gusta' },
-  { id: 'haha', symbol: '😂', label: 'Me divierte' },
-  { id: 'sad', symbol: '😢', label: 'Me entristece' },
+  { id: 'fire', symbol: '🔥', label: 'Fuego', imgUrl: getFluentStickerUrl('🔥') },
+  { id: 'love', symbol: '❤️', label: 'Me encanta', imgUrl: getFluentStickerUrl('❤️') },
+  { id: 'like', symbol: '👍', label: 'Me gusta', imgUrl: getFluentStickerUrl('👍') },
+  { id: 'haha', symbol: '😂', label: 'Me divierte', imgUrl: getFluentStickerUrl('😂') },
+  { id: 'sad', symbol: '😢', label: 'Me entristece', imgUrl: getFluentStickerUrl('😢') },
 ] as const;
 
 type CommentReactionId = (typeof COMMENT_REACTIONS)[number]['id'];
@@ -49,27 +52,38 @@ const createCommentReactionCounts = (): CommentReactionCounts => ({
   sad: 0,
 });
 
+const createFluentSticker = (id: string, emoji: string, names: string[]) => ({
+  id,
+  emoji,
+  names,
+  imgUrl: getFluentStickerUrl(emoji),
+});
+
 const COMMENT_STICKERS = [
-  { id: 'mm-party', names: ['fiesta', 'celebrar', 'party'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f389.svg' },
-  { id: 'mm-sparkles', names: ['brillos', 'magia', 'sparkles'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/2728.svg' },
-  { id: 'mm-rocket', names: ['cohete', 'increible', 'rocket'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f680.svg' },
-  { id: 'mm-crown', names: ['corona', 'rey', 'reina'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f451.svg' },
-  { id: 'mm-fire', names: ['fuego', 'epico', 'fire'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f525.svg' },
-  { id: 'mm-heart-eyes', names: ['amor', 'encanta', 'gato'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f63b.svg' },
-  { id: 'mm-ghost', names: ['fantasma', 'sorpresa', 'ghost'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f47b.svg' },
-  { id: 'mm-star', names: ['estrella', 'favorito', 'star'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/2b50.svg' },
-  { id: 'mm-heart-hands', names: ['corazon', 'manos', 'amor'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1faf6.svg' },
-  { id: 'mm-melting', names: ['derretido', 'mood', 'calor'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1fae0.svg' },
-  { id: 'mm-skull', names: ['calavera', 'morir de risa', 'meme'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f480.svg' },
-  { id: 'mm-clown', names: ['payaso', 'meme', 'broma'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f921.svg' },
-  { id: 'mm-hundred', names: ['cien', 'real', 'perfecto'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f4af.svg' },
-  { id: 'mm-nails', names: ['unas', 'slay', 'iconico'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f485.svg' },
-  { id: 'mm-cold', names: ['frio', 'congelado', 'cool'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f976.svg' },
-  { id: 'mm-mind-blown', names: ['impactado', 'mente', 'increible'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f92f.svg' },
-  { id: 'mm-crying', names: ['llorando', 'emocion', 'mood'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f62d.svg' },
-  { id: 'mm-purple-heart', names: ['corazon morado', 'amor', 'aesthetic'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f49c.svg' },
-  { id: 'mm-hug', names: ['abrazo', 'carino', 'apoyo'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f917.svg' },
-  { id: 'mm-cool', names: ['lentes', 'cool', 'genial'], imgUrl: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f60e.svg' },
+  createFluentSticker('mm-heart-hands', '🫶', ['corazón con manos', 'amor', 'apoyo']),
+  createFluentSticker('mm-melting', '🫠', ['derretido', 'mood', 'calor']),
+  createFluentSticker('mm-skull', '💀', ['calavera', 'morir de risa', 'meme']),
+  createFluentSticker('mm-nails', '💅', ['uñas', 'slay', 'icónico']),
+  createFluentSticker('mm-hundred', '💯', ['cien', 'real', 'perfecto']),
+  createFluentSticker('mm-mind-blown', '🤯', ['impactado', 'mente', 'increíble']),
+  createFluentSticker('mm-pleading', '🥹', ['emocionado', 'ternura', 'por favor']),
+  createFluentSticker('mm-crying', '😭', ['llorando', 'emoción', 'mood']),
+  createFluentSticker('mm-fire', '🔥', ['fuego', 'épico', 'tendencia']),
+  createFluentSticker('mm-purple-heart', '💜', ['corazón morado', 'amor', 'aesthetic']),
+  createFluentSticker('mm-heart-arrow', '💘', ['flechazo', 'amor', 'crush']),
+  createFluentSticker('mm-heart-eyes', '😍', ['amor', 'encanta', 'crush']),
+  createFluentSticker('mm-party', '🥳', ['fiesta', 'celebrar', 'party']),
+  createFluentSticker('mm-confetti', '🎉', ['confeti', 'fiesta', 'celebrar']),
+  createFluentSticker('mm-sparkles', '✨', ['brillos', 'magia', 'aesthetic']),
+  createFluentSticker('mm-rocket', '🚀', ['cohete', 'increíble', 'subiendo']),
+  createFluentSticker('mm-crown', '👑', ['corona', 'rey', 'reina']),
+  createFluentSticker('mm-cool', '😎', ['lentes', 'cool', 'genial']),
+  createFluentSticker('mm-cold', '🥶', ['frío', 'congelado', 'cool']),
+  createFluentSticker('mm-clown', '🤡', ['payaso', 'meme', 'broma']),
+  createFluentSticker('mm-side-eye', '🙄', ['mirada', 'drama', 'side eye']),
+  createFluentSticker('mm-handshake', '🤝', ['trato', 'acuerdo', 'equipo']),
+  createFluentSticker('mm-hug', '🤗', ['abrazo', 'cariño', 'apoyo']),
+  createFluentSticker('mm-bubble-tea', '🧋', ['bubble tea', 'bebida', 'aesthetic']),
 ];
 
 const COMMENT_SUCCESS_MESSAGE = 'Tu comentario ya forma parte de la conversación.';
@@ -89,9 +103,11 @@ const renderCommentContent = (value: string) => value
   .filter(Boolean)
   .map((part, index) => {
     const match = part.match(/^\[sticker:(https:\/\/[^\]]+)\]$/);
-    const sticker = match ? COMMENT_STICKERS.find(({ imgUrl }) => imgUrl === match[1]) : null;
-    return sticker
-      ? <img key={`${sticker.id}-${index}`} src={sticker.imgUrl} alt={sticker.names[0]} className="manga-comment-sticker" loading="lazy" />
+    const stickerUrl = match?.[1];
+    const sticker = stickerUrl ? COMMENT_STICKERS.find(({ imgUrl }) => imgUrl === stickerUrl) : null;
+    const isLegacySticker = Boolean(stickerUrl?.startsWith('https://cdn.jsdelivr.net/gh/twitter/twemoji@'));
+    return sticker || isLegacySticker
+      ? <img key={`${sticker?.id || 'legacy-sticker'}-${index}`} src={sticker?.imgUrl || stickerUrl} alt={sticker?.names[0] || 'Sticker'} className="manga-comment-sticker" loading="lazy" />
       : <span key={`comment-text-${index}`}>{part}</span>;
   });
 
@@ -111,9 +127,19 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
   const [commentReactionSelections, setCommentReactionSelections] = useState<Record<number, CommentReactionId | null>>({});
   const [commentReactionCounts, setCommentReactionCounts] = useState<Record<number, CommentReactionCounts>>({});
   const [reactionBursts, setReactionBursts] = useState<Record<number, { id: CommentReactionId; key: number }>>({});
+  const composerToolsRef = useRef<HTMLDivElement>(null);
 
   const token = getStoredToken();
   const user = getStoredUser();
+
+  useEffect(() => {
+    if (!composerTool) return;
+    const closeComposerTool = (event: PointerEvent) => {
+      if (!composerToolsRef.current?.contains(event.target as Node)) setComposerTool(null);
+    };
+    document.addEventListener('pointerdown', closeComposerTool);
+    return () => document.removeEventListener('pointerdown', closeComposerTool);
+  }, [composerTool]);
 
   useEffect(() => {
     let active = true;
@@ -375,7 +401,7 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
             <div className={`whitespace-pre-wrap text-sm leading-relaxed ${isLight ? 'text-black/72' : 'text-white/70'}`}>{renderCommentContent(comment.content)}</div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <div className="manga-comment-reaction-list flex w-[95%] flex-nowrap items-center justify-between" aria-label="Reacciones al comentario">
+              <div className="manga-comment-reaction-list flex flex-nowrap items-center gap-0.5" aria-label="Reacciones al comentario">
                 {COMMENT_REACTIONS.map((reaction) => {
                   const isSelected = selectedReaction === reaction.id;
                   const count = reaction.id === 'like' ? comment.likes : localCounts[reaction.id];
@@ -391,9 +417,7 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
                       title={reaction.label}
                       className={`manga-comment-reaction-button ${isSelected ? 'is-selected' : ''} ${isLight ? 'is-light' : 'is-dark'}`}
                     >
-                      <span className="manga-comment-reaction-emoji" aria-hidden="true">
-                        {reaction.symbol}
-                      </span>
+                      <img src={reaction.imgUrl} alt="" className="manga-comment-reaction-emoji" aria-hidden="true" />
                       <span className="manga-comment-reaction-count tabular-nums">{count}</span>
                     </motion.button>
                   );
@@ -471,11 +495,11 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
               }}
               readOnly={!token}
               placeholder={token ? `¿Qué te pareció, ${user?.username || 'lector'}?` : 'Inicia sesión para comentar...'}
-              className={`min-h-28 w-full resize-y border-0 bg-transparent p-4 text-sm leading-relaxed outline-none sm:min-h-32 ${selectedSticker ? 'pb-[76px]' : ''} ${isLight ? 'text-black placeholder:text-black/30' : 'text-white placeholder:text-white/20'}`}
+              className={`min-h-28 w-full resize-y border-0 bg-transparent p-4 text-sm leading-relaxed outline-none sm:min-h-32 ${selectedSticker ? 'pb-[66px]' : ''} ${isLight ? 'text-black placeholder:text-black/30' : 'text-white placeholder:text-white/20'}`}
             />
 
             {selectedSticker && (
-              <div className={`manga-comment-composer-sticker-row absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-xl border px-2 py-1.5 ${isLight ? 'border-black/[0.08] bg-white/92' : 'border-white/[0.08] bg-black/85'}`}>
+              <div className={`manga-comment-composer-sticker-row absolute bottom-2.5 left-3 inline-flex items-center gap-1 rounded-lg border px-1.5 py-1 ${isLight ? 'border-black/[0.08] bg-white/92' : 'border-white/[0.08] bg-black/85'}`}>
                 <img
                   src={selectedSticker.imgUrl}
                   alt={selectedSticker.names[0]}
@@ -485,7 +509,7 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
                   type="button"
                   onClick={() => setSelectedSticker(null)}
                   aria-label="Quitar sticker"
-                  className={`flex h-6 w-6 items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-black/[0.06] hover:text-black' : 'text-white/45 hover:bg-white/[0.07] hover:text-white'}`}
+                  className={`flex h-[22px] w-[22px] items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-black/[0.06] hover:text-black' : 'text-white/45 hover:bg-white/[0.07] hover:text-white'}`}
                 >
                   <X size={14} />
                 </button>
@@ -494,7 +518,7 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex min-w-0 flex-wrap items-center gap-2">
+            <div ref={composerToolsRef} className="relative flex min-w-0 flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setComposerTool((current) => current === 'emojis' ? null : 'emojis')}
@@ -536,7 +560,7 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
                   <div className="grid grid-cols-4 gap-2">
                     {COMMENT_STICKERS.map((sticker) => (
                       <button key={sticker.id} type="button" onClick={() => handleStickerClick(sticker)} title={sticker.names[0]} className={`flex aspect-square items-center justify-center rounded-xl border p-2 transition-colors hover:border-[#FF4D88]/55 ${isLight ? 'border-black/[0.07] bg-black/[0.025]' : 'border-white/[0.07] bg-white/[0.035]'}`}>
-                        <img src={sticker.imgUrl} alt={sticker.names[0]} className="h-full w-full object-contain" loading="lazy" />
+                        <img src={sticker.imgUrl} alt={sticker.names[0]} className="h-full w-full object-contain" loading="eager" decoding="async" />
                       </button>
                     ))}
                   </div>
