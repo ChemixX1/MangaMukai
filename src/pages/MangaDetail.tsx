@@ -18,7 +18,6 @@ import {
   MonitorPlay,
   Palette,
   Search,
-  Star,
   Users,
 } from 'lucide-react';
 
@@ -43,7 +42,7 @@ import {
   refreshUser,
 } from '../services/authService';
 import type { MangaCapitulo } from '../types/manga';
-import { ChapterList, MangaComments, MangaMusicCard } from '../components/manga';
+import { ChapterList, MangaComments, MangaMusicCard, MangaRecommendationSidebar } from '../components/manga';
 import { Footer } from '../components/layout';
 import { FOOTER_SOCIALS } from '../components/layout/Footer';
 import { useTheme } from '../hooks/useTheme';
@@ -107,39 +106,6 @@ function SidebarMetaRow({ icon, label, value, isLight, valueDotColor }: { icon: 
         <span className="truncate">{value || 'N/A'}</span>
       </span>
     </div>
-  );
-}
-
-function RelatedSidebar({ related, currentId, isLight }: { related: RelatedManga[]; currentId: number | string; isLight: boolean }) {
-  const items = related.filter((item) => String(item.id) !== String(currentId)).slice(0, 8);
-  if (items.length === 0) return null;
-
-  return (
-    <aside className={`rounded-2xl border p-3 backdrop-blur-xl xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-hidden ${isLight ? 'border-black/10 bg-white/75' : 'border-white/10 bg-black/55'}`} aria-labelledby="related-title">
-      <h2 id="related-title" className={`mb-3 px-1 text-center text-sm font-black uppercase tracking-[0.05em] ${isLight ? 'text-black' : 'text-white'}`}>Mangas similares</h2>
-      <div className="manga-related-marquee relative h-[570px] overflow-hidden rounded-xl xl:h-auto xl:min-h-0 xl:max-h-none xl:flex-1">
-        <div className="manga-related-marquee-track">
-          {[0, 1].map((copyIndex) => (
-            <div key={`related-sequence-${copyIndex}`} className="manga-related-marquee-sequence" aria-hidden={copyIndex === 1 ? true : undefined}>
-              {items.map((manga) => (
-                <Link key={`${copyIndex}-${manga.id}`} to={`/manga/${manga.id}`} tabIndex={copyIndex === 1 ? -1 : undefined} className={`group flex min-w-0 gap-3 rounded-xl border p-2 transition-colors hover:border-[#FF4D88]/40 ${isLight ? 'border-black/[0.07] bg-white/80' : 'border-white/[0.07] bg-white/[0.035]'}`}>
-                  <img src={manga.portada} alt={copyIndex === 0 ? toTitleCase(manga.titulo) : ''} loading="lazy" className="h-[92px] w-[68px] shrink-0 rounded-lg object-cover" />
-                  <span className="flex min-h-[92px] min-w-0 flex-1 flex-col py-0.5">
-                    <span className={`manga-related-item-title line-clamp-3 font-[Montserrat] text-[13px] font-normal normal-case leading-[1.38] transition-colors group-hover:text-[#FF4D88] ${isLight ? 'text-black/85' : 'text-white/85'}`}>{toTitleCase(manga.titulo)}</span>
-                    <span className={`mt-auto flex items-center gap-3 pb-0.5 text-[12px] ${isLight ? 'text-black/55' : 'text-white/50'}`}>
-                      <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold"><Star size={17} className="manga-related-star fill-[#facc15] text-[#facc15]" />10</span>
-                      <span className="truncate font-semibold">{typeof manga.chapterCount === 'number' ? `${manga.chapterCount} capítulos` : 'Calculando capítulos'}</span>
-                    </span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ))}
-        </div>
-        <span className={`pointer-events-none absolute inset-x-0 top-0 z-10 h-7 bg-gradient-to-b to-transparent ${isLight ? 'from-white/90' : 'from-black/90'}`} />
-        <span className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-gradient-to-t to-transparent ${isLight ? 'from-white/90' : 'from-black/90'}`} />
-      </div>
-    </aside>
   );
 }
 
@@ -644,7 +610,7 @@ export const MangaDetail = () => {
 
             <motion.div data-testid="manga-detail-right-column" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="manga-detail-sticky-column order-3 flex flex-col gap-5 lg:col-[1/3] xl:col-start-3 xl:row-start-1 xl:h-[calc(100vh-2.5rem)] xl:min-h-0">
               {isDesktopMusicPlacement && <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />}
-              <RelatedSidebar related={related} currentId={manga.id} isLight={isLightMode} />
+              <MangaRecommendationSidebar items={related} currentId={manga.id} isLight={isLightMode} />
             </motion.div>
           </div>
         </div>

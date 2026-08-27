@@ -774,7 +774,9 @@ html {
 }
 
 .navbar-primary-link {
-  font-weight: 600;
+  font-family: "Google Sans Flex", sans-serif;
+  font-weight: 700;
+  font-style: italic;
 }
 
 .navbar-adult-link,
@@ -1200,6 +1202,21 @@ html {
 
 html.dark .auth-navbar-gradient::before {
   background: linear-gradient(to bottom, rgba(8, 8, 11, 0.99) 0%, rgba(8, 8, 11, 0.84) 48%, rgba(8, 8, 11, 0) 100%);
+}
+
+/* Perfil: barra rectangular sólida, separada de la portada al estilo de una red social. */
+.profile-navbar-surface {
+  isolation: isolate;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+html.dark .profile-navbar-surface {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: rgba(13, 14, 18, 0.96);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
 }
 
 .content-navbar-gradient {

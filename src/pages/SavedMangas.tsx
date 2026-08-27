@@ -56,7 +56,7 @@ export const SavedMangas = () => {
               rating: 5,
               status: manga!.tipo,
               chapter_count: manga!.capitulosRecientes.length,
-              target_audience: (manga!.genres || []).some((genre) => String(genre).includes('Manhwa')) ? 'Hombre' : 'Mujer',
+              target_audience: manga!.genero || ((manga!.genres || []).some((genre) => String(genre).includes('Manhwa')) ? 'Hombre' : 'Mujer'),
             },
           }));
           setSavedItems(items);
@@ -101,15 +101,12 @@ export const SavedMangas = () => {
       <div className="desktop-content-shell relative z-10 flex-grow max-w-[1400px] mx-auto w-full px-6 pt-32 pb-20">
         
         {/* HEADER */}
-        <div className={`mb-12 flex flex-col items-end justify-between gap-4 border-b pb-6 md:flex-row ${isLight ? 'border-black/10' : 'border-white/10'}`}>
-            <div>
-                <h1 className={`mb-2 flex items-center gap-3 text-4xl font-[1000] italic uppercase tracking-tighter md:text-5xl ${isLight ? 'text-black' : 'text-white'}`}>
+        <div className={`mb-12 flex flex-col items-center justify-between gap-4 border-b pb-6 text-center md:flex-row md:items-end md:text-left ${isLight ? 'border-black/10' : 'border-white/10'}`}>
+            <div className="flex flex-col items-center md:items-start">
+                <h1 className={`google-sans-library flex items-center justify-center gap-3 text-4xl font-bold not-italic tracking-tight md:justify-start md:text-5xl ${isLight ? 'text-black' : 'text-white'}`}>
                     <Bookmark className="fill-[#FF4D88] text-[#FF4D88]" size={36} />
-                    Tu Colección
+                    Guardados
                 </h1>
-                <p className={`font-mono text-sm ${isLight ? 'text-black/50' : 'text-white/45'}`}>
-                    {savedItems.length} {savedItems.length === 1 ? 'MANGA GUARDADO' : 'MANGAS GUARDADOS'}
-                </p>
             </div>
             
             {!user && (
@@ -145,7 +142,7 @@ export const SavedMangas = () => {
                 <AnimatePresence mode="popLayout">
                     {savedItems.map((item) => {
                         const manga = item.mangas;
-                        const isMujer = manga.target_audience === 'mujer';
+                        const isMujer = manga.target_audience.toLocaleLowerCase('es') === 'mujer';
                         const badgeColor = isMujer ? 'bg-pink-600' : 'bg-cyan-600';
 
                         return (

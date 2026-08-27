@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, X, AlarmClock, Bell, ChevronRight, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
 import { AlarmAlert, CoinMarketModal, SearchModal, TimerModal } from "../modals";
-import { DetailCoin3DIcon, DetailShoppingCart3DIcon } from "../common";
+import { DetailCoin3DIcon } from "../common";
 import { ChatWindow, MessagesPanel, NotificationsPanel } from "../social";
 import { useTheme } from "../../hooks/useTheme";
 import { getUltimosCapitulos } from "../../services/mangaService";
@@ -58,6 +58,7 @@ export const Navbar = () => {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const isLightMode = theme === 'light';
+  const isProfileRoute = location.pathname === '/perfil';
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -259,7 +260,7 @@ export const Navbar = () => {
 
   return (
     <>
-      <header className={`${isMobileMenuOpen ? 'fixed lg:absolute' : 'absolute'} auth-navbar-gradient left-0 top-0 z-[100] w-full py-4 sm:py-6`}>
+      <header className={`${isMobileMenuOpen ? 'fixed' : isProfileRoute ? 'sticky' : 'absolute'} ${isProfileRoute ? 'profile-navbar-surface py-3 sm:py-3' : 'auth-navbar-gradient py-4 sm:py-6'} left-0 top-0 z-[100] w-full`}>
         <div className="desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16 flex justify-between items-center">
             
             {/* 1. IZQUIERDA */}
@@ -271,18 +272,18 @@ export const Navbar = () => {
               </Link>
 
               <nav className="hidden h-10 items-center gap-8 lg:translate-y-0.5 lg:flex">
-                <Link to="/" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Inicio
                 </Link>
 
-                <Link to="/biblioteca" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/biblioteca" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Biblioteca
                 </Link>
 
-                <Link to="/manga-bn" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/manga-bn" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Mangas B&N
                 </Link>
-                <Link to="/manga-19" className={`navbar-primary-link share-tech-regular navbar-adult-link inline-flex h-full items-center text-[16px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.065em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/manga-19" className={`navbar-primary-link share-tech-regular navbar-adult-link inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   <span className="navbar-adult-option inline-flex items-center gap-1.5">
                     <NavbarFire size={17} />
                     <span className="navbar-adult-label">Mangas <span className="navbar-adult-number">+19</span></span>
@@ -340,22 +341,16 @@ export const Navbar = () => {
 
                 {/* ── Monedas en navbar (solo si hay sesión) ── */}
                 {currentUser && (
-                  <div className="hidden sm:flex items-center gap-2">
-                    {/* Moneda 3D + cantidad */}
-                    <div className="flex items-center gap-1.5">
-                      <DetailCoin3DIcon size={27} className="h-[27px] w-[27px] object-contain drop-shadow-[0_5px_7px_rgba(180,83,9,0.28)]" />
-                      <span className="text-[12px] font-black text-yellow-400 tracking-wide">{currentUser.coins ?? 0}</span>
-                    </div>
-                    {/* Botón Recargar */}
+                  <div className="hidden sm:flex items-center">
                     <button
+                      type="button"
                       onClick={() => setIsCoinModalOpen(true)}
-                      className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-colors ${headerUsesDarkText ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25'}`}
+                      aria-label={`Abrir mercado de monedas. Saldo: ${currentUser.coins ?? 0}`}
+                      title="Abrir mercado de monedas"
+                      className={`group flex items-center gap-2 rounded-xl border px-2.5 py-1.5 shadow-sm transition-all duration-200 hover:-translate-y-px ${headerUsesDarkText ? 'border-[#D99A16]/35 bg-[#FFF5D8]/95 hover:border-[#D99A16]/55 hover:bg-[#ffefbf]' : 'border-[#FFC53D]/25 bg-[#FFC53D]/10 hover:border-[#FFC53D]/45 hover:bg-[#FFC53D]/15'}`}
                     >
-                      <DetailShoppingCart3DIcon
-                        size={20}
-                        className="-my-1 h-5 w-5 shrink-0 object-contain grayscale brightness-[0.58] contrast-125"
-                      />
-                      Recargar
+                      <DetailCoin3DIcon size={27} className="h-[27px] w-[27px] object-contain drop-shadow-[0_5px_7px_rgba(180,83,9,0.28)] transition-transform duration-200 group-hover:scale-[1.06] group-active:scale-95" />
+                      <span className={`font-[Montserrat] text-[15px] font-bold leading-none tracking-wide transition-transform duration-200 group-hover:scale-[1.06] group-active:scale-95 ${headerUsesDarkText ? 'text-[#D99A16]' : 'text-[#FFC53D]'}`}>{currentUser.coins ?? 0}</span>
                     </button>
                   </div>
                 )}
@@ -474,7 +469,7 @@ export const Navbar = () => {
                     to={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`navbar-primary-link share-tech-regular group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.35rem,6.5vw,1.7rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
+                    className={`navbar-primary-link share-tech-regular group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.25rem,6vw,1.55rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
                   >
                     <span className={`inline-flex items-center justify-center gap-2 ${link.isAdult ? 'navbar-adult-option' : ''}`}>
                       {link.isAdult && <NavbarFire size={22} />}
@@ -523,27 +518,18 @@ export const Navbar = () => {
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-[#FF4D88]/20 bg-[#FF4D88]/[0.06] px-3 py-2.5">
+                    <button type="button" onClick={() => { setIsMobileMenuOpen(false); setIsCoinModalOpen(true); }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#FF4D88]/20 bg-[#FF4D88]/[0.06] px-3 py-2.5 text-left transition-colors hover:bg-[#FF4D88]/10">
                       <div className="flex min-w-0 items-center gap-2.5">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center">
                           <DetailCoin3DIcon size={40} className="h-10 w-10 object-contain drop-shadow-[0_7px_10px_rgba(180,83,9,0.3)]" />
                         </div>
                         <div className="min-w-0">
                           <p className={`mobile-account-label truncate text-[9px] font-bold uppercase tracking-normal ${isLightMode ? 'text-black' : 'text-white'}`}>Monedas disponibles</p>
-                          <p className="text-sm font-black leading-tight text-[#FF4D88]">{currentUser.coins ?? 0}</p>
+                          <p className="font-[Montserrat] text-base font-bold leading-tight text-[#E4A11B]">{currentUser.coins ?? 0}</p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => { setIsMobileMenuOpen(false); setIsCoinModalOpen(true); }}
-                        className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[#FF4D88] px-3 text-[9px] font-black uppercase tracking-wider text-white transition-colors hover:bg-[#e13c75]"
-                      >
-                        <DetailShoppingCart3DIcon
-                          size={22}
-                          className="-my-1 h-[22px] w-[22px] shrink-0 object-contain grayscale brightness-[0.58] contrast-125"
-                        /> Recargar
-                      </button>
-                    </div>
+                      <ChevronRight size={17} className="shrink-0 text-[#FF4D88]" />
+                    </button>
 
                     <button
                       type="button"

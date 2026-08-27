@@ -2,12 +2,12 @@
 /**
  * Plugin Name: MangaMukai Social
  * Description: Perfiles publicos, amistades, chat, notificaciones y seguimiento de mangas para React.
- * Version: 2.0.0
+ * Version: 3.0.0
  */
 
 if (!defined('ABSPATH')) exit;
 
-const MM_SOCIAL_DB_VERSION = '2.0.0';
+const MM_SOCIAL_DB_VERSION = '3.0.0';
 
 function mm_social_table($suffix) {
     global $wpdb;
@@ -25,6 +25,7 @@ function mm_social_install_schema() {
     $notifications = mm_social_table('notifications');
     $comment_refs = mm_social_table('comment_refs');
     $subscriptions = mm_social_table('manga_subscriptions');
+    $posts = mm_social_table('profile_posts');
 
     dbDelta("CREATE TABLE {$friendships} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -73,6 +74,20 @@ function mm_social_install_schema() {
         created_at datetime NOT NULL,
         PRIMARY KEY  (user_id,manga_id), KEY manga_id (manga_id)
     ) {$charset};");
+    dbDelta("CREATE TABLE {$posts} (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) unsigned NOT NULL,
+        content text NOT NULL,
+        media_id bigint(20) unsigned DEFAULT NULL,
+        media_url text DEFAULT NULL,
+        media_type varchar(20) NOT NULL DEFAULT '',
+        visibility varchar(20) NOT NULL DEFAULT 'public',
+        status varchar(20) NOT NULL DEFAULT 'published',
+        created_at datetime NOT NULL,
+        updated_at datetime NOT NULL,
+        PRIMARY KEY  (id),
+        KEY user_created (user_id,created_at), KEY status (status)
+    ) {$charset};");
     update_option('mm_social_db_version', MM_SOCIAL_DB_VERSION, false);
 }
 add_action('init', 'mm_social_install_schema', 5);
@@ -111,6 +126,11 @@ function mm_social_profile_meta($user_id) {
         'avatar_url' => esc_url_raw($read_first($stored['avatar_url'] ?? '', ['mm_avatar_url', 'avatar_url', 'profile_avatar'])),
         'banner_url' => esc_url_raw($read_first($stored['banner_url'] ?? '', ['mm_banner_url', 'banner_url', 'profile_banner'])),
         'banner_color' => sanitize_text_field((string) ($stored['banner_color'] ?? 'bg-[#FF4D88]')),
+        'birth_date' => sanitize_text_field($read_first($stored['birth_date'] ?? '', ['mm_birth_date'])),
+        'country_code' => sanitize_text_field($read_first($stored['country_code'] ?? '', ['mm_country_code'])),
+        'phone' => preg_replace('/\D+/', '', $read_first($stored['phone'] ?? '', ['mm_phone'])),
+        'show_birth_date' => !empty($stored['show_birth_date']),
+        'show_phone' => !empty($stored['show_phone']),
         'social_links' => array_map('sanitize_text_field', $links),
     ];
 }
@@ -130,6 +150,8 @@ function mm_social_public_user($user_id, $detailed = false) {
             'bio' => $meta['bio'], 'location' => $meta['location'],
             'banner_url' => $meta['banner_url'], 'banner_color' => $meta['banner_color'],
             'created_at' => mysql_to_rfc3339($user->user_registered),
+            'birth_date' => $meta['show_birth_date'] ? $meta['birth_date'] : '',
+            'phone' => $meta['show_phone'] && $meta['phone'] !== '' ? trim($meta['country_code'] . ' ' . $meta['phone']) : '',
             'social_links' => array_merge([
                 'facebook' => '', 'twitter' => '', 'instagram' => '', 'discord' => '',
                 'whatsapp' => '', 'telegram' => '', 'youtube' => '', 'github' => '',
@@ -185,6 +207,7 @@ function mm_social_get_public_profile(WP_REST_Request $request) {
     $relationship = mm_social_friendship_status(get_current_user_id(), $id);
     $profile['friendship_status'] = $relationship['status'];
     $profile['friend_request_id'] = $relationship['request_id'];
+    $profile['posts'] = mm_social_posts_for_user($id, 18);
     return rest_ensure_response(['success' => true, 'profile' => $profile]);
 }
 
@@ -401,6 +424,128 @@ function mm_social_sync_manga_subscriptions(WP_REST_Request $request) {
     return rest_ensure_response(['success' => true, 'action' => $action]);
 }
 
+function mm_social_post_payload($row) {
+    if (!$row) return null;
+    return [
+        'id' => (int) $row->id,
+        'user_id' => (int) $row->user_id,
+        'content' => (string) $row->content,
+        'media_id' => $row->media_id ? (int) $row->media_id : null,
+        'media_url' => (string) ($row->media_url ?? ''),
+        'media_type' => (string) ($row->media_type ?? ''),
+        'created_at' => mysql_to_rfc3339($row->created_at),
+        'author' => mm_social_public_user((int) $row->user_id),
+    ];
+}
+
+function mm_social_posts_for_user($user_id, $limit = 18) {
+    global $wpdb;
+    $limit = min(30, max(1, absint($limit)));
+    $rows = $wpdb->get_results($wpdb->prepare(
+        'SELECT * FROM ' . mm_social_table('profile_posts') . " WHERE user_id=%d AND status='published' AND visibility='public' ORDER BY id DESC LIMIT %d",
+        absint($user_id), $limit
+    ));
+    return array_values(array_filter(array_map('mm_social_post_payload', $rows)));
+}
+
+function mm_social_get_profile_posts(WP_REST_Request $request) {
+    $user_id = absint($request->get_param('user_id'));
+    if (!$user_id) $user_id = get_current_user_id();
+    if (!$user_id || !get_userdata($user_id)) {
+        return new WP_Error('mm_social_profile_missing', 'Perfil no encontrado.', ['status' => 404]);
+    }
+    return rest_ensure_response(['success' => true, 'posts' => mm_social_posts_for_user($user_id, $request->get_param('limit'))]);
+}
+
+function mm_social_upload_post_media(WP_REST_Request $request) {
+    if (empty($_FILES['file']) || !is_array($_FILES['file'])) {
+        return new WP_Error('mm_social_media_missing', 'Selecciona una imagen o video.', ['status' => 400]);
+    }
+
+    $file = $_FILES['file'];
+    if (!empty($file['error'])) return new WP_Error('mm_social_media_upload_error', 'No se pudo recibir el archivo.', ['status' => 400]);
+    $checked = wp_check_filetype_and_ext($file['tmp_name'], $file['name']);
+    $mime = sanitize_mime_type((string) ($checked['type'] ?? ''));
+    $is_image = strpos($mime, 'image/') === 0;
+    $is_video = strpos($mime, 'video/') === 0;
+    if (!$is_image && !$is_video) return new WP_Error('mm_social_media_invalid', 'Solo se permiten imágenes o videos.', ['status' => 415]);
+
+    $maximum = $is_video ? 80 * MB_IN_BYTES : 15 * MB_IN_BYTES;
+    if ((int) $file['size'] <= 0 || (int) $file['size'] > $maximum) {
+        return new WP_Error('mm_social_media_too_large', $is_video ? 'El video supera 80 MB.' : 'La imagen supera 15 MB.', ['status' => 413]);
+    }
+
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/media.php';
+    require_once ABSPATH . 'wp-admin/includes/image.php';
+    $attachment_id = media_handle_upload('file', 0, ['post_author' => get_current_user_id()], ['test_form' => false]);
+    if (is_wp_error($attachment_id)) return new WP_Error('mm_social_media_upload_error', $attachment_id->get_error_message(), ['status' => 500]);
+    wp_update_post(['ID' => $attachment_id, 'post_author' => get_current_user_id()]);
+
+    return new WP_REST_Response([
+        'success' => true,
+        'media' => [
+            'id' => (int) $attachment_id,
+            'url' => (string) wp_get_attachment_url($attachment_id),
+            'type' => $is_video ? 'video' : 'image',
+        ],
+    ], 201);
+}
+
+function mm_social_create_profile_post(WP_REST_Request $request) {
+    global $wpdb;
+    $current = get_current_user_id();
+    $content = trim(sanitize_textarea_field((string) $request->get_param('content')));
+    $media_id = absint($request->get_param('media_id'));
+    $length = function_exists('mb_strlen') ? mb_strlen($content) : strlen($content);
+    if ($length > 3000) return new WP_Error('mm_social_post_too_long', 'La publicación supera 3000 caracteres.', ['status' => 400]);
+
+    $media_url = '';
+    $media_type = '';
+    if ($media_id) {
+        $attachment = get_post($media_id);
+        if (!$attachment || $attachment->post_type !== 'attachment' || (int) $attachment->post_author !== $current) {
+            return new WP_Error('mm_social_media_forbidden', 'El archivo no pertenece a tu perfil.', ['status' => 403]);
+        }
+        $mime = (string) get_post_mime_type($media_id);
+        $media_type = strpos($mime, 'video/') === 0 ? 'video' : (strpos($mime, 'image/') === 0 ? 'image' : '');
+        if ($media_type === '') return new WP_Error('mm_social_media_invalid', 'Archivo no válido.', ['status' => 415]);
+        $media_url = (string) wp_get_attachment_url($media_id);
+    }
+    if ($content === '' && !$media_id) return new WP_Error('mm_social_post_empty', 'Escribe algo o selecciona un archivo.', ['status' => 400]);
+
+    $now = current_time('mysql', true);
+    $ok = $wpdb->insert(mm_social_table('profile_posts'), [
+        'user_id' => $current,
+        'content' => $content,
+        'media_id' => $media_id ?: null,
+        'media_url' => $media_url,
+        'media_type' => $media_type,
+        'visibility' => 'public',
+        'status' => 'published',
+        'created_at' => $now,
+        'updated_at' => $now,
+    ], ['%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s']);
+    if (!$ok) return new WP_Error('mm_social_database_error', 'No se pudo guardar la publicación.', ['status' => 500]);
+    $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . mm_social_table('profile_posts') . ' WHERE id=%d', $wpdb->insert_id));
+    return new WP_REST_Response(['success' => true, 'post' => mm_social_post_payload($row)], 201);
+}
+
+function mm_social_delete_profile_post(WP_REST_Request $request) {
+    global $wpdb;
+    $id = absint($request->get_param('id'));
+    $table = mm_social_table('profile_posts');
+    $row = $wpdb->get_row($wpdb->prepare('SELECT id,user_id FROM ' . $table . ' WHERE id=%d', $id));
+    if (!$row || (int) $row->user_id !== get_current_user_id()) return new WP_Error('mm_social_post_missing', 'Publicación no encontrada.', ['status' => 404]);
+    $wpdb->update($table, ['status' => 'deleted', 'updated_at' => current_time('mysql', true)], ['id' => $id], ['%s', '%s'], ['%d']);
+    return rest_ensure_response(['success' => true]);
+}
+
+add_filter('upload_mimes', static function ($mimes) {
+    $mimes['webm'] = 'video/webm';
+    return $mimes;
+});
+
 add_action('post_updated', static function ($post_id, $after, $before) {
     if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id) || $after->post_status !== 'publish' || $after->post_modified_gmt === $before->post_modified_gmt) return;
     global $wpdb;
@@ -471,12 +616,65 @@ add_filter('rest_request_after_callbacks', static function ($response, $handler,
     $method = strtoupper($request->get_method());
     $data = mm_social_response_data($response);
 
+    if ($route === '/mangamukai/v1/profile' && $method === 'GET' && get_current_user_id()) {
+        $user = get_userdata(get_current_user_id());
+        $profile_meta = mm_social_profile_meta(get_current_user_id());
+        $data['success'] = true;
+        $data['profile'] = [
+            'username' => (string) ($data['username'] ?? ($user->display_name ?: $user->user_login)),
+            'bio' => (string) ($data['bio'] ?? $profile_meta['bio']),
+            'location' => (string) ($data['location'] ?? $profile_meta['location']),
+            'avatar_url' => (string) ($data['avatar_url'] ?? $profile_meta['avatar_url']),
+            'banner_url' => (string) ($data['banner_url'] ?? $profile_meta['banner_url']),
+            'banner_color' => (string) ($data['banner_color'] ?? $profile_meta['banner_color']),
+            'is_pro' => (bool) get_user_meta(get_current_user_id(), 'mm_is_pro', true),
+            'created_at' => (string) ($data['created_at'] ?? $user->user_registered),
+            'birth_date' => $profile_meta['birth_date'],
+            'country_code' => $profile_meta['country_code'],
+            'phone' => $profile_meta['phone'],
+            'show_birth_date' => $profile_meta['show_birth_date'],
+            'show_phone' => $profile_meta['show_phone'],
+            'social_links' => array_merge([
+                'facebook' => '', 'twitter' => '', 'instagram' => '', 'discord' => '',
+                'whatsapp' => '', 'telegram' => '', 'youtube' => '', 'github' => '',
+            ], is_array($data['social_links'] ?? null) ? $data['social_links'] : $profile_meta['social_links']),
+        ];
+        $response = rest_ensure_response($response);
+        $response->set_data($data);
+    }
     if ($route === '/mangamukai/v1/profile' && $method === 'POST' && get_current_user_id()) {
         $payload = $request->get_json_params();
         if (!is_array($payload)) $payload = [];
         $profile = mm_social_profile_meta(get_current_user_id());
-        foreach (['bio', 'location', 'avatar_url', 'banner_url', 'banner_color'] as $key) if (array_key_exists($key, $payload)) $profile[$key] = $payload[$key];
-        if (isset($payload['social_links']) && is_array($payload['social_links'])) $profile['social_links'] = $payload['social_links'];
+        if (array_key_exists('bio', $payload)) $profile['bio'] = sanitize_textarea_field((string) $payload['bio']);
+        if (array_key_exists('location', $payload)) $profile['location'] = sanitize_text_field((string) $payload['location']);
+        if (array_key_exists('avatar_url', $payload)) $profile['avatar_url'] = esc_url_raw((string) $payload['avatar_url']);
+        if (array_key_exists('banner_url', $payload)) $profile['banner_url'] = esc_url_raw((string) $payload['banner_url']);
+        if (array_key_exists('banner_color', $payload)) $profile['banner_color'] = sanitize_text_field((string) $payload['banner_color']);
+        if (array_key_exists('birth_date', $payload)) {
+            $birth_date = sanitize_text_field((string) $payload['birth_date']);
+            if ($birth_date !== '' && (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $birth_date, $parts) || !checkdate((int) ($parts[2] ?? 0), (int) ($parts[3] ?? 0), (int) ($parts[1] ?? 0)) || $birth_date > gmdate('Y-m-d'))) {
+                $birth_date = '';
+            }
+            $profile['birth_date'] = $birth_date;
+            update_user_meta(get_current_user_id(), 'mm_birth_date', $birth_date);
+        }
+        if (array_key_exists('country_code', $payload)) {
+            $country_code = sanitize_text_field((string) $payload['country_code']);
+            $profile['country_code'] = preg_match('/^\+\d{1,4}$/', $country_code) ? $country_code : '';
+            update_user_meta(get_current_user_id(), 'mm_country_code', $profile['country_code']);
+        }
+        if (array_key_exists('phone', $payload)) {
+            $phone = preg_replace('/\D+/', '', (string) $payload['phone']);
+            $profile['phone'] = strlen($phone) >= 6 && strlen($phone) <= 15 ? $phone : '';
+            update_user_meta(get_current_user_id(), 'mm_phone', $profile['phone']);
+            update_user_meta(get_current_user_id(), 'mm_phone_e164', $profile['country_code'] . $profile['phone']);
+        }
+        if (array_key_exists('show_birth_date', $payload)) $profile['show_birth_date'] = filter_var($payload['show_birth_date'], FILTER_VALIDATE_BOOLEAN);
+        if (array_key_exists('show_phone', $payload)) $profile['show_phone'] = filter_var($payload['show_phone'], FILTER_VALIDATE_BOOLEAN);
+        if (isset($payload['social_links']) && is_array($payload['social_links'])) {
+            $profile['social_links'] = array_map('sanitize_text_field', $payload['social_links']);
+        }
         update_user_meta(get_current_user_id(), 'mm_social_profile', $profile);
     }
     if ($route === '/mangamukai/v1/profile/image' && $method === 'POST' && get_current_user_id() && !empty($data['url'])) {
@@ -545,4 +743,10 @@ add_action('rest_api_init', static function () {
     register_rest_route('mangamukai/v1', '/social/notifications/read', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_mark_notifications_read', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/comments/reaction', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_notify_comment_reaction', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/manga-subscriptions', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_sync_manga_subscriptions', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/posts', [
+        ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_profile_posts', 'permission_callback' => '__return_true'],
+        ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_create_profile_post', 'permission_callback' => $auth],
+    ]);
+    register_rest_route('mangamukai/v1', '/social/posts/media', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_upload_post_media', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/posts/(?P<id>\d+)', ['methods' => WP_REST_Server::DELETABLE, 'callback' => 'mm_social_delete_profile_post', 'permission_callback' => $auth]);
 });

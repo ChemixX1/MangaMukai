@@ -91,7 +91,7 @@ export function BlackWhiteYouthAccordion() {
                   onMouseEnter={() => setActiveIndex(index)}
                   className={`manga-bn-accordion-panel group relative min-h-0 min-w-0 overflow-hidden rounded-[18px] border ${isLightMode ? 'border-black/10 bg-white' : 'border-white/10 bg-[#101216]'}`}
                 >
-                  <img src={manga.portada} alt={title} className="manga-bn-interactive-cover absolute inset-0 h-full w-full object-cover" />
+                  <img src={manga.portada} alt={title} className="manga-bn-interactive-cover absolute inset-0 h-full w-full object-cover object-center sm:object-top" />
                   <span className={`absolute inset-0 transition-colors duration-500 ${isActive ? 'bg-gradient-to-t from-black via-black/20 to-transparent' : 'bg-black/35 group-hover:bg-black/20'}`} />
                   <button type="button" onClick={() => setActiveIndex(index)} aria-expanded={isActive} aria-label={`Mostrar ${title}`} className="absolute inset-0 z-10 cursor-pointer" />
 

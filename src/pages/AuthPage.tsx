@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Footer } from "../components/layout";
-import { MANGAMUKAI_API, wordpressUrl } from "../config/api";
+import { MANGAMUKAI_API, SOCIAL_LOGIN_SESSION_URL, socialLoginUrl, wordpressUrl } from "../config/api";
 import { useTheme } from "../hooks/useTheme";
 import { saveAuth } from "../services/authService";
 import { getUltimosCapitulos } from "../services/mangaService";
@@ -358,6 +358,39 @@ export const AuthPage = () => {
     document.title = `${isLogin ? "Iniciar sesión" : "Crear cuenta"} | Manga Mukai`;
   }, [isLogin]);
 
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const provider = query.get("social") || query.get("return_provider");
+    if (provider !== "google" && provider !== "discord") return;
+
+    let active = true;
+    setLoading(true);
+    setError(null);
+    void fetch(SOCIAL_LOGIN_SESSION_URL, {
+      method: "POST",
+      credentials: "include",
+    }).then(async (response) => {
+      const data = (await response.json()) as AuthResponse;
+      if (!response.ok || !data.success || !data.token || !data.user) {
+        throw new Error(data.message || `No se pudo completar el acceso con ${provider === "google" ? "Google" : "Discord"}.`);
+      }
+      if (!active) return;
+      saveAuth(data.token, data.user, true);
+      setSuccess(`Acceso con ${provider === "google" ? "Google" : "Discord"} completado.`);
+      window.setTimeout(() => navigate(returnTo, { replace: true }), 450);
+    }).catch((caught) => {
+      if (!active) return;
+      setError(caught instanceof Error ? caught.message : "No se pudo completar el inicio de sesión social.");
+      navigate("/auth/login", { replace: true });
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [location.search, navigate, returnTo]);
+
   const openBirthDatePicker = () => {
     const picker = birthDatePickerRef.current;
     if (!picker) return;
@@ -440,7 +473,7 @@ export const AuthPage = () => {
               {SOCIAL_AUTH.map((social) => (
                 <a
                   key={social.provider}
-                  href={wordpressUrl(`register/?oauthWindow=true&provider=${social.provider}`)}
+                  href={socialLoginUrl(social.provider)}
                   className={`flex min-h-[54px] items-center justify-center gap-2 rounded-[24px] border px-3 py-3 text-center text-[13px] font-semibold tracking-normal transition-colors ${social.className}`}
                 >
                   <img src={social.icon} alt="" className="h-[18px] w-[18px]" decoding="async" />

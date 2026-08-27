@@ -1,0 +1,80 @@
+DirectoryIndex index.html index.php
+
+# Serve modern cover formats with their correct media type.
+<IfModule mod_mime.c>
+AddType image/avif .avif
+AddType image/webp .webp
+</IfModule>
+
+# Keep the React shell fresh after deploys.
+<IfModule mod_headers.c>
+<FilesMatch "^index\.html$">
+Header set Cache-Control "no-cache, no-store, must-revalidate"
+Header set Pragma "no-cache"
+Header set Expires "0"
+# Clear browser HTTP cache only; cookies and localStorage sessions remain intact.
+Header always set Clear-Site-Data '"cache"'
+</FilesMatch>
+</IfModule>
+
+# Country blocking is managed by manga-country-block.php.
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+
+# PayPal IPN callbacks must reach WordPress even though / serves React.
+RewriteCond %{QUERY_STRING} (^|&)mm_(coin|sub)_ipn=1(&|$)
+RewriteRule ^$ /index.php [L]
+
+# Google/Discord OAuth starts and callbacks must reach WordPress, not the SPA.
+RewriteCond %{QUERY_STRING} (^|&)provider=(google|discord)(&|$) [NC]
+RewriteRule ^(login|register)/?$ /index.php [L,QSA]
+
+# Exchange the authenticated WordPress cookie for a MangaMukai React session.
+RewriteCond %{QUERY_STRING} (^|&)mm_social_session=1(&|$) [NC]
+RewriteRule ^$ /index.php [L,QSA]
+
+# Serve real files and directories directly.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# WordPress routes.
+RewriteCond %{REQUEST_URI} ^/wp-
+RewriteRule ^ /index.php [L]
+
+RewriteCond %{REQUEST_URI} ^/feed
+RewriteRule ^ /index.php [L]
+
+RewriteCond %{REQUEST_URI} ^/xmlrpc
+RewriteRule ^ /index.php [L]
+
+# Sitemaps and robots.
+RewriteCond %{REQUEST_URI} ^/sitemap-react\.xml$
+RewriteRule ^ /backend-patches/manga-sitemap-react.php [L]
+
+RewriteCond %{REQUEST_URI} ^/sitemap
+RewriteRule ^ /index.php [L]
+
+RewriteCond %{REQUEST_URI} .*-sitemap\.xml$
+RewriteRule ^ /index.php [L]
+
+RewriteCond %{REQUEST_URI} \.xsl$
+RewriteRule ^ /index.php [L]
+
+RewriteCond %{REQUEST_URI} ^/robots\.txt$
+RewriteRule ^ /index.php [L]
+
+# Every manga request receives a server-rendered SEO head and the normal SPA.
+RewriteRule ^manga/([0-9]+)/?$ /backend-patches/manga-social-meta.php?id=$1 [L,QSA]
+
+# Consolidate old WordPress manga slugs into the canonical /manga/{id} route.
+# Known one-segment React routes bypass the WordPress lookup.
+RewriteCond %{REQUEST_URI} !^/(nosotros|contacto|perfil|saved|legal|catalog|pago-exitoso|manga-bn|manga-19|manga)/?$
+RewriteRule ^([^/.]+)/?$ /backend-patches/manga-slug-redirect.php?slug=$1 [L,QSA]
+
+# Everything else goes to the React SPA.
+RewriteRule ^ /index.html [L]
+</IfModule>

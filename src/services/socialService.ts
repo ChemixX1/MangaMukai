@@ -2,6 +2,7 @@ import { MANGAMUKAI_API } from '../config/api';
 import { clearStoredAuth, getStoredToken } from './authService';
 import type { ProfileSocialLinks } from './wordpressService';
 import type { FriendUser } from './friendsService';
+import type { ProfilePost } from './profilePostService';
 
 export const OPEN_CHAT_EVENT = 'mm_open_chat';
 
@@ -19,7 +20,10 @@ export interface PublicProfile extends FriendUser {
   banner_url: string;
   banner_color: string;
   created_at: string;
+  birth_date: string;
+  phone: string;
   social_links: ProfileSocialLinks;
+  posts: ProfilePost[];
   friendship_status: FriendshipStatus;
   friend_request_id: number;
 }

@@ -37,6 +37,11 @@ export interface WordPressProfile {
   username: string;
   bio: string;
   location: string;
+  birth_date: string;
+  country_code: string;
+  phone: string;
+  show_birth_date: boolean;
+  show_phone: boolean;
   avatar_url: string;
   banner_url: string;
   banner_color: string;
@@ -45,7 +50,7 @@ export interface WordPressProfile {
   social_links: ProfileSocialLinks;
 }
 
-interface ApiResponse {
+interface ApiResponse extends Partial<WordPressProfile> {
   success?: boolean;
   message?: string;
   profile?: WordPressProfile;
@@ -67,6 +72,11 @@ const profileFromUser = (user: MMUser): WordPressProfile => ({
   username: user.display_name || user.username,
   bio: '',
   location: '',
+  birth_date: '',
+  country_code: '+51',
+  phone: '',
+  show_birth_date: false,
+  show_phone: false,
   avatar_url: user.avatar || '',
   banner_url: '',
   banner_color: 'bg-[#FF4D88]',
@@ -136,13 +146,14 @@ export const getWordPressProfile = async (
     if (clearIfUnauthorized(res)) return fallback;
 
     const data = await readJson<ApiResponse>(res);
-    if (data?.success && data.profile) {
+    const remoteProfile = data?.profile || data;
+    if (data?.success && remoteProfile) {
       return {
         ...fallback,
-        ...data.profile,
+        ...remoteProfile,
         social_links: {
           ...fallback.social_links,
-          ...(data.profile.social_links || {}),
+          ...(remoteProfile.social_links || {}),
         },
       };
     }

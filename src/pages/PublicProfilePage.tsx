@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CalendarDays, Check, Edit3, Link2, Loader2, MapPin, MessageCircle, User, UserPlus } from 'lucide-react';
+import { Cake, CalendarDays, Check, Edit3, Image as ImageIcon, Link2, Loader2, MapPin, MessageCircle, Phone, User, UserPlus, Video } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { getStoredToken, getStoredUser } from '../services/authService';
 import { respondFriendRequest, sendFriendRequest } from '../services/friendsService';
@@ -9,6 +9,21 @@ import { getPublicProfile, openChat, type PublicProfile } from '../services/soci
 const SOCIAL_LABELS: Record<string, string> = {
   facebook: 'Facebook', twitter: 'X / Twitter', instagram: 'Instagram', discord: 'Discord',
   whatsapp: 'WhatsApp', telegram: 'Telegram', youtube: 'YouTube', github: 'GitHub',
+};
+
+const formatProfileDate = (value: string) => {
+  if (!value) return '';
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+};
+
+const formatPostDate = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(date);
 };
 
 export const PublicProfilePage = () => {
@@ -87,6 +102,8 @@ export const PublicProfilePage = () => {
               <div className="flex flex-wrap items-center gap-2"><h1 className="break-words text-3xl font-black tracking-tight md:text-4xl">{profile.username}</h1>{profile.is_pro && <span className="rounded-full bg-[#FF4D88]/15 px-3 py-1 text-[9px] font-black text-[#FF4D88]">MUKAI PRO</span>}</div>
               <div className={`mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs ${isLight ? 'text-black/50' : 'text-white/45'}`}>
                 {profile.location && <span className="flex items-center gap-1.5"><MapPin size={14} className="text-[#FF4D88]" />{profile.location}</span>}
+                {profile.birth_date && <span className="flex items-center gap-1.5"><Cake size={14} className="text-[#FF4D88]" />{formatProfileDate(profile.birth_date)}</span>}
+                {profile.phone && <span className="flex items-center gap-1.5"><Phone size={14} className="text-[#FF4D88]" />{profile.phone}</span>}
                 <span className="flex items-center gap-1.5"><CalendarDays size={14} className="text-[#FF4D88]" />Miembro desde {joined}</span>
               </div>
             </div>
@@ -112,6 +129,41 @@ export const PublicProfilePage = () => {
               </div>
             </aside>
           </div>
+
+          <section className="mt-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-black">Publicaciones</h2>
+              <span className={`text-[11px] font-bold ${isLight ? 'text-black/40' : 'text-white/35'}`}>{profile.posts?.length || 0}</span>
+            </div>
+            {!profile.posts?.length ? (
+              <div className={`rounded-2xl border px-5 py-9 text-center ${isLight ? 'border-black/10 bg-zinc-50' : 'border-white/10 bg-black'}`}>
+                <ImageIcon size={25} className="mx-auto text-[#FF4D88]/60" />
+                <p className={`mt-3 text-xs font-bold ${isLight ? 'text-black/45' : 'text-white/40'}`}>Este perfil todavía no tiene publicaciones.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {profile.posts.map((post) => (
+                  <article key={post.id} className={`overflow-hidden rounded-2xl border ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
+                    <header className="flex items-center gap-3 p-4">
+                      <div className={`h-10 w-10 overflow-hidden rounded-full ${isLight ? 'bg-zinc-100' : 'bg-zinc-900'}`}>
+                        {post.author.avatar_url
+                          ? <img src={post.author.avatar_url} alt="" className="h-full w-full object-cover" />
+                          : <User size={18} className={`m-auto mt-2.5 ${isLight ? 'text-black/25' : 'text-white/25'}`} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black">{post.author.username}</p>
+                        <p className={`text-[10px] ${isLight ? 'text-black/40' : 'text-white/35'}`}>{formatPostDate(post.created_at)}</p>
+                      </div>
+                      {post.media_type === 'video' ? <Video size={16} className="text-[#FF4D88]" /> : post.media_type === 'image' ? <ImageIcon size={16} className="text-[#FF4D88]" /> : null}
+                    </header>
+                    {post.content && <p className={`whitespace-pre-wrap px-4 pb-4 text-sm leading-6 ${isLight ? 'text-black/70' : 'text-white/65'}`}>{post.content}</p>}
+                    {post.media_url && post.media_type === 'video' && <video controls preload="metadata" src={post.media_url} className="max-h-[420px] w-full bg-black object-contain" />}
+                    {post.media_url && post.media_type === 'image' && <img src={post.media_url} alt="Publicación" loading="lazy" className="max-h-[420px] w-full object-cover" />}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </section>
       </div>
       {currentUser && String(currentUser.id) === id && <span className="sr-only">Este es tu perfil.</span>}
