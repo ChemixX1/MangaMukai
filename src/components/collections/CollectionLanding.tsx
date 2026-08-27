@@ -6,6 +6,11 @@ import { getLatestMenMangas, getPopularWomenByViews, getUltimosCapitulos } from 
 import type { MangaCapitulo } from "../../types/manga";
 import { useTheme } from "../../hooks/useTheme";
 import { AdultHeroCoverflow } from "./AdultMotionCarousels";
+import { PopularCarousel } from "../home/PopularCarousel";
+import { AdultLatestUpdates } from "./AdultLatestUpdates";
+import { YouthCarousel } from "../home/YouthCarousel";
+import { useHomeData } from "../../context/HomeDataContext";
+import { AdultYouthMotionCarousel } from "./AdultYouthMotionCarousel";
 
 type CollectionVariant = "mono" | "adult";
 
@@ -80,6 +85,7 @@ function AdultGate({ onAccept }: { onAccept: () => void }) {
 export function CollectionLanding({ variant }: CollectionLandingProps) {
   const theme = themes[variant];
   const { theme: colorMode } = useTheme();
+  const { latestWomen, latestMen } = useHomeData();
   const isLightMode = colorMode === "light";
   const [mangas, setMangas] = useState<MangaCapitulo[]>([]);
   const [menMangas, setMenMangas] = useState<MangaCapitulo[]>([]);
@@ -129,6 +135,15 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
   const visibleMangas = useMemo(() => activeGenre
     ? mangas.filter((manga) => manga.genres?.some((genre) => genre.toLowerCase() === activeGenre.toLowerCase()))
     : mangas, [activeGenre, mangas]);
+
+  const latestWomenWithChapters = useMemo(
+    () => latestWomen.filter((manga) => manga.capitulosRecientes.length > 0),
+    [latestWomen],
+  );
+  const latestMenWithChapters = useMemo(
+    () => latestMen.filter((manga) => manga.capitulosRecientes.length > 0),
+    [latestMen],
+  );
 
   const heroItems = (variant === "adult" && menMangas.length > 0 ? menMangas : mangas).slice(0, 8);
   const active = heroItems[activeIndex % Math.max(heroItems.length, 1)];
@@ -203,7 +218,34 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
         </div>
         )}
       </section>
-      <section className="desktop-content-shell mx-auto max-w-[1400px] px-5 py-16 lg:px-16">
+      {variant === "adult" && (
+        <section className={`relative -mt-3 pb-10 pt-8 sm:-mt-4 sm:pb-12 sm:pt-8 ${isLightMode ? "bg-[#f5f6f8]" : "bg-black"}`}>
+          <PopularCarousel />
+        </section>
+      )}
+      {variant === "adult" && (
+        <AdultLatestUpdates
+          items={latestWomenWithChapters}
+          isLight={isLightMode}
+          sectionId="adult-latest-women"
+        />
+      )}
+      {variant === "adult" && <AdultYouthMotionCarousel items={latestMenWithChapters} isLight={isLightMode} />}
+      {variant === "adult" && (
+        <section className={`relative py-14 sm:py-16 ${isLightMode ? "bg-[#f5f6f8]" : "bg-black"}`}>
+          <YouthCarousel />
+        </section>
+      )}
+      {variant === "adult" && (
+        <AdultLatestUpdates
+          items={latestMenWithChapters}
+          isLight={isLightMode}
+          titleAccent="actualizaciones"
+          sectionId="adult-latest-youth"
+          accent="blue"
+        />
+      )}
+      {variant !== "adult" && <section className="desktop-content-shell mx-auto max-w-[1400px] px-5 py-16 lg:px-16">
         <div className="mb-8 flex items-end justify-between gap-5">
           <div><p className="mb-2 text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: theme.accent }}>Explora la colección</p><h2 className="text-3xl font-black uppercase italic tracking-tight sm:text-4xl">{theme.title}</h2></div>
           <span className={`text-xs font-bold ${isLightMode ? "text-black/45" : "text-white/40"}`}>{visibleMangas.length} títulos</span>
@@ -230,19 +272,19 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
                     chapter={chapter.numero}
                     isFree={chapter.esGratis}
                     date={chapter.fecha}
-                    accentClassName={variant === "adult" ? "text-[#FF4D88]" : "text-[#00C2FF]"}
+                    accentClassName="text-[#00C2FF]"
                   />
                 ))}</div>
               </Link>
             ))}
           </div>
         )}
-      </section>
-      <section className={`bg-gradient-to-b ${theme.glow} to-transparent py-16 text-center`}>
+      </section>}
+      {variant !== "adult" && <section className={`bg-gradient-to-b ${theme.glow} to-transparent py-16 text-center`}>
         <Flame className="mx-auto mb-4" style={{ color: theme.accent }} />
         <h2 className="mb-3 text-3xl font-black uppercase italic">¿Buscas algo diferente?</h2>
         <Link to="/biblioteca" className={`text-xs font-black uppercase tracking-[0.25em] transition ${isLightMode ? "text-black/60 hover:text-black" : "text-white/60 hover:text-white"}`}>Ver biblioteca completa</Link>
-      </section>
+      </section>}
     </main>
   );
 }

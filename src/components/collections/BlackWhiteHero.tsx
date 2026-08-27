@@ -139,14 +139,14 @@ export function BlackWhiteHero() {
           ) : (
             <AnimatePresence mode="wait">
               <motion.div key={active.id} className="w-full max-w-[660px]" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 18 }} transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}>
-                <div className="mb-6 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
-                  <span className={`border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.19em] ${isLightMode ? 'border-black bg-black text-white' : 'border-white bg-white text-black'}`}>Manga B&N</span>
+                <div className="mb-4 flex flex-wrap items-center justify-center gap-1.5 lg:justify-start">
+                  <span className={`border px-2 py-1 text-[8px] font-black uppercase tracking-[0.14em] ${isLightMode ? 'border-black bg-black text-white' : 'border-white bg-white text-black'}`}>Manga B&N</span>
                   {genres.map((genre) => (
-                    <span key={genre} className={`border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.17em] ${isLightMode ? 'border-black/25 bg-white/25 text-black' : 'border-white/25 bg-black/25 text-white'}`}>{genre}</span>
+                    <span key={genre} className={`border px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] ${isLightMode ? 'border-black/25 bg-white/25 text-black' : 'border-white/25 bg-black/25 text-white'}`}>{genre}</span>
                   ))}
                 </div>
 
-                <h1 className="mb-7 line-clamp-3 text-center text-[clamp(1.95rem,3.5vw,3.45rem)] font-black uppercase italic leading-[0.98] tracking-[-0.045em] lg:text-left">
+                <h1 className="mb-6 line-clamp-3 text-center text-[clamp(1.55rem,3vw,3rem)] font-black uppercase italic leading-[0.98] tracking-[-0.045em] lg:text-left">
                   {title}
                 </h1>
 

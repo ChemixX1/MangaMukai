@@ -17,6 +17,10 @@ import { YouthCarousel } from './YouthCarousel';
 interface HomePageFrameProps {
   hero: ReactNode;
   afterHero?: ReactNode;
+  afterLatest?: ReactNode;
+  latestSection?: ReactNode;
+  menSection?: ReactNode;
+  youthLatestSection?: ReactNode;
   pageClassName?: string;
 }
 
@@ -24,7 +28,15 @@ interface HomePageFrameProps {
  * Shared Home composition. Pages can provide a purpose-built hero while the
  * filters, carousels, news and release sections remain structurally identical.
  */
-export function HomePageFrame({ hero, afterHero, pageClassName = '' }: HomePageFrameProps) {
+export function HomePageFrame({
+  hero,
+  afterHero,
+  afterLatest,
+  latestSection,
+  menSection,
+  youthLatestSection,
+  pageClassName = '',
+}: HomePageFrameProps) {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { isReady } = useHomeData();
@@ -55,11 +67,12 @@ export function HomePageFrame({ hero, afterHero, pageClassName = '' }: HomePageF
 
             <section className="home-block home-block-popular"><PopularCarousel /></section>
             <section className="home-block home-block-news"><News /></section>
-            <section className="home-block home-block-latest"><Latest /></section>
-            <section className="home-block home-block-men relative z-30 -mt-10 md:-mt-14 lg:-mt-16"><LatestUpdates /></section>
+            <section className="home-block home-block-latest">{latestSection ?? <Latest />}</section>
+            {afterLatest}
+            <section className="home-block home-block-men relative z-30 -mt-10 md:-mt-14 lg:-mt-16">{menSection ?? <LatestUpdates />}</section>
             <section className="home-block home-block-youth"><YouthCarousel /></section>
             <section className="home-block home-block-youth-news"><News variant="youth" /></section>
-            <section className="home-block home-block-youth-latest"><YouthLatest /></section>
+            <section className="home-block home-block-youth-latest">{youthLatestSection ?? <YouthLatest />}</section>
             <section className="home-block home-block-releases -mt-4 sm:mt-0"><NewReleases /></section>
           </div>
         </div>

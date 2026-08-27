@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Bookmark, ChevronLeft, ChevronRight, Flame, Play } from 'lucide-react';
+import { Bookmark, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -57,7 +57,7 @@ export function AdultHeroCoverflow({
 
   return (
     <div className="desktop-content-shell relative z-10 mx-auto flex min-h-[960px] w-full max-w-[1500px] flex-col px-5 pb-14 pt-28 sm:px-8 lg:min-h-[850px] lg:px-16 lg:pb-10 lg:pt-24">
-      <div className="relative h-[300px] shrink-0 sm:h-[400px]" style={{ perspective: '1450px' }}>
+      <div className="relative h-[320px] shrink-0 sm:h-[455px]" style={{ perspective: '1450px' }}>
         {items.map((manga, index) => {
           let relative = index - activeIndex;
           if (relative > items.length / 2) relative -= items.length;
@@ -66,7 +66,11 @@ export function AdultHeroCoverflow({
           const isActive = relative === 0;
 
           return (
-            <div key={manga.id} className="absolute left-1/2 top-1/2 h-[190px] w-[122px] -translate-x-1/2 -translate-y-1/2 sm:h-[330px] sm:w-[220px]">
+            <div
+              key={manga.id}
+              className="absolute left-1/2 top-1/2 h-[206px] w-[132px] -translate-x-1/2 -translate-y-1/2 sm:h-[360px] sm:w-[240px]"
+              style={{ zIndex: isActive ? 70 : 40 - distance }}
+            >
               <motion.button
                 type="button"
                 onClick={() => isActive ? navigate(`/manga/${manga.id}`) : onSelect(index)}
@@ -78,12 +82,12 @@ export function AdultHeroCoverflow({
                   if (info.offset.x > 65 || info.velocity.x > 520) onPrevious();
                 }}
                 animate={{
-                  x: relative * (isCompact ? 72 : 148),
+                  x: relative * (isCompact ? 76 : 160),
                   y: isActive ? -8 : 16 + Math.min(distance, 2) * 12,
-                  scale: isActive ? 1 : distance === 1 ? 0.84 : 0.7,
+                  scale: isActive ? 1.12 : distance === 1 ? 0.82 : 0.68,
                   rotateY: relative * -13,
                   opacity: distance <= 2 ? (isActive ? 1 : 0.74) : 0,
-                  zIndex: 30 - distance,
+                  zIndex: isActive ? 70 : 40 - distance,
                 }}
                 transition={{ type: 'spring', stiffness: 195, damping: 25, mass: 0.9 }}
                 style={{ pointerEvents: distance <= 2 ? 'auto' : 'none' }}
@@ -92,8 +96,6 @@ export function AdultHeroCoverflow({
               >
                 <img src={manga.portada} alt={cleanTitle(manga.titulo)} draggable={false} className="h-full w-full select-none object-cover transition-transform duration-500 group-hover:scale-105" />
                 <span className="absolute inset-0 bg-gradient-to-t from-black via-black/5 to-transparent" />
-                <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#FF4D88] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white sm:left-4 sm:top-4 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-[9px] sm:tracking-[0.16em]"><Flame size={9} fill="currentColor" className="sm:h-[10px] sm:w-[10px]" /> +19</span>
-                {isActive && <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2.5 pb-3 pt-10 text-[7px] font-black uppercase tracking-[0.08em] text-white sm:px-5 sm:pb-5 sm:pt-14 sm:text-[11px] sm:tracking-[0.12em]">Desliza para cambiar</span>}
               </motion.button>
             </div>
           );
@@ -119,19 +121,23 @@ export function AdultHeroCoverflow({
           <div className="min-w-0">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="bg-[#FF4D88] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white">Mangas para hombres +19</span>
-              <span className={`font-[Montserrat] text-[11px] font-bold tabular-nums ${isLight ? 'text-black/45' : 'text-white/45'}`}>{String(activeIndex + 1).padStart(2, '0')} / {String(items.length).padStart(2, '0')}</span>
             </div>
-            <h1 className="line-clamp-3 text-[clamp(1.7rem,3vw,3rem)] font-black uppercase italic leading-[0.98] tracking-[-0.04em]">{title}</h1>
+            <h1 className="line-clamp-3 text-[clamp(1.3rem,2.2vw,2.25rem)] font-black uppercase italic leading-[0.98] tracking-[-0.04em]">{title}</h1>
             <div className="mt-5 flex flex-wrap gap-2">
               {tags.map((tag) => <span key={tag} className={`border px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] ${isLight ? 'border-black/15 bg-white/45 text-black/70' : 'border-white/15 bg-white/[0.05] text-white/70'}`}>{tag}</span>)}
             </div>
           </div>
 
-          <div className={`flex min-w-0 flex-col border-l-4 pl-5 lg:pl-7 ${isLight ? 'border-black' : 'border-white'}`}>
+          <div className="relative flex min-w-0 flex-col pl-5 lg:pl-7">
+            <span className={`absolute bottom-3 left-0 top-0 w-[3px] ${isLight ? 'bg-black' : 'bg-white'}`} aria-hidden="true" />
+            <div className="mb-2.5 flex items-center gap-2.5">
+              <span className="h-[1.15em] w-1 shrink-0 rounded-full bg-[#FF4D88]" aria-hidden="true" />
+              <h2 className={`text-[12px] font-black uppercase tracking-[0.18em] ${isLight ? 'text-black' : 'text-white'}`}>Sinopsis</h2>
+            </div>
             <p className={`line-clamp-4 text-justify text-[14px] font-medium leading-7 sm:text-[15px] ${isLight ? 'text-black/70' : 'text-white/75'}`}>{description}</p>
-            <div className="mt-auto flex flex-wrap gap-3 pt-6">
-              <button type="button" onClick={() => navigate(`/manga/${active.id}`)} className="flex h-12 items-center gap-2 bg-[#FF4D88] px-6 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black"><Play size={15} fill="currentColor" /> Leer ahora</button>
-              <button type="button" onClick={() => setIsBookmarked((current) => !current)} className={`flex h-12 items-center gap-2 border px-6 text-[11px] font-black uppercase tracking-[0.14em] transition ${isBookmarked ? 'border-[#FF4D88] bg-[#FF4D88]/15 text-[#FF4D88]' : isLight ? 'border-black/20 bg-white/50 text-black hover:border-[#FF4D88]' : 'border-white/20 bg-black/25 text-white hover:border-[#FF4D88]'}`}><Bookmark size={15} fill={isBookmarked ? 'currentColor' : 'none'} /> {isBookmarked ? 'Guardado' : 'Guardar'}</button>
+            <div className="mt-auto flex flex-wrap justify-start gap-3 pt-6">
+              <button type="button" onClick={() => navigate(`/manga/${active.id}`)} className="flex h-12 items-center gap-2 rounded-[7px] bg-[#FF4D88] px-6 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black"><Play size={15} fill="currentColor" /> Leer ahora</button>
+              <button type="button" onClick={() => setIsBookmarked((current) => !current)} className={`flex h-12 items-center gap-2 rounded-[7px] border px-6 text-[11px] font-black uppercase tracking-[0.14em] transition ${isBookmarked ? 'border-[#FF4D88] bg-[#FF4D88]/15 text-[#FF4D88]' : isLight ? 'border-black/20 bg-white/50 text-black hover:border-[#FF4D88]' : 'border-white/20 bg-black/25 text-white hover:border-[#FF4D88]'}`}><Bookmark size={15} fill={isBookmarked ? 'currentColor' : 'none'} /> {isBookmarked ? 'Guardado' : 'Guardar'}</button>
             </div>
           </div>
         </motion.div>

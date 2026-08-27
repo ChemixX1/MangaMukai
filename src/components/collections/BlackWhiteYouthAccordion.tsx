@@ -1,11 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowUpRight, BookOpen, Sparkles } from 'lucide-react';
+import { ArrowUpRight, BookOpen, Mars } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useHomeData } from '../../context/HomeDataContext';
 import { useTheme } from '../../hooks/useTheme';
 import type { MangaCapitulo } from '../../types/manga';
+import FilterStripTactical from '../home/FilterStripTactical';
 
 const youthPattern = /hombre|juvenil|shounen|seinen|acci[oó]n|comedia|escolar|aventura/i;
 
@@ -50,15 +51,19 @@ export function BlackWhiteYouthAccordion() {
   }, [isPaused, items.length]);
 
   return (
-    <section className={`relative overflow-hidden py-16 transition-colors duration-500 sm:py-20 ${isLightMode ? 'bg-[#eef1f4] text-black' : 'bg-[#08090b] text-white'}`} aria-labelledby="bn-youth-title">
-      <div className="desktop-content-shell relative z-10 mx-auto max-w-[1500px] px-5 lg:px-16">
-        <div className="mb-9 flex flex-wrap items-end justify-between gap-5">
-          <div>
-            <p className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.34em] text-[#00C2FF]"><Sparkles size={13} /> Tinta joven</p>
-            <h2 id="bn-youth-title" className="text-3xl font-black uppercase italic tracking-[-0.035em] sm:text-4xl">Mangas B&N juveniles</h2>
-          </div>
-          <p className={`max-w-sm text-right text-xs font-semibold leading-5 ${isLightMode ? 'text-black/45' : 'text-white/45'}`}>Pasa el cursor por una portada para abrir su historia.</p>
+    <section className={`relative overflow-hidden pb-0 transition-colors duration-500 ${isLightMode ? 'bg-[#eef1f4] text-black' : 'bg-[#08090b] text-white'}`} aria-labelledby="bn-youth-title">
+      <div className="relative z-20 h-[82px] w-full md:h-[88px]">
+        <div aria-hidden="true" className="home-men-ramp pointer-events-none absolute bottom-[-8px] left-0 h-10 w-full bg-gradient-to-r from-[#67E8F9] via-[#38BDF8] to-[#3B82F6]" />
+        <div className="desktop-content-shell relative z-10 mx-auto flex h-full w-full max-w-[1500px] items-center px-5 lg:px-16">
+          <h2 id="bn-youth-title" className="flex -translate-y-1.5 items-center gap-3 text-3xl font-black uppercase italic tracking-[-0.035em] sm:text-4xl">
+            <span aria-hidden="true" className="h-7 w-[3px] shrink-0 bg-[#00C2FF] sm:h-8" />
+            <Mars className="h-7 w-7 shrink-0 text-[#00C2FF] sm:h-8 sm:w-8" strokeWidth={3} />
+            Mangas <span className="text-[#00C2FF]">juveniles</span>
+          </h2>
         </div>
+      </div>
+
+      <div className="desktop-content-shell relative z-10 mx-auto max-w-[1500px] px-5 pb-14 pt-12 lg:px-16 lg:pt-14">
 
         {!isReady || items.length === 0 ? (
           <div className="flex h-[560px] gap-2 overflow-hidden">
@@ -90,8 +95,6 @@ export function BlackWhiteYouthAccordion() {
                   <span className={`absolute inset-0 transition-colors duration-500 ${isActive ? 'bg-gradient-to-t from-black via-black/20 to-transparent' : 'bg-black/35 group-hover:bg-black/20'}`} />
                   <button type="button" onClick={() => setActiveIndex(index)} aria-expanded={isActive} aria-label={`Mostrar ${title}`} className="absolute inset-0 z-10 cursor-pointer" />
 
-                  <span className="absolute left-4 top-4 z-20 grid h-8 min-w-8 place-items-center rounded-full border border-white/30 bg-black/35 px-2 font-[Montserrat] text-[10px] font-bold text-white backdrop-blur-md">{String(index + 1).padStart(2, '0')}</span>
-
                   <AnimatePresence initial={false} mode="wait">
                     {isActive ? (
                       <motion.div key={`open-${manga.id}`} className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-7" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }} transition={{ duration: 0.32 }}>
@@ -101,7 +104,7 @@ export function BlackWhiteYouthAccordion() {
                         <Link to={`/manga/${manga.id}`} className="relative z-30 mt-5 inline-flex h-11 items-center gap-2 bg-white px-5 text-[10px] font-black uppercase tracking-[0.15em] text-black transition hover:bg-[#00C2FF]"><BookOpen size={14} /> Ver manga <ArrowUpRight size={14} /></Link>
                       </motion.div>
                     ) : (
-                      <motion.span key={`closed-${manga.id}`} className="absolute bottom-5 left-1/2 z-20 hidden max-h-[68%] -translate-x-1/2 overflow-hidden text-[11px] font-black uppercase tracking-[0.12em] text-white [text-orientation:mixed] [writing-mode:vertical-rl] sm:block" initial={{ opacity: 0 }} animate={{ opacity: 0.9 }} exit={{ opacity: 0 }}>{title}</motion.span>
+                      <motion.span key={`closed-${manga.id}`} className="absolute inset-0 z-20 hidden -rotate-90 items-center justify-center overflow-visible whitespace-nowrap text-[clamp(1rem,1.8vw,1.55rem)] font-black uppercase tracking-[0.12em] text-white sm:flex" initial={{ opacity: 0 }} animate={{ opacity: 0.26 }} exit={{ opacity: 0 }}>{manga.tipo || 'Manga'}</motion.span>
                     )}
                   </AnimatePresence>
                 </motion.article>
@@ -111,7 +114,9 @@ export function BlackWhiteYouthAccordion() {
         )}
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,rgba(0,194,255,0.12),transparent_66%)]" aria-hidden="true" />
+      <div className="relative z-30 mt-2 w-full">
+        <FilterStripTactical />
+      </div>
     </section>
   );
 }
