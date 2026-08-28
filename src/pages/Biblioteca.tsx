@@ -118,7 +118,7 @@ export const Biblioteca = () => {
         setAllItems(data);
         setAvailableTags(Array.from(tags).sort((a, b) => a.localeCompare(b, "es")));
         setLoading(false);
-        window.requestAnimationFrame(finishGlobalLoading);
+        window.requestAnimationFrame(() => finishGlobalLoading());
       } catch (error) {
         console.error("Biblioteca preload error:", error);
         if (cancelled) return;

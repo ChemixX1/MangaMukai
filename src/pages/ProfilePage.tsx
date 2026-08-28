@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MangaRecommendationSidebar, type RecommendationManga } from '../components/manga';
+import { ProfileMotionBackdrop, type ProfileBackdropCover } from '../components/social';
 import {
   Cake,
+  CalendarDays,
   Camera,
   Check,
   Edit3,
@@ -92,24 +93,20 @@ const formatPostDate = (value = '') => {
   return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
-const buildRecommendations = (items: Awaited<ReturnType<typeof getUltimosCapitulos>>): RecommendationManga[] => {
+const buildProfileCovers = (items: Awaited<ReturnType<typeof getUltimosCapitulos>>): ProfileBackdropCover[] => {
   const seen = new Set<string>();
-  return items.reduce<RecommendationManga[]>((result, manga) => {
+  return items.reduce<ProfileBackdropCover[]>((result, manga) => {
     const id = manga.eroSeri || manga.id;
     const key = String(id);
     if (!id || seen.has(key) || !manga.portada) return result;
     seen.add(key);
-    const chapterNumbers = manga.capitulosRecientes
-      .map((chapter) => Number.parseFloat(chapter.numero))
-      .filter(Number.isFinite);
     result.push({
       id,
-      titulo: manga.titulo,
-      portada: manga.portada,
-      chapterCount: chapterNumbers.length > 0 ? Math.max(...chapterNumbers) : undefined,
+      title: manga.titulo,
+      cover: manga.portada,
     });
     return result;
-  }, []).slice(0, 8);
+  }, []).slice(0, 10);
 };
 
 const UserAvatar = ({ entry, size = 'h-10 w-10' }: { entry: FriendEntry; size?: string }) => entry.user.avatar_url
@@ -135,7 +132,7 @@ export const ProfilePage = () => {
   const [postText, setPostText] = useState('');
   const [postMedia, setPostMedia] = useState<PostMedia | null>(null);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
-  const [recommendations, setRecommendations] = useState<RecommendationManga[]>([]);
+  const [backgroundCovers, setBackgroundCovers] = useState<ProfileBackdropCover[]>([]);
   const [publishing, setPublishing] = useState(false);
   const avatarRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
@@ -150,18 +147,19 @@ export const ProfilePage = () => {
       return;
     }
     let active = true;
-    startGlobalLoading(12);
+    const loadingScope = 'profile-page';
+    startGlobalLoading(12, loadingScope);
     Promise.all([
       getWordPressProfile(user),
       getFriendsOverview().catch(() => emptyFriendsOverview()),
       getProfilePosts(user.id).catch(() => []),
-      getUltimosCapitulos().then(buildRecommendations).catch(() => []),
-    ]).then(([loadedProfile, loadedFriends, loadedPosts, loadedRecommendations]) => {
+      getUltimosCapitulos().then(buildProfileCovers).catch(() => []),
+    ]).then(([loadedProfile, loadedFriends, loadedPosts, loadedBackgroundCovers]) => {
       if (!active) return;
       setProfile(loadedProfile);
       setFriends(loadedFriends);
       setPosts(loadedPosts);
-      setRecommendations(loadedRecommendations);
+      setBackgroundCovers(loadedBackgroundCovers);
     }).catch(() => {
       if (!active) return;
       setProfile(fallbackProfile(user.username, user.avatar || ''));
@@ -170,11 +168,11 @@ export const ProfilePage = () => {
     }).finally(() => {
       if (!active) return;
       setLoading(false);
-      finishGlobalLoading();
+      finishGlobalLoading(loadingScope);
     });
     return () => {
       active = false;
-      finishGlobalLoading();
+      finishGlobalLoading(loadingScope);
     };
   }, [navigate, user]);
 
@@ -298,6 +296,7 @@ export const ProfilePage = () => {
   const card = isLight
     ? 'border-black/[0.08] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
     : 'border-white/[0.08] bg-[#242526] shadow-[0_1px_2px_rgba(0,0,0,0.45)]';
+  const joined = new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(new Date(profile.created_at));
 
   return (
     <main className={`min-h-screen pb-24 transition-colors ${isLight ? 'bg-[#f0f2f5] text-[#1c1e21]' : 'bg-[#18191a] text-white'}`}>
@@ -337,6 +336,7 @@ export const ProfilePage = () => {
                 <div className="min-w-0">
                   {editing ? <input value={profile.username} maxLength={60} onChange={(event) => setProfile((current) => ({ ...current, username: event.target.value }))} className={`w-full max-w-xl rounded-lg border px-4 py-3 text-2xl font-black outline-none focus:border-[#FF4D88]/60 ${input}`} /> : <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start"><h1 className="break-words text-3xl font-black tracking-[-0.035em] md:text-4xl">{profile.username}</h1>{profile.is_pro && <span className="rounded bg-yellow-400 px-2 py-1 text-[9px] font-black text-black">MUKAI PRO</span>}</div>}
                   <div className={`mt-2 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold sm:justify-start ${muted}`}>
+                    <span className="flex items-center gap-1.5"><CalendarDays size={14} className="text-[#FF4D88]" />Miembro desde {joined}</span>
                     <span>{friends.friends.length} {friends.friends.length === 1 ? 'amigo' : 'amigos'}</span>
                     <span className="flex items-center gap-1.5"><MapPin size={14} />{profile.location || 'Ubicación sin configurar'}</span>
                   </div>
@@ -357,11 +357,13 @@ export const ProfilePage = () => {
         </div>
       </section>
 
-      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+      <div className="relative isolate min-h-[680px] overflow-hidden">
+        <ProfileMotionBackdrop covers={backgroundCovers} isLight={isLight} />
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
         {notice && <p className={`mb-5 rounded-lg border px-4 py-3 text-xs font-semibold ${notice.type === 'success' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500' : 'border-red-500/20 bg-red-500/10 text-red-400'}`}>{notice.text}</p>}
 
         {activeSection === 'summary' && (
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="mx-auto max-w-3xl">
             <div className="space-y-4">
             <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-composer-title">
               <h2 id="profile-composer-title" className="sr-only">Crear publicación</h2>
@@ -411,11 +413,6 @@ export const ProfilePage = () => {
             {posts.length === 0 && <div className={`rounded-xl border border-dashed py-12 text-center ${isLight ? 'border-black/15 bg-white/45' : 'border-white/15 bg-white/[0.025]'}`}><ImageIcon size={30} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">Comparte tu primera actualización</p><p className={`mt-1 text-xs ${muted}`}>Publica una idea, una imagen o un video para tu comunidad.</p></div>}
             </div>
 
-            {recommendations.length > 0 && (
-              <div className="lg:sticky lg:top-20">
-                <MangaRecommendationSidebar items={recommendations} isLight={isLight} title="Mangas recomendados" />
-              </div>
-            )}
           </div>
         )}
 
@@ -428,7 +425,7 @@ export const ProfilePage = () => {
             </article>
 
             <article className={`rounded-xl border p-5 ${card}`}>
-              <div className="flex items-center justify-between"><h2 className="text-xl font-black tracking-tight">Redes y enlaces</h2><ExternalLink size={18} className="text-[#FF4D88]" /></div>
+              <div className="flex items-center justify-between"><h2 className="text-xl font-black tracking-tight">Redes sociales</h2><ExternalLink size={18} className="text-[#FF4D88]" /></div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {SOCIAL_FIELDS.map((field) => editing ? (
                   <label key={field.key} className="block"><span className={`mb-1.5 block text-[10px] font-bold ${muted}`}>{field.label}</span><input value={profile.social_links[field.key]} onChange={(event) => setProfile((current) => ({ ...current, social_links: { ...current.social_links, [field.key]: event.target.value } }))} placeholder={field.placeholder} className={`w-full rounded-lg border px-3 py-2.5 text-xs outline-none focus:border-[#FF4D88]/60 ${input}`} /></label>
@@ -437,7 +434,7 @@ export const ProfilePage = () => {
                     ? <span key={field.key} className={`rounded-lg px-3 py-2.5 text-xs font-bold ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}: {profile.social_links[field.key]}</span>
                     : <a key={field.key} href={profile.social_links[field.key]} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2.5 text-xs font-bold transition-colors hover:text-[#FF4D88] ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}</a>
                 ) : null)}
-                {!editing && !Object.values(profile.social_links).some(Boolean) && <p className={`text-xs ${muted}`}>Todavía no agregaste enlaces públicos.</p>}
+                {!editing && !Object.values(profile.social_links).some(Boolean) && <p className={`text-xs ${muted}`}>Todavía no agregaste redes sociales.</p>}
               </div>
             </article>
 
@@ -472,6 +469,7 @@ export const ProfilePage = () => {
               {friends.outgoing.length > 0 && <div className={`mt-5 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}><h3 className={`mb-2 text-[10px] font-black uppercase tracking-wider ${muted}`}>Solicitudes enviadas</h3><div className="flex flex-wrap gap-2">{friends.outgoing.map((entry) => <Link key={entry.request_id} to={`/usuarios/${entry.user.id}`} className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><UserAvatar entry={entry} size="h-5 w-5" />{entry.user.username}</Link>)}</div></div>}
             </section>
         )}
+        </div>
       </div>
     </main>
   );

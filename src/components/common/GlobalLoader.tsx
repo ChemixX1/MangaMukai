@@ -26,6 +26,7 @@ export const GlobalLoader = () => {
   const maximumTimerRef = useRef<number | null>(null);
   const routeLoadingRef = useRef(false);
   const explicitLoadingRef = useRef(false);
+  const activeScopesRef = useRef(new Set<string>());
   const beginRef = useRef<((initialProgress?: number, isRouteLoading?: boolean) => void) | null>(null);
   const finishRef = useRef<((force?: boolean) => void) | null>(null);
   const previousRouteRef = useRef<string | null>(null);
@@ -79,6 +80,7 @@ export const GlobalLoader = () => {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 
       maximumTimerRef.current = window.setTimeout(() => {
+        activeScopesRef.current.clear();
         explicitLoadingRef.current = false;
         routeLoadingRef.current = false;
         finish(true);
@@ -104,6 +106,7 @@ export const GlobalLoader = () => {
       if (!detail) return;
 
       if (detail.status === 'start') {
+        activeScopesRef.current.add(detail.scope || 'page');
         explicitLoadingRef.current = true;
         begin(detail.progress ?? 8, true);
         return;
@@ -114,6 +117,8 @@ export const GlobalLoader = () => {
       }
 
       if (detail.status === 'complete') {
+        activeScopesRef.current.delete(detail.scope || 'page');
+        if (activeScopesRef.current.size > 0) return;
         explicitLoadingRef.current = false;
         routeLoadingRef.current = false;
         finish();

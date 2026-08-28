@@ -20,7 +20,6 @@ interface SavedItem {
     cover_url: string;
     rating: number;
     status: string;
-    chapter_count: number;
     target_audience: string;
   };
 }
@@ -35,8 +34,9 @@ export const SavedMangas = () => {
   // 1. Cargar Usuario y Favoritos
   useEffect(() => {
     let active = true;
+    const loadingScope = 'saved-mangas';
     const fetchData = async () => {
-      startGlobalLoading(12);
+      startGlobalLoading(12, loadingScope);
       setLoading(true);
       try {
         const currentUser = getStoredUser();
@@ -55,7 +55,6 @@ export const SavedMangas = () => {
               cover_url: manga!.portada,
               rating: 5,
               status: manga!.tipo,
-              chapter_count: manga!.capitulosRecientes.length,
               target_audience: manga!.genero || ((manga!.genres || []).some((genre) => String(genre).includes('Manhwa')) ? 'Hombre' : 'Mujer'),
             },
           }));
@@ -66,14 +65,14 @@ export const SavedMangas = () => {
         if (active) setSavedItems([]);
       } finally {
         if (active) setLoading(false);
-        finishGlobalLoading();
+        finishGlobalLoading(loadingScope);
       }
     };
 
     void fetchData();
     return () => {
       active = false;
-      finishGlobalLoading();
+      finishGlobalLoading(loadingScope);
     };
   }, []);
 
@@ -181,9 +180,6 @@ export const SavedMangas = () => {
                                         <h3 className="text-xs font-black text-white uppercase italic tracking-tight line-clamp-2 leading-tight mb-1 group-hover:text-[#FF4D88] transition-colors">
                                             {manga.title}
                                         </h3>
-                                        <p className="text-[10px] text-zinc-400 font-mono">
-                                            {manga.chapter_count} Caps
-                                        </p>
                                     </div>
                                 </Link>
 

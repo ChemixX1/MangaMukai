@@ -260,7 +260,7 @@ export const Navbar = () => {
 
   return (
     <>
-      <header className={`${isMobileMenuOpen ? 'fixed' : isProfileRoute ? 'sticky' : 'absolute'} ${isProfileRoute ? 'profile-navbar-surface py-3 sm:py-3' : 'auth-navbar-gradient py-4 sm:py-6'} left-0 top-0 z-[100] w-full`}>
+      <header className={`${isMobileMenuOpen ? 'fixed' : isProfileRoute ? 'sticky' : 'absolute'} site-navbar-surface left-0 top-0 z-[100] w-full py-3 sm:py-3`}>
         <div className="desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16 flex justify-between items-center">
             
             {/* 1. IZQUIERDA */}
@@ -272,18 +272,18 @@ export const Navbar = () => {
               </Link>
 
               <nav className="hidden h-10 items-center gap-8 lg:translate-y-0.5 lg:flex">
-                <Link to="/" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/" className={`navbar-primary-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Inicio
                 </Link>
 
-                <Link to="/biblioteca" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/biblioteca" className={`navbar-primary-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Biblioteca
                 </Link>
 
-                <Link to="/manga-bn" className={`navbar-primary-link share-tech-regular inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/manga-bn" className={`navbar-primary-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Mangas B&N
                 </Link>
-                <Link to="/manga-19" className={`navbar-primary-link share-tech-regular navbar-adult-link inline-flex h-full items-center text-[15px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.055em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <Link to="/manga-19" className={`navbar-primary-link navbar-adult-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   <span className="navbar-adult-option inline-flex items-center gap-1.5">
                     <NavbarFire size={17} />
                     <span className="navbar-adult-label">Mangas <span className="navbar-adult-number">+19</span></span>
@@ -469,7 +469,7 @@ export const Navbar = () => {
                     to={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`navbar-primary-link share-tech-regular group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.25rem,6vw,1.55rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
+                    className={`navbar-primary-link group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.1rem,5.4vw,1.35rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
                   >
                     <span className={`inline-flex items-center justify-center gap-2 ${link.isAdult ? 'navbar-adult-option' : ''}`}>
                       {link.isAdult && <NavbarFire size={22} />}

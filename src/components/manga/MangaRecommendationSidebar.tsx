@@ -17,11 +17,13 @@ export function MangaRecommendationSidebar({
   currentId,
   isLight,
   title = 'Mangas similares',
+  compactDesktop = false,
 }: {
   items: RecommendationManga[];
   currentId?: number | string;
   isLight: boolean;
   title?: string;
+  compactDesktop?: boolean;
 }) {
   const visibleItems = items
     .filter((item) => currentId === undefined || String(item.id) !== String(currentId))
@@ -32,7 +34,7 @@ export function MangaRecommendationSidebar({
   return (
     <aside className={`rounded-2xl border p-3 backdrop-blur-xl xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-hidden ${isLight ? 'border-black/10 bg-white/75' : 'border-white/10 bg-black/55'}`} aria-label={title}>
       <h2 className={`mb-3 px-1 text-center text-sm font-black uppercase tracking-[0.05em] ${isLight ? 'text-black' : 'text-white'}`}>{title}</h2>
-      <div className="manga-related-marquee relative h-[570px] overflow-hidden rounded-xl xl:h-auto xl:min-h-[520px] xl:max-h-[620px] xl:flex-1">
+      <div className={`manga-related-marquee relative h-[570px] overflow-hidden rounded-xl xl:h-auto xl:flex-1 ${compactDesktop ? 'xl:min-h-[520px] xl:max-h-[620px]' : 'xl:min-h-0 xl:max-h-none'}`}>
         <div className="manga-related-marquee-track">
           {[0, 1].map((copyIndex) => (
             <div key={`recommendation-sequence-${copyIndex}`} className="manga-related-marquee-sequence" aria-hidden={copyIndex === 1 ? true : undefined}>

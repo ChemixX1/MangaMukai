@@ -34,6 +34,36 @@ interface AuthResponse {
   message?: string;
 }
 
+interface SocialSessionResult {
+  ok: boolean;
+  data: AuthResponse;
+}
+
+const socialSessionRequests = new Map<string, Promise<SocialSessionResult>>();
+
+const exchangeSocialSession = (code: string) => {
+  const requestKey = code || 'wordpress-cookie';
+  const existing = socialSessionRequests.get(requestKey);
+  if (existing) return existing;
+
+  const body = code ? new URLSearchParams({ code }) : undefined;
+  const request = fetch(SOCIAL_LOGIN_SESSION_URL, {
+    method: "POST",
+    credentials: "include",
+    body,
+  }).then(async (response) => ({
+    ok: response.ok,
+    data: (await response.json()) as AuthResponse,
+  }));
+
+  socialSessionRequests.set(requestKey, request);
+  void request.then(
+    () => window.setTimeout(() => socialSessionRequests.delete(requestKey), 1500),
+    () => window.setTimeout(() => socialSessionRequests.delete(requestKey), 1500),
+  );
+  return request;
+};
+
 const COUNTRY_CODES = [
   { code: "+51", iso: "pe", country: "Perú" },
   { code: "+54", iso: "ar", country: "Argentina" },
@@ -361,17 +391,14 @@ export const AuthPage = () => {
   useEffect(() => {
     const query = new URLSearchParams(location.search);
     const provider = query.get("social") || query.get("return_provider");
+    const socialCode = query.get("social_code") || "";
     if (provider !== "google" && provider !== "discord") return;
 
     let active = true;
     setLoading(true);
     setError(null);
-    void fetch(SOCIAL_LOGIN_SESSION_URL, {
-      method: "POST",
-      credentials: "include",
-    }).then(async (response) => {
-      const data = (await response.json()) as AuthResponse;
-      if (!response.ok || !data.success || !data.token || !data.user) {
+    void exchangeSocialSession(socialCode).then(({ ok, data }) => {
+      if (!ok || !data.success || !data.token || !data.user) {
         throw new Error(data.message || `No se pudo completar el acceso con ${provider === "google" ? "Google" : "Discord"}.`);
       }
       if (!active) return;

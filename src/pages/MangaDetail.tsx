@@ -35,6 +35,7 @@ import {
   toggleBookmarkWithTotal,
   toggleMangaLike,
 } from '../services/interactionsService';
+import { getMangaComments, type MangaComment } from '../services/communityService';
 import {
   getStoredToken,
   getStoredUser,
@@ -121,8 +122,8 @@ export const MangaDetail = () => {
   const [manga, setManga] = useState<MangaCapitulo | null>(null);
   const [chapters, setChapters] = useState<SeriesChapter[]>([]);
   const [related, setRelated] = useState<RelatedManga[]>([]);
+  const [initialComments, setInitialComments] = useState<MangaComment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [chaptersLoading, setChaptersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   const [synopsisHasOverflow, setSynopsisHasOverflow] = useState(false);
@@ -230,19 +231,20 @@ export const MangaDetail = () => {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    startGlobalLoading(10);
+    const loadingScope = `manga-detail:${id}`;
+    startGlobalLoading(10, loadingScope);
     setLoading(true);
     setError(null);
     setManga(null);
     setChapters([]);
     setRelated([]);
+    setInitialComments([]);
     setSynopsisExpanded(false);
     setActiveContent('chapters');
     setChapterSearch('');
     setChapterSortOrder('desc');
     setSelectedReaction(null);
     setReactionCounts(createReactionCounts());
-    setChaptersLoading(true);
     setEngagement({ online: 0, bookmarks: 0, likes: 0 });
 
     const fetchData = async () => {
@@ -252,8 +254,7 @@ export const MangaDetail = () => {
         if (!mangaData) {
           setError('Manga no encontrado.');
           setLoading(false);
-          setChaptersLoading(false);
-          finishGlobalLoading();
+          finishGlobalLoading(loadingScope);
           return;
         }
 
@@ -261,9 +262,10 @@ export const MangaDetail = () => {
         updateGlobalLoading(36);
         const mangaPostId = mangaData.eroSeri || mangaData.id;
 
-        const [chapterData, relatedData] = await Promise.all([
+        const [chapterData, relatedData, commentData] = await Promise.all([
           getChaptersBySeries(mangaPostId),
           getRelatedMangas(mangaPostId, 18),
+          getMangaComments(String(mangaData.id)),
           loadInteractions(String(mangaData.id)),
         ]);
         if (!active) return;
@@ -275,9 +277,9 @@ export const MangaDetail = () => {
         if (!active) return;
         setChapters(chapterData);
         setRelated(relatedData);
+        setInitialComments(commentData);
         setLoading(false);
-        setChaptersLoading(false);
-        finishGlobalLoading();
+        finishGlobalLoading(loadingScope);
 
         void getUltimosCapitulos().then((catalog) => {
           if (!active || catalog.length === 0) return;
@@ -298,8 +300,7 @@ export const MangaDetail = () => {
         if (active) {
           setError('No se pudo cargar el manga.');
           setLoading(false);
-          setChaptersLoading(false);
-          finishGlobalLoading();
+          finishGlobalLoading(loadingScope);
         }
       }
     };
@@ -307,7 +308,7 @@ export const MangaDetail = () => {
     void fetchData();
     return () => {
       active = false;
-      finishGlobalLoading();
+      finishGlobalLoading(loadingScope);
     };
   }, [id, loadInteractions]);
 
@@ -475,7 +476,7 @@ export const MangaDetail = () => {
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" onClick={handleReadFirst} disabled={chaptersLoading || !firstChapter} className="poppins-bold flex min-h-[48px] items-center justify-center rounded-md bg-[#FF4D88] px-3 py-3 text-[14px] text-white transition hover:-translate-y-0.5 hover:bg-[#ef2f73] disabled:cursor-not-allowed disabled:opacity-45">
+                <button type="button" onClick={handleReadFirst} disabled={!firstChapter} className="poppins-bold flex min-h-[48px] items-center justify-center rounded-md bg-[#FF4D88] px-3 py-3 text-[14px] text-white transition hover:-translate-y-0.5 hover:bg-[#ef2f73] disabled:cursor-not-allowed disabled:opacity-45">
                   Leer capítulo 1
                 </button>
                 <button type="button" onClick={handleBookmark} className={`poppins-regular flex min-h-[48px] items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-[14px] transition ${isBookmarked ? 'border-[#FF4D88]/40 bg-[#FF4D88]/15 text-[#FF4D88]' : isLightMode ? 'border-black/10 bg-white/80 text-black hover:border-[#FF4D88]' : 'border-white/10 bg-white/10 text-white hover:border-[#FF4D88]'}`}>
@@ -569,9 +570,7 @@ export const MangaDetail = () => {
                       <ArrowDown strokeWidth={2.2} className={`manga-chapter-sort-arrow ${chapterSortOrder === 'desc' ? 'opacity-100' : 'opacity-30'}`} />
                     </button>
                   </div>
-                  {chaptersLoading ? (
-                    <div className={`flex items-center justify-center gap-3 rounded-2xl border py-20 ${isLightMode ? 'border-black/10 bg-white/70 text-black/35' : 'border-white/10 bg-black/50 text-white/35'}`}><Loader2 className="animate-spin" size={20} /><span className="text-[10px] font-bold">Cargando capítulos</span></div>
-                  ) : chapterSearch.trim() && filteredChapters.length === 0 ? (
+                  {chapterSearch.trim() && filteredChapters.length === 0 ? (
                     <div className={`rounded-2xl border px-5 py-16 text-center text-sm ${isLightMode ? 'border-black/10 bg-white/70 text-black/45' : 'border-white/10 bg-black/50 text-white/40'}`}>No encontramos capítulos con esa búsqueda.</div>
                   ) : (
                     <ChapterList chapters={filteredChapters} purchasedChapterIds={purchasedIds} userCoins={userCoins} userInfo={userInfo} onPurchaseSuccess={handlePurchaseSuccess} isLight={isLightMode} sortOrder={chapterSortOrder} />
@@ -617,7 +616,7 @@ export const MangaDetail = () => {
       </section>
 
       <div id="comentarios" className="relative z-10 scroll-mt-28">
-        <MangaComments mangaId={String(manga.id)} isLight={isLightMode} />
+        <MangaComments mangaId={String(manga.id)} initialComments={initialComments} isLight={isLightMode} />
       </div>
       <Footer />
     </main>

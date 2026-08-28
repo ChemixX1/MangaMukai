@@ -216,7 +216,7 @@ export default function Hero() {
         <AnimatePresence initial={false} mode="popLayout">
           {!loading && activeItem && (
             <motion.div key={activeItem.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.2 }} className="absolute inset-0">
-              <img src={activeItem.backgroundHero} alt="" className="home-hero-backdrop-image home-theme-backdrop-image h-full w-full object-cover" />
+              <img src={activeItem.backgroundHero} alt="" className="home-hero-backdrop-image home-main-hero-backdrop-image home-theme-backdrop-image h-full w-full object-cover" />
               <div aria-hidden="true" className="home-hero-theme-scrim absolute inset-0" />
             </motion.div>
           )}

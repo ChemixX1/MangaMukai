@@ -29,11 +29,11 @@ RewriteCond %{QUERY_STRING} (^|&)mm_(coin|sub)_ipn=1(&|$)
 RewriteRule ^$ /index.php [L]
 
 # Google/Discord OAuth starts and callbacks must reach WordPress, not the SPA.
-RewriteCond %{QUERY_STRING} (^|&)provider=(google|discord)(&|$) [NC]
+RewriteCond %{QUERY_STRING} (^|&)(provider|return_provider)=(google|discord)(&|$) [NC]
 RewriteRule ^(login|register)/?$ /index.php [L,QSA]
 
-# Exchange the authenticated WordPress cookie for a MangaMukai React session.
-RewriteCond %{QUERY_STRING} (^|&)mm_social_session=1(&|$) [NC]
+# Exchange the OAuth result or an authenticated WordPress cookie for React.
+RewriteCond %{QUERY_STRING} (^|&)mm_social_(session|return)=1(&|$) [NC]
 RewriteRule ^$ /index.php [L,QSA]
 
 # Serve real files and directories directly.

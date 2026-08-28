@@ -380,10 +380,17 @@ html {
 }
 
 .home-hero-backdrop-image {
+  --home-backdrop-shift-y: 0px;
   filter: brightness(0.64) contrast(1.08);
   object-position: center 30%;
-  transform: scale(1.04);
+  transform: translateY(var(--home-backdrop-shift-y)) scale(1.04);
   transition: filter 700ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Inicio: baja el lienzo para conservar el logotipo incluido en la parte alta. */
+.home-main-hero-backdrop-image {
+  --home-backdrop-shift-y: 20px;
+  object-position: center 10%;
 }
 
 .home-theme-backdrop-base,
@@ -403,7 +410,12 @@ html {
 @media (max-width: 767px) {
   .home-hero-backdrop-image {
     object-position: center 52%;
-    transform: scale(1.12);
+    transform: translateY(var(--home-backdrop-shift-y)) scale(1.12);
+  }
+
+  .home-main-hero-backdrop-image {
+    --home-backdrop-shift-y: 14px;
+    object-position: center 34%;
   }
 
   .home-showcase-cover-image {
@@ -774,9 +786,9 @@ html {
 }
 
 .navbar-primary-link {
-  font-family: "Google Sans Flex", sans-serif;
-  font-weight: 700;
-  font-style: italic;
+  font-family: "Garet", "Montserrat", sans-serif;
+  font-weight: 600;
+  font-style: normal;
 }
 
 .navbar-adult-link,
@@ -1204,8 +1216,8 @@ html.dark .auth-navbar-gradient::before {
   background: linear-gradient(to bottom, rgba(8, 8, 11, 0.99) 0%, rgba(8, 8, 11, 0.84) 48%, rgba(8, 8, 11, 0) 100%);
 }
 
-/* Perfil: barra rectangular sólida, separada de la portada al estilo de una red social. */
-.profile-navbar-surface {
+/* Barra rectangular sólida, separada del contenido al estilo de una red social. */
+.site-navbar-surface {
   isolation: isolate;
   border-bottom: 1px solid rgba(15, 23, 42, 0.1);
   background: rgba(255, 255, 255, 0.96);
@@ -1213,7 +1225,7 @@ html.dark .auth-navbar-gradient::before {
   backdrop-filter: blur(18px) saturate(1.25);
 }
 
-html.dark .profile-navbar-surface {
+html.dark .site-navbar-surface {
   border-bottom-color: rgba(255, 255, 255, 0.1);
   background: rgba(13, 14, 18, 0.96);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);

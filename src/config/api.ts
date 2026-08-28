@@ -12,10 +12,20 @@ export const wordpressUrl = (path: string) =>
   `${WEBSITE_URL}/${path.replace(/^\/+/, "")}`;
 
 export const socialLoginUrl = (provider: 'google' | 'discord') => {
-  const callbackUrl = `${WEBSITE_URL}/auth/login?social=${provider}`;
+  const localOrigin = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? trimTrailingSlash(window.location.origin)
+    : '';
+  const callbackUrl = `${localOrigin || WEBSITE_URL}/auth/login?social=${provider}`;
+  const redirectUrl = localOrigin
+    ? `${WEBSITE_URL}/?${new URLSearchParams({
+        mm_social_return: '1',
+        provider,
+        target: callbackUrl,
+      }).toString()}`
+    : callbackUrl;
   const query = new URLSearchParams({
     provider,
-    redirect_to: callbackUrl,
+    redirect_to: redirectUrl,
   });
   return `${WEBSITE_URL}/login/?${query.toString()}`;
 };

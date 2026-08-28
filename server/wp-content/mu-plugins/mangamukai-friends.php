@@ -2,7 +2,7 @@
 /**
  * Plugin Name: MangaMukai Social
  * Description: Perfiles publicos, amistades, chat, notificaciones y seguimiento de mangas para React.
- * Version: 3.0.0
+ * Version: 3.0.2
  */
 
 if (!defined('ABSPATH')) exit;
@@ -92,10 +92,20 @@ function mm_social_install_schema() {
 }
 add_action('init', 'mm_social_install_schema', 5);
 
-function mm_social_auth_permission() {
-    return get_current_user_id() > 0
-        ? true
-        : new WP_Error('mm_social_unauthorized', 'Debes iniciar sesion.', ['status' => 401]);
+function mm_social_auth_permission(WP_REST_Request $request) {
+    $user = function_exists('mm_get_request_user')
+        ? mm_get_request_user($request)
+        : (is_user_logged_in() ? wp_get_current_user() : null);
+
+    if ($user instanceof WP_User && $user->ID) {
+        // Las rutas sociales usan get_current_user_id() dentro de sus callbacks.
+        // Vincular aquí el Bearer token evita depender de una cookie de WordPress,
+        // que no está disponible cuando React se ejecuta desde localhost.
+        wp_set_current_user((int) $user->ID);
+        return true;
+    }
+
+    return new WP_Error('mm_social_unauthorized', 'Debes iniciar sesion.', ['status' => 401]);
 }
 
 function mm_social_pair($first, $second) {
@@ -201,6 +211,12 @@ function mm_social_create_notification($user_id, $actor_id, $type, $entity_id, $
 }
 
 function mm_social_get_public_profile(WP_REST_Request $request) {
+    if (function_exists('mm_get_request_user')) {
+        $viewer = mm_get_request_user($request);
+        if ($viewer instanceof WP_User && $viewer->ID) {
+            wp_set_current_user((int) $viewer->ID);
+        }
+    }
     $id = absint($request->get_param('id'));
     $profile = mm_social_public_user($id, true);
     if (!$profile) return new WP_Error('mm_social_profile_missing', 'Perfil no encontrado.', ['status' => 404]);

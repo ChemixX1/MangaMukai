@@ -15,7 +15,6 @@ import {
   X,
 } from 'lucide-react';
 import {
-  getMangaComments,
   notifyCommentReaction,
   postMangaComment,
   toggleCommentLike,
@@ -26,6 +25,7 @@ import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from '../../services
 
 interface MangaCommentsProps {
   mangaId: string;
+  initialComments: MangaComment[];
   isLight?: boolean;
 }
 
@@ -111,10 +111,9 @@ const renderCommentContent = (value: string) => value
       : <span key={`comment-text-${index}`}>{part}</span>;
   });
 
-export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) => {
+export const MangaComments = ({ mangaId, initialComments, isLight = false }: MangaCommentsProps) => {
   const navigate = useNavigate();
-  const [comments, setComments] = useState<MangaComment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [comments, setComments] = useState<MangaComment[]>(initialComments);
   const [posting, setPosting] = useState(false);
   const [content, setContent] = useState('');
   const [visibleCount, setVisibleCount] = useState(3);
@@ -142,23 +141,12 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
   }, [composerTool]);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    getMangaComments(mangaId)
-      .then((items) => {
-        if (!active) return;
-        setComments(items);
-        setCommentReactionSelections(Object.fromEntries(
-          items.filter((comment) => comment.is_liked_by_user).map((comment) => [comment.id, 'like']),
-        ));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [mangaId]);
+    setComments(initialComments);
+    setVisibleCount(3);
+    setCommentReactionSelections(Object.fromEntries(
+      initialComments.filter((comment) => comment.is_liked_by_user).map((comment) => [comment.id, 'like']),
+    ));
+  }, [initialComments, mangaId]);
 
   useEffect(() => {
     const updateProfile = (event: Event) => {
@@ -541,7 +529,7 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
               </button>
               {composerTool === 'emojis' && (
                 <div className="manga-comment-emoji-picker absolute bottom-full left-0 z-30 mb-2">
-                  <Suspense fallback={<div className={`flex h-[420px] w-full items-center justify-center rounded-2xl border ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-[#101010]'}`}><Loader2 size={22} className="animate-spin text-[#FF4D88]" /></div>}>
+                  <Suspense fallback={null}>
                     <EmojiPicker
                       onEmojiClick={handleEmojiClick}
                       theme={(isLight ? 'light' : 'dark') as Theme}
@@ -581,11 +569,7 @@ export const MangaComments = ({ mangaId, isLight = false }: MangaCommentsProps) 
         </form>
 
         <div className="min-h-72">
-          {loading ? (
-            <div className={`flex min-h-72 items-center justify-center ${isLight ? 'text-black/25' : 'text-white/25'}`}>
-              <Loader2 size={24} className="animate-spin" />
-            </div>
-          ) : topLevelComments.length === 0 ? (
+          {topLevelComments.length === 0 ? (
             <div className={`flex min-h-72 flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center ${isLight ? 'border-black/10 bg-zinc-50' : 'border-white/10 bg-[#080808]'}`}>
               <span className={`mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
                 <MessageSquareText size={30} className={isLight ? 'text-black/25' : 'text-white/20'} />
