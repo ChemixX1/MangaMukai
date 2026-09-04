@@ -787,8 +787,135 @@ html {
 
 .navbar-primary-link {
   font-family: "Garet", "Montserrat", sans-serif;
-  font-weight: 600;
+  font-weight: 400;
   font-style: normal;
+}
+
+.profile-user-popover,
+.profile-user-popover button,
+.profile-user-popover a,
+.profile-user-menu-option {
+  font-family: "Montserrat", sans-serif;
+  font-weight: 600;
+}
+
+@keyframes profile-covers-forward {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes profile-covers-reverse {
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+.profile-cover-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.profile-cover-field {
+  position: absolute;
+  inset: -7% -5%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: clamp(12px, 2vh, 22px);
+  transform: rotate(-1.8deg) scale(1.055);
+  transform-origin: center;
+}
+
+.profile-cover-row {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+.profile-cover-track,
+.profile-cover-sequence {
+  display: flex;
+  height: 100%;
+}
+
+.profile-cover-track {
+  width: max-content;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.profile-cover-track-forward { animation: profile-covers-forward 64s linear infinite; }
+.profile-cover-track-reverse { animation: profile-covers-reverse 70s linear infinite; }
+
+.profile-cover-sequence {
+  flex: none;
+  gap: clamp(10px, 1.15vw, 18px);
+  padding-right: clamp(10px, 1.15vw, 18px);
+}
+
+.profile-cover-card {
+  height: 100%;
+  max-height: 280px;
+  aspect-ratio: 2 / 3;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: clamp(10px, 1.2vw, 18px);
+  background: #111116;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+}
+
+.profile-cover-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.9) contrast(1.04);
+}
+
+.profile-cover-glow,
+.profile-cover-veil {
+  position: absolute;
+  inset: 0;
+}
+
+.profile-cover-glow {
+  background:
+    radial-gradient(circle at 16% 20%, rgba(255, 77, 136, 0.22), transparent 34%),
+    radial-gradient(circle at 84% 72%, rgba(124, 58, 237, 0.18), transparent 36%);
+}
+
+.profile-cover-backdrop-light .profile-cover-field { opacity: 0.52; }
+.profile-cover-backdrop-dark .profile-cover-field { opacity: 0.58; }
+.profile-cover-backdrop-light .profile-cover-veil {
+  background: linear-gradient(180deg, rgba(240, 242, 245, 0.58), rgba(240, 242, 245, 0.38) 48%, rgba(240, 242, 245, 0.66));
+}
+.profile-cover-backdrop-dark .profile-cover-veil {
+  background: linear-gradient(180deg, rgba(24, 25, 26, 0.58), rgba(24, 25, 26, 0.34) 48%, rgba(24, 25, 26, 0.7));
+}
+
+@media (max-width: 639px) {
+  .profile-cover-field {
+    inset: -5% -14%;
+    gap: 10px;
+    transform: rotate(-1.2deg) scale(1.04);
+  }
+
+  .profile-cover-card { max-height: 205px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-cover-track {
+    animation: none;
+    will-change: auto;
+  }
+
+  .profile-cover-row:nth-child(even) .profile-cover-track {
+    transform: translateX(-22%);
+  }
 }
 
 .navbar-adult-link,

@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { getStoredToken, getStoredUser } from '../services/authService';
+import { getStoredToken, getStoredUser, updateStoredUser } from '../services/authService';
 import { getUltimosCapitulos } from '../services/mangaService';
 import {
   emptyFriendsOverview,
@@ -42,6 +42,7 @@ import {
   type ProfilePost,
 } from '../services/profilePostService';
 import { finishGlobalLoading, startGlobalLoading } from '../utils/globalLoading';
+import { getSharedAuthCovers } from '../utils/authCoverCache';
 import {
   emptySocialLinks,
   getWordPressProfile,
@@ -109,6 +110,10 @@ const buildProfileCovers = (items: Awaited<ReturnType<typeof getUltimosCapitulos
   }, []).slice(0, 10);
 };
 
+const getCachedProfileCovers = (): ProfileBackdropCover[] => (getSharedAuthCovers() || [])
+  .slice(0, 10)
+  .map((cover, index) => ({ id: `cached-profile-${index}`, title: cover.title, cover: cover.src }));
+
 const UserAvatar = ({ entry, size = 'h-10 w-10' }: { entry: FriendEntry; size?: string }) => entry.user.avatar_url
   ? <img src={entry.user.avatar_url} alt="" className={`${size} shrink-0 rounded-full object-cover ring-2 ring-[#FF4D88]/25`} />
   : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#FF4D88] text-sm font-black text-white`}>{entry.user.username.charAt(0).toUpperCase()}</span>;
@@ -125,6 +130,7 @@ export const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveConfirmed, setSaveConfirmed] = useState(false);
   const [imageType, setImageType] = useState<'avatar' | 'banner' | null>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actionId, setActionId] = useState<number | null>(null);
@@ -132,13 +138,14 @@ export const ProfilePage = () => {
   const [postText, setPostText] = useState('');
   const [postMedia, setPostMedia] = useState<PostMedia | null>(null);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
-  const [backgroundCovers, setBackgroundCovers] = useState<ProfileBackdropCover[]>([]);
+  const [backgroundCovers, setBackgroundCovers] = useState<ProfileBackdropCover[]>(getCachedProfileCovers);
   const [publishing, setPublishing] = useState(false);
   const avatarRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
   const postImageRef = useRef<HTMLInputElement>(null);
   const postVideoRef = useRef<HTMLInputElement>(null);
   const postMediaUrlsRef = useRef(new Set<string>());
+  const saveConfirmationRef = useRef<number | null>(null);
   const user = useMemo(() => getStoredUser(), []);
 
   useEffect(() => {
@@ -153,10 +160,18 @@ export const ProfilePage = () => {
       getWordPressProfile(user),
       getFriendsOverview().catch(() => emptyFriendsOverview()),
       getProfilePosts(user.id).catch(() => []),
-      getUltimosCapitulos().then(buildProfileCovers).catch(() => []),
+      getUltimosCapitulos()
+        .then((items) => buildProfileCovers(items))
+        .then((covers) => covers.length > 0 ? covers : getCachedProfileCovers())
+        .catch(getCachedProfileCovers),
     ]).then(([loadedProfile, loadedFriends, loadedPosts, loadedBackgroundCovers]) => {
       if (!active) return;
       setProfile(loadedProfile);
+      updateStoredUser({
+        username: loadedProfile.username,
+        display_name: loadedProfile.username,
+        avatar: loadedProfile.avatar_url,
+      });
       setFriends(loadedFriends);
       setPosts(loadedPosts);
       setBackgroundCovers(loadedBackgroundCovers);
@@ -179,6 +194,7 @@ export const ProfilePage = () => {
   useEffect(() => () => {
     postMediaUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     postMediaUrlsRef.current.clear();
+    if (saveConfirmationRef.current) window.clearTimeout(saveConfirmationRef.current);
   }, []);
 
   const reloadFriends = async () => setFriends(await getFriendsOverview());
@@ -214,7 +230,12 @@ export const ProfilePage = () => {
       const result = await saveWordPressProfile(profile);
       if (!result.success) throw new Error(result.message);
       setEditing(false);
-      setNotice({ type: 'success', text: 'Perfil guardado y sincronizado.' });
+      setSaveConfirmed(true);
+      if (saveConfirmationRef.current) window.clearTimeout(saveConfirmationRef.current);
+      saveConfirmationRef.current = window.setTimeout(() => {
+        setSaveConfirmed(false);
+        saveConfirmationRef.current = null;
+      }, 1250);
     } catch (caught) {
       setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo guardar el perfil.' });
     } finally {
@@ -244,6 +265,19 @@ export const ProfilePage = () => {
       await reloadFriends();
     } catch (caught) {
       setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo eliminar la amistad.' });
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleCancelRequest = async (entry: FriendEntry) => {
+    setActionId(entry.request_id);
+    setNotice(null);
+    try {
+      await removeFriend(entry.user.id);
+      await reloadFriends();
+    } catch (caught) {
+      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo cancelar la solicitud.' });
     } finally {
       setActionId(null);
     }
@@ -341,9 +375,24 @@ export const ProfilePage = () => {
                     <span className="flex items-center gap-1.5"><MapPin size={14} />{profile.location || 'Ubicación sin configurar'}</span>
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex w-full shrink-0 justify-center gap-2 sm:w-auto">
                   {editing && <button type="button" onClick={() => { setEditing(false); if (user) void getWordPressProfile(user).then(setProfile); }} className={`flex h-10 items-center gap-2 rounded-lg border px-4 text-xs font-bold ${isLight ? 'border-black/10 bg-[#e4e6eb] hover:bg-[#d8dadf]' : 'border-white/10 bg-[#3a3b3c] hover:bg-[#4e4f50]'}`}><X size={16} />Cancelar</button>}
-                  <button type="button" onClick={() => { if (editing) void handleSave(); else { setEditing(true); setActiveSection('information'); } }} disabled={saving} className="flex h-10 items-center gap-2 rounded-lg bg-[#FF4D88] px-5 text-xs font-black text-white transition-colors hover:bg-[#e93b78] disabled:opacity-50">{saving ? <Loader2 size={16} className="animate-spin" /> : editing ? <Save size={16} /> : <Edit3 size={16} />}{editing ? 'Guardar' : 'Editar perfil'}</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editing) void handleSave();
+                      else {
+                        setSaveConfirmed(false);
+                        setEditing(true);
+                        setActiveSection('information');
+                      }
+                    }}
+                    disabled={saving || saveConfirmed}
+                    aria-label={saveConfirmed ? 'Perfil guardado' : editing ? 'Guardar perfil' : 'Editar perfil'}
+                    className={`flex h-10 min-w-36 items-center justify-center gap-2 rounded-lg border px-5 text-xs font-black transition-all disabled:opacity-100 ${saveConfirmed ? 'border-[#FF4D88]/25 bg-[#FF4D88]/10 text-[#FF4D88]' : 'border-[#FF4D88] bg-[#FF4D88] text-white hover:border-[#e93b78] hover:bg-[#e93b78]'}`}
+                  >
+                    {saving ? <Loader2 size={16} className="animate-spin" /> : saveConfirmed ? <Check size={21} strokeWidth={3} /> : editing ? <><Save size={16} />Guardar</> : <><Edit3 size={16} />Editar perfil</>}
+                  </button>
                 </div>
               </div>
             </div>
@@ -466,7 +515,7 @@ export const ProfilePage = () => {
               <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{friends.friends.map((entry) => <div key={entry.user.id} className={`group flex items-center gap-3 rounded-lg p-3 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><Link to={`/usuarios/${entry.user.id}`}><UserAvatar entry={entry} size="h-12 w-12" /></Link><Link to={`/usuarios/${entry.user.id}`} className="min-w-0 flex-1 truncate text-sm font-bold hover:text-[#FF4D88]">{entry.user.username}</Link><button type="button" onClick={() => openChat(entry.user)} aria-label={`Chatear con ${entry.user.username}`} className="flex h-8 w-8 items-center justify-center rounded-full text-[#FF4D88] hover:bg-[#FF4D88]/10"><MessageCircle size={16} /></button><button type="button" onClick={() => void handleRemove(entry)} disabled={actionId === entry.user.id} aria-label="Eliminar amistad" className={`flex h-8 w-8 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${isLight ? 'text-black/35 hover:bg-red-500/10 hover:text-red-500' : 'text-white/30 hover:bg-red-500/10 hover:text-red-400'}`}><UserMinus size={14} /></button></div>)}</div>
               {friends.friends.length === 0 && <div className={`mt-5 rounded-xl border border-dashed py-16 text-center ${isLight ? 'border-black/15 bg-[#f7f8fa]' : 'border-white/15 bg-white/[0.025]'}`}><Users size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">Tu lista está vacía</p><p className={`mx-auto mt-1 max-w-sm text-xs leading-relaxed ${muted}`}>Las solicitudes se envían desde el perfil público de cada lector.</p></div>}
 
-              {friends.outgoing.length > 0 && <div className={`mt-5 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}><h3 className={`mb-2 text-[10px] font-black uppercase tracking-wider ${muted}`}>Solicitudes enviadas</h3><div className="flex flex-wrap gap-2">{friends.outgoing.map((entry) => <Link key={entry.request_id} to={`/usuarios/${entry.user.id}`} className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><UserAvatar entry={entry} size="h-5 w-5" />{entry.user.username}</Link>)}</div></div>}
+              {friends.outgoing.length > 0 && <div className={`mt-5 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}><h3 className={`mb-2 text-[10px] font-black uppercase tracking-wider ${muted}`}>Solicitudes enviadas</h3><div className="flex flex-wrap gap-2">{friends.outgoing.map((entry) => <div key={entry.request_id} className={`flex items-center overflow-hidden rounded-full pl-2 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><Link to={`/usuarios/${entry.user.id}`} className="flex items-center gap-2 py-1.5 pl-1 text-[10px] font-bold hover:text-[#FF4D88]"><UserAvatar entry={entry} size="h-5 w-5" />{entry.user.username}</Link><button type="button" onClick={() => void handleCancelRequest(entry)} disabled={actionId === entry.request_id} aria-label={`Cancelar solicitud a ${entry.user.username}`} title="Cancelar solicitud" className={`ml-1 flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]' : 'text-white/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]'}`}>{actionId === entry.request_id ? <Loader2 size={13} className="animate-spin" /> : <X size={14} />}</button></div>)}</div></div>}
             </section>
         )}
         </div>

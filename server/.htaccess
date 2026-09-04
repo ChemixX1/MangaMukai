@@ -24,6 +24,14 @@ RewriteEngine On
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteBase /
 
+# Keep OAuth callbacks and session cookies on one secure production origin.
+# Leave ACME challenges reachable for automatic certificate renewals.
+RewriteCond %{HTTP_HOST} ^(www\.)?mangamukai\.com(:[0-9]+)?$ [NC]
+RewriteCond %{HTTPS} !=on [OR]
+RewriteCond %{HTTP_HOST} ^www\.mangamukai\.com [NC]
+RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
+RewriteRule ^ https://mangamukai.com%{REQUEST_URI} [R=301,L,NE]
+
 # PayPal IPN callbacks must reach WordPress even though / serves React.
 RewriteCond %{QUERY_STRING} (^|&)mm_(coin|sub)_ipn=1(&|$)
 RewriteRule ^$ /index.php [L]

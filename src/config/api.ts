@@ -1,7 +1,21 @@
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
+const getDefaultWebsiteUrl = () => {
+  if (typeof window === "undefined") {
+    return "https://mangamukai.com";
+  }
+
+  const isLocalDevelopment = ["localhost", "127.0.0.1"].includes(
+    window.location.hostname,
+  );
+
+  return isLocalDevelopment
+    ? "https://mangamukai.com"
+    : window.location.origin;
+};
+
 const WEBSITE_URL = trimTrailingSlash(
-  import.meta.env.VITE_WORDPRESS_URL || "https://mangamukai.com",
+  import.meta.env.VITE_WORDPRESS_URL || getDefaultWebsiteUrl(),
 );
 
 export const WORDPRESS_POSTS_API = `${WEBSITE_URL}/wp-json/wp/v2/posts`;

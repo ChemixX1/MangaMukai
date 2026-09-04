@@ -619,7 +619,7 @@ export const ReaderPage = () => {
       </motion.div>
 
       {/* CONTENEDOR PRINCIPAL */}
-      <div className="w-full max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 pt-52 px-4 pb-20 relative">
+      <div className="w-full max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 pt-52 px-0 lg:px-4 pb-20 relative">
 
         {/* IZQUIERDA: REPRODUCTOR - ESTATICO (NO STICKY) */}
         <aside className="order-1 lg:order-1 w-full max-w-[400px] lg:w-64 h-fit z-40 shrink-0">
@@ -630,12 +630,12 @@ export const ReaderPage = () => {
         </aside>
 
         {/* CENTRAL: LECTOR */}
-        <main className="order-2 lg:order-2 flex-1 w-full max-w-[800px] mx-auto bg-black border-x border-zinc-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] min-h-[50vh] flex flex-col items-center relative z-10">
+        <main className="order-2 lg:order-2 flex-1 w-full max-w-none lg:max-w-[800px] mx-auto bg-black border-0 lg:border-x border-zinc-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] min-h-[50vh] flex flex-col gap-0 items-center relative z-10">
           {images.length > 0 ? (
               images.map((img) => (
               <img 
                   key={img.id} src={img.image_url} alt={`Página ${img.page_number}`}
-                  className="w-full h-auto block select-none mb-1"
+                  className="w-full h-auto block shrink-0 select-none m-0 p-0"
                   loading="lazy" style={{ display: 'block' }} 
               />
               ))

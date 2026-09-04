@@ -24,6 +24,7 @@ import {
 } from "../../services/authService";
 import { getInteractions } from "../../services/interactionsService";
 import { getConversations, getNotifications, syncMangaSubscriptions } from "../../services/socialService";
+import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "../../services/wordpressService";
 
 const loadSubscriptionModal = () =>
   import("../modals/SubscriptionModal").then((module) => ({ default: module.SubscriptionModal }));
@@ -160,6 +161,17 @@ export const Navbar = () => {
   // Escuchar cambios de autenticación
   useEffect(() => {
     const update = () => setCurrentUser(getCurrentStoredUser());
+    const updateProfile = (event: Event) => {
+      const detail = (event as CustomEvent<ProfileUpdatedDetail>).detail;
+      setCurrentUser((current) => {
+        if (!current || String(current.id) !== detail.userId) return current;
+        return {
+          ...current,
+          ...(detail.username ? { username: detail.username, display_name: detail.username } : {}),
+          ...(detail.avatarUrl ? { avatar: detail.avatarUrl } : {}),
+        };
+      });
+    };
     const handleExpired = () => {
       setCurrentUser(null);
       setShowUserMenu(false);
@@ -168,9 +180,11 @@ export const Navbar = () => {
 
     window.addEventListener(AUTH_CHANGED_EVENT, update);
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpired);
+    window.addEventListener(PROFILE_UPDATED_EVENT, updateProfile);
     return () => {
       window.removeEventListener(AUTH_CHANGED_EVENT, update);
       window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpired);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, updateProfile);
     };
   }, []);
 
@@ -271,7 +285,7 @@ export const Navbar = () => {
                 </span>
               </Link>
 
-              <nav className="hidden h-10 items-center gap-8 lg:translate-y-0.5 lg:flex">
+              <nav className="hidden h-10 items-center gap-8 lg:-translate-y-0.5 lg:flex">
                 <Link to="/" className={`navbar-primary-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                   Inicio
                 </Link>
@@ -363,26 +377,26 @@ export const Navbar = () => {
                         aria-label={`Abrir perfil de ${currentUser.username}`}
                         aria-expanded={showUserMenu}
                         title={currentUser.username}
-                        className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all ${headerUsesDarkText ? 'border-zinc-200 bg-zinc-100 hover:border-[#FF4D88]' : 'border-white/10 bg-black hover:border-[#FF4D88]'}`}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full border bg-transparent transition-colors ${headerUsesDarkText ? 'border-black/20 text-black hover:border-black/40 hover:text-[#FF4D88]' : 'border-white/25 text-white hover:border-white/45 hover:text-[#FF4D88]'}`}
                       >
-                        {currentUser.avatar ? <img src={currentUser.avatar} alt="avatar" className="h-7 w-7 rounded-full object-cover ring-2 ring-[#FF4D88]/30" /> : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF4D88]"><UserIcon size={14} className="text-white" /></span>}
+                        {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className="h-8 w-8 rounded-full object-cover" /> : <UserIcon size={20} strokeWidth={2.4} />}
                       </button>
 
                       {showUserMenu && (
-                        <div className={`auth-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
+                        <div className={`auth-user-popover profile-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
                           <img src={profilePopoverBackground} alt="" aria-hidden="true" className="auth-user-popover-background absolute inset-0 h-full w-full object-cover object-[55%_center]" />
                           <div aria-hidden="true" className="auth-user-popover-scrim absolute inset-0" />
                           <div className="relative z-10">
                             <div className={`flex items-center gap-3 border-b p-4 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                              {currentUser.avatar ? <img src={currentUser.avatar} alt="avatar" className="h-10 w-10 rounded-full object-cover ring-2 ring-[#FF4D88]/40" /> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FF4D88]"><UserIcon size={18} className="text-white" /></span>}
-                              <div className="min-w-0"><p className="truncate text-sm font-black">{currentUser.username}</p><p className={`truncate text-[10px] ${isLightMode ? 'text-black/55' : 'text-white/55'}`}>{currentUser.email}</p></div>
+                              {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className={`h-11 w-11 rounded-full border object-cover ${isLightMode ? 'border-black/20' : 'border-white/25'}`} /> : <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-transparent ${isLightMode ? 'border-black/20 text-black' : 'border-white/25 text-white'}`}><UserIcon size={20} /></span>}
+                              <div className="min-w-0"><p className="truncate font-[Montserrat] text-[15px] font-semibold uppercase tracking-[0.035em]">{currentUser.username}</p><p className={`truncate font-[Montserrat] text-[11px] font-semibold ${isLightMode ? 'text-black/55' : 'text-white/55'}`}>{currentUser.email}</p></div>
                             </div>
                             <div className="flex flex-col gap-0.5 px-2 pb-2">
-                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors ${isLightMode ? 'text-black/75 hover:bg-white/45 hover:text-black' : 'text-white/75 hover:bg-black/30 hover:text-white'}`}><UserIcon size={14} className="text-[#FF4D88]" /> Mi Perfil</Link>
-                              <Link to="/saved" onClick={() => setShowUserMenu(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors ${isLightMode ? 'text-black/75 hover:bg-white/45 hover:text-black' : 'text-white/75 hover:bg-black/30 hover:text-white'}`}><Bookmark size={14} className="text-[#FF4D88]" /> Guardados</Link>
-                              <button type="button" onClick={() => { setShowUserMenu(false); setShowMessages(true); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-colors ${isLightMode ? 'text-black/75 hover:bg-white/45 hover:text-black' : 'text-white/75 hover:bg-black/30 hover:text-white'}`}><MessageCircle size={14} className="text-[#FF4D88]" /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[9px] text-white">{unreadMessages}</span>}</button>
+                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><UserIcon size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Mi Perfil</Link>
+                              <Link to="/saved" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><Bookmark size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Guardados</Link>
+                              <button type="button" onClick={() => { setShowUserMenu(false); setShowMessages(true); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><MessageCircle size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[9px] text-white">{unreadMessages}</span>}</button>
                             </div>
-                            <div className={`border-t px-2 pb-2 pt-1 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}><button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-red-400 transition-colors hover:bg-red-500/10"><LogOut size={14} /> Cerrar Sesión</button></div>
+                            <div className={`border-t px-2 pb-2 pt-1 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}><button onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10"><LogOut size={17} /> Cerrar Sesión</button></div>
                           </div>
                         </div>
                       )}

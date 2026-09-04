@@ -51,7 +51,10 @@ Copia `.env.example` como `.env` si necesitas apuntar a otra instalación de Wor
 VITE_WORDPRESS_URL=https://tu-wordpress.com
 ```
 
-Sin esa variable, el frontend utiliza `https://mangamukai.com`.
+Sin esa variable, el frontend usa el mismo origen desde el que se carga en
+produccion, de modo que React y WordPress comparten dominio, cookies y HTTPS.
+Durante el desarrollo local utiliza `https://mangamukai.com` como backend por
+defecto.
 
 ## Validación y build
 

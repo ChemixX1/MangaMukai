@@ -430,7 +430,7 @@ export const MangaDetail = () => {
 
       <section className="relative z-10 pb-20 pt-28 md:pt-32">
         <div className="desktop-content-shell mx-auto w-full max-w-[1780px] px-3 sm:px-5 lg:px-4 2xl:px-6">
-          <div className="mb-2 grid items-center xl:grid-cols-[290px_minmax(0,1fr)_330px] xl:gap-8">
+          <div className="mb-2 grid items-center xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
             <div className="text-center xl:col-start-3">
               <p className={`manga-detail-social-prompt text-[13px] ${isLightMode ? 'text-black/60' : 'text-white/60'}`}>¡No olvides seguirnos!</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5" aria-label="Redes sociales de MangaMukai">
@@ -444,7 +444,7 @@ export const MangaDetail = () => {
           </div>
           <div data-testid="manga-detail-social-divider" className={`mb-5 h-px w-full bg-gradient-to-r from-transparent via-current to-transparent ${isLightMode ? 'text-black/20' : 'text-white/20'}`} aria-hidden="true" />
 
-          <div className="grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[290px_minmax(0,1fr)_330px] xl:gap-8">
+          <div className="grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
             <motion.aside
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}

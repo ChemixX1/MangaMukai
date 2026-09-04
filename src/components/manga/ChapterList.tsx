@@ -1,11 +1,9 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { BadgeCheck, BookOpen, ChevronDown, ChevronUp, Clock, Flame, Heart, LockKeyhole, MessageCircle } from "lucide-react";
 import { CoinMarketModal, PurchaseModal } from "../modals";
-import {
-  Countdown,
-  DetailCoin3DIcon,
-} from "../common";
+import { DetailCoin3DIcon } from "../common";
 import { buyChapter, getStoredToken } from "../../services/authService";
 import { getChapterPreviewImage } from "../../services/mangaService";
 
@@ -53,6 +51,95 @@ const isRecentChapter = (createdAt: string): boolean => {
   const elapsedDays = Math.max(0, Math.floor((Date.now() - published) / 86_400_000));
   return elapsedDays <= 14;
 };
+
+const formatUnlockTime = (remainingMilliseconds: number): string => {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMilliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}d ${hours.toString().padStart(2, '0')}h`;
+  if (hours > 0) return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
+  return `${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+};
+
+function PremiumUnlockTimer({
+  chapterId,
+  targetDate,
+  isLight,
+  onExpire,
+}: {
+  chapterId: number | string;
+  targetDate: string;
+  isLight: boolean;
+  onExpire: (chapterId: number | string) => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  const [now, setNow] = useState(() => Date.now());
+  const [showCountdown, setShowCountdown] = useState(false);
+  const targetTime = new Date(targetDate).getTime();
+  const remainingMilliseconds = Math.max(0, targetTime - now);
+  const hasExpired = Number.isFinite(targetTime) && targetTime <= now;
+  const countdownCopy = formatUnlockTime(remainingMilliseconds);
+
+  useEffect(() => {
+    let timer = 0;
+    const tick = () => {
+      setNow(Date.now());
+      timer = window.setTimeout(tick, 1000 - (Date.now() % 1000));
+    };
+
+    tick();
+    return () => window.clearTimeout(timer);
+  }, [targetDate]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setShowCountdown(false);
+      return;
+    }
+
+    setShowCountdown(false);
+    const timer = window.setInterval(() => setShowCountdown((current) => !current), 2200);
+    return () => window.clearInterval(timer);
+  }, [reduceMotion, targetDate]);
+
+  useEffect(() => {
+    if (hasExpired) onExpire(chapterId);
+  }, [chapterId, hasExpired, onExpire]);
+
+  const visibleCopy = reduceMotion
+    ? `Gratis en ${countdownCopy}`
+    : showCountdown
+      ? countdownCopy
+      : 'Gratis en';
+
+  return (
+    <span
+      className={`inline-flex h-7 w-[112px] shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap font-[Montserrat] text-[10px] font-semibold leading-none tracking-[-0.01em] ${isLight ? 'text-black' : 'text-white'}`}
+      role="timer"
+      aria-label={`Gratis en ${countdownCopy}`}
+      title={`Gratis en ${countdownCopy}`}
+    >
+      <Clock className="h-3 w-3 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+      <span className={`relative inline-grid h-4 items-center overflow-hidden ${reduceMotion ? 'min-w-0' : 'w-[68px]'}`} aria-hidden="true">
+        <AnimatePresence initial={false} mode="wait">
+          <motion.span
+            key={reduceMotion ? 'reduced' : showCountdown ? 'countdown' : 'label'}
+            initial={reduceMotion ? false : { opacity: 0, y: 7 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -7 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className={`${reduceMotion ? 'relative' : 'absolute inset-0'} flex items-center justify-center whitespace-nowrap tabular-nums`}
+          >
+            {visibleCopy}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+    </span>
+  );
+}
 
 const CHAPTER_FACE_FOCUS_POINTS = [
   { x: 32, y: 28 },
@@ -233,6 +320,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [localUnlocked, setLocalUnlocked] = useState<Set<string>>(new Set());
+  const [timedUnlocked, setTimedUnlocked] = useState<Set<string>>(new Set());
   const [activeCommentChapterIds, setActiveCommentChapterIds] = useState<Set<string>>(new Set());
   const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
@@ -255,6 +343,16 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
     return purchasedChapterIds.has(idStr) || localUnlocked.has(idStr);
   };
 
+  const handleTimedUnlock = useCallback((chapterId: number | string) => {
+    const id = String(chapterId);
+    setTimedUnlocked((current) => {
+      if (current.has(id)) return current;
+      const next = new Set(current);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
   const totalChapters = chapters.length;
 
   const orderedChapters = [...chapters].sort((a, b) => {
@@ -270,6 +368,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
 
   const isChapterLocked = (chapter: Chapter) => {
     if (!chapter.is_paid) return false;
+    if (timedUnlocked.has(String(chapter.id))) return false;
     if (chapter.free_at && new Date(chapter.free_at) <= new Date()) return false;
 
     if (isChapterPurchased(chapter)) {
@@ -351,7 +450,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
               return (
                 <div
                   key={chapter.id}
-                  className={`manga-chapter-row group relative grid w-full grid-cols-[68px_minmax(0,1fr)] items-center gap-x-3 overflow-hidden rounded-xl border border-white/[0.07] bg-black/30 px-4 py-3 text-left text-sm transition-all duration-200 md:grid-cols-[84px_minmax(0,1fr)_100px_minmax(230px,auto)] md:gap-x-3 md:px-5 ${locked ? 'opacity-90 hover:opacity-100' : ''}`}
+                  className={`manga-chapter-row group relative grid w-full grid-cols-[68px_minmax(0,1fr)] items-center gap-x-3 overflow-hidden rounded-xl border border-white/[0.07] bg-black/30 px-4 py-3 text-left text-sm transition-all duration-200 md:grid-cols-[84px_minmax(0,1fr)_minmax(300px,auto)] md:gap-x-4 md:px-5 ${locked ? 'opacity-90 hover:opacity-100' : ''}`}
                 >
                   <button
                     type="button"
@@ -398,25 +497,24 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                     </div>
                   </div>
 
-                  <div className="pointer-events-none relative z-[1] hidden items-center justify-center md:flex">
-                    {locked && isFutureFree ? (
-                      <div className="flex items-center gap-1.5 text-pink-400 bg-pink-500/10 px-2 py-1 rounded border border-pink-500/20">
-                        <Clock size={10} />
-                        <Countdown targetDate={chapter.free_at!} />
-                      </div>
-                    ) : locked ? (
-                      <span className="rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-yellow-400">
-                        Premium
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="pointer-events-none relative z-[1] hidden items-center justify-end gap-4 text-right md:flex">
+                  <div className="pointer-events-none relative z-[1] hidden flex-nowrap items-center justify-end gap-4 whitespace-nowrap text-right md:flex">
                     {locked ? (
-                      <span className="flex shrink-0 items-center gap-3">
+                      <span className="flex shrink-0 flex-nowrap items-center gap-3 whitespace-nowrap">
                         <span className="manga-chapter-coin-value flex items-center gap-1.5 text-yellow-400">
                           <DetailCoin3DIcon size={18} className="h-[18px] w-[18px] object-contain" /> {chapter.price_coins}
                         </span>
+                        {isFutureFree ? (
+                          <PremiumUnlockTimer
+                            chapterId={chapter.id}
+                            targetDate={chapter.free_at!}
+                            isLight={isLight}
+                            onExpire={handleTimedUnlock}
+                          />
+                        ) : (
+                          <span className="rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-yellow-400">
+                            Premium
+                          </span>
+                        )}
                         <LockKeyhole size={17} strokeWidth={1.8} className="manga-chapter-access-icon shrink-0" />
                       </span>
                     ) : (

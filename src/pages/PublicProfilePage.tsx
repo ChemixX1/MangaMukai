@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Cake,
   CalendarDays,
-  Check,
   Edit3,
   Image as ImageIcon,
   Link2,
@@ -14,14 +13,16 @@ import {
   User,
   UserPlus,
   Video,
+  X,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { ProfileMotionBackdrop, type ProfileBackdropCover } from '../components/social';
 import { getStoredToken, getStoredUser } from '../services/authService';
-import { respondFriendRequest, sendFriendRequest } from '../services/friendsService';
+import { removeFriend, respondFriendRequest, sendFriendRequest } from '../services/friendsService';
 import { getUltimosCapitulos } from '../services/mangaService';
 import { getPublicProfile, openChat, type PublicProfile } from '../services/socialService';
 import { finishGlobalLoading, startGlobalLoading } from '../utils/globalLoading';
+import { getSharedAuthCovers } from '../utils/authCoverCache';
 
 const SOCIAL_LABELS: Record<string, string> = {
   facebook: 'Facebook',
@@ -47,6 +48,10 @@ const buildProfileCovers = (items: Awaited<ReturnType<typeof getUltimosCapitulos
     return result;
   }, []).slice(0, 10);
 };
+
+const getCachedProfileCovers = (): ProfileBackdropCover[] => (getSharedAuthCovers() || [])
+  .slice(0, 10)
+  .map((cover, index) => ({ id: `cached-public-profile-${index}`, title: cover.title, cover: cover.src }));
 
 const formatProfileDate = (value: string) => {
   if (!value) return '';
@@ -75,7 +80,7 @@ export const PublicProfilePage = () => {
   const isLight = theme === 'light';
   const currentUser = getStoredUser();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [backgroundCovers, setBackgroundCovers] = useState<ProfileBackdropCover[]>([]);
+  const [backgroundCovers, setBackgroundCovers] = useState<ProfileBackdropCover[]>(getCachedProfileCovers);
   const [activeSection, setActiveSection] = useState<PublicProfileSection>('summary');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -99,7 +104,10 @@ export const PublicProfilePage = () => {
     startGlobalLoading(14, loadingScope);
     void Promise.all([
       load(true),
-      getUltimosCapitulos().then((items) => setBackgroundCovers(buildProfileCovers(items))).catch(() => setBackgroundCovers([])),
+      getUltimosCapitulos()
+        .then((items) => buildProfileCovers(items))
+        .then((covers) => setBackgroundCovers(covers.length > 0 ? covers : getCachedProfileCovers()))
+        .catch(() => setBackgroundCovers(getCachedProfileCovers())),
     ]).finally(() => finishGlobalLoading(loadingScope));
     return () => finishGlobalLoading(loadingScope);
   }, [id, load]);
@@ -125,7 +133,9 @@ export const PublicProfilePage = () => {
 
     setWorking(true);
     try {
-      if (profile.friendship_status === 'pending_received') {
+      if (profile.friendship_status === 'pending_sent') {
+        await removeFriend(profile.id);
+      } else if (profile.friendship_status === 'pending_received') {
         await respondFriendRequest(profile.friend_request_id, 'accept');
       } else if (profile.friendship_status === 'none' || profile.friendship_status === 'guest') {
         await sendFriendRequest(profile.id);
@@ -161,7 +171,7 @@ export const PublicProfilePage = () => {
     : profile.friendship_status === 'friends'
       ? 'Enviar mensaje'
       : profile.friendship_status === 'pending_sent'
-        ? 'Solicitud enviada'
+        ? 'Cancelar solicitud'
         : profile.friendship_status === 'pending_received'
           ? 'Aceptar solicitud'
           : 'Agregar amigo';
@@ -237,13 +247,13 @@ export const PublicProfilePage = () => {
               <button
                 type="button"
                 onClick={() => void handleRelationship()}
-                disabled={working || profile.friendship_status === 'pending_sent'}
-                className={`mb-1 flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-default disabled:opacity-60 sm:w-auto ${profile.friendship_status === 'friends' ? isLight ? 'bg-[#e4e6eb] text-[#050505] hover:bg-[#d8dadf]' : 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]' : 'bg-[#FF4D88] text-white hover:bg-[#ff347b]'}`}
+                disabled={working}
+                className={`mb-1 flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-default disabled:opacity-60 sm:w-auto ${profile.friendship_status === 'friends' || profile.friendship_status === 'pending_sent' ? isLight ? 'bg-[#e4e6eb] text-[#050505] hover:bg-[#d8dadf]' : 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]' : 'bg-[#FF4D88] text-white hover:bg-[#ff347b]'}`}
               >
                 {working ? <Loader2 size={17} className="animate-spin" />
                   : profile.friendship_status === 'self' ? <Edit3 size={17} />
                     : profile.friendship_status === 'friends' ? <MessageCircle size={18} />
-                      : profile.friendship_status === 'pending_sent' ? <Check size={17} />
+                      : profile.friendship_status === 'pending_sent' ? <X size={17} />
                         : <UserPlus size={18} />}
                 {buttonText}
               </button>

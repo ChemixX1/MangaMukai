@@ -2,7 +2,7 @@
 /**
  * Plugin Name: MangaMukai Social Auth Bridge
  * Description: Entrega una sesión React después del acceso OAuth de Ultimate Member.
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -47,10 +47,19 @@ function mm_social_auth_return_url(string $value): string {
     $scheme = strtolower((string) ($parts['scheme'] ?? ''));
     $host = strtolower((string) ($parts['host'] ?? ''));
     $path = '/' . ltrim((string) ($parts['path'] ?? ''), '/');
-    if ($scheme !== 'https' || $host !== strtolower((string) ($site['host'] ?? '')) || $path !== '/') return '';
+    if ($scheme !== 'https' || $host !== strtolower((string) ($site['host'] ?? ''))
+        || isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])
+        || (isset($parts['port']) && (int) $parts['port'] !== 443)) return '';
 
     $query = [];
     parse_str((string) ($parts['query'] ?? ''), $query);
+    // Production must return to React only AFTER Ultimate Member creates its cookie.
+    if (rtrim($path, '/') === '/auth/login') {
+        $provider = sanitize_key((string) ($query['social'] ?? ''));
+        return in_array($provider, ['google', 'discord'], true)
+            ? add_query_arg('social', $provider, home_url('/auth/login', 'https')) : '';
+    }
+    if ($path !== '/') return '';
     $provider = sanitize_key((string) ($query['provider'] ?? ''));
     $target = mm_social_auth_local_target((string) ($query['target'] ?? ''));
     if ((string) ($query['mm_social_return'] ?? '') !== '1' || !in_array($provider, ['google', 'discord'], true) || $target === '') {
@@ -206,3 +215,10 @@ add_action('um_on_login_before_redirect', static function () {
     wp_redirect($return_url, 302, 'MangaMukai Social Auth');
     exit;
 }, 1);
+
+// The OAuth provider return is an intermediate WordPress step, NOT the React
+// callback: UM still has to validate/link the account and create the WP session.
+add_filter('um_social_login_return_url', static function ($url, $provider) {
+    if (mm_social_auth_saved_return() === '' || !in_array($provider, ['google', 'discord'], true)) return $url;
+    return add_query_arg('return_provider', $provider, home_url('/login/', 'https'));
+}, 100, 2);
