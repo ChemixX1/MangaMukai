@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties } from "react";
 import { Crown, TrendingUp, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getPopularMenByViews, getUltimosCapitulos } from '../../services/mangaService';
 import { useHomeData } from '../../context/HomeDataContext';
 import { MangaMetaBar } from '../common';
 import { preloadImages } from '../../utils/preloadImages';
+import { whenIdle } from '../../utils/whenIdle';
+import { filterYouthMen } from '../../utils/youthFilter';
+import type { MangaCapitulo } from '../../types/manga';
 
 // --- FUNCIONES DE ESTILO ---
 
@@ -52,12 +55,37 @@ const mergePopularItems = (...groups: CarouselManga[][]): CarouselManga[] => {
   return merged;
 };
 
-export const YouthCarousel = () => {
+interface YouthCarouselProps {
+  youthOnly?: boolean;
+  /** Filtro adicional (función estable a nivel de módulo). */
+  filterMangas?: (items: MangaCapitulo[]) => MangaCapitulo[];
+  /** Color del ticket "Gratis" de cada tarjeta. */
+  freeTicketTone?: 'pink' | 'blue';
+  /**
+   * Portadas mínimas para animar la cinta. Por debajo se queda quieta y
+   * alineada a la izquierda (0 = siempre en movimiento).
+   */
+  minItemsForMotion?: number;
+}
+
+export const YouthCarousel = ({ youthOnly = false, filterMangas, freeTicketTone = 'pink', minItemsForMotion = 0 }: YouthCarouselProps = {}) => {
   const { latestMen, popularMenWeekly, popularMenHistorical, isReady } = useHomeData();
+  // En el home solo mostramos mangas de tag Hombre y sin B&N/BN/HOT.
+  const narrow = (items: MangaCapitulo[]) => {
+    const base = youthOnly ? filterYouthMen(items) : items;
+    return filterMangas ? filterMangas(base) : base;
+  };
+  const menLatest = narrow(latestMen);
+  const menWeekly = narrow(popularMenWeekly);
+  const menHistorical = narrow(popularMenHistorical);
   const [items, setItems] = useState<CarouselManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
   const [isTouchPaused, setIsTouchPaused] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const sequenceRef = useRef<HTMLDivElement>(null);
+  const [fillsViewport, setFillsViewport] = useState(true);
+  const [conveyor, setConveyor] = useState<{ from: number; to: number; duration: number } | null>(null);
 
   const [activeFilter, setActiveFilter] = useState("Semanal");
 
@@ -78,14 +106,16 @@ export const YouthCarousel = () => {
       };
     });
 
+  /* Igual que en el carrusel de mujeres: la pestaña "Mensual" se adelanta en un
+     hueco libre, no compitiendo con lo que ya se está pintando. */
   useEffect(() => {
     if (!isReady) return;
-    void (async () => {
-      const warmedPeriods = await Promise.all([
-        getPopularMenByViews('monthly', false),
-      ]);
-      await preloadImages(warmedPeriods.flat().slice(0, 24).map(manga => manga.portada));
-    })();
+    return whenIdle(() => {
+      void (async () => {
+        const monthly = await getPopularMenByViews('monthly', false);
+        await preloadImages(monthly.slice(0, 12).map(manga => manga.portada));
+      })();
+    });
   }, [isReady]);
 
   useEffect(() => {
@@ -98,27 +128,38 @@ export const YouthCarousel = () => {
         else setFilterLoading(true);
         const period = activeFilter === 'Semanal' ? 'weekly' : activeFilter === 'Mensual' ? 'monthly' : 'historical';
         const contextualMangas = activeFilter === 'Semanal'
-          ? popularMenWeekly
+          ? menWeekly
           : activeFilter === 'Histórico'
-            ? popularMenHistorical
+            ? menHistorical
             : [];
-        const mangasWP = contextualMangas.length > 0
-          ? contextualMangas
-          : await getPopularMenByViews(period, false);
+        let mangasWP = contextualMangas;
+        if (mangasWP.length === 0) {
+          const fetched = await getPopularMenByViews(period, false);
+          mangasWP = narrow(fetched);
+        }
         let nextItems = mergePopularItems(
           formatItems(mangasWP),
-          formatItems(popularMenHistorical),
-          formatItems(latestMen),
+          formatItems(menHistorical),
+          formatItems(menLatest),
         );
 
         if (nextItems.length === 0) {
           const library = await getUltimosCapitulos();
-          const menLibrary = library.filter(manga => manga.genero === 'Hombre');
-          nextItems = formatItems(menLibrary.length > 0 ? menLibrary : library);
+          // Con filtro de colección manda el filtro (y si no hay nada, queda vacío):
+          // el campo `genero` no es fiable y no debe colar mangas sin la etiqueta.
+          const menLibrary = filterMangas
+            ? narrow(library)
+            : youthOnly
+              ? filterYouthMen(library)
+              : library.filter(manga => manga.genero === 'Hombre');
+          nextItems = formatItems(menLibrary.length > 0 || filterMangas ? menLibrary : library);
         }
 
         if (nextItems.length > 0) {
-          await preloadImages(nextItems.map(manga => manga.coverImage));
+          // Solo las primeras tarjetas entran en pantalla; el resto va con
+          // `loading="lazy"` y no debe retrasar la aparición de la cinta.
+          await preloadImages(nextItems.slice(0, 5).map(manga => manga.coverImage));
+          void preloadImages(nextItems.slice(5).map(manga => manga.coverImage));
         }
         if (cancelled) return;
         if (nextItems.length > 0) {
@@ -141,15 +182,50 @@ export const YouthCarousel = () => {
   }, [activeFilter, isReady, popularMenWeekly.length, popularMenHistorical.length, latestMen.length]);
 
   const showSkeleton = loading && items.length === 0;
-  const marqueeItems = items.length === 0
-    ? []
-    : Array.from({ length: Math.max(12, items.length) }, (_, index) => items[index % items.length]);
+  // Solo mangas unicos: sin relleno por repeticion. El carrusel se completa solo
+  // conforme se suben mas mangas a la base de datos (hasta el tope de 12).
+  const marqueeItems = items;
+
+  // Con muy pocas portadas el movimiento queda pobre: la cinta se congela y se
+  // queda pegada a la izquierda hasta que haya suficientes mangas.
+  const isStatic = minItemsForMotion > 0 && items.length < minItemsForMotion;
+
+  // Si los mangas unicos llenan el ancho -> marquee continuo (2 copias, sin ver
+  // duplicados). Si son pocos -> cinta de una sola copia (cada manga una vez, sin
+  // duplicar) manteniendo el mismo movimiento y rapidez.
+  useLayoutEffect(() => {
+    if (isStatic) {
+      setFillsViewport(false);
+      setConveyor(null);
+      return;
+    }
+    const viewport = viewportRef.current;
+    const sequence = sequenceRef.current;
+    if (!viewport || !sequence) return;
+    const measure = () => {
+      const vw = viewport.clientWidth;
+      const sw = sequence.scrollWidth;
+      const fills = sw > 0 && sw >= vw;
+      setFillsViewport(fills);
+      setConveyor(fills ? null : { from: vw, to: -sw, duration: Math.max(12, (52 * (vw + sw)) / Math.max(vw, 1)) });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(sequence);
+    measure();
+    return () => observer.disconnect();
+  }, [items, isStatic]);
 
   return (
     <section className="home-youth-popular relative w-full pb-0 group/section mt-0" aria-busy={filterLoading || showSkeleton}>
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes home-youth-conveyor {
+          from { transform: translateX(var(--cv-from, 0)); }
+          to { transform: translateX(var(--cv-to, -100%)); }
+        }
 
         /* Efecto Shine */
         .shine-effect::after {
@@ -207,17 +283,35 @@ export const YouthCarousel = () => {
         <div className="relative min-h-[300px]"> 
             {!showSkeleton && (
             <div
+              ref={viewportRef}
               className="-mx-2 touch-pan-y overflow-hidden py-4"
-              aria-label="Mangas populares juveniles en movimiento continuo"
+              aria-label={isStatic ? 'Mangas populares juveniles' : 'Mangas populares juveniles en movimiento continuo'}
               onTouchStart={() => setIsTouchPaused(true)}
               onTouchEnd={() => setIsTouchPaused(false)}
               onTouchCancel={() => setIsTouchPaused(false)}
             >
-                    <div className="home-popular-marquee-track" style={isTouchPaused ? { animationPlayState: 'paused' } : undefined}>
+                    <div
+                      className={!isStatic && fillsViewport ? 'home-popular-marquee-track' : 'flex w-max'}
+                      style={
+                        isStatic
+                          ? undefined
+                          : fillsViewport
+                            ? (isTouchPaused ? { animationPlayState: 'paused' } : undefined)
+                            : conveyor
+                              ? ({
+                                  '--cv-from': `${conveyor.from}px`,
+                                  '--cv-to': `${conveyor.to}px`,
+                                  animation: `home-youth-conveyor ${conveyor.duration}s linear infinite`,
+                                  animationPlayState: isTouchPaused ? 'paused' : 'running',
+                                } as CSSProperties)
+                              : undefined
+                      }
+                    >
                         {items.length > 0 ? (
-                          [0, 1].map((copyIndex) => (
+                          (!isStatic && fillsViewport ? [0, 1] : [0]).map((copyIndex) => (
                             <div
                               key={`youth-popular-sequence-${copyIndex}`}
+                              ref={copyIndex === 0 ? sequenceRef : undefined}
                               className="home-popular-marquee-sequence"
                               aria-hidden={copyIndex === 1 ? true : undefined}
                             >
@@ -259,7 +353,7 @@ export const YouthCarousel = () => {
                                 >
                                     {/* IMAGEN + SHINE */}
                                     <div className="relative aspect-[3/4.2] w-full overflow-hidden transition-all duration-300 shine-effect">
-                                            <img src={manga.coverImage} alt={manga.title} className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105" loading="lazy" />
+                                            <img src={manga.coverImage} alt={`Portada del manga ${manga.title}`} className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105" loading="lazy" />
                                             
                                             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-black/40 to-transparent z-10" />
                                             
@@ -292,7 +386,9 @@ export const YouthCarousel = () => {
                                       chapter={manga.chapterNum}
                                       isFree={manga.isFree}
                                       date={manga.date}
-                                      accentClassName={rankConfig.accent}
+                                      accentClassName={youthOnly ? "text-[#00C2FF]" : rankConfig.accent}
+                                      accentAll={youthOnly}
+                                      ticketTone={freeTicketTone}
                                       className="pt-4 pb-2"
                                     />
                                 </Link>

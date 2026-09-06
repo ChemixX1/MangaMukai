@@ -1,22 +1,42 @@
 import { useEffect, useState } from 'react';
 
-type MangaDetailClockProps = {
+interface MangaDetailClockProps {
   isLight: boolean;
+}
+
+const capitalize = (value: string) =>
+  `${value.charAt(0).toLocaleUpperCase('es')}${value.slice(1)}`;
+
+/**
+ * "Sábado 02 de Septiembre del 2026". `toLocaleDateString` con opciones devuelve
+ * "sábado, 02 de septiembre de 2026", así que las piezas se componen a mano para
+ * poder poner día y mes en mayúscula inicial y el "del" antes del año.
+ *
+ * Se recalcula en cada tic a partir de la hora actual, así que el día y el mes
+ * cambian solos al pasar la medianoche sin necesidad de recargar la página.
+ */
+const formatLongDate = (date: Date) => {
+  const weekday = capitalize(date.toLocaleDateString('es-ES', { weekday: 'long' }));
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = capitalize(date.toLocaleDateString('es-ES', { month: 'long' }));
+  return `${weekday} ${day} de ${month} del ${date.getFullYear()}`;
 };
 
-const getClockParts = (date: Date) => [
-  { label: 'HRS', value: date.getHours().toString().padStart(2, '0') },
-  { label: 'MIN', value: date.getMinutes().toString().padStart(2, '0') },
-  { label: 'SEG', value: date.getSeconds().toString().padStart(2, '0') },
+const timeUnitsOf = (date: Date) => [
+  { label: 'HRS', value: String(date.getHours()).padStart(2, '0') },
+  { label: 'MIN', value: String(date.getMinutes()).padStart(2, '0') },
+  { label: 'SEG', value: String(date.getSeconds()).padStart(2, '0') },
 ];
 
 export const MangaDetailClock = ({ isLight }: MangaDetailClockProps) => {
-  const [clockTime, setClockTime] = useState(() => new Date());
+  const [now, setNow] = useState(() => new Date());
 
+  /* El siguiente aviso se programa al filo del segundo siguiente, no cada 1000 ms
+     exactos: así el contador no se va desfasando con el reloj del sistema. */
   useEffect(() => {
     let timer = 0;
     const tick = () => {
-      setClockTime(new Date());
+      setNow(new Date());
       timer = window.setTimeout(tick, 1000 - (Date.now() % 1000));
     };
 
@@ -24,36 +44,29 @@ export const MangaDetailClock = ({ isLight }: MangaDetailClockProps) => {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const dateLabel = clockTime.toLocaleDateString('es-PE', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-  const clockParts = getClockParts(clockTime);
+  const units = timeUnitsOf(now);
 
   return (
-    <section className={`manga-detail-future-clock w-full ${isLight ? 'is-light' : 'is-dark'}`} aria-label={`Hora local: ${clockParts.map((part) => part.value).join(':')}`}>
-      <div className="manga-detail-future-clock-header">
-        <p className="manga-detail-future-clock-date">{dateLabel}</p>
-      </div>
+    <div
+      className={`manga-detail-clock ${isLight ? 'is-light' : 'is-dark'}`}
+      role="timer"
+      aria-label={`${formatLongDate(now)}, ${units.map((unit) => unit.value).join(':')}`}
+    >
+      <p className="manga-detail-clock-date">{formatLongDate(now)}</p>
 
-      <div className="manga-detail-future-clock-shell">
-        <span className="manga-detail-future-clock-corner corner-top" aria-hidden="true" />
-        <span className="manga-detail-future-clock-corner corner-bottom" aria-hidden="true" />
-        <span className="manga-detail-future-clock-scan" aria-hidden="true" />
-
-        <div className="manga-detail-future-clock-display">
-          {clockParts.map((part, index) => (
-            <div key={part.label} className="contents">
-              <div className={`manga-detail-future-clock-unit ${part.label === 'SEG' ? 'is-seconds' : ''}`}>
-                <span className="manga-detail-future-clock-value">{part.value}</span>
-                <span className="manga-detail-future-clock-label">{part.label}</span>
-              </div>
-              {index < clockParts.length - 1 && <span className="manga-detail-future-clock-separator" aria-hidden="true">:</span>}
+      <div className="manga-detail-clock-shell" aria-hidden="true">
+        <div className="manga-detail-clock-display">
+          {units.map((unit, index) => (
+            <div key={unit.label} className="manga-detail-clock-group">
+              <span className="manga-detail-clock-unit">
+                <span className="manga-detail-clock-value tabular-nums">{unit.value}</span>
+                <span className="manga-detail-clock-label">{unit.label}</span>
+              </span>
+              {index < units.length - 1 && <span className="manga-detail-clock-separator">:</span>}
             </div>
           ))}
         </div>
       </div>
-    </section>
+    </div>
   );
 };

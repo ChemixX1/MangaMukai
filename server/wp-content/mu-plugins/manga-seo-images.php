@@ -18,13 +18,21 @@ add_filter('robots_txt', static function ($output, $public) {
         'User-agent: *',
         'Disallow: /wp-admin/',
         'Allow: /wp-admin/admin-ajax.php',
+        // El renderizado de la SPA necesita los bundles: bloquearlos deja a
+        // Googlebot con una pagina vacia.
+        'Allow: /assets/',
         'Allow: /wp-content/uploads/',
+        'Allow: /wp-includes/js/',
+        // Rutas privadas: se dejan rastreables a proposito para que Google lea
+        // la etiqueta noindex que envia manga-route-meta.php.
         '',
         'User-agent: Googlebot-Image',
         'Allow: /wp-content/uploads/',
+        'Allow: /assets/',
         '',
         'Sitemap: https://mangamukai.com/sitemap.xml',
         'Sitemap: https://mangamukai.com/sitemap-react.xml',
+        'Sitemap: https://mangamukai.com/sitemap-chapters.xml',
         '',
     ]);
 }, PHP_INT_MAX, 2);
@@ -65,3 +73,21 @@ add_action('save_post_manga', static function () {
         unlink($cache_file);
     }
 });
+
+/**
+ * Publicar o editar una serie o un capitulo invalida los head SEO cacheados por
+ * manga-route-meta.php y los bloques del sitemap de capitulos, para que las
+ * novedades entren en el indice sin esperar al TTL.
+ */
+add_action('save_post', static function ($post_id, $post) {
+    if (wp_is_post_revision($post_id) || !in_array($post->post_type, ['manga', 'post'], true)) {
+        return;
+    }
+
+    $temp = sys_get_temp_dir();
+    foreach (['/mm_route_*.html', '/mm_chapter_sitemap_*.xml'] as $pattern) {
+        foreach ((array) glob($temp . $pattern) as $file) {
+            @unlink($file);
+        }
+    }
+}, 20, 2);

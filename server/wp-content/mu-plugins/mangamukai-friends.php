@@ -2,12 +2,12 @@
 /**
  * Plugin Name: MangaMukai Social
  * Description: Perfiles publicos, amistades, chat, notificaciones y seguimiento de mangas para React.
- * Version: 3.0.2
+ * Version: 3.1.0
  */
 
 if (!defined('ABSPATH')) exit;
 
-const MM_SOCIAL_DB_VERSION = '3.0.0';
+const MM_SOCIAL_DB_VERSION = '3.1.0';
 
 function mm_social_table($suffix) {
     global $wpdb;
@@ -35,8 +35,10 @@ function mm_social_install_schema() {
         status varchar(20) NOT NULL DEFAULT 'pending',
         created_at datetime NOT NULL,
         updated_at datetime NOT NULL,
-        PRIMARY KEY  (id), UNIQUE KEY user_pair (user_low,user_high),
-        KEY requester_id (requester_id), KEY status (status)
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_pair (user_low,user_high),
+        KEY requester_id (requester_id),
+        KEY status (status)
     ) {$charset};");
     dbDelta("CREATE TABLE {$messages} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -45,8 +47,11 @@ function mm_social_install_schema() {
         body text NOT NULL,
         created_at datetime NOT NULL,
         read_at datetime DEFAULT NULL,
-        PRIMARY KEY  (id), KEY sender_id (sender_id), KEY recipient_id (recipient_id),
-        KEY conversation (sender_id,recipient_id,created_at), KEY unread (recipient_id,read_at)
+        PRIMARY KEY  (id),
+        KEY sender_id (sender_id),
+        KEY recipient_id (recipient_id),
+        KEY conversation (sender_id,recipient_id,created_at),
+        KEY unread (recipient_id,read_at)
     ) {$charset};");
     dbDelta("CREATE TABLE {$notifications} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -58,21 +63,25 @@ function mm_social_install_schema() {
         dedupe_key varchar(191) NOT NULL,
         created_at datetime NOT NULL,
         read_at datetime DEFAULT NULL,
-        PRIMARY KEY  (id), UNIQUE KEY dedupe_key (dedupe_key),
-        KEY user_read (user_id,read_at), KEY user_created (user_id,created_at)
+        PRIMARY KEY  (id),
+        UNIQUE KEY dedupe_key (dedupe_key),
+        KEY user_read (user_id,read_at),
+        KEY user_created (user_id,created_at)
     ) {$charset};");
     dbDelta("CREATE TABLE {$comment_refs} (
         comment_id bigint(20) unsigned NOT NULL,
         user_id bigint(20) unsigned NOT NULL,
         manga_id varchar(100) NOT NULL DEFAULT '',
         updated_at datetime NOT NULL,
-        PRIMARY KEY  (comment_id), KEY user_id (user_id)
+        PRIMARY KEY  (comment_id),
+        KEY user_id (user_id)
     ) {$charset};");
     dbDelta("CREATE TABLE {$subscriptions} (
         user_id bigint(20) unsigned NOT NULL,
         manga_id bigint(20) unsigned NOT NULL,
         created_at datetime NOT NULL,
-        PRIMARY KEY  (user_id,manga_id), KEY manga_id (manga_id)
+        PRIMARY KEY  (user_id,manga_id),
+        KEY manga_id (manga_id)
     ) {$charset};");
     dbDelta("CREATE TABLE {$posts} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -81,14 +90,19 @@ function mm_social_install_schema() {
         media_id bigint(20) unsigned DEFAULT NULL,
         media_url text DEFAULT NULL,
         media_type varchar(20) NOT NULL DEFAULT '',
+        shared_post_id bigint(20) unsigned DEFAULT NULL,
         visibility varchar(20) NOT NULL DEFAULT 'public',
         status varchar(20) NOT NULL DEFAULT 'published',
         created_at datetime NOT NULL,
         updated_at datetime NOT NULL,
         PRIMARY KEY  (id),
-        KEY user_created (user_id,created_at), KEY status (status)
+        KEY user_created (user_id,created_at),
+        KEY status (status),
+        UNIQUE KEY user_shared (user_id,shared_post_id)
     ) {$charset};");
-    update_option('mm_social_db_version', MM_SOCIAL_DB_VERSION, false);
+    if ($wpdb->get_var("SHOW COLUMNS FROM {$posts} LIKE 'shared_post_id'") === 'shared_post_id') {
+        update_option('mm_social_db_version', MM_SOCIAL_DB_VERSION, false);
+    }
 }
 add_action('init', 'mm_social_install_schema', 5);
 
@@ -159,7 +173,7 @@ function mm_social_public_user($user_id, $detailed = false) {
         $result += [
             'bio' => $meta['bio'], 'location' => $meta['location'],
             'banner_url' => $meta['banner_url'], 'banner_color' => $meta['banner_color'],
-            'created_at' => mysql_to_rfc3339($user->user_registered),
+            'created_at' => str_replace(' ', 'T', $user->user_registered) . 'Z',
             'birth_date' => $meta['show_birth_date'] ? $meta['birth_date'] : '',
             'phone' => $meta['show_phone'] && $meta['phone'] !== '' ? trim($meta['country_code'] . ' ' . $meta['phone']) : '',
             'social_links' => array_merge([
@@ -328,8 +342,8 @@ function mm_social_message_payload($row, $current) {
     $other = (int) $row->sender_id === (int) $current ? (int) $row->recipient_id : (int) $row->sender_id;
     return [
         'id' => (int) $row->id, 'sender_id' => (int) $row->sender_id, 'recipient_id' => (int) $row->recipient_id,
-        'body' => (string) $row->body, 'created_at' => mysql_to_rfc3339($row->created_at),
-        'read_at' => $row->read_at ? mysql_to_rfc3339($row->read_at) : null,
+        'body' => (string) $row->body, 'created_at' => str_replace(' ', 'T', $row->created_at) . 'Z',
+        'read_at' => $row->read_at ? str_replace(' ', 'T', $row->read_at) . 'Z' : null,
         'other_user' => mm_social_public_user($other),
     ];
 }
@@ -360,12 +374,13 @@ function mm_social_get_messages(WP_REST_Request $request) {
     $current = get_current_user_id();
     $other = absint($request->get_param('id'));
     if (!$other || !mm_social_are_friends($current, $other)) return new WP_Error('mm_social_chat_forbidden', 'Solo puedes conversar con tus amigos.', ['status' => 403]);
+    $before = absint($request->get_param('before')) ?: PHP_INT_MAX;
     $rows = $wpdb->get_results($wpdb->prepare(
-        'SELECT * FROM ' . mm_social_table('messages') . ' WHERE (sender_id=%d AND recipient_id=%d) OR (sender_id=%d AND recipient_id=%d) ORDER BY id DESC LIMIT 60',
-        $current, $other, $other, $current
+        'SELECT * FROM ' . mm_social_table('messages') . ' WHERE ((sender_id=%d AND recipient_id=%d) OR (sender_id=%d AND recipient_id=%d)) AND id<%d ORDER BY id DESC LIMIT 61',
+        $current, $other, $other, $current, $before
     ));
-    $items = array_reverse(array_map(static function ($row) use ($current) { return mm_social_message_payload($row, $current); }, $rows));
-    return rest_ensure_response(['success' => true, 'messages' => $items]);
+    $items = array_reverse(array_map(static function ($row) use ($current) { return mm_social_message_payload($row, $current); }, array_slice($rows, 0, 60)));
+    return rest_ensure_response(['success' => true, 'messages' => $items, 'has_more' => count($rows) > 60]);
 }
 
 function mm_social_send_message(WP_REST_Request $request) {
@@ -403,7 +418,7 @@ function mm_social_get_notifications(WP_REST_Request $request) {
             'id' => (int) $row->id, 'type' => (string) $row->type, 'entity_id' => (string) $row->entity_id,
             'payload' => json_decode((string) $row->payload, true) ?: [],
             'actor' => $row->actor_id ? mm_social_public_user((int) $row->actor_id) : null,
-            'created_at' => mysql_to_rfc3339($row->created_at), 'read' => !empty($row->read_at),
+            'created_at' => str_replace(' ', 'T', $row->created_at) . 'Z', 'read' => !empty($row->read_at),
         ];
     }, $rows);
     $unread = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . mm_social_table('notifications') . ' WHERE user_id=%d AND read_at IS NULL', $current));
@@ -440,18 +455,20 @@ function mm_social_sync_manga_subscriptions(WP_REST_Request $request) {
     return rest_ensure_response(['success' => true, 'action' => $action]);
 }
 
-function mm_social_post_payload($row) {
+function mm_social_post_payload($row, $include_shared = true) {
     if (!$row) return null;
-    return [
+    $payload = [
         'id' => (int) $row->id,
         'user_id' => (int) $row->user_id,
         'content' => (string) $row->content,
         'media_id' => $row->media_id ? (int) $row->media_id : null,
         'media_url' => (string) ($row->media_url ?? ''),
         'media_type' => (string) ($row->media_type ?? ''),
-        'created_at' => mysql_to_rfc3339($row->created_at),
+        'created_at' => str_replace(' ', 'T', $row->created_at) . 'Z',
         'author' => mm_social_public_user((int) $row->user_id),
     ];
+    if (function_exists('mm_interactions_post_data')) $payload += mm_interactions_post_data($row, $include_shared);
+    return $payload;
 }
 
 function mm_social_posts_for_user($user_id, $limit = 18) {
@@ -465,6 +482,7 @@ function mm_social_posts_for_user($user_id, $limit = 18) {
 }
 
 function mm_social_get_profile_posts(WP_REST_Request $request) {
+    if (function_exists('mm_interactions_viewer')) mm_interactions_viewer($request);
     $user_id = absint($request->get_param('user_id'));
     if (!$user_id) $user_id = get_current_user_id();
     if (!$user_id || !get_userdata($user_id)) {

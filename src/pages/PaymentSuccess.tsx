@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { activateSubscription, confirmCoinPurchase, refreshUser } from "../services/authService";
+import { refreshMusicLibrary } from "../services/musicPlayer";
 
 type Status = "verifying" | "success" | "timeout";
 
@@ -37,6 +38,8 @@ export const PaymentSuccess = () => {
           if (activated) {
             window.clearInterval(timer);
             await refreshUser();
+            // Mukai Music queda desbloqueado en el acto, sin recargar la web.
+            await refreshMusicLibrary();
             setStatus("success");
             return;
           }

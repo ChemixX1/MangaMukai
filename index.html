@@ -42,16 +42,59 @@
     <link href="https://fonts.googleapis.com/css2?family=Anta&family=Audiowide&family=Changa+One:ital@0;1&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Michroma&family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Sans+Myanmar:wght@100..900&family=Open+Sans:wght@400;600;700&family=Orbitron:wght@400..900&family=Poppins:wght@400;600;700;800&family=Raleway:wght@400;500;600&family=Science+Gothic:wght@100..900&family=Share+Tech&display=swap" rel="stylesheet" />
     <link href="https://fonts.cdnfonts.com/css/garet" rel="stylesheet" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MangaMukai — Lee Manga Online Gratis</title>
-    <meta name="description" content="Lee manga online en español: romance, acción, fantasía, B&N y contenido para adultos. Nuevos capítulos cada día." />
+    <title>MangaMukai — Leer manga online gratis en español</title>
+    <meta name="description" content="Lee manga online gratis y en español en MangaMukai: manhwa, manhua, romance, acción, fantasía, seinen y contenido +19. Capítulos nuevos cada día con lector rápido." />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <meta name="googlebot-image" content="index,follow" />
     <link rel="canonical" href="https://mangamukai.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="MangaMukai" />
-    <meta property="og:title" content="MangaMukai — Lee Manga Online Gratis" />
-    <meta property="og:description" content="Descubre y lee tus mangas favoritos en español." />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:title" content="MangaMukai — Leer manga online gratis en español" />
+    <meta property="og:description" content="Manga, manhwa y manhua en español con capítulos nuevos cada día." />
     <meta property="og:url" content="https://mangamukai.com/" />
+    <meta property="og:image" content="https://mangamukai.com/favicon.svg" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@MangaMukai" />
+    <!-- Identidad del sitio para Google. Los handlers PHP sustituyen este bloque
+         por uno especifico de cada ruta (portada, coleccion, ficha, capitulo). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://mangamukai.com/#organization",
+            "name": "MangaMukai",
+            "url": "https://mangamukai.com/",
+            "logo": { "@type": "ImageObject", "url": "https://mangamukai.com/favicon.svg" },
+            "sameAs": [
+              "https://www.facebook.com/MangaAyanokouji/",
+              "https://x.com/MangaMukai",
+              "https://www.instagram.com/mangamukai/",
+              "https://t.me/+J6TE0l401vRhZTYx"
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://mangamukai.com/#website",
+            "url": "https://mangamukai.com/",
+            "name": "MangaMukai",
+            "inLanguage": "es",
+            "publisher": { "@id": "https://mangamukai.com/#organization" },
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": {
+                "@type": "EntryPoint",
+                "urlTemplate": "https://mangamukai.com/biblioteca?buscar={search_term_string}"
+              },
+              "query-input": "required name=search_term_string"
+            }
+          }
+        ]
+      }
+    </script>
     <script>
       if ('scrollRestoration' in history) {
         history.scrollRestoration = 'manual';

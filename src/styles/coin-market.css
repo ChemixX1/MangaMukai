@@ -1,0 +1,285 @@
+/* Tienda de monedas. Paleta propia de la página: la moneda 3D del navbar manda
+   sobre los acentos cálidos, y el rosa de marca queda para el título. */
+.coin-recharge {
+  --coin-bg: #08080b;
+  --coin-card: #101014;
+  --coin-card-hover: #16161c;
+  --coin-border: rgba(255, 255, 255, 0.09);
+  --coin-border-hover: rgba(255, 255, 255, 0.2);
+  --coin-fg: #ffffff;
+  --coin-fg-muted: #a1a1ac;
+  --coin-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  --coin-buy: linear-gradient(180deg, #fbbf24, #f59e0b);
+  --coin-buy-fg: #1a1204;
+
+  min-height: 100vh;
+  padding: 132px 20px 88px;
+  background: var(--coin-bg);
+  color: var(--coin-fg);
+}
+
+.coin-recharge[data-theme='light'] {
+  --coin-bg: #f7f7f9;
+  --coin-card: #ffffff;
+  --coin-card-hover: #ffffff;
+  --coin-border: rgba(15, 23, 42, 0.1);
+  --coin-border-hover: rgba(15, 23, 42, 0.24);
+  --coin-fg: #17171b;
+  --coin-fg-muted: #62626c;
+  --coin-shadow: 0 14px 34px rgba(15, 23, 42, 0.09);
+}
+
+.coin-recharge__content {
+  position: relative;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.coin-recharge__header {
+  text-align: center;
+  margin-bottom: 52px;
+}
+
+.coin-market-page .coin-recharge__title {
+  margin: 0;
+  /* Segoe Script es la de Windows; detrás van alternativas manuscritas para el
+     resto de sistemas y, al final, la cursiva genérica. */
+  font-family: 'Segoe Script', 'Segoe Print', 'Bradley Hand', 'Snell Roundhand', cursive;
+  font-size: clamp(2.2rem, 6.4vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.coin-market-page .coin-recharge__title span {
+  /* index.css fija Montserrat en `.coin-market-page span`, y esa regla directa
+     gana a la herencia: hay que repetir la manuscrita aquí. */
+  font-family: inherit;
+  /* inline-block + relleno a la derecha: sin ellos la cursiva se come la última
+     letra al recortar el degradado sobre el texto. */
+  display: inline-block;
+  padding-right: 0.22em;
+  margin-right: -0.14em;
+  background: linear-gradient(96deg, #ff6aa0 0%, #ff2d6f 45%, #e11d48 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.coin-recharge__subtitle {
+  margin: 14px 0 0;
+  font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+  font-weight: 500;
+  color: var(--coin-fg-muted);
+}
+
+/* Selector de método: solo aparece cuando hay más de uno activo. */
+.coin-recharge__methods {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 34px;
+}
+
+.coin-recharge__method {
+  min-height: 44px;
+  padding: 0 22px;
+  border: 1px solid var(--coin-border);
+  border-radius: 12px;
+  background: var(--coin-card);
+  color: var(--coin-fg);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.coin-recharge__method[aria-checked='true'] {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.coin-recharge__packs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+@media (min-width: 768px) {
+  .coin-recharge__packs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.coin-pack {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 1px solid var(--coin-border);
+  border-radius: 18px;
+  background: var(--coin-card);
+  box-shadow: var(--coin-shadow);
+  transition: border-color 200ms ease, transform 200ms ease, background-color 200ms ease;
+}
+
+.coin-pack:hover {
+  border-color: var(--coin-border-hover);
+  background: var(--coin-card-hover);
+  transform: translateY(-2px);
+}
+
+/* Pila de monedas: la misma moneda 3D del navbar, apilada y con una apoyada
+   delante. El número de piezas lo pone data-coins. */
+.coin-pack__stack {
+  position: relative;
+  width: 96px;
+  height: 74px;
+}
+
+.coin-pack__stack img {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
+}
+
+.coin-pack__stack img:nth-child(1) { left: 14px; bottom: 28px; }
+.coin-pack__stack img:nth-child(2) { left: 8px; bottom: 18px; }
+.coin-pack__stack img:nth-child(3) { left: 16px; bottom: 8px; }
+.coin-pack__stack img:nth-child(4) { left: 6px; bottom: 0; }
+.coin-pack__stack img:nth-child(5) {
+  left: 46px;
+  bottom: 0;
+  width: 52px;
+  height: 52px;
+}
+
+/* Con pocas piezas, la última es la que se apoya delante. */
+.coin-pack__stack[data-coins='3'] img:nth-child(3),
+.coin-pack__stack[data-coins='4'] img:nth-child(4) {
+  left: 44px;
+  bottom: 0;
+  width: 52px;
+  height: 52px;
+}
+
+.coin-pack--featured {
+  border-color: rgba(255, 45, 111, 0.55);
+}
+
+.coin-pack__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.coin-pack__tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: linear-gradient(96deg, #ff2d6f, #e11d48);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.coin-pack__amount {
+  font-size: clamp(1.35rem, 3.4vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.coin-pack__checkout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.coin-pack__price {
+  font-size: clamp(1.25rem, 3.2vw, 1.6rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.coin-pack__buy {
+  min-height: 38px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--coin-buy);
+  color: var(--coin-buy-fg);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.coin-pack__buy:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.coin-pack__buy:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.coin-pack__buy:focus-visible,
+.coin-recharge__method:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 3px;
+}
+
+.coin-recharge__error {
+  margin: 26px auto 0;
+  max-width: 520px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff6b6b;
+}
+
+@media (max-width: 420px) {
+  .coin-pack {
+    grid-template-columns: 74px minmax(0, 1fr) auto;
+    padding: 16px;
+  }
+
+  .coin-pack__stack {
+    width: 74px;
+    height: 62px;
+  }
+
+  .coin-pack__stack img {
+    width: 38px;
+    height: 38px;
+  }
+
+  .coin-pack__stack img:nth-child(5),
+  .coin-pack__stack[data-coins='3'] img:nth-child(3),
+  .coin-pack__stack[data-coins='4'] img:nth-child(4) {
+    left: 34px;
+    width: 42px;
+    height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coin-pack,
+  .coin-pack__buy {
+    transition: none;
+  }
+
+  .coin-pack:hover {
+    transform: none;
+  }
+}

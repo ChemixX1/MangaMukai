@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import FilterStripTactical from "./FilterStripTactical";
 import { useHomeData } from '../../context/HomeDataContext';
+import { useSavedMangas } from '../../hooks/useSavedMangas';
+import { buildViewsIndex, withKnownViews } from '../../utils/seriesViews';
+import { filterYouthMen } from '../../utils/youthFilter';
 
 interface Manga {
   id: number | string;
@@ -100,24 +103,29 @@ const FittingTagRow = ({ tags }: { tags: string[] }) => {
 };
 
 export const LatestUpdates = () => {
-  const { latestMen, isReady } = useHomeData();
+  const { latestMen, popularMenWeekly, popularMenHistorical, isReady } = useHomeData();
   const [items, setItems] = useState<Manga[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
 
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const { isSaved, toggle: toggleSaved } = useSavedMangas();
   const activeItem = items && items.length > 0 ? items[currentIndex] : null;
+  // Guardado real: mismo estado que la ficha y la página de guardados.
+  const isBookmarked = activeItem ? isSaved(activeItem.id) : false;
 
   const handleBookmark = () => {
-    setIsBookmarked((prev) => !prev);
+    if (activeItem) void toggleSaved(activeItem.id);
   };
 
   useEffect(() => {
     if (!isReady) return;
-    setItems(formatMenItems(latestMen));
+    // Las últimas actualizaciones llegan sin vistas: se completan con las
+    // cifras de los rankings de populares, que sí las traen.
+    const viewsIndex = buildViewsIndex(popularMenWeekly, popularMenHistorical);
+    setItems(formatMenItems(withKnownViews(filterYouthMen(latestMen), viewsIndex)));
     setLoading(false);
-  }, [isReady, latestMen]);
+  }, [isReady, latestMen, popularMenWeekly, popularMenHistorical]);
 
   const nextSlide = useCallback(() => {
     if (items.length > 0) setCurrentIndex((prev) => (prev === items.length - 1 ? 0 : prev + 1));
@@ -142,7 +150,7 @@ export const LatestUpdates = () => {
 
   return (
     <section
-      className="home-men-showcase relative w-full min-h-[1020px] sm:min-h-[980px] md:min-h-[1080px] lg:min-h-[850px] lg:h-[850px] overflow-hidden bg-transparent text-white font-sans flex flex-col"
+      className="home-men-showcase relative w-full min-h-[960px] sm:min-h-[1040px] md:min-h-[1080px] lg:min-h-[850px] lg:h-[850px] overflow-hidden bg-transparent text-white font-sans flex flex-col"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
@@ -206,9 +214,9 @@ export const LatestUpdates = () => {
                           <span className="whitespace-nowrap">{formatViews(activeItem.totalViews)}</span>
                         </div>
                       </div>
-                      <h1 className="home-men-feature-heading home-theme-title h-auto overflow-hidden text-ellipsis text-center text-3xl font-[1000] uppercase italic leading-[0.9] tracking-tighter text-white drop-shadow-lg line-clamp-2 sm:text-left sm:text-4xl lg:text-[30px]">
+                      <h2 className="home-men-feature-heading home-theme-title h-auto overflow-hidden text-ellipsis text-center text-3xl font-[1000] uppercase italic leading-[0.9] tracking-tighter text-white drop-shadow-lg line-clamp-2 sm:text-left sm:text-4xl lg:text-[30px]">
                           {activeItem.title}
-                      </h1>
+                      </h2>
                   </div>
 
                   <div className="home-men-copy-width flex w-full max-w-2xl items-stretch">
@@ -250,7 +258,7 @@ export const LatestUpdates = () => {
         </div>
 
         {/* --- COLUMNA DERECHA: CARDS --- */}
-        <div className="relative order-1 flex h-[400px] w-full items-center justify-center [perspective:1000px] sm:h-[320px] md:h-[450px] lg:order-2 lg:w-[50%] lg:justify-start lg:pl-28">
+        <div className="relative order-1 flex h-[400px] w-full items-center justify-center [perspective:1000px] sm:h-[320px] md:h-[450px] lg:order-2 lg:w-[50%] lg:justify-start lg:pl-20">
             <div className="transform-style-3d relative flex h-full w-full translate-x-0 items-center justify-center sm:-translate-x-1 lg:translate-x-1 lg:justify-start">
               {items.map((item, index) => {
                 const relativeIndex = getRelativeIndex(index);
@@ -302,7 +310,7 @@ export const LatestUpdates = () => {
                     `}>
                         
                         <div className="relative h-full w-full overflow-hidden">
-                            <img src={item.coverImage} alt={item.title} className="home-showcase-cover-image h-full w-full object-cover" loading="lazy" decoding="async" />
+                            <img src={item.coverImage} alt={`Portada del manga ${item.title}`} className="home-showcase-cover-image h-full w-full object-cover" loading="lazy" decoding="async" />
                             <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-md border border-white/15 bg-black/70 px-2 py-1 text-[10px] font-black text-yellow-400" aria-label={`Valoración ${item.rating}`}>
                               <Star size={11} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
                               {item.rating}
@@ -317,7 +325,7 @@ export const LatestUpdates = () => {
         </div>
       </div>
 
-      <div className="relative z-30 flex w-full justify-center gap-2 pb-7 pt-2" aria-label="Cambiar manga juvenil">
+      <div className="relative z-30 -mt-6 flex w-full justify-center gap-2 pb-3 pt-0 sm:mt-0 sm:pb-7 sm:pt-2" aria-label="Cambiar manga juvenil">
         {items.map((_, i) => (
           <button
             key={i}

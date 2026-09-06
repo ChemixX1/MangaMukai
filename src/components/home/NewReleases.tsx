@@ -62,7 +62,7 @@ export const NewReleases = () => {
             >
                 <img 
                     src={mainItem.coverImage} 
-                    alt={mainItem.title} 
+                    alt={`Portada del manga ${mainItem.title}`} 
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 filter brightness-75 group-hover:brightness-100"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-90 transition-opacity duration-300" />
@@ -116,7 +116,7 @@ export const NewReleases = () => {
                     >
                         <img 
                             src={item.coverImage} 
-                            alt={item.title} 
+                            alt={`Portada del manga ${item.title}`} 
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                             loading="lazy"
                         />

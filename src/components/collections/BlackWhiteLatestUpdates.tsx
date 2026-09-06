@@ -162,7 +162,7 @@ function BlackWhiteLatestBoard({ audience, sectionId, variant }: BlackWhiteLates
                   className={`group overflow-hidden rounded-[22px] border ${isLight ? 'border-black/10 bg-white shadow-[0_18px_50px_rgba(18,48,58,0.08)]' : 'border-white/10 bg-[#0b171c] shadow-[0_18px_50px_rgba(0,0,0,0.22)]'}`}
                 >
                   <Link to={`/manga/${manga.id}`} className="relative block h-36 overflow-hidden bg-black">
-                    <img src={manga.portada} alt={cleanTitle(manga.titulo)} loading="lazy" className="manga-bn-interactive-cover h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.035]" />
+                    <img src={manga.portada} alt={`Portada del manga ${cleanTitle(manga.titulo)}`} loading="lazy" className="manga-bn-interactive-cover h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.035]" />
                     <span className="absolute inset-0 bg-gradient-to-t from-black via-black/5 to-transparent" />
                     <span className="absolute left-4 top-4 rounded-full border border-white/30 bg-black/45 px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md">{manga.tipo || 'Manga B&N'}</span>
                     <span className="absolute -bottom-3 right-4 font-[Montserrat] text-7xl font-black leading-none tracking-[-0.1em] text-white/90">{displayIndex}</span>
@@ -224,7 +224,7 @@ function BlackWhiteLatestBoard({ audience, sectionId, variant }: BlackWhiteLates
                 </header>
 
                 <Link to={`/manga/${manga.id}`} className="relative block h-36 overflow-hidden bg-black">
-                  <img src={manga.portada} alt={cleanTitle(manga.titulo)} loading="lazy" className="manga-bn-interactive-cover h-full w-full object-cover object-top grayscale transition duration-500 group-hover:scale-105" />
+                  <img src={manga.portada} alt={`Portada del manga ${cleanTitle(manga.titulo)}`} loading="lazy" className="manga-bn-interactive-cover h-full w-full object-cover object-top grayscale transition duration-500 group-hover:scale-105" />
                   <span className="absolute inset-0 bg-gradient-to-t from-black via-black/5 to-transparent" />
                   <span className="absolute -bottom-3 right-4 font-[Montserrat] text-7xl font-black leading-none tracking-[-0.1em] text-white/90">{displayIndex}</span>
                 </Link>

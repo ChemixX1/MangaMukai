@@ -187,6 +187,9 @@ $html = file_get_contents($index_file);
 $html = preg_replace('~<title\b[^>]*>.*?</title>\s*~is', '', $html);
 $html = preg_replace('~<meta\b[^>]*(?:name|property)=["\'](?:description|robots|googlebot|googlebot-image|twitter:[^"\']+|og:[^"\']+)["\'][^>]*>\s*~i', '', $html);
 $html = preg_replace('~<link\b[^>]*rel=["\'](?:canonical|image_src)["\'][^>]*>\s*~i', '', $html);
+// El shell trae un JSON-LD generico de Organization/WebSite: se sustituye por el
+// grafo de esta ficha para no publicar dos veces los mismos @id.
+$html = preg_replace('~<script\b[^>]*type=["\']application/ld\+json["\'][^>]*>.*?</script>\s*~is', '', $html);
 $html = str_replace('</head>', $seo_head . '  </head>', $html);
 
 $noscript = '<noscript><main><h1>' . $escape($title) . '</h1><img src="' .

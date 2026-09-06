@@ -35,6 +35,14 @@ const emitLoadingProgress = (progress: number, complete = false) => {
   }));
 };
 
+/**
+ * Solo se espera a las portadas que se ven sin desplazar la página. Antes se
+ * descargaban y decodificaban las ~32 antes de levantar el loader, así que la
+ * pantalla de carga duraba lo que tardaba la última imagen del carrusel; el
+ * resto sigue precargándose, pero ya con la página a la vista.
+ */
+const ABOVE_THE_FOLD_COVERS = 8;
+
 const preloadCriticalImages = async (payload: HomeDataPayload) => {
   const criticalMangas = [
     ...payload.popularWeekly,
@@ -48,7 +56,8 @@ const preloadCriticalImages = async (payload: HomeDataPayload) => {
   const authCovers = seedSharedAuthCovers(criticalMangas);
   const sources = authCovers.map(cover => cover.src);
 
-  await preloadImages(sources);
+  await preloadImages(sources.slice(0, ABOVE_THE_FOLD_COVERS));
+  void preloadImages(sources.slice(ABOVE_THE_FOLD_COVERS));
 };
 
 const loadHomeData = (): Promise<HomeDataPayload> => {
@@ -112,17 +121,24 @@ const HomeDataContext = createContext<HomeData>({
 
 export const useHomeData = () => useContext(HomeDataContext);
 
+const EMPTY_HOME_DATA: HomeData = {
+  popularWeekly: [],
+  popularMenWeekly: [],
+  popularHistorical: [],
+  popularMenHistorical: [],
+  latestWomen: [],
+  latestMen: [],
+  newReleases: [],
+  isReady: false,
+};
+
 export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
-  const [data, setData] = useState<HomeData>({
-    popularWeekly: [],
-    popularMenWeekly: [],
-    popularHistorical: [],
-    popularMenHistorical: [],
-    latestWomen: [],
-    latestMen: [],
-    newReleases: [],
-    isReady: false,
-  });
+  /* Al volver a la portada desde otra página el proveedor se monta de nuevo. Si
+     ya hay datos cargados se arranca con ellos, así los listados se pintan en el
+     primer fotograma en vez de vaciarse y rellenarse otra vez. */
+  const [data, setData] = useState<HomeData>(
+    () => (cachedHomeData ? { ...cachedHomeData, isReady: true } : EMPTY_HOME_DATA),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +150,11 @@ export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
         emitLoadingProgress(92);
         await preloadCriticalImages(payload);
         if (cancelled) return;
-        setData({ ...payload, isReady: true });
+        // Al volver desde la caché el estado inicial ya es esta misma carga: se
+        // deja tal cual para no provocar un repintado con datos idénticos.
+        setData((current) => (current.isReady && current.popularWeekly === payload.popularWeekly
+          ? current
+          : { ...payload, isReady: true }));
         window.requestAnimationFrame(() => emitLoadingProgress(100, true));
       })
       .catch((error) => {

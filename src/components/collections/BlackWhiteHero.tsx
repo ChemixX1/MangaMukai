@@ -4,10 +4,11 @@ import { Bookmark, Play, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useHomeData } from '../../context/HomeDataContext';
+import { useSavedMangas } from '../../hooks/useSavedMangas';
 import { useTheme } from '../../hooks/useTheme';
 import type { MangaCapitulo } from '../../types/manga';
-
-const blackWhitePattern = /b\/?n|blanco|negro|shounen|seinen|acci[oó]n|manga juvenil/i;
+import { collectionTags } from '../../utils/collectionTags';
+import { byTotalViews, filterWomenBlackWhite } from '../../utils/womenBlackWhite';
 
 const cleanTitle = (value = '') => value
   .replace(/[-–]?\s*(Capitulo|Capítulo|Chapter|Volumen|Episodio)\s*\d+.*$/i, '')
@@ -32,22 +33,6 @@ const uniqueBySeries = (items: MangaCapitulo[]) => {
   });
 };
 
-const belongsToBlackWhite = (manga: MangaCapitulo) => blackWhitePattern.test([
-  manga.tipo,
-  manga.genero,
-  ...(manga.genres || []),
-].filter(Boolean).join(' '));
-
-const formatAge = (value?: string) => {
-  if (!value) return '—';
-  const date = new Date(value.includes(' ') ? value.replace(' ', 'T') : value);
-  if (Number.isNaN(date.getTime())) return '—';
-  const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000));
-  if (days === 0) return 'HOY';
-  if (days >= 365) return `${Math.floor(days / 365)}a`;
-  return `${days}d`;
-};
-
 const getRating = (manga: MangaCapitulo) => {
   const seed = String(manga.id).split('').reduce((total, character) => total + character.charCodeAt(0), 0);
   return `9.${seed % 8}`;
@@ -66,7 +51,7 @@ export function BlackWhiteHero() {
   } = useHomeData();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const { isSaved, toggle: toggleSaved } = useSavedMangas();
   const isLightMode = theme === 'light';
 
   const items = useMemo(() => {
@@ -77,8 +62,8 @@ export function BlackWhiteHero() {
       ...latestMen,
       ...newReleases,
     ]);
-    const blackWhiteMangas = allMangas.filter(belongsToBlackWhite);
-    return uniqueBySeries([...blackWhiteMangas, ...allMangas]).slice(0, 9);
+    // Solo los más vistos con público Mujer dentro de la colección B&N.
+    return filterWomenBlackWhite(allMangas).sort(byTotalViews).slice(0, 9);
   }, [latestMen, latestWomen, newReleases, popularHistorical, popularMenHistorical]);
 
   const nextSlide = useCallback(() => {
@@ -105,12 +90,14 @@ export function BlackWhiteHero() {
   const title = cleanTitle(active?.titulo || 'Mangas en blanco y negro');
   const description = cleanDescription(title, active?.descripcion)
     || 'Historias clásicas, acción y tinta pura en una colección pensada para lectores de manga tradicional.';
-  const genres = (active?.genres?.length ? active.genres : [active?.tipo || 'Manga']).slice(0, 2);
+  const genres = collectionTags(active, 'bn');
   const latestChapter = active?.capitulosRecientes?.[0]?.numero;
+  // Guardado real: mismo estado que la ficha y la página de guardados.
+  const isBookmarked = active ? isSaved(active.id) : false;
 
   return (
     <section
-      className={`bn-hero relative min-h-[1050px] w-full overflow-hidden transition-colors duration-700 lg:h-[690px] lg:min-h-0 ${isLightMode ? 'bg-[#f5f6f8] text-black' : 'bg-[#101010] text-white'}`}
+      className={`bn-hero relative min-h-[985px] w-full overflow-hidden transition-colors duration-700 lg:h-[690px] lg:min-h-0 ${isLightMode ? 'bg-[#f5f6f8] text-black' : 'bg-[#101010] text-white'}`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       aria-label="Mangas en blanco y negro destacados"
@@ -146,12 +133,12 @@ export function BlackWhiteHero() {
                   ))}
                 </div>
 
-                <h1 className="mb-6 line-clamp-3 text-center text-[clamp(1.55rem,3vw,3rem)] font-black uppercase italic leading-[0.98] tracking-[-0.045em] lg:text-left">
+                <h2 className="mb-6 line-clamp-3 text-center text-[clamp(1.55rem,3vw,3rem)] font-black uppercase italic leading-[0.98] tracking-[-0.045em] lg:text-left">
                   {title}
-                </h1>
+                </h2>
 
                 <div className={`mb-8 flex min-h-[138px] w-full items-center border-l-[4px] px-6 py-5 backdrop-blur-md ${isLightMode ? 'border-black bg-white/55' : 'border-white bg-black/35'}`}>
-                  <p className={`line-clamp-4 text-justify text-[14px] font-medium leading-7 sm:text-[15px] ${isLightMode ? 'text-black/72' : 'text-white/82'}`}>{description}</p>
+                  <p className={`line-clamp-4 h-28 text-justify text-[14px] font-medium leading-7 sm:text-[15px] ${isLightMode ? 'text-black/72' : 'text-white/82'}`}>{description}</p>
                 </div>
 
                 <div className="mb-8 grid max-w-[360px] grid-cols-3 gap-6 text-left">
@@ -164,16 +151,19 @@ export function BlackWhiteHero() {
                     <strong className="mt-1 block text-[21px] font-black tracking-tight">CH {latestChapter || '—'}</strong>
                   </div>
                   <div>
-                    <span className={`block text-[9px] font-black uppercase tracking-[0.18em] ${isLightMode ? 'text-black/60' : 'text-white/55'}`}>Estado</span>
-                    <strong className="mt-1 block text-[21px] font-black tracking-tight">{formatAge(active.rawFecha || active.fecha)}</strong>
+                    <span className={`block text-[9px] font-black uppercase tracking-[0.18em] ${isLightMode ? 'text-black/60' : 'text-white/55'}`}>Estatus</span>
+                    <strong className="mt-1 flex items-center gap-2 text-[21px] font-black tracking-tight">
+                      <span aria-hidden="true" className={`bn-hero-status-dot h-2.5 w-2.5 shrink-0 rounded-full ${isLightMode ? 'bg-black' : 'bg-white'}`} />
+                      Ongoing
+                    </strong>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap justify-center gap-4 lg:justify-start">
-                  <button type="button" onClick={() => navigate(`/manga/${active.id}`)} className="h-[52px] -skew-x-[11deg] bg-white px-8 text-black transition hover:bg-[#00C2FF] active:scale-95">
+                <div className="flex flex-nowrap items-center justify-center gap-3 sm:gap-4 lg:justify-start">
+                  <button type="button" onClick={() => navigate(`/manga/${active.id}`)} className="h-[52px] shrink-0 -skew-x-[11deg] bg-white px-6 text-black transition hover:bg-[#FF4D88] hover:text-white active:scale-95 sm:px-8">
                     <span className="flex skew-x-[11deg] items-center gap-3 text-[12px] font-black uppercase tracking-[0.13em]">Leer ahora <Play size={16} fill="currentColor" /></span>
                   </button>
-                  <button type="button" onClick={() => setIsBookmarked((current) => !current)} className={`h-[52px] -skew-x-[11deg] border-2 px-8 transition active:scale-95 ${isBookmarked ? 'border-[#00C2FF] bg-[#00C2FF] text-black' : isLightMode ? 'border-black/30 bg-white/65 text-black hover:border-black' : 'border-white/30 bg-white/90 text-[#111827] hover:border-white'}`}>
+                  <button type="button" onClick={() => void toggleSaved(active.id)} className={`h-[52px] shrink-0 -skew-x-[11deg] border-2 px-6 transition active:scale-95 sm:px-8 ${isBookmarked ? 'border-[#00C2FF] bg-[#00C2FF] text-black' : isLightMode ? 'border-black/30 bg-white/65 text-black hover:border-black' : 'border-white/30 bg-white/90 text-[#111827] hover:border-white'}`}>
                     <span className="flex skew-x-[11deg] items-center gap-3 text-[12px] font-black uppercase tracking-[0.13em]"><Bookmark size={16} fill={isBookmarked ? 'currentColor' : 'none'} />{isBookmarked ? 'Guardado' : 'Guardar'}</span>
                   </button>
                 </div>
@@ -189,19 +179,23 @@ export function BlackWhiteHero() {
             <>
               <AnimatePresence mode="wait">
                 <motion.article key={active.id} className={`relative h-[340px] w-[238px] shrink-0 overflow-hidden rounded-[18px] border shadow-[0_24px_70px_rgba(0,0,0,0.38)] sm:h-[390px] sm:w-[300px] lg:h-[500px] lg:w-[360px] xl:w-[400px] ${isLightMode ? 'border-black/15 bg-white' : 'border-white/15 bg-black'}`} initial={{ opacity: 0, scale: 0.96, x: 16 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.97, x: -14 }} transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}>
-                  <img src={active.portada} alt={title} className="manga-bn-interactive-cover h-full w-full object-cover" />
+                  <img src={active.portada} alt={`Portada del manga ${title}`} className="manga-bn-interactive-cover h-full w-full object-cover" />
                   <div className="absolute inset-x-0 bottom-0 h-[34%] bg-gradient-to-t from-black via-black/45 to-transparent" />
                   <span className="absolute left-4 top-4 rounded-full bg-white/80 px-4 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-black backdrop-blur-md">Destacado</span>
-                  <div className="absolute bottom-4 left-4 flex max-w-[calc(100%-2rem)] flex-wrap gap-2">
-                    {genres.map((genre) => <span key={genre} className="bg-black/75 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-sm">{genre}</span>)}
-                  </div>
+                  {/* La portada destacada abre la ficha del manga. */}
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/manga/${active.id}`)}
+                    aria-label={`Ver ${title}`}
+                    className="absolute inset-0 z-20 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#00C2FF]"
+                  />
                 </motion.article>
               </AnimatePresence>
 
               <div className="flex h-[340px] w-[66px] shrink-0 flex-col justify-between sm:h-[390px] sm:w-[96px] lg:h-[500px] lg:w-[125px] xl:w-[145px]">
                 {thumbnails.map(({ item, index }) => (
                   <button key={item.id} type="button" onClick={() => setActiveIndex(index)} aria-label={`Mostrar ${cleanTitle(item.titulo)}`} className="group relative h-[78px] w-full overflow-hidden rounded-[11px] border border-white/30 bg-black transition hover:-translate-y-0.5 hover:border-white sm:h-[90px] sm:rounded-[14px] lg:h-[112px] lg:rounded-[16px]">
-                    <img src={item.portada} alt={cleanTitle(item.titulo)} className="manga-bn-interactive-cover h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                    <img src={item.portada} alt={`Portada del manga ${cleanTitle(item.titulo)}`} className="manga-bn-interactive-cover h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                     <span className="absolute inset-x-0 bottom-0 h-[3px] bg-[#FF4D88]" />
                   </button>
                 ))}

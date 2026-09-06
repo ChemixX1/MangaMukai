@@ -7,7 +7,9 @@
     "dev": "vite --open",
     "build": "tsc -b && vite build && node scripts/copy-server.mjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-ftps.ps1",
+    "deploy:dry": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-ftps.ps1 -DryRun"
   },
   "dependencies": {
     "@lobehub/fluent-emoji": "^4.1.0",

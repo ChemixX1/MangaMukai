@@ -17,6 +17,20 @@ export interface ProfilePost {
   media_type: 'image' | 'video' | '';
   created_at: string;
   author: ProfilePostAuthor;
+  reactions?: Record<string, number>;
+  my_reaction?: string;
+  comment_count?: number;
+  share_count?: number;
+  shared_post_id?: number | null;
+  shared_post?: ProfilePost | null;
+}
+
+export interface ProfilePostComment {
+  id: number;
+  post_id: number;
+  content: string;
+  created_at: string;
+  author: ProfilePostAuthor;
 }
 
 interface PostPayload {
@@ -25,6 +39,10 @@ interface PostPayload {
   posts?: ProfilePost[];
   post?: ProfilePost;
   media?: { id: number; url: string; type: 'image' | 'video' };
+  comments?: ProfilePostComment[];
+  comment?: ProfilePostComment;
+  has_more?: boolean;
+  shared?: ProfilePost;
 }
 
 const authHeaders = (json = false): HeadersInit => {
@@ -58,6 +76,7 @@ export const getProfilePosts = async (userId: string | number): Promise<ProfileP
   const response = await fetch(`${MANGAMUKAI_API}/social/posts?${query.toString()}`, {
     credentials: 'include',
     headers: authHeaders(),
+    cache: 'no-store',
   });
   const payload = await ensureSuccess(response);
   return payload.posts || [];
@@ -87,4 +106,19 @@ export const createProfilePost = async (content: string, mediaId?: number): Prom
   const payload = await ensureSuccess(response);
   if (!payload.post) throw new Error('El servidor no devolvió la publicación.');
   return payload.post;
+};
+
+export const getProfilePostComments = async (postId: number, before?: number) => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/posts/${postId}/comments${before ? `?before=${before}` : ''}`, { headers: authHeaders(), credentials: 'include', cache: 'no-store' });
+  const payload = await ensureSuccess(response);
+  return { comments: payload.comments || [], hasMore: !!payload.has_more };
+};
+
+export const interactWithProfilePost = async (postId: number, action: 'reaction' | 'comments' | 'share', body: Record<string, string> = {}) => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/posts/${postId}/${action}`, {
+    method: 'POST', credentials: 'include', headers: authHeaders(true), body: JSON.stringify(body),
+  });
+  const payload = await ensureSuccess(response);
+  if (!payload.post) throw new Error('No se pudo sincronizar la publicación.');
+  return payload as PostPayload & { post: ProfilePost };
 };

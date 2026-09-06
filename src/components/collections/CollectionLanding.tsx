@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { BookOpen, ChevronLeft, ChevronRight, Eye, Flame, LockKeyhole, Play, Star, Tag } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BookOpen, ChevronLeft, ChevronRight, Eye, Flame, Play, Star, Tag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { MangaMetaBar } from "../common";
-import { getLatestMenMangas, getPopularWomenByViews, getUltimosCapitulos } from "../../services/mangaService";
+import { getPopularMenByViews, getPopularWomenByViews, getUltimosCapitulos } from "../../services/mangaService";
 import type { MangaCapitulo } from "../../types/manga";
+import { buildViewsIndex, withKnownViews } from "../../utils/seriesViews";
+import { useSavedMangas } from "../../hooks/useSavedMangas";
 import { useTheme } from "../../hooks/useTheme";
 import { AdultHeroCoverflow } from "./AdultMotionCarousels";
 import { PopularCarousel } from "../home/PopularCarousel";
@@ -11,6 +13,11 @@ import { AdultLatestUpdates } from "./AdultLatestUpdates";
 import { YouthCarousel } from "../home/YouthCarousel";
 import { useHomeData } from "../../context/HomeDataContext";
 import { AdultYouthMotionCarousel } from "./AdultYouthMotionCarousel";
+import { collectionTags } from '../../utils/collectionTags';
+import { byTotalViews, filterMenHot, filterWomenHot } from "../../utils/womenBlackWhite";
+import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from "../../utils/globalLoading";
+import { preloadImages } from "../../utils/preloadImages";
+import { whenIdle } from "../../utils/whenIdle";
 
 type CollectionVariant = "mono" | "adult";
 
@@ -43,6 +50,9 @@ const themes = {
   },
 } as const;
 
+/** El loader global cubre la página +19 hasta que su contenido está completo. */
+const ADULT_LOADER_SCOPE = "collection-adult";
+
 const adultPattern = /\+19|adult|ecchi|hentai|hot|er[oó]tico|maduro|harem|yuri/i;
 const monoPattern = /b\/?n|blanco|negro|shounen|seinen|acci[oó]n|manga juvenil/i;
 
@@ -67,36 +77,51 @@ function formatViews(value = 0) {
   return String(value);
 }
 
-function AdultGate({ onAccept }: { onAccept: () => void }) {
-  return (
-    <div className="fixed inset-0 z-[200] grid place-items-center bg-black/95 px-5 backdrop-blur-xl">
-      <div className="w-full max-w-md border border-pink-500/30 bg-[#12070d] p-8 text-center shadow-[0_0_90px_rgba(255,77,136,0.2)]">
-        <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-full border border-pink-500/30 bg-pink-500/10"><LockKeyhole className="text-[#FF4D88]" /></div>
-        <p className="mb-2 text-[10px] font-black uppercase tracking-[0.4em] text-[#FF4D88]">Contenido adulto</p>
-        <h2 className="mb-4 text-3xl font-black uppercase italic text-white">+18 años</h2>
-        <p className="mb-8 text-sm leading-relaxed text-white/60">Al continuar confirmas que tienes 18 años o más y que este contenido es legal en tu país.</p>
-        <button onClick={onAccept} className="w-full bg-[#FF4D88] px-5 py-4 text-xs font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-black">Tengo +18 años — Entrar</button>
-        <Link to="/" className="mt-4 block text-[10px] font-bold uppercase tracking-widest text-white/30 hover:text-white">Salir</Link>
-      </div>
-    </div>
-  );
-}
-
 export function CollectionLanding({ variant }: CollectionLandingProps) {
   const theme = themes[variant];
   const { theme: colorMode } = useTheme();
-  const { latestWomen, latestMen } = useHomeData();
+  const {
+    latestWomen,
+    latestMen,
+    popularHistorical,
+    popularWeekly,
+    popularMenWeekly,
+    popularMenHistorical,
+    newReleases,
+    isReady: homeReady,
+  } = useHomeData();
+  const { isSaved, toggle: toggleSaved } = useSavedMangas();
   const isLightMode = colorMode === "light";
   const [mangas, setMangas] = useState<MangaCapitulo[]>([]);
-  const [menMangas, setMenMangas] = useState<MangaCapitulo[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeGenre, setActiveGenre] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [adultAccepted, setAdultAccepted] = useState(() => variant !== "adult" || sessionStorage.getItem("mm_adult_ok") === "1");
+  const loaderDoneRef = useRef(false);
+  const [popularMenMonthly, setPopularMenMonthly] = useState<MangaCapitulo[]>([]);
 
+  /* El ranking mensual no está en el contexto del home; se pide aquí (queda en
+     caché y lo comparte el carrusel de populares) solo para sumar sus vistas.
+     Como únicamente completa contadores, espera a que el navegador esté libre. */
+  useEffect(() => {
+    if (variant !== "adult") return;
+    let mounted = true;
+    const cancelIdle = whenIdle(() => {
+      getPopularMenByViews("monthly", false)
+        .then((list) => { if (mounted) setPopularMenMonthly(list); })
+        .catch(() => undefined);
+    });
+    return () => {
+      mounted = false;
+      cancelIdle();
+    };
+  }, [variant]);
+
+  /* `false` es imprescindible: con el valor por defecto (`true`) esta llamada
+     pedía `refresh=1` y obligaba al backend a recalcular el ranking histórico
+     que el contexto del home ya estaba trayendo. Así comparte esa misma promesa. */
   useEffect(() => {
     let mounted = true;
-    Promise.all([getUltimosCapitulos(), getPopularWomenByViews("historical")])
+    Promise.all([getUltimosCapitulos(), getPopularWomenByViews("historical", false)])
       .then(([library, popular]) => {
         if (!mounted) return;
         const all = uniqueMangas([...library, ...popular]);
@@ -104,17 +129,6 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
         setMangas(matching.length >= 6 ? matching : all);
       })
       .finally(() => mounted && setLoading(false));
-
-    getLatestMenMangas().then((latestMen) => {
-      if (!mounted || latestMen.length === 0) return;
-      const adultMen = latestMen.filter((manga) => belongsToCollection(manga, "adult"));
-      setMenMangas(uniqueMangas(adultMen.length >= 5 ? adultMen : latestMen).slice(0, 12));
-      setMangas((current) => {
-        const all = uniqueMangas([...current, ...latestMen]);
-        const matching = all.filter((manga) => belongsToCollection(manga, variant));
-        return matching.length >= 6 ? matching : all;
-      });
-    });
     return () => { mounted = false; };
   }, [variant]);
 
@@ -136,17 +150,64 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
     ? mangas.filter((manga) => manga.genres?.some((genre) => genre.toLowerCase() === activeGenre.toLowerCase()))
     : mangas, [activeGenre, mangas]);
 
+  /* En +19 cada bloque exige la etiqueta HOT literal: Mujer arriba, Hombre en
+     juveniles y abajo. Los rankings de vistas casi no traen mangas HOT, así que
+     cada pool suma la biblioteca completa (`mangas`) y el filtro decide. */
   const latestWomenWithChapters = useMemo(
-    () => latestWomen.filter((manga) => manga.capitulosRecientes.length > 0),
-    [latestWomen],
+    () => filterWomenHot(uniqueMangas([...latestWomen, ...mangas])),
+    [latestWomen, mangas],
   );
   const latestMenWithChapters = useMemo(
-    () => latestMen.filter((manga) => manga.capitulosRecientes.length > 0),
-    [latestMen],
+    () => filterMenHot(uniqueMangas([...latestMen, ...mangas])),
+    [latestMen, mangas],
+  );
+  /* Vistas por serie: las últimas actualizaciones y el catálogo llegan sin
+     `totalViews`, así que el contador de juveniles se completa con la cifra
+     que traen los rankings para esa misma serie. */
+  const viewsIndex = useMemo(
+    () => buildViewsIndex(popularMenWeekly, popularMenMonthly, popularMenHistorical, popularWeekly, popularHistorical, newReleases, latestMen, latestWomen, mangas),
+    [popularMenWeekly, popularMenMonthly, popularMenHistorical, popularWeekly, popularHistorical, newReleases, latestMen, latestWomen, mangas],
+  );
+  const youthHotMen = useMemo(
+    () => withKnownViews(filterMenHot(uniqueMangas([...latestMen, ...popularMenWeekly, ...popularMenHistorical, ...mangas])), viewsIndex),
+    [latestMen, popularMenWeekly, popularMenHistorical, mangas, viewsIndex],
   );
 
-  const heroItems = (variant === "adult" && menMangas.length > 0 ? menMangas : mangas).slice(0, 8);
+  /* Hero +19: solo los más vistos con público Mujer y etiqueta HOT. Sin HOT no entra. */
+  const heroItems = useMemo(() => {
+    if (variant !== "adult") return mangas.slice(0, 8);
+    const pool = uniqueMangas([...popularHistorical, ...popularWeekly, ...latestWomen, ...newReleases, ...mangas]);
+    return filterWomenHot(pool).sort(byTotalViews).slice(0, 8);
+  }, [variant, mangas, popularHistorical, popularWeekly, latestWomen, newReleases]);
   const active = heroItems[activeIndex % Math.max(heroItems.length, 1)];
+  const heroCoverKey = heroItems.map((manga) => manga.portada).filter(Boolean).join("|");
+
+  /* La página +19 se muestra entera de una vez: el loader global se mantiene
+     hasta que llegan los listados y las portadas del hero ya están decodificadas. */
+  useEffect(() => {
+    if (variant !== "adult") return;
+    startGlobalLoading(12, ADULT_LOADER_SCOPE);
+    return () => {
+      if (!loaderDoneRef.current) finishGlobalLoading(ADULT_LOADER_SCOPE);
+    };
+  }, [variant]);
+
+  useEffect(() => {
+    if (variant !== "adult" || loaderDoneRef.current) return;
+    if (loading || !homeReady) return;
+
+    let cancelled = false;
+    updateGlobalLoading(90);
+    void preloadImages(heroCoverKey.split("|").slice(0, 3)).finally(() => {
+      if (cancelled) return;
+      loaderDoneRef.current = true;
+      finishGlobalLoading(ADULT_LOADER_SCOPE);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [variant, loading, homeReady, heroCoverKey]);
 
   const showPreviousHero = () => {
     if (heroItems.length < 2) return;
@@ -162,14 +223,13 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
     setActiveIndex(index);
   };
 
-  const acceptAdult = () => {
-    sessionStorage.setItem("mm_adult_ok", "1");
-    setAdultAccepted(true);
-  };
-
   return (
     <main className={`collection-landing min-h-screen overflow-hidden transition-colors duration-700 ${isLightMode ? "home-theme-light bg-[#f5f6f8] text-slate-950" : `home-theme-dark ${theme.page} text-white`}`}>
-      {variant === "adult" && !adultAccepted && <AdultGate onAccept={acceptAdult} />}
+      {/* El título grande del hero es el manga destacado y va rotando: el H1 real
+          de la colección se declara aquí para buscadores y lectores de pantalla. */}
+      <h1 className="sr-only">
+        {variant === "adult" ? "Mangas +19 en español para adultos" : "Manga en blanco y negro: shounen, seinen y acción"}
+      </h1>
       <section className={`relative overflow-hidden ${variant === "adult" ? "min-h-[960px] lg:min-h-[850px]" : "min-h-[790px]"}`}>
         <div className={`home-theme-backdrop-base absolute inset-0 ${isLightMode ? "bg-[#f5f6f8]" : "bg-[#121212]"}`} aria-hidden="true">
           {active?.portada && <img src={active.portada} alt="" className={`absolute inset-0 h-full w-full scale-105 object-cover grayscale blur-[2px] transition-[filter] duration-700 ${isLightMode ? "brightness-[0.82] contrast-[1.03]" : "brightness-[0.36] contrast-[1.08]"}`} />}
@@ -193,14 +253,14 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
               <span className={`flex items-center gap-1 border px-3 py-1 text-[11px] font-black uppercase tracking-wider backdrop-blur-sm ${isLightMode ? "border-black/10 bg-white/55 text-black/70" : "border-white/15 bg-black/30 text-white"}`}><Eye size={12} /> {formatViews(active?.totalViews)}</span>
             </div>
             <p className="mb-3 text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: theme.accent }}>{theme.eyebrow}</p>
-            <h1 className="mb-6 line-clamp-3 text-4xl font-black uppercase italic leading-[0.95] tracking-tighter sm:text-5xl lg:text-6xl">{active?.titulo || theme.title}</h1>
+            <h2 className="mb-6 line-clamp-3 text-4xl font-black uppercase italic leading-[0.95] tracking-tighter sm:text-5xl lg:text-6xl">{active?.titulo || theme.title}</h2>
             <div className={`mb-6 border p-6 backdrop-blur-md transition-colors duration-700 ${isLightMode ? "border-black/10 bg-white/60" : "border-white/10 bg-black/35"}`} style={{ borderLeft: `4px solid ${theme.accent}` }}>
               <p className={`line-clamp-5 text-sm font-medium leading-7 sm:text-base ${isLightMode ? "text-black/70" : "text-white/75"}`}>{active?.descripcion || theme.description}</p>
             </div>
-            <div className="mb-7 flex flex-wrap gap-2">{(active?.genres || [theme.badge]).slice(0, 4).map((genre) => <span key={genre} className="bg-white px-3 py-1 text-[10px] font-black uppercase text-black">{genre}</span>)}</div>
+            <div className="mb-7 flex flex-wrap gap-2">{collectionTags(active, 'bn').map((genre) => <span key={genre} className="bg-white px-3 py-1 text-[10px] font-black uppercase text-black">{genre}</span>)}</div>
             <div className="flex flex-wrap gap-4">
               <Link to={active ? `/manga/${active.id}` : "/biblioteca"} className={`flex items-center gap-2 px-7 py-4 text-xs font-black uppercase tracking-widest transition ${theme.button}`}><Play size={15} fill="currentColor" /> Leer ahora</Link>
-              <Link to="/saved" className={`flex items-center gap-2 border px-7 py-4 text-xs font-black uppercase tracking-widest transition ${isLightMode ? "border-black/20 bg-white/55 text-black hover:bg-black hover:text-white" : "border-white/25 bg-black/30 text-white hover:bg-white hover:text-black"}`}><BookOpen size={15} /> Guardar</Link>
+              <button type="button" onClick={() => active && void toggleSaved(active.id)} className={`flex items-center gap-2 border px-7 py-4 text-xs font-black uppercase tracking-widest transition ${active && isSaved(active.id) ? "border-transparent text-white" : isLightMode ? "border-black/20 bg-white/55 text-black hover:bg-black hover:text-white" : "border-white/25 bg-black/30 text-white hover:bg-white hover:text-black"}`} style={active && isSaved(active.id) ? { backgroundColor: theme.accent } : undefined}><BookOpen size={15} /> {active && isSaved(active.id) ? "Guardado" : "Guardar"}</button>
             </div>
           </div>
           <div className="order-1 flex h-[430px] w-full items-center justify-center lg:order-2 lg:w-[53%]">
@@ -208,7 +268,7 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
               <div className="relative flex h-full w-full max-w-[650px] items-center justify-center">
                 {[activeIndex - 1, activeIndex, activeIndex + 1].map((index, position) => {
                   const item = heroItems[(index + heroItems.length) % heroItems.length];
-                  return <img key={`${item.id}-${position}`} src={item.portada} alt={item.titulo} className={`absolute h-[330px] w-[220px] rounded-xl object-cover shadow-2xl transition-all duration-500 sm:h-[420px] sm:w-[280px] ${position === 1 ? "z-20 scale-100" : position === 0 ? "z-10 -translate-x-[55%] -rotate-6 scale-90 opacity-90" : "z-10 translate-x-[55%] rotate-6 scale-90 opacity-90"}`} />;
+                  return <img key={`${item.id}-${position}`} src={item.portada} alt={`Portada del manga ${item.titulo}`} className={`absolute h-[330px] w-[220px] rounded-xl object-cover shadow-2xl transition-all duration-500 sm:h-[420px] sm:w-[280px] ${position === 1 ? "z-20 scale-100" : position === 0 ? "z-10 -translate-x-[55%] -rotate-6 scale-90 opacity-90" : "z-10 translate-x-[55%] rotate-6 scale-90 opacity-90"}`} />;
                 })}
                 <button onClick={showPreviousHero} aria-label="Manga anterior" className={`absolute left-0 z-30 rounded-full border p-3 backdrop-blur-sm transition ${isLightMode ? "border-black/15 bg-white/70 text-black hover:bg-black hover:text-white" : "border-white/15 bg-black/60 text-white hover:bg-white hover:text-black"}`}><ChevronLeft /></button>
                 <button onClick={showNextHero} aria-label="Manga siguiente" className={`absolute right-0 z-30 rounded-full border p-3 backdrop-blur-sm transition ${isLightMode ? "border-black/15 bg-white/70 text-black hover:bg-black hover:text-white" : "border-white/15 bg-black/60 text-white hover:bg-white hover:text-black"}`}><ChevronRight /></button>
@@ -220,7 +280,7 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
       </section>
       {variant === "adult" && (
         <section className={`relative -mt-3 pb-10 pt-8 sm:-mt-4 sm:pb-12 sm:pt-8 ${isLightMode ? "bg-[#f5f6f8]" : "bg-black"}`}>
-          <PopularCarousel />
+          <PopularCarousel filterMangas={filterWomenHot} />
         </section>
       )}
       {variant === "adult" && (
@@ -228,12 +288,14 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
           items={latestWomenWithChapters}
           isLight={isLightMode}
           sectionId="adult-latest-women"
+          rowTone="neutral"
+          includeUpcoming
         />
       )}
-      {variant === "adult" && <AdultYouthMotionCarousel items={latestMenWithChapters} isLight={isLightMode} />}
+      {variant === "adult" && <AdultYouthMotionCarousel items={youthHotMen} isLight={isLightMode} />}
       {variant === "adult" && (
         <section className={`relative py-14 sm:py-16 ${isLightMode ? "bg-[#f5f6f8]" : "bg-black"}`}>
-          <YouthCarousel />
+          <YouthCarousel filterMangas={filterMenHot} freeTicketTone="blue" minItemsForMotion={7} />
         </section>
       )}
       {variant === "adult" && (
@@ -243,6 +305,8 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
           titleAccent="actualizaciones"
           sectionId="adult-latest-youth"
           accent="blue"
+          rowTone="neutral"
+          includeUpcoming
         />
       )}
       {variant !== "adult" && <section className="desktop-content-shell mx-auto max-w-[1400px] px-5 py-16 lg:px-16">
@@ -258,7 +322,7 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
             {visibleMangas.slice(0, 24).map((manga, index) => (
               <Link key={`${manga.id}-${index}`} to={`/manga/${manga.id}`} className={`group overflow-hidden rounded-xl border transition hover:-translate-y-2 ${isLightMode ? "border-black/10 bg-white shadow-[0_16px_38px_rgba(15,23,42,0.09)] hover:border-black/25" : "border-white/10 bg-[#111318] shadow-xl hover:border-white/25"}`}>
                 <div className="relative aspect-[3/4.2] overflow-hidden">
-                  <img src={manga.portada} alt={manga.titulo} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                  <img src={manga.portada} alt={`Portada del manga ${manga.titulo}`} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   <span className="absolute bottom-2 right-2 px-2 py-1 text-[9px] font-black uppercase" style={{ backgroundColor: theme.accent }}>{manga.tipo || theme.badge}</span>
                   <span className="absolute right-2 top-2 flex items-center gap-1 bg-yellow-400 px-2 py-1 text-[9px] font-black text-black"><Star size={9} fill="currentColor" /> 9.{index % 8}</span>

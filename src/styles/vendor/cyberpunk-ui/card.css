@@ -1,0 +1,265 @@
+/* ============================================================
+ * Cyberpunk UI — Card
+ *
+ * Markup:
+ *   <div class="cp-card cp-card--cut">
+ *     <div class="cp-card__header">
+ *       <h3 class="cp-card__title">SYSTEM STATUS</h3>
+ *       <p class="cp-card__subtitle">v2077.4</p>
+ *     </div>
+ *     <div class="cp-card__body">…</div>
+ *     <div class="cp-card__footer">…</div>
+ *   </div>
+ *
+ * Modifiers:
+ *   --cut    : corner-cut shape
+ *   --neon   : animated conic border
+ *   --raised : brighter surface
+ *   --magenta | --yellow | --green | --purple : accent recolor
+ * ============================================================ */
+
+.cp-card {
+  --cp-card-accent: var(--cp-cyan);
+  --cp-card-glow:   var(--cp-glow-cyan);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--cp-bg-soft);
+  color: var(--cp-fg);
+  border: 1px solid var(--cp-border);
+  border-radius: var(--cp-radius);
+  overflow: hidden;
+  isolation: isolate;
+  transition: border-color 200ms var(--cp-ease-snap),
+              box-shadow 250ms var(--cp-ease-snap);
+}
+
+.cp-card::before {
+  /* Top-left accent bar */
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 56px; height: 3px;
+  background: var(--cp-card-accent);
+  box-shadow: 0 0 8px var(--cp-card-accent);
+}
+
+.cp-card:hover {
+  border-color: var(--cp-card-accent);
+  box-shadow: var(--cp-card-glow);
+}
+
+.cp-card--raised {
+  background: var(--cp-bg-raised);
+}
+
+.cp-card--magenta { --cp-card-accent: var(--cp-magenta); --cp-card-glow: var(--cp-glow-magenta); }
+.cp-card--yellow  { --cp-card-accent: var(--cp-yellow);  --cp-card-glow: var(--cp-glow-yellow); }
+.cp-card--green   { --cp-card-accent: var(--cp-green);   --cp-card-glow: var(--cp-glow-green); }
+.cp-card--purple  { --cp-card-accent: var(--cp-purple);  --cp-card-glow: var(--cp-glow-purple); }
+
+/* Corner-cut card */
+.cp-card--cut {
+  --cp-cc: var(--cp-corner-cut);
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(
+    var(--cp-cc) 0,
+    100% 0,
+    100% calc(100% - var(--cp-cc)),
+    calc(100% - var(--cp-cc)) 100%,
+    0 100%,
+    0 var(--cp-cc)
+  );
+  /* paint a fake border via outline-on-pseudo */
+}
+.cp-card--cut::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    /* corner accent: top-left */
+    linear-gradient(135deg, var(--cp-card-accent) 0 1px, transparent 1px) 0 0/12px 12px no-repeat,
+    /* corner accent: bottom-right */
+    linear-gradient(315deg, var(--cp-card-accent) 0 1px, transparent 1px) 100% 100%/12px 12px no-repeat;
+}
+
+/* --- Ornate HUD-frame card --------------------------------
+ * Markup:
+ *   <div class="cp-card cp-card--hud cp-card--magenta">
+ *     <div class="cp-card__header">…</div>
+ *     <div class="cp-card__body">…</div>
+ *   </div>
+ * Notched panel + inset darker recess + outer bloom. */
+.cp-card--hud {
+  --_cc: 14px;
+  --_nw: 38%;
+  --_nd: 6px;
+  --_nx: 12px;
+
+  background: var(--cp-bg-soft);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--cp-card-accent) 35%, transparent))
+          drop-shadow(0 0 24px color-mix(in oklab, var(--cp-card-accent) 25%, transparent));
+  clip-path: polygon(
+    var(--_cc) 0,
+    calc(50% - var(--_nw) / 2) 0,
+    calc(50% - var(--_nw) / 2 + var(--_nx)) var(--_nd),
+    calc(50% + var(--_nw) / 2 - var(--_nx)) var(--_nd),
+    calc(50% + var(--_nw) / 2) 0,
+    calc(100% - var(--_cc)) 0,
+    100% var(--_cc),
+    100% calc(100% - var(--_cc)),
+    calc(100% - var(--_cc)) 100%,
+    calc(50% + var(--_nw) / 2) 100%,
+    calc(50% + var(--_nw) / 2 - var(--_nx)) calc(100% - var(--_nd)),
+    calc(50% - var(--_nw) / 2 + var(--_nx)) calc(100% - var(--_nd)),
+    calc(50% - var(--_nw) / 2) 100%,
+    var(--_cc) 100%,
+    0 calc(100% - var(--_cc)),
+    0 var(--_cc)
+  );
+  box-shadow:
+    inset 0 0 0 1.5px var(--cp-card-accent),
+    inset 0 0 32px color-mix(in oklab, var(--cp-card-accent) 12%, transparent);
+}
+.cp-card--hud::before {
+  /* Override default top-left tick — accent strip handles emphasis */
+  display: none;
+}
+.cp-card--hud > .cp-card__header {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--cp-card-accent) 18%, var(--cp-bg-soft)),
+    var(--cp-bg-soft)
+  );
+  padding-inline: 1.6rem;
+  padding-top: 1.2rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--cp-card-accent) 30%, var(--cp-border-soft));
+}
+.cp-card--hud > .cp-card__body {
+  padding-inline: 1.6rem;
+  background: color-mix(in oklab, var(--cp-bg-sunken) 80%, transparent);
+}
+.cp-card--hud > .cp-card__footer {
+  background: var(--cp-bg-sunken);
+  padding-inline: 1.6rem;
+  padding-bottom: 1.2rem;
+  border-top: 1px solid color-mix(in oklab, var(--cp-card-accent) 25%, var(--cp-border-soft));
+}
+.cp-card--hud:hover { box-shadow:
+    inset 0 0 0 1.5px var(--cp-card-accent),
+    inset 0 0 40px color-mix(in oklab, var(--cp-card-accent) 22%, transparent); }
+
+/* Optional center glow strip (place inside as <div class="cp-card__strip"></div>) */
+.cp-card__strip {
+  position: absolute;
+  inset: auto 8% auto 8%;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--cp-card-accent) 10%,
+    color-mix(in oklab, white 70%, var(--cp-card-accent)) 50%,
+    var(--cp-card-accent) 90%,
+    transparent 100%
+  );
+  border-radius: 2px;
+  box-shadow:
+    0 0 6px var(--cp-card-accent),
+    0 0 18px var(--cp-card-accent),
+    0 0 36px color-mix(in oklab, var(--cp-card-accent) 60%, transparent);
+}
+
+/* Animated neon border */
+.cp-card--neon {
+  background: var(--cp-bg-raised);
+  border: 0;
+  padding: 1px;
+}
+.cp-card--neon::before {
+  width: auto; height: auto;
+  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
+  background: conic-gradient(
+    from var(--cp-angle),
+    var(--cp-cyan),
+    var(--cp-magenta),
+    var(--cp-purple),
+    var(--cp-yellow),
+    var(--cp-cyan)
+  );
+  animation: cp-border-spin 6s linear infinite;
+  z-index: 0;
+  box-shadow: none;
+}
+.cp-card--neon > .cp-card__header,
+.cp-card--neon > .cp-card__body,
+.cp-card--neon > .cp-card__footer {
+  position: relative;
+  z-index: 1;
+  background: var(--cp-bg-soft);
+}
+.cp-card--neon > .cp-card__header {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--cp-card-accent) 14%, var(--cp-bg-soft)),
+    var(--cp-bg-soft)
+  );
+  border-bottom: 1px solid var(--cp-border-soft);
+}
+.cp-card--neon > .cp-card__footer {
+  background: var(--cp-bg-sunken);
+  border-top: 1px solid var(--cp-border-soft);
+}
+.cp-card--neon:hover {
+  box-shadow: none;
+}
+
+/* Card slots ------------------------------------------------- */
+.cp-card__header,
+.cp-card__body,
+.cp-card__footer {
+  padding: 1rem 1.25rem;
+}
+.cp-card__header {
+  border-bottom: 1px solid var(--cp-border-soft);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--cp-card-accent) 8%, transparent),
+    transparent
+  );
+}
+.cp-card__title {
+  font-family: var(--cp-font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cp-fg);
+  margin: 0;
+}
+.cp-card__subtitle {
+  font-family: var(--cp-font-mono);
+  font-size: 0.75rem;
+  color: var(--cp-fg-muted);
+  margin-top: 0.2rem;
+  letter-spacing: 0.08em;
+}
+.cp-card__body { flex: 1; }
+.cp-card__footer {
+  border-top: 1px solid var(--cp-border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  background: var(--cp-bg-sunken);
+}

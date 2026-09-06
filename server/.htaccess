@@ -12,8 +12,10 @@ AddType image/webp .webp
 Header set Cache-Control "no-cache, no-store, must-revalidate"
 Header set Pragma "no-cache"
 Header set Expires "0"
-# Clear browser HTTP cache only; cookies and localStorage sessions remain intact.
-Header always set Clear-Site-Data '"cache"'
+# Sin Clear-Site-Data: borraba la cache HTTP de todo el dominio en cada visita a
+# la portada, obligando a redescargar JS, CSS y portadas en cada sesion (peor LCP
+# y peor Page Experience). El shell ya viaja con no-store y los assets llevan
+# hash en el nombre, asi que un deploy nuevo nunca se sirve cacheado.
 </FilesMatch>
 </IfModule>
 
@@ -44,6 +46,15 @@ RewriteRule ^(login|register)/?$ /index.php [L,QSA]
 RewriteCond %{QUERY_STRING} (^|&)mm_social_(session|return)=1(&|$) [NC]
 RewriteRule ^$ /index.php [L,QSA]
 
+# Cada ruta de React recibe su propio head SEO (title, description, canonical,
+# JSON-LD y contenido en noscript). Sin esto todas las rutas comparten el head
+# estatico de index.html, que declara canonical hacia la portada.
+RewriteRule ^$ /backend-patches/manga-route-meta.php [L,QSA]
+RewriteRule ^(biblioteca|manga-19|manga-bn|nosotros|contacto|legal|perfil|saved|recargar|pago-exitoso)/?$ /backend-patches/manga-route-meta.php [L,QSA]
+RewriteRule ^read/([0-9]+)/?$ /backend-patches/manga-route-meta.php [L,QSA]
+RewriteRule ^auth/(login|register)/?$ /backend-patches/manga-route-meta.php [L,QSA]
+RewriteRule ^usuarios/([0-9]+)/?$ /backend-patches/manga-route-meta.php [L,QSA]
+
 # Serve real files and directories directly.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
@@ -62,6 +73,10 @@ RewriteRule ^ /index.php [L]
 # Sitemaps and robots.
 RewriteCond %{REQUEST_URI} ^/sitemap-react\.xml$
 RewriteRule ^ /backend-patches/manga-sitemap-react.php [L]
+
+# Indice y bloques del sitemap de capitulos (/read/{id}).
+RewriteRule ^sitemap-chapters\.xml$ /backend-patches/manga-sitemap-chapters.php [L]
+RewriteRule ^sitemap-chapters-([0-9]+)\.xml$ /backend-patches/manga-sitemap-chapters.php?page=$1 [L]
 
 RewriteCond %{REQUEST_URI} ^/sitemap
 RewriteRule ^ /index.php [L]

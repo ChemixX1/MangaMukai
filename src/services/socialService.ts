@@ -68,6 +68,7 @@ interface ApiPayload {
   conversations?: Conversation[];
   notifications?: SocialNotification[];
   unread_count?: number;
+  has_more?: boolean;
 }
 
 const authHeaders = (json = false): HeadersInit => {
@@ -117,13 +118,14 @@ export const getConversations = async (): Promise<{ conversations: Conversation[
   return { conversations: payload.conversations || [], unread: Number(payload.unread_count || 0) };
 };
 
-export const getConversationMessages = async (userId: number): Promise<ChatMessage[]> => {
-  const response = await fetch(`${MANGAMUKAI_API}/social/messages/${userId}`, {
+export const getConversationMessages = async (userId: number, before?: number): Promise<{ messages: ChatMessage[]; hasMore: boolean }> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/messages/${userId}${before ? `?before=${before}` : ''}`, {
     credentials: 'include',
     headers: authHeaders(),
+    cache: 'no-store',
   });
   const payload = await ensureResponse(response);
-  return payload.messages || [];
+  return { messages: payload.messages || [], hasMore: !!payload.has_more };
 };
 
 export const sendChatMessage = async (recipientId: number, body: string): Promise<ChatMessage> => {

@@ -3,6 +3,7 @@ import { Grid, Clock, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useHomeData } from '../../context/HomeDataContext';
 import { MangaMetaBar, PaginationControls } from '../common';
+import { useChapterAccess } from '../../hooks/useChapterAccess';
 
 const ITEMS_PER_PAGE = 18;
 
@@ -18,6 +19,13 @@ const timeAgo = (dateString: string) => {
     return `${diffDays}d`;
 };
 
+/**
+ * Los listados marcan las series que aún no tienen capítulos con una fila vacía
+ * (`numero: "-"`, id 0). Esa fila no puede abrir el lector: lleva a la ficha.
+ */
+const isPublishedChapter = (chapter: { id: number; numero: string }) =>
+  Number(chapter.numero) > 0 && Number(chapter.id) > 0;
+
 // Función para colores según tipo
 const getTypeColor = (type: string) => {
     const t = type.toLowerCase();
@@ -29,6 +37,7 @@ const getTypeColor = (type: string) => {
 
 interface LatestMangaItem {
   id: string | number;
+  seriesId: string | number | null;
   title: string;
   coverImage: string;
   type: string;
@@ -47,6 +56,7 @@ export const Latest = () => {
   const [loading, setLoading] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const { openChapter, chapterAccessModal } = useChapterAccess();
 
   useEffect(() => {
     if (!isReady) return;
@@ -54,6 +64,7 @@ export const Latest = () => {
     const mapToItems = (mangas: typeof latestWomen) =>
       mangas.map(manga => ({
         id: manga.id,
+        seriesId: manga.eroSeri || manga.id,
         title: manga.titulo,
         coverImage: manga.portada,
         type: manga.tipo,
@@ -137,14 +148,14 @@ export const Latest = () => {
               <div 
                 key={`${currentPage}-${manga.id}-${index}`}
                 style={{ animationDelay: `${index * 50}ms` }}
-                className={`manga-update-card home-theme-surface w-full self-start group relative flex flex-col overflow-hidden rounded-xl bg-[#0f1115] ring-1 ring-white/10 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#FF4D88]/20 ${isVisible ? 'animate-card' : 'opacity-0'}`}
+                className={`manga-update-card home-theme-surface w-full self-start group relative flex flex-col overflow-hidden rounded-xl bg-[#0f1115] ring-1 ring-white/10 shadow-lg transition-all duration-300 hover:-translate-y-2 ${isVisible ? 'animate-card' : 'opacity-0'}`}
               >
                   {/* PORTADA */}
                   <div className="relative aspect-[3/4.4] overflow-hidden bg-[#0f1115] shine-effect">
                     <Link to={`/manga/${manga.id}`} className="block w-full h-full">
                         <img 
                         src={manga.coverImage} 
-                        alt={manga.title}
+                        alt={`Portada del manga ${manga.title}`}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         loading="lazy"
                         />
@@ -161,33 +172,56 @@ export const Latest = () => {
 
                   {/* INFO */}
                   <div className="flex flex-col items-center text-center"> 
-                    <h3 className="manga-update-title home-theme-title flex h-14 w-full flex-none items-center justify-center px-3 py-2 text-[13px] md:text-[15px] font-[800] text-white leading-tight uppercase tracking-tight group-hover:text-[#FF4D88] transition-colors font-sans">
+                    <h3 className="manga-update-title home-theme-title flex h-12 md:h-[52px] w-full flex-none items-center justify-center px-3 py-1.5 text-[13px] md:text-[15px] font-[800] text-white leading-[1.15] uppercase tracking-tight group-hover:text-[#FF4D88] transition-colors font-sans">
                       <span className="line-clamp-2">{manga.title}</span>
                     </h3>
 
-                    {/* LISTA DE CAPÍTULOS */}
+                    {/* LISTA DE CAPÍTULOS — cada fila abre su capítulo en el
+                        lector; sin capítulo publicado lleva a la ficha. */}
                     <div className="manga-update-rows w-full">
                         {Array.from({ length: 2 }, (_, slotIndex) => {
                           const cap = manga.chapters[slotIndex];
-                          return cap ? (
+
+                          if (!cap) return (
                               <Link
-                                  key={cap.id}
-                                  to={`/read/${cap.id}`}
-                                  className="group/cap block transition-colors"
+                                key={`empty-update-${slotIndex}`}
+                                to={`/manga/${manga.id}`}
+                                aria-label={`Ver ${manga.title}`}
+                                className="home-card-slot-link home-card-slot-row home-theme-surface-alt block min-h-9 border-t border-white/5 bg-[#1a1a1a]"
+                              />
+                          );
+
+                          if (!isPublishedChapter(cap)) return (
+                              <Link
+                                key={`upcoming-update-${slotIndex}`}
+                                to={`/manga/${manga.id}`}
+                                className="home-card-slot-link block"
                               >
                                   <MangaMetaBar
                                     chapter={cap.numero}
                                     isFree={cap.isFree}
                                     date={cap.dateLabel}
-                                    className="group-hover/cap:bg-[#222]"
                                   />
                               </Link>
-                          ) : (
-                              <div
-                                key={`empty-update-${slotIndex}`}
-                                aria-hidden="true"
-                                className="home-card-slot-row home-theme-surface-alt min-h-9 border-t border-white/5 bg-[#1a1a1a]"
-                              />
+                          );
+
+                          return (
+                              <Link
+                                  key={cap.id}
+                                  to={`/read/${cap.id}`}
+                                  onClick={(event) => {
+                                    if (cap.isFree) return;
+                                    event.preventDefault();
+                                    void openChapter({ chapterId: cap.id, seriesId: manga.seriesId, isFree: cap.isFree, chapterNumber: cap.numero });
+                                  }}
+                                  className="home-card-slot-link block"
+                              >
+                                  <MangaMetaBar
+                                    chapter={cap.numero}
+                                    isFree={cap.isFree}
+                                    date={cap.dateLabel}
+                                  />
+                              </Link>
                           );
                         })}
                     </div>
@@ -195,6 +229,7 @@ export const Latest = () => {
               </div>
             ))}
         </div>
+        {chapterAccessModal}
         <PaginationControls
           currentPage={currentPage}
           totalPages={totalPages}

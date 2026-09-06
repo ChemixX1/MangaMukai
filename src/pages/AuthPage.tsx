@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   Cake,
@@ -17,6 +17,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Footer } from "../components/layout";
 import { MANGAMUKAI_API, SOCIAL_LOGIN_SESSION_URL, socialLoginUrl, wordpressUrl } from "../config/api";
 import { useTheme } from "../hooks/useTheme";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { saveAuth } from "../services/authService";
 import { getUltimosCapitulos } from "../services/mangaService";
 import {
@@ -324,7 +325,9 @@ export const AuthPage = () => {
   const { theme } = useTheme();
   const isLight = theme === "light";
   const isLogin = location.pathname.endsWith("/login");
-  const returnTo = "/";
+  const requestedReturn = location.state?.returnTo || new URLSearchParams(location.search).get("returnTo") || "/";
+  const returnTo = typeof requestedReturn === "string" && requestedReturn.startsWith("/") && !requestedReturn.startsWith("//") && !requestedReturn.includes("\\") && !requestedReturn.startsWith("/auth/") ? requestedReturn : "/";
+  const reducedMotion = useReducedMotion();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -341,6 +344,14 @@ export const AuthPage = () => {
   const [coverImpulseToken, setCoverImpulseToken] = useState(0);
   const previousAuthView = useRef(isLogin);
   const birthDatePickerRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!success) return;
+    // Carga completa en vez de navegación interna: vale igual para el formulario
+    // y para Google/Discord, y toda la app arranca ya con la sesión nueva.
+    const timer = window.setTimeout(() => window.location.assign(returnTo), reducedMotion ? 350 : 850);
+    return () => window.clearTimeout(timer);
+  }, [success, returnTo, reducedMotion]);
 
   useEffect(() => {
     const cachedCovers = getSharedAuthCovers();
@@ -384,9 +395,7 @@ export const AuthPage = () => {
     setSuccess(null);
   }, [isLogin]);
 
-  useEffect(() => {
-    document.title = `${isLogin ? "Iniciar sesión" : "Crear cuenta"} | Manga Mukai`;
-  }, [isLogin]);
+  useDocumentTitle(isLogin ? "Iniciar sesión" : "Crear cuenta");
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
@@ -404,7 +413,6 @@ export const AuthPage = () => {
       if (!active) return;
       saveAuth(data.token, data.user, true);
       setSuccess(`Acceso con ${provider === "google" ? "Google" : "Discord"} completado.`);
-      window.setTimeout(() => navigate(returnTo, { replace: true }), 450);
     }).catch((caught) => {
       if (!active) return;
       setError(caught instanceof Error ? caught.message : "No se pudo completar el inicio de sesión social.");
@@ -462,7 +470,6 @@ export const AuthPage = () => {
 
       saveAuth(data.token, data.user, isLogin ? rememberSession : true);
       setSuccess(isLogin ? "¡Bienvenido de vuelta!" : "¡Tu cuenta ya está lista!");
-      window.setTimeout(() => navigate(returnTo, { replace: true }), 650);
     } catch {
       setError("No se pudo conectar con el servidor. Inténtalo nuevamente");
     } finally {
@@ -490,6 +497,14 @@ export const AuthPage = () => {
             transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
             className={`auth-form-card ${isLogin ? "auth-form-card-login" : "auth-form-card-register"} w-full max-w-[390px] rounded-[22px] border p-5 sm:max-w-[430px] sm:rounded-[26px] sm:p-7 ${surfaceClass}`}
           >
+            {success ? (
+              <div role="status" aria-label="Sesión iniciada correctamente" className="flex min-h-[400px] items-center justify-center">
+                <svg aria-hidden="true" viewBox="0 0 100 100" className="h-28 w-28 text-[#FF4D88]" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                  <motion.circle cx="50" cy="50" r="43" initial={{ pathLength: reducedMotion ? 1 : 0, rotate: -90 }} animate={{ pathLength: 1 }} transition={{ duration: reducedMotion ? 0 : 0.4, ease: "easeOut" }} style={{ transformOrigin: '50% 50%' }} />
+                  <motion.path d="M29 51 44 65 72 36" initial={{ pathLength: reducedMotion ? 1 : 0, opacity: reducedMotion ? 1 : 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ delay: reducedMotion ? 0 : 0.3, duration: reducedMotion ? 0 : 0.3, ease: "easeOut" }} />
+                </svg>
+              </div>
+            ) : <>
             <div className="mb-7 text-center sm:mb-8">
               <h1 className="auth-title-audiowide whitespace-nowrap text-[clamp(1.25rem,4.7vw,1.65rem)] leading-none tracking-normal">
                 {isLogin ? "Bienvenido de nuevo" : "Crea tu cuenta"}
@@ -664,12 +679,6 @@ export const AuthPage = () => {
                 </div>
               )}
 
-              {success && (
-                <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-500">
-                  {success}
-                </div>
-              )}
-
               <button
                 type="submit"
                 disabled={loading}
@@ -692,6 +701,7 @@ export const AuthPage = () => {
                 {isLogin ? "Crea tu cuenta" : "Inicia sesión"}
               </Link>
             </p>
+            </>}
           </motion.div>
         </section>
       </main>

@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bookmark, Trash2, BookOpen, Ghost, ArrowRight } from "lucide-react";
 import { Footer } from "../components/layout";
+import { useSavedMangas } from "../hooks/useSavedMangas";
 import { useTheme } from "../hooks/useTheme";
-import { getInteractions, toggleBookmark } from "../services/interactionsService";
 import { getMangaById } from "../services/mangaService";
 import { getStoredUser } from "../services/authService";
 import type { MMUser } from "../services/authService";
+import type { MangaCapitulo } from "../types/manga";
 import { finishGlobalLoading, startGlobalLoading } from "../utils/globalLoading";
 
 // Interfaces
@@ -24,73 +25,89 @@ interface SavedItem {
   };
 }
 
+const LOADING_SCOPE = 'saved-mangas';
+
+const toSavedItem = (manga: MangaCapitulo): SavedItem => ({
+  id: String(manga.id),
+  mangas: {
+    id: String(manga.id),
+    title: manga.titulo,
+    cover_url: manga.portada,
+    rating: 5,
+    status: manga.tipo,
+    target_audience: manga.genero || ((manga.genres || []).some((genre) => String(genre).includes('Manhwa')) ? 'Hombre' : 'Mujer'),
+  },
+});
+
 export const SavedMangas = () => {
   const { theme } = useTheme();
   const isLight = theme === "light";
+  // La lista de ids vive en el almacén compartido con todos los botones "Guardar".
+  const { ids, loaded, toggle } = useSavedMangas();
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<MMUser | null>(null);
+  const [user] = useState<MMUser | null>(() => getStoredUser());
+  const detailsRef = useRef(new Map<string, SavedItem>());
+  const loaderOpenRef = useRef(false);
 
-  // 1. Cargar Usuario y Favoritos
+  // 1. Loader global mientras llega la primera lista
   useEffect(() => {
-    let active = true;
-    const loadingScope = 'saved-mangas';
-    const fetchData = async () => {
-      startGlobalLoading(12, loadingScope);
-      setLoading(true);
-      try {
-        const currentUser = getStoredUser();
-        if (!active) return;
-        setUser(currentUser);
-
-        if (currentUser) {
-          const interactions = await getInteractions();
-          const mangas = await Promise.all((interactions?.bookmarks || []).map((id) => getMangaById(id)));
-          if (!active) return;
-          const items: SavedItem[] = mangas.filter(Boolean).map((manga) => ({
-            id: String(manga!.id),
-            mangas: {
-              id: String(manga!.id),
-              title: manga!.titulo,
-              cover_url: manga!.portada,
-              rating: 5,
-              status: manga!.tipo,
-              target_audience: manga!.genero || ((manga!.genres || []).some((genre) => String(genre).includes('Manhwa')) ? 'Hombre' : 'Mujer'),
-            },
-          }));
-          setSavedItems(items);
-        }
-      } catch (error) {
-        console.error('No se pudieron cargar los mangas guardados:', error);
-        if (active) setSavedItems([]);
-      } finally {
-        if (active) setLoading(false);
-        finishGlobalLoading(loadingScope);
-      }
-    };
-
-    void fetchData();
+    startGlobalLoading(12, LOADING_SCOPE);
+    loaderOpenRef.current = true;
     return () => {
-      active = false;
-      finishGlobalLoading(loadingScope);
+      if (loaderOpenRef.current) finishGlobalLoading(LOADING_SCOPE);
+      loaderOpenRef.current = false;
     };
   }, []);
 
-  // 2. Función para eliminar de guardados
-  const handleRemove = async (bookmarkId: string, e: React.MouseEvent) => {
+  // 2. Cada cambio en los ids (guardar o quitar desde cualquier página) rearma la rejilla
+  useEffect(() => {
+    if (!loaded) return;
+    let active = true;
+
+    const fetchMissing = async () => {
+      const missing = ids.filter((id) => !detailsRef.current.has(id));
+      if (missing.length > 0) {
+        const mangas = await Promise.all(missing.map((id) => getMangaById(id).catch(() => null)));
+        mangas.forEach((manga, index) => {
+          if (manga) detailsRef.current.set(missing[index], toSavedItem(manga));
+        });
+      }
+      if (!active) return;
+      setSavedItems(ids.map((id) => detailsRef.current.get(id)).filter((item): item is SavedItem => Boolean(item)));
+    };
+
+    fetchMissing()
+      .catch((error) => {
+        console.error('No se pudieron cargar los mangas guardados:', error);
+        if (active) setSavedItems([]);
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+        if (loaderOpenRef.current) {
+          finishGlobalLoading(LOADING_SCOPE);
+          loaderOpenRef.current = false;
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [ids, loaded]);
+
+  // 3. Quitar de guardados: el almacén adelanta el cambio y lo confirma con el servidor
+  const handleRemove = (bookmarkId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Optimistic Update
-    setSavedItems(prev => prev.filter(item => item.id !== bookmarkId));
-    await toggleBookmark(bookmarkId);
+    void toggle(bookmarkId);
   };
 
   if (loading) return <main className={`min-h-screen ${isLight ? 'bg-white' : 'bg-black'}`} />;
 
   return (
     <div className={`flex min-h-screen flex-col font-sans selection:bg-[#FF4D88] selection:text-white ${isLight ? 'bg-white text-black' : 'bg-black text-white'}`}>
-      
+
       {/* Fondo Decorativo */}
       <div className="fixed inset-0 z-0 pointer-events-none">
          <div className={`absolute left-1/2 top-0 h-[400px] w-full max-w-4xl -translate-x-1/2 rounded-full bg-[#FF4D88] blur-[120px] ${isLight ? 'opacity-[0.06]' : 'opacity-10'}`} />
@@ -98,7 +115,7 @@ export const SavedMangas = () => {
       </div>
 
       <div className="desktop-content-shell relative z-10 flex-grow max-w-[1400px] mx-auto w-full px-6 pt-32 pb-20">
-        
+
         {/* HEADER */}
         <div className={`mb-12 flex flex-col items-center justify-between gap-4 border-b pb-6 text-center md:flex-row md:items-end md:text-left ${isLight ? 'border-black/10' : 'border-white/10'}`}>
             <div className="flex flex-col items-center md:items-start">
@@ -107,7 +124,7 @@ export const SavedMangas = () => {
                     Guardados
                 </h1>
             </div>
-            
+
             {!user && (
                 <div className="bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-lg text-red-400 text-xs font-bold uppercase tracking-wide">
                     Inicia sesión para ver tus guardados
@@ -134,8 +151,8 @@ export const SavedMangas = () => {
                 </Link>
             </div>
         ) : (
-            <motion.div 
-                layout 
+            <motion.div
+                layout
                 className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
             >
                 <AnimatePresence mode="popLayout">
@@ -155,16 +172,16 @@ export const SavedMangas = () => {
                             >
                                 <Link to={`/manga/${manga.id}`} className={`relative block aspect-[2/3] overflow-hidden rounded-xl border bg-[#111] shadow-xl transition-all duration-300 ${isLight ? 'border-black/10 hover:border-black/25' : 'border-white/5 hover:border-white/20'}`}>
                                     {/* Imagen con Fallback */}
-                                    <img 
-                                        src={manga.cover_url} 
-                                        alt={manga.title} 
+                                    <img
+                                        src={manga.cover_url}
+                                        alt={manga.title}
                                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                         loading="lazy"
                                         onError={(e) => {
                                             (e.target as HTMLImageElement).src = 'https://placehold.co/400x600/1a1a1a/666?text=Sin+Imagen';
                                         }}
                                     />
-                                    
+
                                     {/* Overlay degradado */}
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
 
@@ -184,7 +201,7 @@ export const SavedMangas = () => {
                                 </Link>
 
                                 {/* Botón Eliminar */}
-                                <button 
+                                <button
                                     onClick={(e) => handleRemove(item.id, e)}
                                     className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500/80 backdrop-blur-md rounded-lg text-white/70 hover:text-white border border-white/10 transition-all opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 z-20 cursor-pointer"
                                     title="Quitar de guardados"
@@ -198,7 +215,7 @@ export const SavedMangas = () => {
             </motion.div>
         )}
       </div>
-      
+
       <Footer />
     </div>
   );

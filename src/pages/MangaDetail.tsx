@@ -32,10 +32,10 @@ import {
 } from '../services/mangaService';
 import {
   getInteractions,
-  toggleBookmarkWithTotal,
   toggleMangaLike,
 } from '../services/interactionsService';
-import { getMangaComments, type MangaComment } from '../services/communityService';
+import { seedSavedMangas, toggleSavedManga } from '../services/savedMangas';
+import { getMangaComments, getEntityReactions, setEntityReaction, type MangaComment } from '../services/communityService';
 import {
   getStoredToken,
   getStoredUser,
@@ -44,13 +44,14 @@ import {
 } from '../services/authService';
 import type { MangaCapitulo } from '../types/manga';
 import { ChapterList, MangaComments, MangaMusicCard, MangaRecommendationSidebar } from '../components/manga';
+import { MangaDetailClock } from '../components/common';
 import { Footer } from '../components/layout';
 import { FOOTER_SOCIALS } from '../components/layout/Footer';
 import { useTheme } from '../hooks/useTheme';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { collectionBadge } from '../utils/womenBlackWhite';
 import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from '../utils/globalLoading';
 import { preloadImages } from '../utils/preloadImages';
-
-const MANGA_DETAIL_REFERENCE_TIME = Date.now();
 
 const formatCompactNumber = (value: number) => new Intl.NumberFormat('es-PE', {
   notation: value >= 1000 ? 'compact' : 'standard',
@@ -132,6 +133,21 @@ export const MangaDetail = () => {
   const [chapterSortOrder, setChapterSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedReaction, setSelectedReaction] = useState<MangaReactionId | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<MangaReactionId, number>>(createReactionCounts);
+  // Solo la ultima peticion de reaccion puede reconciliar el estado optimista.
+  const reactionSequence = useRef(0);
+  const [reactionError, setReactionError] = useState('');
+
+  useEffect(() => {
+    if (!manga?.id) return;
+    let active = true;
+    setReactionError('');
+    void getEntityReactions('manga', manga.id).then(result => {
+      if (!active) return;
+      setReactionCounts({ ...createReactionCounts(), ...result.reactions });
+      setSelectedReaction((result.my_reaction || null) as MangaReactionId | null);
+    }).catch(() => { if (active) setReactionError('No se pudieron cargar las reacciones.'); });
+    return () => { active = false; };
+  }, [manga?.id]);
 
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [userCoins, setUserCoins] = useState(0);
@@ -216,6 +232,8 @@ export const MangaDetail = () => {
     if (!interactions) return;
 
     setIsBookmarked(interactions.bookmarks?.some((item) => String(item) === mangaId) || false);
+    // La lista completa ya viene en la respuesta: se comparte con los botones "Guardar" del resto de la web.
+    seedSavedMangas(interactions.bookmarks ?? []);
     setIsLiked(interactions.likes?.some((item) => String(item) === mangaId) || false);
     setEngagement({
       online: Number(interactions.online_readers || 0),
@@ -227,6 +245,14 @@ export const MangaDetail = () => {
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  // El servidor ya envía este head; aquí solo se mantiene al navegar dentro de la SPA.
+  useDocumentTitle(
+    manga?.titulo,
+    manga
+      ? `${cleanSynopsis(manga.titulo, manga.descripcion).replace(/\s+/g, ' ').slice(0, 200) || `Lee ${manga.titulo} online en español`} · MangaMukai`
+      : undefined,
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -342,10 +368,10 @@ export const MangaDetail = () => {
     }
 
     setInteractionBusy('bookmark');
-    const result = await toggleBookmarkWithTotal(String(manga.id));
-    if (result) {
-      setIsBookmarked(result.action === 'added');
-      setEngagement((current) => ({ ...current, bookmarks: result.total }));
+    const outcome = await toggleSavedManga(String(manga.id));
+    if (outcome.status === 'ok') {
+      setIsBookmarked(outcome.action === 'added');
+      setEngagement((current) => ({ ...current, bookmarks: outcome.total }));
     }
     setInteractionBusy('');
   };
@@ -370,14 +396,36 @@ export const MangaDetail = () => {
     void loadUser();
   }, [loadUser]);
 
+  // Optimista: el contador y el resaltado cambian en el mismo clic; la red solo confirma o revierte.
   const handleReaction = (reactionId: MangaReactionId) => {
-    setReactionCounts((current) => {
-      const next = { ...current };
-      if (selectedReaction) next[selectedReaction] = Math.max(0, next[selectedReaction] - 1);
-      if (selectedReaction !== reactionId) next[reactionId] += 1;
-      return next;
-    });
-    setSelectedReaction((current) => current === reactionId ? null : reactionId);
+    if (!manga) return;
+    if (!getStoredToken()) { navigate('/auth/login', { state: { returnTo: `/manga/${manga.id}` } }); return; }
+
+    const previousSelection = selectedReaction;
+    const previousCounts = reactionCounts;
+    const nextSelection = previousSelection === reactionId ? null : reactionId;
+    const optimistic = { ...previousCounts };
+    if (previousSelection) optimistic[previousSelection] = Math.max(0, optimistic[previousSelection] - 1);
+    if (nextSelection) optimistic[nextSelection] += 1;
+
+    const sequence = reactionSequence.current + 1;
+    reactionSequence.current = sequence;
+    setReactionError('');
+    setSelectedReaction(nextSelection);
+    setReactionCounts(optimistic);
+
+    void setEntityReaction('manga', manga.id, nextSelection || '')
+      .then(result => {
+        if (reactionSequence.current !== sequence) return;
+        setReactionCounts({ ...createReactionCounts(), ...result.reactions });
+        setSelectedReaction((result.my_reaction || null) as MangaReactionId | null);
+      })
+      .catch(caught => {
+        if (reactionSequence.current !== sequence) return;
+        setSelectedReaction(previousSelection);
+        setReactionCounts(previousCounts);
+        setReactionError(caught instanceof Error ? caught.message : 'No se pudo guardar la reacción.');
+      });
   };
 
   if (loading) {
@@ -402,8 +450,6 @@ export const MangaDetail = () => {
   const genres = manga.genres || [];
   const synopsis = cleanSynopsis(manga.titulo, manga.descripcion);
   const publishedDate = manga.publishedAt || manga.rawFecha;
-  const releaseTime = manga.rawFecha ? new Date(manga.rawFecha.replace(' ', 'T')).getTime() : 0;
-  const isNewRelease = releaseTime > 0 && MANGA_DETAIL_REFERENCE_TIME - releaseTime < 1000 * 60 * 60 * 24 * 45;
   const engagementStats = [
     { label: 'Likes', value: engagement.likes, icon: Heart },
     { label: 'Guardados', value: engagement.bookmarks, icon: Bookmark },
@@ -419,6 +465,8 @@ export const MangaDetail = () => {
     ? onlineReaderProgress
     : ((activeEngagementIndex + 1) / engagementStats.length) * 100;
   const typeIndicatorColor = /manhwa|manhua/i.test(manga.tipo || '') ? '#8b5cf6' : '#FF4D88';
+  // Distintivo de la portada según la colección a la que pertenece la ficha.
+  const coverBadge = collectionBadge(manga);
 
   return (
     <main className={`manga-detail-page relative min-h-screen overflow-x-clip transition-colors duration-500 ${isLightMode ? 'manga-detail-theme-light bg-white text-black' : 'manga-detail-theme-dark bg-black text-white'}`}>
@@ -430,8 +478,12 @@ export const MangaDetail = () => {
 
       <section className="relative z-10 pb-20 pt-28 md:pt-32">
         <div className="desktop-content-shell mx-auto w-full max-w-[1780px] px-3 sm:px-5 lg:px-4 2xl:px-6">
-          <div className="mb-2 grid items-center xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
-            <div className="text-center xl:col-start-3">
+          <div className="mb-2 grid items-center gap-4 xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
+            {/* Va en la primera columna para quedar justo encima de la portada. */}
+            <div className="mx-auto w-full max-w-[300px] lg:max-w-none xl:col-start-1 xl:row-start-1">
+              <MangaDetailClock isLight={isLightMode} />
+            </div>
+            <div className="text-center xl:col-start-3 xl:row-start-1">
               <p className={`manga-detail-social-prompt text-[13px] ${isLightMode ? 'text-black/60' : 'text-white/60'}`}>¡No olvides seguirnos!</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5" aria-label="Redes sociales de MangaMukai">
                 {FOOTER_SOCIALS.map(({ name, href, icon: SocialIcon }) => (
@@ -454,25 +506,6 @@ export const MangaDetail = () => {
             >
               <div className={`manga-detail-cover relative aspect-[3/4.35] overflow-hidden rounded-[8px] border ${isLightMode ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
                 <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} className="h-full w-full object-cover" />
-                {isNewRelease && <span className="absolute right-3 top-3 rounded-md bg-[#FF4D88] px-2 py-1 text-[8px] font-black uppercase text-white">Estreno</span>}
-                <div className="absolute left-0 top-1/2 flex -translate-y-1/2 flex-col items-start gap-1.5 text-[10px] font-bold uppercase text-white">
-                  <span className="rotate-180 rounded-l-md bg-violet-600 px-2 py-2.5 shadow-lg">
-                    <span className="flex flex-col items-center gap-1">
-                      <span className="[text-orientation:mixed] [writing-mode:vertical-rl]">Color</span>
-                      <Palette size={13} strokeWidth={2.3} className="rotate-180 text-white" aria-hidden="true" />
-                    </span>
-                  </span>
-                  <span className="rotate-180 rounded-l-md bg-[#FF4D88] px-2.5 py-3 shadow-lg [text-orientation:mixed] [writing-mode:vertical-rl]">Estreno</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLike}
-                  disabled={interactionBusy !== ''}
-                  aria-label={isLiked ? 'Quitar Me gusta' : 'Me gusta'}
-                  className={`absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur-md transition-all hover:scale-105 ${isLiked ? 'border-[#FF4D88] bg-[#FF4D88] text-white' : 'border-white/20 bg-black/60 text-white hover:text-[#FF4D88]'}`}
-                >
-                  {interactionBusy === 'like' ? <Loader2 size={17} className="animate-spin" /> : <Heart size={17} fill={isLiked ? 'currentColor' : 'none'} />}
-                </button>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -520,6 +553,33 @@ export const MangaDetail = () => {
                 </div>
               </div>
 
+              {/* Etiquetas de la ficha y "Me gusta", antes encima de la portada:
+                  ahora en una sola fila bajo el contador de likes y lectores. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-[#FF4D88] px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">
+                  Estreno
+                </span>
+                {coverBadge === 'bn' ? (
+                  <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-zinc-100 px-3 py-2 text-[11px] uppercase leading-none text-black shadow-lg">B&amp;N</span>
+                ) : coverBadge === 'hot' ? (
+                  <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">Hot</span>
+                ) : (
+                  <span className="manga-detail-cover-tag inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">
+                    Color
+                    <Palette size={14} strokeWidth={2.3} aria-hidden="true" />
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLike}
+                  disabled={interactionBusy !== ''}
+                  aria-label={isLiked ? 'Quitar Me gusta' : 'Me gusta'}
+                  className={`ml-auto flex shrink-0 items-center justify-center bg-transparent transition-all hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60 ${isLiked ? 'text-[#FF4D88]' : isLightMode ? 'text-black/70 hover:text-[#FF4D88]' : 'text-white/80 hover:text-[#FF4D88]'}`}
+                >
+                  {interactionBusy === 'like' ? <Loader2 size={24} className="animate-spin" /> : <Heart size={24} fill={isLiked ? 'currentColor' : 'none'} />}
+                </button>
+              </div>
+
               <div className="mt-2 px-1">
                 <SidebarMetaRow icon={<BookType />} label="Tipo" value={manga.tipo || 'Manga'} isLight={isLightMode} valueDotColor={typeIndicatorColor} />
                 <SidebarMetaRow icon={<Building2 />} label="Estudio" value={manga.studio || 'N/A'} isLight={isLightMode} />
@@ -536,6 +596,11 @@ export const MangaDetail = () => {
               )}
               <header className={`border-b pb-5 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
                 <h1 className={`text-center font-[Montserrat] text-[clamp(1.2rem,1.6vw,1.72rem)] font-bold uppercase leading-[1.16] tracking-[-0.025em] ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</h1>
+                {manga.tituloOriginal && (
+                  <p className={`mx-auto mt-2 w-fit max-w-full rounded-md px-3 py-1 text-center font-[Montserrat] text-[clamp(0.8rem,1vw,0.95rem)] font-medium backdrop-blur-md ${isLightMode ? 'bg-black/[0.06] text-black/70' : 'bg-white/[0.08] text-white/75'}`}>
+                    {manga.tituloOriginal}
+                  </p>
+                )}
                 {genres.length > 0 && (
                   <div className="no-scrollbar mt-4 flex flex-nowrap items-center justify-start gap-2 overflow-x-auto whitespace-nowrap px-1 pb-1 sm:mx-auto sm:w-fit sm:max-w-full sm:justify-center sm:overflow-hidden">
                     <span className="shrink-0 text-lg font-black text-[#FF4D88]">#</span>
@@ -586,11 +651,12 @@ export const MangaDetail = () => {
 
               <div className={`mt-7 rounded-2xl border px-4 py-4 ${isLightMode ? 'border-black/10 bg-white/[0.28]' : 'border-white/10 bg-black/20'}`} aria-label="Reacciones del manga">
                 <div className="flex flex-wrap items-center justify-center gap-3">
+                  {reactionError && <p role="alert" className="text-xs text-red-500">{reactionError}</p>}
                   {MANGA_REACTIONS.map((reaction) => (
                     <div key={reaction.id} className="flex flex-col items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => handleReaction(reaction.id)}
+                        onClick={() => void handleReaction(reaction.id)}
                         aria-label={reaction.label}
                         aria-pressed={selectedReaction === reaction.id}
                         title={reaction.label}

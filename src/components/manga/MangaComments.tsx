@@ -17,7 +17,7 @@ import {
 import {
   notifyCommentReaction,
   postMangaComment,
-  toggleCommentLike,
+  setEntityReaction,
   type MangaComment,
 } from '../../services/communityService';
 import { getStoredToken, getStoredUser } from '../../services/authService';
@@ -27,6 +27,7 @@ interface MangaCommentsProps {
   mangaId: string;
   initialComments: MangaComment[];
   isLight?: boolean;
+  chapterId?: string;
 }
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
@@ -111,7 +112,7 @@ const renderCommentContent = (value: string) => value
       : <span key={`comment-text-${index}`}>{part}</span>;
   });
 
-export const MangaComments = ({ mangaId, initialComments, isLight = false }: MangaCommentsProps) => {
+export const MangaComments = ({ mangaId, initialComments, isLight = false, chapterId }: MangaCommentsProps) => {
   const navigate = useNavigate();
   const [comments, setComments] = useState<MangaComment[]>(initialComments);
   const [posting, setPosting] = useState(false);
@@ -127,9 +128,18 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
   const [commentReactionCounts, setCommentReactionCounts] = useState<Record<number, CommentReactionCounts>>({});
   const [reactionBursts, setReactionBursts] = useState<Record<number, { id: CommentReactionId; key: number }>>({});
   const composerToolsRef = useRef<HTMLDivElement>(null);
+  // Cada comentario lleva su propio contador de peticiones: solo la ultima respuesta reconcilia el estado.
+  const reactionSequences = useRef(new Map<number, number>());
 
   const token = getStoredToken();
   const user = getStoredUser();
+
+  // Una entrada en null significa "quite mi reaccion"; solo si no hay entrada volvemos al dato del servidor.
+  const resolveSelection = (comment: MangaComment): CommentReactionId | null => (
+    comment.id in commentReactionSelections
+      ? commentReactionSelections[comment.id]
+      : ((comment.my_reaction || (comment.is_liked_by_user ? 'like' : null)) as CommentReactionId | null)
+  );
 
   useEffect(() => {
     if (!composerTool) return;
@@ -144,8 +154,9 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
     setComments(initialComments);
     setVisibleCount(3);
     setCommentReactionSelections(Object.fromEntries(
-      initialComments.filter((comment) => comment.is_liked_by_user).map((comment) => [comment.id, 'like']),
+      initialComments.map((comment) => [comment.id, (comment.my_reaction || (comment.is_liked_by_user ? 'like' : null)) as CommentReactionId | null]),
     ));
+    setCommentReactionCounts(Object.fromEntries(initialComments.map(comment => [comment.id, { ...createCommentReactionCounts(), ...comment.reactions, like: comment.reactions?.like ?? comment.likes ?? 0 }])));
   }, [initialComments, mangaId]);
 
   useEffect(() => {
@@ -209,7 +220,7 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
 
     setPosting(true);
     setMessage('');
-    const posted = await postMangaComment(mangaId, publishedContent, null);
+    const posted = await postMangaComment(mangaId, publishedContent, null, chapterId);
     if (posted) {
       setComments((current) => [posted, ...current]);
       setContent('');
@@ -242,7 +253,7 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
     if (!trimmed || replyPosting) return;
 
     setReplyPosting(true);
-    const posted = await postMangaComment(mangaId, trimmed, comment.id);
+    const posted = await postMangaComment(mangaId, trimmed, comment.id, chapterId);
     if (posted) {
       setComments((current) => [...current, posted]);
       setReplyContent('');
@@ -253,62 +264,51 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
     setReplyPosting(false);
   };
 
-  const handleCommentReaction = async (comment: MangaComment, reactionId: CommentReactionId) => {
+  // La reaccion se pinta en el mismo clic; la red solo confirma o revierte despues.
+  const handleCommentReaction = (comment: MangaComment, reactionId: CommentReactionId) => {
     if (!token) {
       goToLogin();
       return;
     }
 
-    const previousSelection = commentReactionSelections[comment.id]
-      || (comment.is_liked_by_user ? 'like' : null);
+    const previousSelection = resolveSelection(comment);
     const nextSelection = previousSelection === reactionId ? null : reactionId;
-    const commentsSnapshot = comments;
-    const selectionsSnapshot = commentReactionSelections;
-    const countsSnapshot = commentReactionCounts;
+    const previousCounts = commentReactionCounts[comment.id] || createCommentReactionCounts();
+    const sequence = (reactionSequences.current.get(comment.id) || 0) + 1;
+    reactionSequences.current.set(comment.id, sequence);
 
-    setCommentReactionSelections((current) => ({ ...current, [comment.id]: nextSelection }));
-    setCommentReactionCounts((current) => {
-      const nextCounts = { ...(current[comment.id] || createCommentReactionCounts()) };
-      if (previousSelection && previousSelection !== 'like') {
-        nextCounts[previousSelection] = Math.max(0, nextCounts[previousSelection] - 1);
+    const optimisticCounts = { ...previousCounts };
+    if (previousSelection) optimisticCounts[previousSelection] = Math.max(0, optimisticCounts[previousSelection] - 1);
+    if (nextSelection) optimisticCounts[nextSelection] += 1;
+
+    setCommentReactionSelections(current => ({ ...current, [comment.id]: nextSelection }));
+    setCommentReactionCounts(current => ({ ...current, [comment.id]: optimisticCounts }));
+    setReactionBursts(current => ({ ...current, [comment.id]: { id: reactionId, key: Date.now() } }));
+    setComments(current => current.map(item => item.id === comment.id
+      ? { ...item, likes: optimisticCounts.like, my_reaction: nextSelection || '', is_liked_by_user: nextSelection === 'like' }
+      : item));
+
+    void (async () => {
+      try {
+        const result = await setEntityReaction('comment', comment.id, nextSelection || '');
+        if (reactionSequences.current.get(comment.id) !== sequence) return;
+        const confirmed = { ...createCommentReactionCounts(), ...result.reactions };
+        setCommentReactionSelections(current => ({ ...current, [comment.id]: (result.my_reaction || null) as CommentReactionId | null }));
+        setCommentReactionCounts(current => ({ ...current, [comment.id]: confirmed }));
+        setComments(current => current.map(item => item.id === comment.id
+          ? { ...item, likes: confirmed.like, my_reaction: result.my_reaction || '', is_liked_by_user: result.my_reaction === 'like' }
+          : item));
+        void notifyCommentReaction(comment.id, nextSelection && nextSelection !== 'like' ? nextSelection : null);
+      } catch (caught) {
+        if (reactionSequences.current.get(comment.id) !== sequence) return;
+        setCommentReactionSelections(current => ({ ...current, [comment.id]: previousSelection }));
+        setCommentReactionCounts(current => ({ ...current, [comment.id]: previousCounts }));
+        setComments(current => current.map(item => item.id === comment.id
+          ? { ...item, likes: previousCounts.like, my_reaction: previousSelection || '', is_liked_by_user: previousSelection === 'like' }
+          : item));
+        setMessage(caught instanceof Error ? caught.message : 'No se pudo guardar la reacción.');
       }
-      if (nextSelection && nextSelection !== 'like') {
-        nextCounts[nextSelection] += 1;
-      }
-      return { ...current, [comment.id]: nextCounts };
-    });
-    setReactionBursts((current) => ({
-      ...current,
-      [comment.id]: { id: reactionId, key: Date.now() },
-    }));
-
-    const likeStateChanged = (previousSelection === 'like') !== (nextSelection === 'like');
-
-    if (likeStateChanged) {
-      const nextLiked = nextSelection === 'like';
-      setComments((current) => current.map((item) => item.id === comment.id
-        ? {
-            ...item,
-            likes: nextLiked ? item.likes + 1 : Math.max(0, item.likes - 1),
-            is_liked_by_user: nextLiked,
-          }
-        : item));
-    }
-
-    const notificationTasks: Promise<boolean>[] = [];
-    if (likeStateChanged) notificationTasks.push(toggleCommentLike(comment.id));
-    if (previousSelection && previousSelection !== 'like' && (!nextSelection || nextSelection === 'like')) {
-      notificationTasks.push(notifyCommentReaction(comment.id, null));
-    }
-    if (nextSelection && nextSelection !== 'like') {
-      notificationTasks.push(notifyCommentReaction(comment.id, nextSelection));
-    }
-    const results = await Promise.all(notificationTasks);
-    if (results.some((success) => !success)) {
-      setComments(commentsSnapshot);
-      setCommentReactionSelections(selectionsSnapshot);
-      setCommentReactionCounts(countsSnapshot);
-    }
+    })();
   };
 
   const selectReply = (comment: MangaComment) => {
@@ -322,8 +322,7 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
   };
 
   const renderComment = (comment: MangaComment, isReply = false) => {
-    const selectedReaction = commentReactionSelections[comment.id]
-      || (comment.is_liked_by_user ? 'like' : null);
+    const selectedReaction = resolveSelection(comment);
     const localCounts = commentReactionCounts[comment.id] || createCommentReactionCounts();
     const burst = reactionBursts[comment.id];
     const burstReaction = burst ? COMMENT_REACTIONS.find(({ id }) => id === burst.id) : null;
@@ -392,7 +391,7 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
               <div className="manga-comment-reaction-list flex flex-nowrap items-center gap-0.5" aria-label="Reacciones al comentario">
                 {COMMENT_REACTIONS.map((reaction) => {
                   const isSelected = selectedReaction === reaction.id;
-                  const count = reaction.id === 'like' ? comment.likes : localCounts[reaction.id];
+                  const count = localCounts[reaction.id];
                   return (
                     <motion.button
                       key={reaction.id}
@@ -466,7 +465,7 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false }: Man
         <div className="flex items-center justify-center gap-3 text-center">
           <MessageSquareText size={28} className="text-[#FF4D88] md:h-8 md:w-8" />
           <h2 id="comments-title" className={`text-2xl font-black uppercase italic tracking-tight md:text-[28px] ${isLight ? 'text-black' : 'text-white'}`}>
-            Comentarios
+          {chapterId ? 'Comentarios del capítulo' : 'Comentarios'}
           </h2>
         </div>
       </div>

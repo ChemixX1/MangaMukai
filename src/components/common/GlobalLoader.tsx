@@ -4,12 +4,13 @@ import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
 import { GLOBAL_LOADING_EVENT, type GlobalLoadingDetail } from '../../utils/globalLoading';
 import { lockPageScroll } from '../../utils/scrollLock';
+import { MukaiLoaderWheel } from './MukaiLoaderWheel';
 
 const HOME_LOADING_EVENT = 'mangamukai:home-loading';
 const MINIMUM_VISIBLE_TIME = 720;
 const MAXIMUM_VISIBLE_TIME = 10000;
-const LOADER_RING_RADIUS = 48;
-const LOADER_RING_CIRCUMFERENCE = 2 * Math.PI * LOADER_RING_RADIUS;
+// El lector trae su propia rueda y precarga los capitulos vecinos: nunca cubrirlo con el loader global.
+const isReaderDestination = (to: string) => /^\/read\/[^/?]+/.test(to);
 const isAuthViewTransition = (from: string, to: string) => {
   const fromPath = from.split('?')[0];
   const toPath = to.split('?')[0];
@@ -136,6 +137,7 @@ export const GlobalLoader = () => {
       const destinationRoute = `${destination.pathname}${destination.search}`;
       if (currentRoute === destinationRoute) return;
       if (isAuthViewTransition(currentRoute, destinationRoute)) return;
+      if (isReaderDestination(destinationRoute)) return;
       explicitLoadingRef.current = false;
       begin(8, true);
     };
@@ -182,7 +184,7 @@ export const GlobalLoader = () => {
     if (previousRoute === route) return;
     previousRouteRef.current = route;
 
-    if (isAuthViewTransition(previousRoute, route)) {
+    if (isAuthViewTransition(previousRoute, route) || isReaderDestination(route)) {
       explicitLoadingRef.current = false;
       routeLoadingRef.current = false;
       return;
@@ -236,154 +238,14 @@ export const GlobalLoader = () => {
               initial={{ opacity: 0, letterSpacing: '-0.07em' }}
               animate={{ opacity: 1, letterSpacing: '-0.045em' }}
               transition={{ duration: reduceMotion ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="inline-flex max-w-full items-center justify-center gap-[0.16em] whitespace-nowrap text-[clamp(2rem,8vw,4rem)] font-black italic leading-none"
+              className="inline-flex max-w-full items-center justify-center gap-[0.16em] whitespace-nowrap text-[clamp(2.5rem,10vw,4rem)] font-black italic leading-none"
             >
               <span className={isLightMode ? 'text-[#111216]' : 'text-white'}>MANGA</span>
               <span className="text-[#FF4D88]">MUKAI</span>
             </motion.div>
 
             <div className="mt-6 flex items-center justify-center">
-              <div className="relative h-[104px] w-[104px]" aria-hidden="true">
-                <svg viewBox="0 0 120 120" className="absolute inset-0 h-full w-full overflow-visible fill-none">
-                  <defs>
-                    <linearGradient id="mukai-loader-pink" x1="18" y1="18" x2="102" y2="102" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#7c3aed" />
-                      <stop offset="0.46" stopColor="#d946ef" />
-                      <stop offset="1" stopColor="#FF4D88" />
-                    </linearGradient>
-                    <linearGradient id="mukai-loader-cyan" x1="22" y1="96" x2="98" y2="24" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#67e8f9" />
-                      <stop offset="1" stopColor="#dffcff" />
-                    </linearGradient>
-                    <filter id="mukai-loader-pink-glow" x="-45%" y="-45%" width="190%" height="190%">
-                      <feGaussianBlur stdDeviation="2.6" result="blur" />
-                      <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                    <filter id="mukai-loader-electric" x="-55%" y="-55%" width="210%" height="210%">
-                      <feTurbulence
-                        type="fractalNoise"
-                        baseFrequency="0.045 0.28"
-                        numOctaves="2"
-                        seed="7"
-                        result="electricNoise"
-                      >
-                        {!reduceMotion && (
-                          <animate
-                            attributeName="seed"
-                            values="2;18;7;26;2"
-                            dur="0.72s"
-                            repeatCount="indefinite"
-                          />
-                        )}
-                      </feTurbulence>
-                      <feDisplacementMap
-                        in="SourceGraphic"
-                        in2="electricNoise"
-                        scale="4.8"
-                        xChannelSelector="R"
-                        yChannelSelector="B"
-                        result="electricStroke"
-                      />
-                      <feGaussianBlur in="electricStroke" stdDeviation="2.4" result="electricGlow" />
-                      <feMerge>
-                        <feMergeNode in="electricGlow" />
-                        <feMergeNode in="electricStroke" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                    <filter id="mukai-loader-cyan-glow" x="-45%" y="-45%" width="190%" height="190%">
-                      <feGaussianBlur stdDeviation="1.7" result="blur" />
-                      <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={LOADER_RING_RADIUS}
-                    stroke="url(#mukai-loader-pink)"
-                    strokeWidth="1.6"
-                    opacity={isLightMode ? 0.28 : 0.34}
-                  />
-                  <motion.circle
-                    cx="60"
-                    cy="60"
-                    r={LOADER_RING_RADIUS}
-                    stroke="url(#mukai-loader-pink)"
-                    strokeWidth="3.1"
-                    strokeLinecap="round"
-                    strokeDasharray={LOADER_RING_CIRCUMFERENCE}
-                    initial={{ strokeDashoffset: LOADER_RING_CIRCUMFERENCE }}
-                    animate={{ strokeDashoffset: LOADER_RING_CIRCUMFERENCE * (1 - progress / 100) }}
-                    transition={{ duration: reduceMotion ? 0 : 0.36, ease: 'easeOut' }}
-                    transform="rotate(-90 60 60)"
-                    filter="url(#mukai-loader-electric)"
-                  />
-                </svg>
-
-                <motion.svg
-                  viewBox="0 0 120 120"
-                  className="absolute inset-0 h-full w-full overflow-visible fill-none"
-                  animate={reduceMotion ? undefined : { rotate: 360, opacity: [0.72, 1, 0.78, 1] }}
-                  transition={reduceMotion ? undefined : {
-                    rotate: { duration: 1.15, ease: 'linear', repeat: Infinity },
-                    opacity: { duration: 0.34, ease: 'easeInOut', repeat: Infinity },
-                  }}
-                >
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={LOADER_RING_RADIUS}
-                    stroke="#f5d0fe"
-                    strokeWidth="3.4"
-                    strokeLinecap="round"
-                    strokeDasharray="18 284"
-                    filter="url(#mukai-loader-electric)"
-                  />
-                </motion.svg>
-
-                <motion.svg
-                  viewBox="0 0 120 120"
-                  className="absolute inset-0 h-full w-full overflow-visible fill-none"
-                  animate={reduceMotion ? undefined : { rotate: -360 }}
-                  transition={reduceMotion ? undefined : { duration: 2.25, ease: 'linear', repeat: Infinity }}
-                >
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="39.5"
-                    stroke="url(#mukai-loader-cyan)"
-                    strokeWidth="3.2"
-                    strokeLinecap="round"
-                    strokeDasharray="54 19 10 31 37 97"
-                    filter="url(#mukai-loader-cyan-glow)"
-                  />
-                </motion.svg>
-
-                <motion.svg
-                  viewBox="0 0 120 120"
-                  className="absolute inset-0 h-full w-full overflow-visible fill-none"
-                  animate={reduceMotion ? undefined : { rotate: 360 }}
-                  transition={reduceMotion ? undefined : { duration: 4.4, ease: 'linear', repeat: Infinity }}
-                >
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="54"
-                    stroke={isLightMode ? '#7c3aed' : '#c4b5fd'}
-                    strokeWidth="1"
-                    strokeLinecap="round"
-                    strokeDasharray="2 9 16 12 3 15"
-                    opacity={isLightMode ? 0.42 : 0.62}
-                  />
-                </motion.svg>
-              </div>
+              <MukaiLoaderWheel size={104} progress={progress} isLight={isLightMode} />
             </div>
           </motion.div>
         </motion.div>

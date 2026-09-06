@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect, useRef, useMemo } from "react";
 import { Play, Loader2, Bookmark, Eye, Sparkles } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useHomeData } from '../../context/HomeDataContext';
+import { useSavedMangas } from '../../hooks/useSavedMangas';
 
 interface Manga {
   id: number | string;
@@ -126,19 +127,25 @@ const formatHeroItems = (mangasWP: any[]): Manga[] =>
 
 export default function Hero() {
   const { popularHistorical, isReady } = useHomeData();
-  const [items, setItems] = useState<Manga[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const items = useMemo(() => formatHeroItems(popularHistorical), [popularHistorical]);
+  const loading = !isReady;
+  const prefersReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
+  const [isInView, setIsInView] = useState(true);
+  const heroRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [isPageVisible, setIsPageVisible] = useState<boolean>(true);
 
-  const [isBookmarked, setIsBookmarked] = useState(false);
   const navigate = useNavigate();
+  const { isSaved, toggle: toggleSaved } = useSavedMangas();
 
-  const activeItem = items && items.length > 0 ? items[currentIndex] : null;
+  const activeItem = items && items.length > 0 ? items[currentIndex % items.length] : null;
+  // Guardado real: mismo estado que la ficha y la página de guardados.
+  const isBookmarked = activeItem ? isSaved(activeItem.id) : false;
 
   const handleBookmark = () => {
-    setIsBookmarked((prev) => !prev);
+    if (activeItem) void toggleSaved(activeItem.id);
   };
 
   useEffect(() => {
@@ -148,10 +155,19 @@ export default function Hero() {
   }, []);
 
   useEffect(() => {
-    if (!isReady) return;
-    setItems(formatHeroItems(popularHistorical));
-    setLoading(false);
-  }, [isReady, popularHistorical]);
+    const media = window.matchMedia('(max-width: 1023px)');
+    const update = () => setIsMobile(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    const element = heroRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(([entry]) => setIsInView(entry.isIntersecting));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   // --- SLIDER LOGIC ---
   const nextSlide = useCallback(() => {
@@ -164,6 +180,7 @@ export default function Hero() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && (e.target.isContentEditable || e.target.closest('input, textarea, select, [role="textbox"]'))) return;
       if (e.key === "ArrowLeft") prevSlide();
       if (e.key === "ArrowRight") nextSlide();
     };
@@ -172,10 +189,10 @@ export default function Hero() {
   }, [nextSlide, prevSlide]);
 
   useEffect(() => {
-    if (isPaused || items.length === 0 || !isPageVisible) return;
+    if (isPaused || loading || items.length < 2 || !isPageVisible || !isInView || prefersReducedMotion) return;
     const interval = setInterval(nextSlide, 6000);
     return () => clearInterval(interval);
-  }, [nextSlide, isPaused, items.length, isPageVisible]);
+  }, [nextSlide, isPaused, loading, items.length, isPageVisible, isInView, prefersReducedMotion]);
 
   // --- RENDERIZADO ---
 
@@ -204,23 +221,29 @@ export default function Hero() {
         relativeIndex,
         itemIndex: -1,
       }))
-    : items.map((item, index) => ({ item, relativeIndex: getRelativeIndex(index), itemIndex: index }));
+    : items.map((item, index) => ({ item, relativeIndex: getRelativeIndex(index), itemIndex: index }))
+        .filter(({ relativeIndex }) => Math.abs(relativeIndex) <= 2);
 
   if (!loading && items.length === 0) return null;
 
   return (
-    <div className="home-hero relative h-[930px] w-full overflow-hidden bg-[#121212] text-white sm:h-[970px] lg:h-[710px]" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
+    <div ref={heroRef} className="home-hero relative h-[930px] w-full overflow-hidden bg-[#121212] text-white sm:h-[970px] lg:h-[710px]" onMouseEnter={() => { if (!isMobile) setIsPaused(true); }} onMouseLeave={() => { if (!isMobile) setIsPaused(false); }}>
       
       {/* BACKGROUND */}
       <div className="home-hero-backdrop home-theme-backdrop-base absolute inset-0 z-0 bg-[#121212]">
-        <AnimatePresence initial={false} mode="popLayout">
+        {isMobile || prefersReducedMotion ? (
+          !loading && activeItem && <>
+            <img src={activeItem.backgroundHero} alt="" decoding="async" className="home-hero-backdrop-image home-main-hero-backdrop-image home-theme-backdrop-image h-full w-full object-cover" />
+            <div aria-hidden="true" className="home-hero-theme-scrim absolute inset-0" />
+          </>
+        ) : <AnimatePresence initial={false} mode="popLayout">
           {!loading && activeItem && (
-            <motion.div key={activeItem.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.2 }} className="absolute inset-0">
-              <img src={activeItem.backgroundHero} alt="" className="home-hero-backdrop-image home-main-hero-backdrop-image home-theme-backdrop-image h-full w-full object-cover" />
+            <motion.div key={activeItem.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.45 }} className="absolute inset-0">
+              <img src={activeItem.backgroundHero} alt="" decoding="async" className="home-hero-backdrop-image home-main-hero-backdrop-image home-theme-backdrop-image h-full w-full object-cover" />
               <div aria-hidden="true" className="home-hero-theme-scrim absolute inset-0" />
             </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence>}
       </div>
 
       <div className="home-hero-layout desktop-content-shell relative z-10 mx-auto flex h-full w-full flex-col items-center justify-start gap-0 pt-20 lg:flex-row lg:justify-between lg:gap-8 lg:pt-0">
@@ -238,8 +261,7 @@ export default function Hero() {
              </div>
           ) : (
             <>
-              <AnimatePresence mode="wait">
-                <motion.div key={activeItem?.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ duration: 0.5 }} className="space-y-3 w-full flex flex-col items-center lg:items-start">
+              <div className="space-y-3 w-full flex flex-col items-center lg:items-start">
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="home-hero-primary-tag bg-[#FF4D88] w-fit text-white px-2.5 py-1 text-[11px] font-black uppercase tracking-widest transform -skew-x-12">
                       {activeItem?.type}
@@ -255,25 +277,21 @@ export default function Hero() {
                       </div>
                     )}
                   </div>
-                  <h1 className="home-hero-heading home-theme-title text-3xl sm:text-4xl lg:text-[30px] font-[1000] italic uppercase tracking-tighter leading-[0.9] text-white text-center lg:text-left drop-shadow-lg line-clamp-2">
+                  <h2 className="home-hero-heading home-theme-title min-h-[54px] sm:min-h-[65px] lg:min-h-[54px] text-3xl sm:text-4xl lg:text-[30px] font-[1000] italic uppercase tracking-tighter leading-[0.9] text-white text-center lg:text-left drop-shadow-lg line-clamp-2">
                     {activeItem?.title}
-                  </h1>
-                </motion.div>
-              </AnimatePresence>
+                  </h2>
+              </div>
 
               <div className="flex items-stretch max-w-2xl w-full">
                 <div className="w-1 bg-[#FF4D88] shrink-0 z-10 hidden lg:block" />
-                <div className="home-hero-description-panel relative flex-grow bg-white/[0.03] backdrop-blur-md border border-white/5 lg:border-l-0 py-4 px-6 min-h-[110px] flex items-center rounded-lg lg:rounded-none">
-                  <AnimatePresence mode="wait">
-                    <motion.p key={activeItem?.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="home-hero-description text-white text-[14px] lg:text-[16px] font-medium leading-relaxed text-justify line-clamp-5">
+                <div className="home-hero-description-panel relative grid flex-grow items-center rounded-lg border border-white/5 bg-white/[0.03] px-6 py-4 backdrop-blur-md min-h-[110px] lg:rounded-none lg:border-l-0">
+                    <p className="home-hero-description col-start-1 row-start-1 text-white text-[14px] lg:text-[16px] font-medium leading-relaxed text-justify line-clamp-5">
                       {activeItem?.description}
-                    </motion.p>
-                  </AnimatePresence>
+                    </p>
                 </div>
               </div>
 
-              <AnimatePresence mode="wait">
-                <motion.div key={activeItem?.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.1 }} className="space-y-6 w-full flex flex-col items-center lg:items-start">
+              <div className="space-y-6 w-full flex flex-col items-center lg:items-start">
                   <div className="w-full px-4 lg:px-0">
                     <FittingHeroTagRow tags={activeItem?.tags || []} />
                   </div>
@@ -289,15 +307,14 @@ export default function Hero() {
                       </div>
                     </button>
                   </div>
-                </motion.div>
-              </AnimatePresence>
+              </div>
             </>
           )}
         </div>
 
         {/* CARDS DERECHA (3D SLIDER CON SKELETON) */}
-        <div className="home-hero-cards relative z-40 order-1 flex h-[400px] w-full items-center justify-center sm:h-[450px] lg:order-2 lg:h-[500px] lg:w-[50%]" style={{ perspective: '1200px' }}>
-          <div className="relative mt-4 flex h-full w-full scale-[0.79] items-center justify-center sm:scale-[0.92] lg:mt-24 lg:translate-x-10 lg:scale-[0.94]" style={{ transformStyle: 'preserve-3d' }}>
+        <div className="home-hero-cards relative z-40 order-1 flex h-[400px] w-full items-center justify-center sm:h-[450px] lg:order-2 lg:h-[500px] lg:w-[50%]" style={{ perspective: isMobile || prefersReducedMotion ? 'none' : '1200px' }}>
+          <div className="relative mt-4 flex h-full w-full scale-[0.79] items-center justify-center sm:scale-[0.92] lg:mt-24 lg:translate-x-10 lg:scale-[0.94]" style={{ transformStyle: isMobile || prefersReducedMotion ? 'flat' : 'preserve-3d' }}>
             {carouselSlides.map(({ item, relativeIndex, itemIndex }) => {
               const isCenter = relativeIndex === 0;
               const distance = Math.abs(relativeIndex);
@@ -306,7 +323,7 @@ export default function Hero() {
               const xOffset = isAdjacent ? relativeIndex * 76 : isQueued ? Math.sign(relativeIndex) * 4 : 0;
               const depth = isCenter ? 70 : isAdjacent ? -80 : -250 - Math.min(distance, 4) * 18;
               const scale = isCenter ? 1.11 : isAdjacent ? 0.98 : isQueued ? 0.86 : 0.8;
-              const opacity = distance <= 1 ? 1 : isQueued ? 0.14 : 0;
+              const opacity = distance <= 1 ? 1 : isQueued && !isMobile ? 0.14 : 0;
               const rotateY = isAdjacent ? relativeIndex * -28 : isQueued ? relativeIndex * -8 : 0;
               const zIndex = isCenter ? 30 : isAdjacent ? 20 : isQueued ? 10 : 0;
 
@@ -314,9 +331,9 @@ export default function Hero() {
                 <motion.div
                   key={item.id}
                   data-position={relativeIndex}
-                  className={`hero-carousel-slide group absolute left-1/2 top-1/2 h-[285px] w-[192px] sm:h-[310px] sm:w-[207px] lg:h-[365px] lg:w-[260px] ${isAdjacent && !loading ? 'cursor-pointer' : 'cursor-default'}`}
+                  className={`hero-carousel-slide group absolute left-1/2 top-1/2 aspect-[260/365] w-[192px] sm:w-[207px] lg:w-[260px] ${isAdjacent && !loading ? 'cursor-pointer' : 'cursor-default'}`}
                   style={{
-                    transformStyle: 'preserve-3d',
+                    transformStyle: isMobile || prefersReducedMotion ? 'flat' : 'preserve-3d',
                     zIndex,
                     pointerEvents: isAdjacent && !loading ? 'auto' : 'none',
                   }}
@@ -324,12 +341,12 @@ export default function Hero() {
                   animate={{
                     x: `calc(-50% + ${xOffset}%)`,
                     y: 'calc(-50% - 5%)',
-                    z: depth,
+                    z: isMobile || prefersReducedMotion ? 0 : depth,
                     scale,
                     opacity,
-                    rotateY,
+                    rotateY: isMobile || prefersReducedMotion ? 0 : rotateY,
                   }}
-                  transition={{
+                  transition={prefersReducedMotion ? { duration: 0 } : isMobile ? { duration: 0.32, ease: [0.22, 1, 0.36, 1] } : {
                     x: { type: 'spring', stiffness: 68, damping: 18, mass: 0.95 },
                     y: { type: 'spring', stiffness: 68, damping: 18, mass: 0.95 },
                     z: { type: 'spring', stiffness: 68, damping: 18, mass: 0.95 },
@@ -358,7 +375,7 @@ export default function Hero() {
                     ) : (
                         // REAL CARD
                         <>
-                            <img src={item.coverImage} alt={item.title} className="home-showcase-cover-image h-full w-full object-cover" />
+                            <img src={item.coverImage} alt={`Portada del manga ${item.title}`} decoding="async" fetchPriority={isCenter ? 'high' : 'low'} className="home-showcase-cover-image h-full w-full object-cover" />
                             <div className="absolute bottom-4 left-4">
                                 <span className="px-2 py-1 bg-[#FF4D88] text-[10px] font-black rounded uppercase shadow-md">{item.type}</span>
                             </div>
@@ -399,7 +416,7 @@ export default function Hero() {
       {!loading && (
         <div className="absolute bottom-11 left-1/2 z-20 flex -translate-x-1/2 gap-2 sm:bottom-5 lg:bottom-8">
             {items.map((_, i) => (
-            <button key={i} onClick={() => setCurrentIndex(i)} className={`h-1.5 -skew-x-12 transition-all duration-500 ${i === currentIndex ? "w-10 bg-[#FF4D88]" : "w-4 bg-neutral-700 hover:bg-neutral-500"}`} />
+            <button key={i} aria-label={`Mostrar portada ${i + 1}`} aria-current={i === currentIndex ? 'true' : undefined} onClick={() => setCurrentIndex(i)} className={`h-1.5 -skew-x-12 transition-all duration-500 ${i === currentIndex ? "w-10 bg-[#FF4D88]" : "w-4 bg-neutral-700 hover:bg-neutral-500"}`} />
             ))}
         </div>
       )}

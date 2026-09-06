@@ -28,7 +28,25 @@ export interface MangaComment {
   user_id: number | string;
   is_liked_by_user: boolean;
   profiles: MangaCommentProfile;
+  reactions?: Record<string, number>;
+  my_reaction?: string;
 }
+
+export interface EntityReactions { reactions: Record<string, number>; my_reaction: string }
+
+export const getEntityReactions = async (type: 'manga' | 'chapter' | 'comment', id: string | number): Promise<EntityReactions> => {
+  const response = await fetch(`${MANGAMUKAI_API}/reactions/${type}/${id}`, { headers: authHeaders(), cache: 'no-store' });
+  const data = await response.json();
+  if (!response.ok || !data.success) throw new Error(data.message || 'No se pudieron cargar las reacciones.');
+  return data;
+};
+
+export const setEntityReaction = async (type: 'manga' | 'chapter' | 'comment', id: string | number, reaction: string): Promise<EntityReactions> => {
+  const response = await fetch(`${MANGAMUKAI_API}/reactions/${type}/${id}`, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ reaction }) });
+  const data = await response.json();
+  if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo guardar la reacción.');
+  return data;
+};
 
 const authHeaders = (): HeadersInit => {
   const token = getStoredToken();
@@ -43,6 +61,8 @@ const normalizeComment = (comment: Record<string, unknown>): MangaComment => ({
   parent_id: comment.parent_id ? Number(comment.parent_id) : null,
   user_id: String(comment.user_id ?? ''),
   is_liked_by_user: Boolean(comment.is_liked_by_user),
+  reactions: comment.reactions as Record<string, number> | undefined,
+  my_reaction: String(comment.my_reaction || ''),
   profiles: (comment.profiles as MangaCommentProfile) || {
     username: 'Usuario MangaMukai',
     avatar_url: null,
@@ -68,12 +88,14 @@ export const getMusicTracks = async (): Promise<MusicTrack[]> => {
   }
 };
 
-export const getMangaComments = async (mangaId: string): Promise<MangaComment[]> => {
+export const getMangaComments = async (mangaId: string, chapterId?: string, signal?: AbortSignal): Promise<MangaComment[]> => {
   const token = getStoredToken();
   try {
-    const query = new URLSearchParams({ manga_id: mangaId });
+    const query = new URLSearchParams(chapterId ? { manga_id: mangaId, chapter_id: chapterId } : { manga_id: mangaId, scope: 'global' });
     const res = await fetch(`${MANGAMUKAI_API}/comments?${query.toString()}`, {
+      signal,
       headers: authHeaders(),
+      cache: 'no-store',
     });
     if ((res.status === 401 || res.status === 403) && token) clearStoredAuth('expired');
     if (!res.ok) return [];
@@ -89,6 +111,7 @@ export const postMangaComment = async (
   mangaId: string,
   content: string,
   parentId: number | null = null,
+  chapterId?: string,
 ): Promise<MangaComment | null> => {
   const token = getStoredToken();
   if (!token) return null;
@@ -102,7 +125,7 @@ export const postMangaComment = async (
       },
       body: JSON.stringify({
         manga_id: mangaId,
-        chapter_id: null,
+        chapter_id: chapterId || null,
         content,
         parent_id: parentId,
       }),
@@ -111,10 +134,25 @@ export const postMangaComment = async (
     if (!res.ok) return null;
     const data = await res.json();
     if (data.error) return null;
+    if (chapterId) window.dispatchEvent(new CustomEvent('mm_chapter_comments_changed', { detail: { chapterId } }));
     return normalizeComment(data.comment || data);
   } catch {
     return null;
   }
+};
+
+export const getChapterEngagement = async (ids: Array<string | number>) => {
+  const counts: Record<string, number> = {};
+  const engagement: Record<string, EntityReactions> = {};
+  for (let start = 0; start < ids.length; start += 100) {
+    const query = new URLSearchParams({ ids: ids.slice(start, start + 100).join(',') });
+    const response = await fetch(`${MANGAMUKAI_API}/chapters/comment-counts?${query}`, { cache: 'no-store', headers: authHeaders() });
+    if (!response.ok) throw new Error('No se pudieron cargar los contadores.');
+    const data = await response.json();
+    Object.assign(counts, data.counts || {});
+    Object.assign(engagement, data.engagement || {});
+  }
+  return { counts, engagement };
 };
 
 export const toggleCommentLike = async (commentId: number): Promise<boolean> => {

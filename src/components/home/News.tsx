@@ -1,27 +1,26 @@
 import { useState, useEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Heart, X, Check, ChevronRight, ChevronLeft, Zap, Gamepad2, ShieldAlert } from "lucide-react";
+import { ArrowUpRight, Heart, X, Check, ChevronRight, ChevronLeft, Gamepad2, ShieldAlert } from "lucide-react";
 
 // Assets
-import renewalBackdrop from '../../assets/banners/mythical-dragon-beast-anime-style.jpg';
-import premiumBackdrop from '../../assets/banners/anime-style-mythical-dragon-creature.jpg';
-import subscriptionBackdrop from '../../assets/banners/illustration-anime-character-rain.jpg';
 import donationBackdrop from '../../assets/modals/auth-login.jpg';
-import { CoinMarketModal, SubscriptionModal } from '../modals';
+import { openSubscriptionModal } from '../../utils/subscriptionModal';
 import {
   AUTH_CHANGED_EVENT,
   AUTH_SESSION_EXPIRED_EVENT,
   getStoredToken,
-  getStoredUser,
-  type MMUser,
 } from '../../services/authService';
+import { fetchHomeBanners, getCachedHomeBanners, type HomeBanner } from '../../services/bannerService';
 import { useTheme } from '../../hooks/useTheme';
 import { lockPageScroll } from '../../utils/scrollLock';
 
 const PAYPAL_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg";
 let donationSuccessClaimed = false;
-const getAuthenticatedUser = (): MMUser | null => getStoredToken() ? getStoredUser() : null;
+
+/** Identidad del listado, para no repintar el carrusel cuando llega lo mismo. */
+const bannersSignature = (banners: HomeBanner[]) =>
+  banners.map((banner) => `${banner.id}:${banner.image}:${banner.imageMobile}`).join('|');
 
 const PayPalLogo = ({ className = "h-5 w-auto" }: { className?: string }) => (
   <img
@@ -41,42 +40,6 @@ const TelegramLogo = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" /></svg>
 );
 
-const slides = [
-  {
-    id: 1,
-    image: renewalBackdrop,
-    title: "NOS RENOVAMOS",
-    subtitle: "V 2.0 UPDATE",
-    description: "Prepárate para la batalla. Nuevo diseño, rendimiento extremo y una interfaz pensada para verdaderos guerreros del manga.",
-    cta: "Entrar a la Biblioteca",
-    link: "/biblioteca",
-    action: null,
-    color: "#FF4D88"
-  },
-  {
-    id: 2,
-    image: premiumBackdrop,
-    title: "MANGAS PREMIUM",
-    subtitle: "COIN RUSH",
-    description: "Desbloquea capítulos legendarios. Recarga tus monedas y accede al contenido más exclusivo sin límites.",
-    cta: "Recargar Ahora",
-    link: null,
-    action: "coins",
-    color: "#F59E0B"
-  },
-  {
-    id: 3,
-    image: subscriptionBackdrop,
-    title: "SUSCRIPCIÓN MUKAI",
-    subtitle: "MUKAI PRO",
-    description: "Lee sin límites, disfruta acceso anticipado y obtén ventajas exclusivas con el plan mensual de MangaMukai.",
-    cta: "Descubrir Plan",
-    link: null,
-    action: "vip",
-    color: "#00C2FF"
-  }
-];
-
 const supportThemes = [
   {
     accent: "#FF4D88",
@@ -89,30 +52,6 @@ const supportThemes = [
     accentSoft: "rgba(255, 77, 136, 0.10)",
     accentBorder: "rgba(255, 77, 136, 0.50)",
     glow: "rgba(255, 77, 136, 0.28)"
-  },
-  {
-    accent: "#F59E0B",
-    paymentText: "#1a1204",
-    borderStart: "#F59E0B",
-    borderMiddle: "#fbbf24",
-    borderEnd: "#92400e",
-    surface: "#171006",
-    surfaceHover: "#241906",
-    accentSoft: "rgba(245, 158, 11, 0.12)",
-    accentBorder: "rgba(245, 158, 11, 0.55)",
-    glow: "rgba(245, 158, 11, 0.28)"
-  },
-  {
-    accent: "#00C2FF",
-    paymentText: "#03141b",
-    borderStart: "#00C2FF",
-    borderMiddle: "#0ea5e9",
-    borderEnd: "#075985",
-    surface: "#06141a",
-    surfaceHover: "#08232d",
-    accentSoft: "rgba(0, 194, 255, 0.11)",
-    accentBorder: "rgba(0, 194, 255, 0.52)",
-    glow: "rgba(0, 194, 255, 0.26)"
   }
 ];
 
@@ -126,20 +65,23 @@ export default function News({ variant = "default" }: NewsProps) {
   const isYouthNews = variant === "youth";
   const [showDonateModal, setShowDonateModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showCoinModal, setShowCoinModal] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState<MMUser | null>(getAuthenticatedUser);
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredToken()));
   const [donationAmount, setDonationAmount] = useState("5.00");
   const [customAmount, setCustomAmount] = useState("");
   const [donationError, setDonationError] = useState("");
-  
+
+  // Banners publicados en WordPress (Banners Home) para este bloque. Al volver a
+  // la portada se arranca con lo ya conocido, así el carrusel se pinta en el
+  // primer fotograma en lugar de mostrar el hueco negro mientras llega la API.
+  const [banners, setBanners] = useState<HomeBanner[]>(
+    () => getCachedHomeBanners(isYouthNews ? 'youth' : 'home') ?? [],
+  );
   const [currentSlide, setCurrentSlide] = useState(0);
+
 
   // Mantiene las acciones privadas sincronizadas con la sesión actual.
   useEffect(() => {
     const updateAuth = () => {
-      setCurrentUser(getAuthenticatedUser());
       setIsAuthenticated(Boolean(getStoredToken()));
     };
     window.addEventListener(AUTH_CHANGED_EVENT, updateAuth);
@@ -150,13 +92,31 @@ export default function News({ variant = "default" }: NewsProps) {
     };
   }, []);
 
+  // Banners administrados desde WordPress. Si lo que llega es idéntico a lo que
+  // ya se está mostrando no se toca el estado: así no se reinicia la diapositiva
+  // activa ni se vuelven a montar las imágenes.
+  useEffect(() => {
+    let active = true;
+    void fetchHomeBanners(isYouthNews ? 'youth' : 'home').then((list) => {
+      if (!active) return;
+      setBanners((current) => (bannersSignature(current) === bannersSignature(list) ? current : list));
+    });
+    return () => { active = false; };
+  }, [isYouthNews]);
+
+  // Solo se vuelve al primer banner si el que estaba activo ya no existe.
+  useEffect(() => {
+    setCurrentSlide((slide) => (slide < banners.length ? slide : 0));
+  }, [banners.length]);
+
   // Auto-play slider
   useEffect(() => {
+    if (banners.length < 2) return;
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+      setCurrentSlide((prev) => (prev === banners.length - 1 ? 0 : prev + 1));
     }, 6000);
     return () => clearInterval(timer);
-  }, []);
+  }, [banners.length]);
 
   useEffect(() => {
     if (donationSuccessClaimed) return;
@@ -236,28 +196,40 @@ export default function News({ variant = "default" }: NewsProps) {
     }
   };
 
-  const handleAction = (action: string | null, link: string | null) => {
-    if ((action === "coins" || action === "vip") && !isAuthenticated) {
-      navigate('/auth/login', {
-        state: { returnTo: `${window.location.pathname}${window.location.search}` },
-      });
+  /**
+   * El enlace del banner lo define WordPress: acciones internas (#vip, #donar),
+   * rutas de la propia web (/biblioteca) o URLs externas.
+   */
+  const handleBannerClick = (banner: HomeBanner) => {
+    const link = banner.link.trim();
+    if (!link) return;
+
+    if (link === "#vip" || link === "#donar" || link === "#donate") {
+      const needsAuth = link === "#vip";
+      if (needsAuth && !isAuthenticated) {
+        navigate('/auth/login', {
+          state: { returnTo: `${window.location.pathname}${window.location.search}` },
+        });
+        return;
+      }
+      if (link === "#vip") {
+        openSubscriptionModal();
+      } else {
+        setDonationError("");
+        setShowDonateModal(true);
+      }
       return;
     }
 
-    if (action === "donate") {
-      setDonationError("");
-      setShowDonateModal(true);
-    } else if (action === "coins") {
-      setShowCoinModal(true);
-    } else if (action === "vip") {
-      setShowSubscriptionModal(true);
-    } else if (link) {
-      window.open(link, "_self");
+    if (link.startsWith('/')) {
+      navigate(link, { state: { returnTo: `${window.location.pathname}${window.location.search}` } });
+      return;
     }
+
+    window.open(link, banner.newTab ? "_blank" : "_self", "noopener,noreferrer");
   };
 
-  const currentData = slides[currentSlide];
-  const currentSupportTheme = supportThemes[currentSlide];
+  const currentSupportTheme = supportThemes[0];
   const supportThemeVariables = {
     "--support-accent": currentSupportTheme.accent,
     "--support-border-start": currentSupportTheme.borderStart,
@@ -280,14 +252,6 @@ export default function News({ variant = "default" }: NewsProps) {
           0% { background-position: 0 0; }
           100% { background-position: 100% 100%; }
         }
-        @keyframes glitch-anim {
-          0% { clip-path: inset(10% 0 80% 0); transform: translate(-2px, 2px); }
-          20% { clip-path: inset(80% 0 5% 0); transform: translate(2px, -2px); }
-          40% { clip-path: inset(50% 0 30% 0); transform: translate(-2px, -2px); }
-          60% { clip-path: inset(20% 0 60% 0); transform: translate(2px, 2px); }
-          80% { clip-path: inset(90% 0 2% 0); transform: translate(-2px, 2px); }
-          100% { clip-path: inset(30% 0 50% 0); transform: translate(2px, -2px); }
-        }
         .manga-bg {
           background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 20px);
           animation: manga-lines 20s linear infinite;
@@ -300,26 +264,6 @@ export default function News({ variant = "default" }: NewsProps) {
         }
         .card-clip {
           clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
-        }
-        .glitch-text[data-text] {
-            position: relative;
-        }
-        .glitch-text[data-text]::after {
-            content: attr(data-text);
-            position: absolute;
-            left: 2px;
-            text-shadow: -2px 0 red;
-            top: 0;
-            color: white;
-            background: transparent;
-            overflow: hidden;
-            clip-path: inset(0 0 0 0);
-            animation: glitch-anim 2s infinite linear alternate-reverse;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .group:hover .glitch-text[data-text]::after {
-            opacity: 1;
         }
         .news-support-card {
           background: linear-gradient(90deg, var(--support-border-start), var(--support-border-middle), var(--support-border-end));
@@ -387,94 +331,76 @@ export default function News({ variant = "default" }: NewsProps) {
 
       <div className="max-w-[1300px] mx-auto relative">
         
-        {/* CAROUSEL / SLIDER PRINCIPAL */}
+        {/* CARRUSEL DE BANNERS — el contenido se administra desde WordPress (Banners Home) */}
         <div className="home-news-shell relative group z-10 feroz-clip p-[2px] transition-all duration-500 bg-gradient-to-br from-white/20 via-white/5 to-transparent shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)]">
-          
+
           <div className="home-theme-surface relative w-full min-h-[430px] sm:min-h-[380px] md:h-[400px] feroz-clip overflow-hidden bg-[#0a0a0f] manga-bg">
-            
-            {slides.map((slide, index) => (
-              <div 
-                key={slide.id}
-                className={`absolute inset-0 transition-all duration-700 ease-out ${index === currentSlide ? 'opacity-100 scale-100 z-20' : 'opacity-0 scale-105 z-0'}`}
-              >
-                {/* FONDO IMAGEN */}
-                <div className="absolute inset-0">
-                  <img src={slide.image} alt={slide.title} className="w-full h-full object-cover object-center md:object-right opacity-50 mix-blend-screen" />
-                  {/* Gradientes Manga-style */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0f] via-[#0a0a0f]/80 to-transparent" />
-                  <div className={`absolute inset-0 opacity-20 mix-blend-overlay`} style={{ backgroundColor: slide.color }}></div>
-                  {/* Tramado de puntos tipo manga (Halftone simulación simple) */}
-                  <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:4px_4px] [mask-image:linear-gradient(to_right,black,transparent)] pointer-events-none"></div>
-                </div>
 
-                {/* CONTENIDO */}
-                <div className="relative h-full flex flex-col justify-center px-6 md:px-20 w-full md:w-3/5">
-                  <div className="-translate-y-5 flex items-center gap-3 mb-2 md:translate-y-0 md:mb-4">
-                    <span 
-                        className="flex items-center gap-2 text-[10px] md:text-[12px] font-black uppercase tracking-[0.3em] px-3 py-1 -skew-x-12 border-l-4 shadow-[0_0_15px_currentColor]"
-                        style={{ borderColor: slide.color, backgroundColor: `${slide.color}20`, color: slide.color }}
-                    >
-                      <Zap size={14} className="animate-pulse" fill="currentColor" />
-                      <span className="skew-x-12">{slide.subtitle}</span>
-                    </span>
-                  </div>
-                  
-                  <h2 
-                    className="text-3xl md:text-6xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-4 glitch-text"
-                    data-text={slide.title}
-                    style={{ textShadow: `4px 4px 0px ${slide.color}80, 8px 8px 0px rgba(0,0,0,0.5)` }}
-                  >
-                    {slide.title}
-                  </h2>
-                  
-                  <div className="flex items-stretch gap-4 bg-black/40 backdrop-blur-sm p-4 border-l-2 -skew-x-6 w-max max-w-[90%]" style={{ borderColor: slide.color }}>
-                    <p className="text-gray-200 text-[11px] md:text-[14px] font-bold leading-snug max-w-sm skew-x-6">
-                      {slide.description}
-                    </p>
-                  </div>
+            {banners.map((banner, index) => {
+              const isActive = index === currentSlide;
+              return (
+                <div
+                  key={banner.id}
+                  className={`absolute inset-0 transition-opacity duration-700 ease-out ${isActive ? 'opacity-100 z-20' : 'pointer-events-none opacity-0 z-0'}`}
+                  aria-hidden={!isActive}
+                >
+                  <picture className="block h-full w-full">
+                    {banner.imageMobile && <source media="(max-width: 767px)" srcSet={banner.imageMobile} />}
+                    <img
+                      src={banner.image}
+                      alt={banner.title}
+                      className="h-full w-full object-cover object-center"
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      decoding="async"
+                    />
+                  </picture>
 
-                  <div className="mt-6 md:mt-8 flex gap-4">
-                    <button 
-                      onClick={() => handleAction(slide.action, slide.link)}
-                      className="btn-clip relative inline-flex items-center gap-3 px-6 py-3 md:px-8 md:py-4 bg-white text-black font-black text-[11px] md:text-[14px] uppercase tracking-widest transition-all duration-300 hover:scale-105 group/cta overflow-hidden"
-                      style={{ boxShadow: `0 0 20px ${slide.color}60` }}
+                  {/* La imagen completa lleva al enlace configurado; el botón es opcional. */}
+                  {isActive && banner.link !== "" && (
+                    <button
+                      type="button"
+                      onClick={() => handleBannerClick(banner)}
+                      aria-label={banner.title || banner.buttonLabel}
+                      className="absolute inset-0 z-10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70"
+                    />
+                  )}
+
+                  {isActive && banner.showButton && (
+                    <button
+                      type="button"
+                      onClick={() => handleBannerClick(banner)}
+                      className="btn-clip group/cta absolute bottom-4 left-5 z-20 inline-flex items-center gap-2 overflow-hidden bg-white px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-black shadow-[0_10px_30px_-12px_rgba(0,0,0,0.9)] transition-all duration-300 hover:scale-105 md:bottom-8 md:left-10 md:gap-3 md:px-8 md:py-3.5 md:text-[13px]"
                     >
-                      <div className="absolute inset-0 opacity-0 group-hover/cta:opacity-100 transition-opacity" style={{ backgroundColor: slide.color }}></div>
-                      <span className="relative z-10 group-hover/cta:text-white transition-colors">{slide.cta}</span>
-                      <ArrowUpRight size={18} className="relative z-10 group-hover/cta:rotate-45 group-hover/cta:text-white transition-all duration-300" strokeWidth={3} />
+                      <span className="absolute inset-0 bg-black opacity-0 transition-opacity duration-300 group-hover/cta:opacity-100" />
+                      <span className="relative z-10 transition-colors group-hover/cta:text-white">{banner.buttonLabel}</span>
+                      <ArrowUpRight size={17} className="relative z-10 transition-all duration-300 group-hover/cta:rotate-45 group-hover/cta:text-white" strokeWidth={3} />
                     </button>
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
-            {/* CONTROLES / INDICADORES (Manga Style) */}
-            <div className={`absolute left-6 z-30 flex gap-3 md:left-20 ${isYouthNews ? 'bottom-7 md:bottom-8' : 'bottom-4'}`}>
-              {slides.map((s, idx) => (
-                <button 
-                  key={idx}
-                  onClick={() => setCurrentSlide(idx)}
-                  className={`h-2 -skew-x-12 transition-all duration-300 ${isYouthNews ? 'home-youth-news-slide-dot border' : ''} ${currentSlide === idx ? 'w-10' : 'w-4 bg-white/30 hover:bg-white/60'}`}
-                  style={{ backgroundColor: currentSlide === idx ? s.color : undefined, boxShadow: currentSlide === idx ? `0 0 10px ${s.color}` : 'none' }}
-                />
-              ))}
-            </div>
-            
-            {/* FLECHAS MANUALES (Desktop) */}
-            <button 
-              onClick={() => setCurrentSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1))}
-              className="hidden md:flex absolute right-20 top-1/2 -translate-y-1/2 z-30 w-12 h-12 items-center justify-center -skew-x-12 bg-black/60 border-2 border-white/10 text-white hover:scale-110 transition-all backdrop-blur-md group/arr"
-              style={{ borderColor: currentData.color }}
-            >
-              <ChevronLeft size={24} className="skew-x-12 group-hover/arr:-translate-x-1 transition-transform" />
-            </button>
-            <button 
-              onClick={() => setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))}
-              className="hidden md:flex absolute right-6 top-1/2 -translate-y-1/2 z-30 w-12 h-12 items-center justify-center -skew-x-12 bg-black/60 border-2 border-white/10 text-white hover:scale-110 transition-all backdrop-blur-md group/arr"
-              style={{ borderColor: currentData.color }}
-            >
-              <ChevronRight size={24} className="skew-x-12 group-hover/arr:translate-x-1 transition-transform" />
-            </button>
+            {/* FLECHAS MANUALES — una en cada extremo */}
+            {banners.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Banner anterior"
+                  onClick={() => setCurrentSlide((prev) => (prev === 0 ? banners.length - 1 : prev - 1))}
+                  className="absolute left-3 top-1/2 z-30 flex h-10 w-10 -translate-y-1/2 -skew-x-12 items-center justify-center border-2 border-white/20 bg-black/60 text-white backdrop-blur-md transition-all hover:scale-110 md:left-6 md:h-12 md:w-12 group/arr"
+                >
+                  <ChevronLeft size={22} className="skew-x-12 transition-transform group-hover/arr:-translate-x-1" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Banner siguiente"
+                  onClick={() => setCurrentSlide((prev) => (prev === banners.length - 1 ? 0 : prev + 1))}
+                  className="absolute right-3 top-1/2 z-30 flex h-10 w-10 -translate-y-1/2 -skew-x-12 items-center justify-center border-2 border-white/20 bg-black/60 text-white backdrop-blur-md transition-all hover:scale-110 md:right-6 md:h-12 md:w-12 group/arr"
+                >
+                  <ChevronRight size={22} className="skew-x-12 transition-transform group-hover/arr:translate-x-1" />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -512,16 +438,12 @@ export default function News({ variant = "default" }: NewsProps) {
             className="news-support-card card-clip group relative w-full p-[2px] text-left transition-all duration-500 hover:-translate-y-1 hover:scale-[1.02] focus-visible:outline-none"
             style={supportThemeVariables}
           >
-            <span className="news-support-surface card-clip relative flex h-[80px] items-center justify-between overflow-hidden px-5 transition-colors duration-500 md:h-[100px] md:px-6">
-              <span className="news-support-glow absolute inset-y-0 right-0 w-2/5 transition-colors duration-500" />
-              <span className="relative z-10 flex min-w-0 items-center gap-3">
+            <span className="home-theme-surface card-clip relative flex h-[80px] items-center justify-center overflow-hidden bg-[#0c0c11] px-5 transition-colors duration-500 md:h-[100px] md:px-6">
+              <span className="relative z-10 flex min-w-0 items-center justify-center gap-3">
                 <span className="news-support-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-colors duration-500 md:h-11 md:w-11">
                   <Heart size={19} fill="currentColor" />
                 </span>
-                <span className="min-w-0 whitespace-nowrap text-[14px] font-black uppercase italic leading-none tracking-tight text-white md:text-[15px]">Apoyar proyecto</span>
-              </span>
-              <span className="relative z-10 ml-2 shrink-0 rounded-lg bg-white px-2 py-1.5">
-                <PayPalLogo className="h-4 w-auto md:h-5" />
+                <span className="home-theme-title min-w-0 whitespace-nowrap text-[19px] font-black uppercase italic leading-none tracking-tight text-white md:text-[22px]">Donación</span>
               </span>
             </span>
           </button>
@@ -740,16 +662,6 @@ export default function News({ variant = "default" }: NewsProps) {
         document.body
       )}
 
-      <CoinMarketModal
-        isOpen={showCoinModal}
-        onClose={() => setShowCoinModal(false)}
-        username={currentUser?.username || ''}
-        userId={String(currentUser?.id || '')}
-      />
-      <SubscriptionModal
-        isOpen={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
-      />
     </section>
   );
 }

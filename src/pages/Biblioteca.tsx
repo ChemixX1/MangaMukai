@@ -66,12 +66,6 @@ export const Biblioteca = () => {
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
   useEffect(() => {
-    const previousTitle = document.title;
-    document.title = "Biblioteca Mukai — MangaMukai";
-    return () => { document.title = previousTitle; };
-  }, []);
-
-  useEffect(() => {
     const params = new URLSearchParams(location.search);
     const audienceFromUrl = getAudience(params.get("audience"));
     const genreFromUrl = params.get("genre");
@@ -80,7 +74,10 @@ export const Biblioteca = () => {
     const audienceFromNavigation = getAudience(filterFromNavigation);
     const audienceFromGenre = getAudience(genreFromUrl);
 
-    setSearchTerm(typeof searchFromNavigation === "string" ? searchFromNavigation : "");
+    // ?buscar= permite compartir una búsqueda y es el destino del SearchAction
+    // declarado en el JSON-LD del sitio.
+    const searchFromUrl = params.get("buscar") || params.get("q") || "";
+    setSearchTerm(typeof searchFromNavigation === "string" ? searchFromNavigation : searchFromUrl);
     setSelectedAudience(audienceFromUrl || audienceFromNavigation || audienceFromGenre);
 
     if (typeof filterFromNavigation === "string" && !audienceFromNavigation) {
@@ -249,6 +246,9 @@ export const Biblioteca = () => {
       >
         <div className="desktop-content-shell relative mx-auto w-full px-4 pb-4 pt-28 text-center sm:px-8 sm:pb-5 sm:pt-36 lg:px-16 lg:pb-2 lg:pt-40">
           <h1 className="mx-auto flex max-w-full justify-center pr-[0.08em]">
+            {/* El logotipo se dibuja con capas de texto: esta línea da al H1 un
+                nombre accesible y con las palabras clave de la página. */}
+            <span className="sr-only">Biblioteca de manga en español</span>
             <DepthText
               text="Biblioteca Mukai"
               parts={[
@@ -443,7 +443,7 @@ export const Biblioteca = () => {
                     <div className={`biblioteca-cover-card-surface relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_14px_34px_rgba(0,0,0,0.18)] ${isLight ? "biblioteca-cover-card-light" : "biblioteca-cover-card-dark"}`}>
                       <img
                         src={manga.portada}
-                        alt={manga.titulo}
+                        alt={`Portada del manga ${manga.titulo}`}
                         className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
                         loading={index < 6 ? "eager" : "lazy"}
                         decoding="async"

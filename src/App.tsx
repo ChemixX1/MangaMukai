@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'r
 import { migrateOldDataToWordPress } from './services/migrationService';
 import { GlobalLoader } from './components/common';
 import { Navbar } from './components/layout';
+import { SubscriptionModalHost } from './components/modals';
+import { useTheme } from './hooks/useTheme';
+import { applyRouteSeo } from './hooks/useDocumentTitle';
 
 const Home = lazy(() => import('./pages/Home'));
 const MangaBlackWhite = lazy(() => import('./pages/MangaBlackWhite'));
@@ -17,6 +20,7 @@ const TermsAndPrivacy = lazy(() => import('./pages/TermsAndPrivacy').then(({ Ter
 const SavedMangas = lazy(() => import('./pages/SavedMangas').then(({ SavedMangas: Page }) => ({ default: Page })));
 const ReaderPage = lazy(() => import('./pages/ReaderPage').then(({ ReaderPage: Page }) => ({ default: Page })));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess').then(({ PaymentSuccess: Page }) => ({ default: Page })));
+const CoinMarketPage = lazy(() => import('./pages/CoinMarketPage').then(({ CoinMarketPage: Page }) => ({ default: Page })));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 
 const ScrollToTop = () => {
@@ -27,7 +31,22 @@ const ScrollToTop = () => {
   return null;
 };
 
+/**
+ * Head SEO base de cada ruta (título, descripción, robots y canonical). Las
+ * páginas con datos propios (manga, capítulo, perfil público) lo afinan después
+ * con useDocumentTitle.
+ */
+const RouteSeo = () => {
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    applyRouteSeo(pathname, search);
+  }, [pathname, search]);
+  return null;
+};
+
 function AppInner() {
+  const { theme } = useTheme();
+  const pageColors = theme === 'light' ? 'bg-white text-black' : 'bg-black text-white';
   useEffect(() => {
     migrateOldDataToWordPress().catch(console.error);
   }, []);
@@ -36,9 +55,11 @@ function AppInner() {
     <Router>
       <GlobalLoader />
       <ScrollToTop />
+      <RouteSeo />
       <Navbar />
-      <div className="min-h-screen bg-black text-white font-sans transition-colors duration-300">
-        <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <SubscriptionModalHost />
+      <div className={`min-h-screen font-sans transition-colors duration-300 ${pageColors}`}>
+        <Suspense fallback={<div className={`min-h-screen ${pageColors}`} />}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/nosotros" element={<AboutPage />} />
@@ -56,6 +77,7 @@ function AppInner() {
             <Route path="/catalogo" element={<Navigate to="/biblioteca" replace />} />
             <Route path="/manga/:id" element={<MangaDetail />} />
             <Route path="/read/:chapterId" element={<ReaderPage />} />
+            <Route path="/recargar" element={<CoinMarketPage />} />
             <Route path="/pago-exitoso" element={<PaymentSuccess />} />
             <Route path="/manga-bn" element={<MangaBlackWhite />} />
             <Route path="/manga-19" element={<MangaAdult />} />

@@ -107,14 +107,14 @@ const readJson = async <T>(res: Response): Promise<T | null> => {
 };
 
 const optimizeProfileImage = async (file: File, type: 'avatar' | 'banner'): Promise<File> => {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml' || file.size < 320_000) {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') {
     return file;
   }
 
   try {
     const bitmap = await createImageBitmap(file);
-    const maxWidth = type === 'avatar' ? 900 : 1920;
-    const maxHeight = type === 'avatar' ? 900 : 1080;
+    const maxWidth = type === 'avatar' ? 512 : 1920;
+    const maxHeight = type === 'avatar' ? 512 : 1080;
     const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
@@ -204,6 +204,10 @@ export const uploadWordPressProfileImage = async (
   type: 'avatar' | 'banner'
 ): Promise<{ success: boolean; url: string; message: string }> => {
   try {
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'].includes(file.type)) {
+      return { success: false, url: '', message: 'Selecciona una imagen JPG, PNG, WebP, GIF o AVIF.' };
+    }
+    if (file.size > 15 * 1024 * 1024) return { success: false, url: '', message: 'La imagen debe pesar menos de 15 MB.' };
     const body = new FormData();
     body.append('file', await optimizeProfileImage(file, type));
     body.append('type', type);
@@ -224,6 +228,10 @@ export const uploadWordPressProfileImage = async (
       message: data?.message || '',
     };
     if (result.success) {
+      // Decode the stored image before replacing the instant local preview.
+      const image = new Image();
+      image.src = result.url;
+      await Promise.race([image.decode().catch(() => undefined), new Promise(resolve => window.setTimeout(resolve, 2500))]);
       const user = getStoredUser();
       if (user) {
         if (type === 'avatar') updateStoredUser({ avatar: result.url });

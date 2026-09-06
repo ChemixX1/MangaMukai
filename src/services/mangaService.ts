@@ -65,6 +65,13 @@ const CAMPOS_SOLICITADOS = [
   'myCRED_sell_content', 'mm_chapter_info', 'wpb_post_views_count', 'manga_cover', 'manga_description', 'manga_tags'
 ].join(',');
 
+/**
+ * `_embed` a secas adjunta autor, términos y comentarios de cada post y multiplica
+ * por ocho el peso de la respuesta (1,5 MB frente a 200 KB en 60 posts). De todo
+ * eso solo se usa la portada destacada, así que se pide únicamente esa incrustación.
+ */
+const EMBED_PORTADA = '_embed=wp:featuredmedia';
+
 // ---------------------------------------------------------------------------
 // UTILS
 // ---------------------------------------------------------------------------
@@ -245,7 +252,7 @@ export const getUltimosCapitulos = async (): Promise<MangaCapitulo[]> => {
 // ---------------------------------------------------------------------------
 export const getLatestMenMangas = async (): Promise<MangaCapitulo[]> => {
   try {
-    const res = await fetch(`${API_URL}?_embed&per_page=60&_fields=${CAMPOS_SOLICITADOS}`);
+    const res = await fetch(`${API_URL}?${EMBED_PORTADA}&per_page=60&_fields=${CAMPOS_SOLICITADOS}`);
     if (!res.ok) throw new Error('Error API');
     const data: WPManga[] = await res.json();
 
@@ -283,8 +290,11 @@ export const getLatestMenMangas = async (): Promise<MangaCapitulo[]> => {
 // ---------------------------------------------------------------------------
 export const getNewReleases = async (): Promise<MangaCapitulo[]> => {
   try {
-    const url = `${API_URL}?_embed&per_page=20&orderby=date&order=desc&_fields=${CAMPOS_SOLICITADOS}&t=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
+    // 12 posts bastan: se recortan a 5 series distintas y de ahí para abajo la
+    // respuesta pesa menos de la mitad. La API no manda cabeceras de caché, así
+    // que ni `no-store` ni el parámetro anti-caché aportaban frescura.
+    const url = `${API_URL}?${EMBED_PORTADA}&per_page=12&orderby=date&order=desc&_fields=${CAMPOS_SOLICITADOS}`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`Error API: ${res.status}`);
     const rawData: WPManga[] = await res.json();
 
@@ -337,6 +347,8 @@ export interface SeriesChapter {
   is_paid: boolean;
   price_coins: number;
   free_at: string | null;
+  /** Portada subida en WordPress. Vacío = se usa la primera página del capítulo. */
+  cover_url?: string | null;
 }
 
 const chapterPreviewCache = new Map<string, string | null>();
@@ -440,16 +452,38 @@ export const getChapterPreviewImage = async (
 // ---------------------------------------------------------------------------
 // 8. CAPÍTULOS POR SERIE (usa endpoint propio — consulta por ero_seri meta)
 // ---------------------------------------------------------------------------
+/* Los listados piden la lista de capítulos de cada ficha visible: dos secciones
+   de la misma página y el paso de página repiten muchas series, así que la
+   respuesta se guarda y las peticiones simultáneas comparten la misma promesa. */
+const seriesChaptersCache = new Map<string, SeriesChapter[]>();
+const seriesChaptersRequests = new Map<string, Promise<SeriesChapter[]>>();
+
 export const getChaptersBySeries = async (eroSeri: number | string): Promise<SeriesChapter[]> => {
-  try {
-    const res = await fetch(`${MM_API}/series/${eroSeri}/chapters`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.success ? (data.chapters as SeriesChapter[]) : [];
-  } catch (error) {
-    console.error('Error getChaptersBySeries:', error);
-    return [];
-  }
+  const key = String(eroSeri);
+  const cached = seriesChaptersCache.get(key);
+  if (cached) return cached;
+
+  const pending = seriesChaptersRequests.get(key);
+  if (pending) return pending;
+
+  const request = fetch(`${MM_API}/series/${key}/chapters`)
+    .then(async (res) => {
+      if (!res.ok) return [];
+      const data = await res.json();
+      const chapters = data.success ? (data.chapters as SeriesChapter[]) : [];
+      if (chapters.length > 0) seriesChaptersCache.set(key, chapters);
+      return chapters;
+    })
+    .catch((error) => {
+      console.error('Error getChaptersBySeries:', error);
+      return [] as SeriesChapter[];
+    })
+    .finally(() => {
+      seriesChaptersRequests.delete(key);
+    });
+
+  seriesChaptersRequests.set(key, request);
+  return request;
 };
 
 // ---------------------------------------------------------------------------

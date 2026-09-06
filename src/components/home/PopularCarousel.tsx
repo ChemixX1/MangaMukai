@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Crown, TrendingUp, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getPopularWomenByViews, getUltimosCapitulos } from '../../services/mangaService';
 import { useHomeData } from '../../context/HomeDataContext';
 import { MangaMetaBar } from '../common';
 import { preloadImages } from '../../utils/preloadImages';
+import { whenIdle } from '../../utils/whenIdle';
+import type { MangaCapitulo } from '../../types/manga';
 
 // --- FUNCIONES DE ESTILO ---
 
@@ -29,6 +31,8 @@ const getTypeColor = (type: string) => {
 
 interface CarouselManga {
   id: string | number;
+  /** Serie a la que pertenece: evita que el mismo manga entre dos veces. */
+  seriesKey: string;
   title: string;
   coverImage: string;
   chapterNum: string | number;
@@ -48,6 +52,7 @@ const formatPopularItems = (mangasWP: any[]): CarouselManga[] =>
       const rawDate = popularChapter?.fecha || manga.rawFecha || manga.fecha;
       return {
         id: manga.id,
+        seriesKey: String(manga.eroSeri || manga.id),
         title: manga.titulo,
         coverImage: manga.portada,
         chapterNum: popularChapter ? popularChapter.numero : "—",
@@ -62,7 +67,7 @@ const mergePopularItems = (...groups: CarouselManga[][]): CarouselManga[] => {
   const merged: CarouselManga[] = [];
   for (const group of groups) {
     for (const manga of group) {
-      const key = String(manga.id);
+      const key = manga.seriesKey;
       if (seen.has(key)) continue;
       seen.add(key);
       merged.push(manga);
@@ -72,25 +77,40 @@ const mergePopularItems = (...groups: CarouselManga[][]): CarouselManga[] => {
   return merged;
 };
 
-export const PopularCarousel = () => {
+interface PopularCarouselProps {
+  /**
+   * Filtra los mangas antes de armar el carrusel. Se espera una función estable
+   * (definida a nivel de módulo): el efecto no la lleva en las dependencias.
+   */
+  filterMangas?: (items: MangaCapitulo[]) => MangaCapitulo[];
+}
+
+export const PopularCarousel = ({ filterMangas }: PopularCarouselProps = {}) => {
   const { popularWeekly, popularHistorical, latestWomen, isReady } = useHomeData();
   const [items, setItems] = useState<CarouselManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
   const [isTouchPaused, setIsTouchPaused] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const sequenceRef = useRef<HTMLDivElement>(null);
+  // Con pocos mangas la cinta no da la vuelta: se muestran una sola vez y
+  // quietos, en vez de repetir la misma portada para rellenar el ancho.
+  const [fillsViewport, setFillsViewport] = useState(true);
 
   const [activeFilter, setActiveFilter] = useState("Semanal");
 
   const filters = ["Semanal", "Mensual", "Histórico"];
 
+  /* La pestaña "Mensual" solo hace falta si el usuario la pulsa: se adelanta en
+     un hueco libre para no robarle ancho de banda al carrusel que ya está a la vista. */
   useEffect(() => {
     if (!isReady) return;
-    void (async () => {
-      const warmedPeriods = await Promise.all([
-        getPopularWomenByViews('monthly', false),
-      ]);
-      await preloadImages(warmedPeriods.flat().slice(0, 24).map(manga => manga.portada));
-    })();
+    return whenIdle(() => {
+      void (async () => {
+        const monthly = await getPopularWomenByViews('monthly', false);
+        await preloadImages(monthly.slice(0, 12).map(manga => manga.portada));
+      })();
+    });
   }, [isReady]);
 
   useEffect(() => {
@@ -113,18 +133,23 @@ export const PopularCarousel = () => {
         const mangasWP = contextualMangas.length > 0
           ? contextualMangas
           : await getPopularWomenByViews(period, false);
+        const applyFilter = filterMangas ?? ((list: MangaCapitulo[]) => list);
         let nextItems = mergePopularItems(
-          formatPopularItems(mangasWP),
-          formatPopularItems(popularHistorical),
-          formatPopularItems(latestWomen),
+          formatPopularItems(applyFilter(mangasWP)),
+          formatPopularItems(applyFilter(popularHistorical)),
+          formatPopularItems(applyFilter(latestWomen)),
         );
 
         if (nextItems.length === 0) {
-          nextItems = formatPopularItems(await getUltimosCapitulos());
+          // Sin resultados en los rankings: se recurre a la biblioteca completa con el mismo filtro.
+          nextItems = formatPopularItems(applyFilter(await getUltimosCapitulos()));
         }
 
         if (nextItems.length > 0) {
-          await preloadImages(nextItems.map(manga => manga.coverImage));
+          // Solo las primeras tarjetas entran en pantalla; el resto va con
+          // `loading="lazy"` y no debe retrasar la aparición de la cinta.
+          await preloadImages(nextItems.slice(0, 5).map(manga => manga.coverImage));
+          void preloadImages(nextItems.slice(5).map(manga => manga.coverImage));
         }
         if (cancelled) return;
         if (nextItems.length > 0) {
@@ -146,11 +171,34 @@ export const PopularCarousel = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilter, isReady, popularWeekly.length, popularHistorical.length, latestWomen.length]);
 
+  useEffect(() => {
+    const measure = () => {
+      const viewport = viewportRef.current;
+      const sequence = sequenceRef.current;
+      // Sin medidas fiables se decide por cantidad: con menos de 8 portadas la
+      // cinta nunca llena el ancho en escritorio.
+      if (!viewport || !sequence || sequence.scrollWidth === 0) {
+        setFillsViewport(items.length >= 8);
+        return;
+      }
+      setFillsViewport(sequence.scrollWidth >= viewport.clientWidth);
+    };
+
+    measure();
+    // Segunda pasada por si las tarjetas terminan de asentar su ancho.
+    const timer = window.setTimeout(measure, 300);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', measure);
+    };
+  }, [items]);
+
   // La carga inicial queda cubierta por GlobalLoader y no dibuja moldes vacíos.
   const showSkeleton = loading && items.length === 0;
-  const marqueeItems = items.length === 0
-    ? []
-    : Array.from({ length: Math.max(12, items.length) }, (_, index) => items[index % items.length]);
+  // Cada manga aparece una sola vez por pasada; el bucle infinito lo da la
+  // segunda copia de la secuencia, no repetir títulos dentro de la lista.
+  const marqueeItems = items;
 
   return (
     <section className="home-popular relative w-full pb-0 group/section mt-0" aria-busy={filterLoading || showSkeleton}>
@@ -214,17 +262,25 @@ export const PopularCarousel = () => {
         <div className="relative min-h-[300px]">
             {!showSkeleton && (
             <div
+              ref={viewportRef}
               className="-mx-2 touch-pan-y overflow-hidden py-4"
               aria-label="Mangas populares en movimiento continuo"
               onTouchStart={() => setIsTouchPaused(true)}
               onTouchEnd={() => setIsTouchPaused(false)}
               onTouchCancel={() => setIsTouchPaused(false)}
             >
-                    <div className="home-popular-marquee-track" style={isTouchPaused ? { animationPlayState: 'paused' } : undefined}>
+                    <div
+                      className="home-popular-marquee-track"
+                      style={{
+                        ...(isTouchPaused ? { animationPlayState: 'paused' } : null),
+                        ...(fillsViewport ? null : { animation: 'none' }),
+                      }}
+                    >
                         {items.length > 0 ? (
-                          [0, 1].map((copyIndex) => (
+                          (fillsViewport ? [0, 1] : [0]).map((copyIndex) => (
                             <div
                               key={`popular-sequence-${copyIndex}`}
+                              ref={copyIndex === 0 ? sequenceRef : undefined}
                               className="home-popular-marquee-sequence"
                               aria-hidden={copyIndex === 1 ? true : undefined}
                             >
@@ -266,7 +322,7 @@ export const PopularCarousel = () => {
                                 >
                                     {/* IMAGEN + SHINE */}
                                     <div className="relative aspect-[3/4.2] w-full overflow-hidden transition-all duration-300 shine-effect">
-                                            <img src={manga.coverImage} alt={manga.title} className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105" loading="lazy" />
+                                            <img src={manga.coverImage} alt={`Portada del manga ${manga.title}`} className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105" loading="lazy" />
                                             
                                             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-black/40 to-transparent z-10" />
                                             

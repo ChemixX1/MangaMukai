@@ -3,8 +3,9 @@ import { X, Check, Crown, Headphones, Loader2, Star } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import subscriptionBg from "../../assets/modals/subscription-bg.webp";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../hooks/useTheme";
-import { startSubscriptionPayment } from "../../services/authService";
+import { getStoredToken, startSubscriptionPayment } from "../../services/authService";
 import { lockPageScroll } from "../../utils/scrollLock";
 import { preloadImages } from "../../utils/preloadImages";
 
@@ -15,6 +16,7 @@ interface SubscriptionModalProps {
 
 export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) => {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const isLightMode = theme === 'light';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,15 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
 
   const handleSubscription = async () => {
     if (loading) return;
+
+    // Sin sesión no hay pago posible: se pasa por el login y se vuelve aquí.
+    if (!getStoredToken()) {
+      handleClose();
+      navigate('/auth/login', {
+        state: { returnTo: `${window.location.pathname}${window.location.search}` },
+      });
+      return;
+    }
 
     setLoading(true);
     setError(null);

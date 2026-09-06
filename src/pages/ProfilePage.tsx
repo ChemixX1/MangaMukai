@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ProfileMotionBackdrop, type ProfileBackdropCover } from '../components/social';
+import { ProfilePostCard } from '../components/social/ProfilePostCard';
+import { MangaRecommendationSidebar, type RecommendationManga } from '../components/manga/MangaRecommendationSidebar';
+import { getUltimosCapitulos } from '../services/mangaService';
 import {
   Cake,
   CalendarDays,
@@ -19,13 +21,13 @@ import {
   Send,
   User,
   UserMinus,
+  UserPlus,
   Users,
   Video,
   X,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { getStoredToken, getStoredUser, updateStoredUser } from '../services/authService';
-import { getUltimosCapitulos } from '../services/mangaService';
 import {
   emptyFriendsOverview,
   getFriendsOverview,
@@ -42,7 +44,6 @@ import {
   type ProfilePost,
 } from '../services/profilePostService';
 import { finishGlobalLoading, startGlobalLoading } from '../utils/globalLoading';
-import { getSharedAuthCovers } from '../utils/authCoverCache';
 import {
   emptySocialLinks,
   getWordPressProfile,
@@ -88,37 +89,11 @@ const formatProfileDate = (value = '') => {
   return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
 };
 
-const formatPostDate = (value = '') => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Ahora';
-  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
-};
-
-const buildProfileCovers = (items: Awaited<ReturnType<typeof getUltimosCapitulos>>): ProfileBackdropCover[] => {
-  const seen = new Set<string>();
-  return items.reduce<ProfileBackdropCover[]>((result, manga) => {
-    const id = manga.eroSeri || manga.id;
-    const key = String(id);
-    if (!id || seen.has(key) || !manga.portada) return result;
-    seen.add(key);
-    result.push({
-      id,
-      title: manga.titulo,
-      cover: manga.portada,
-    });
-    return result;
-  }, []).slice(0, 10);
-};
-
-const getCachedProfileCovers = (): ProfileBackdropCover[] => (getSharedAuthCovers() || [])
-  .slice(0, 10)
-  .map((cover, index) => ({ id: `cached-profile-${index}`, title: cover.title, cover: cover.src }));
-
 const UserAvatar = ({ entry, size = 'h-10 w-10' }: { entry: FriendEntry; size?: string }) => entry.user.avatar_url
   ? <img src={entry.user.avatar_url} alt="" className={`${size} shrink-0 rounded-full object-cover ring-2 ring-[#FF4D88]/25`} />
   : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#FF4D88] text-sm font-black text-white`}>{entry.user.username.charAt(0).toUpperCase()}</span>;
 
-type ProfileSection = 'summary' | 'information' | 'friends';
+type ProfileSection = 'summary' | 'information' | 'friends' | 'requests';
 type PostMedia = { url: string; kind: 'image' | 'video'; name: string; file: File };
 
 export const ProfilePage = () => {
@@ -132,13 +107,15 @@ export const ProfilePage = () => {
   const [saving, setSaving] = useState(false);
   const [saveConfirmed, setSaveConfirmed] = useState(false);
   const [imageType, setImageType] = useState<'avatar' | 'banner' | null>(null);
+  const [avatarConfirmed, setAvatarConfirmed] = useState(false);
+  const [recommendations, setRecommendations] = useState<RecommendationManga[]>([]);
+  const avatarConfirmationRef = useRef<number | null>(null);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [actionId, setActionId] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState<ProfileSection>('summary');
   const [postText, setPostText] = useState('');
   const [postMedia, setPostMedia] = useState<PostMedia | null>(null);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
-  const [backgroundCovers, setBackgroundCovers] = useState<ProfileBackdropCover[]>(getCachedProfileCovers);
   const [publishing, setPublishing] = useState(false);
   const avatarRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
@@ -147,6 +124,14 @@ export const ProfilePage = () => {
   const postMediaUrlsRef = useRef(new Set<string>());
   const saveConfirmationRef = useRef<number | null>(null);
   const user = useMemo(() => getStoredUser(), []);
+
+  useEffect(() => {
+    let active = true;
+    void getUltimosCapitulos().then(items => {
+      if (active) setRecommendations(items.slice(0, 8).map(item => ({ id: item.id, titulo: item.titulo, portada: item.portada })));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!user || !getStoredToken()) {
@@ -160,11 +145,7 @@ export const ProfilePage = () => {
       getWordPressProfile(user),
       getFriendsOverview().catch(() => emptyFriendsOverview()),
       getProfilePosts(user.id).catch(() => []),
-      getUltimosCapitulos()
-        .then((items) => buildProfileCovers(items))
-        .then((covers) => covers.length > 0 ? covers : getCachedProfileCovers())
-        .catch(getCachedProfileCovers),
-    ]).then(([loadedProfile, loadedFriends, loadedPosts, loadedBackgroundCovers]) => {
+    ]).then(([loadedProfile, loadedFriends, loadedPosts]) => {
       if (!active) return;
       setProfile(loadedProfile);
       updateStoredUser({
@@ -174,7 +155,6 @@ export const ProfilePage = () => {
       });
       setFriends(loadedFriends);
       setPosts(loadedPosts);
-      setBackgroundCovers(loadedBackgroundCovers);
     }).catch(() => {
       if (!active) return;
       setProfile(fallbackProfile(user.username, user.avatar || ''));
@@ -195,6 +175,7 @@ export const ProfilePage = () => {
     postMediaUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     postMediaUrlsRef.current.clear();
     if (saveConfirmationRef.current) window.clearTimeout(saveConfirmationRef.current);
+    if (avatarConfirmationRef.current) window.clearTimeout(avatarConfirmationRef.current);
   }, []);
 
   const reloadFriends = async () => setFriends(await getFriendsOverview());
@@ -208,12 +189,19 @@ export const ProfilePage = () => {
     const preview = URL.createObjectURL(file);
     setProfile((current) => ({ ...current, [field]: preview }));
     setImageType(type);
+    if (type === 'avatar') {
+      setAvatarConfirmed(false);
+      if (avatarConfirmationRef.current) window.clearTimeout(avatarConfirmationRef.current);
+    }
     setNotice(null);
     try {
       const result = await uploadWordPressProfileImage(file, type);
       if (!result.success) throw new Error(result.message);
       setProfile((current) => ({ ...current, [field]: result.url }));
-      setNotice({ type: 'success', text: type === 'avatar' ? 'Foto actualizada en todo MangaMukai.' : 'Portada actualizada.' });
+      if (type === 'avatar') {
+        setAvatarConfirmed(true);
+        avatarConfirmationRef.current = window.setTimeout(() => setAvatarConfirmed(false), 1400);
+      } else setNotice({ type: 'success', text: 'Portada actualizada.' });
     } catch (caught) {
       setProfile((current) => ({ ...current, [field]: previous }));
       setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo subir la imagen.' });
@@ -331,6 +319,19 @@ export const ProfilePage = () => {
     ? 'border-black/[0.08] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
     : 'border-white/[0.08] bg-[#242526] shadow-[0_1px_2px_rgba(0,0,0,0.45)]';
   const joined = new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(new Date(profile.created_at));
+  const configuredSocials = SOCIAL_FIELDS.filter((field) => profile.social_links[field.key]);
+
+  // Mosaico 3x2: portada del amigo con su nombre sobre una sombra interior que lo mantiene legible.
+  const renderFriendTile = (entry: FriendEntry) => (
+    <Link key={entry.user.id} to={`/usuarios/${entry.user.id}`} title={entry.user.username} className="group relative block aspect-square overflow-hidden rounded-lg">
+      {entry.user.avatar_url
+        ? <img src={entry.user.avatar_url} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        : <span className="flex h-full w-full items-center justify-center bg-[#FF4D88] text-2xl font-black text-white">{entry.user.username.charAt(0).toUpperCase()}</span>}
+      <span className={`pointer-events-none absolute inset-0 flex items-end p-1.5 ${isLight ? 'shadow-[inset_0_-34px_26px_-14px_rgba(255,255,255,0.96)]' : 'shadow-[inset_0_-34px_26px_-14px_rgba(0,0,0,0.94)]'}`}>
+        <span className={`w-full truncate text-[11px] font-bold leading-tight ${isLight ? 'text-black' : 'text-white'}`}>{entry.user.username}</span>
+      </span>
+    </Link>
+  );
 
   return (
     <main className={`min-h-screen pb-24 transition-colors ${isLight ? 'bg-[#f0f2f5] text-[#1c1e21]' : 'bg-[#18191a] text-white'}`}>
@@ -362,7 +363,7 @@ export const ProfilePage = () => {
                 <div className={`h-32 w-32 overflow-hidden rounded-full border-[5px] shadow-lg sm:h-40 sm:w-40 ${isLight ? 'border-white bg-zinc-100' : 'border-[#242526] bg-zinc-900'}`}>
                   {profile.avatar_url ? <img src={profile.avatar_url} alt="Tu avatar" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center"><User size={52} className={isLight ? 'text-black/20' : 'text-white/20'} /></span>}
                 </div>
-                <button type="button" onClick={() => avatarRef.current?.click()} disabled={imageType === 'avatar'} aria-label="Cambiar foto de perfil" className={`absolute bottom-1 right-1 flex h-10 w-10 items-center justify-center rounded-full border shadow-md transition hover:bg-[#FF4D88] hover:text-white ${isLight ? 'border-white bg-[#e4e6eb] text-black' : 'border-[#242526] bg-[#3a3b3c] text-white'}`}>{imageType === 'avatar' ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}</button>
+                <button type="button" onClick={() => avatarRef.current?.click()} disabled={imageType === 'avatar'} aria-label={avatarConfirmed ? 'Foto actualizada' : 'Cambiar foto de perfil'} className={`absolute bottom-1 right-1 flex h-10 w-10 items-center justify-center rounded-full border shadow-md transition hover:bg-[#FF4D88] hover:text-white ${isLight ? 'border-white bg-[#e4e6eb] text-black' : 'border-[#242526] bg-[#3a3b3c] text-white'}`}>{imageType === 'avatar' ? <Loader2 size={18} className="animate-spin" /> : avatarConfirmed ? <Check size={21} strokeWidth={3} className="text-[#FF4D88]" /> : <Camera size={18} />}</button>
                 <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={(event) => void handleImage(event, 'avatar')} />
               </div>
 
@@ -401,16 +402,46 @@ export const ProfilePage = () => {
               <button type="button" onClick={() => setActiveSection('summary')} aria-current={activeSection === 'summary' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'summary' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Resumen</button>
               <button type="button" onClick={() => setActiveSection('information')} aria-current={activeSection === 'information' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'information' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Información</button>
               <button type="button" onClick={() => setActiveSection('friends')} aria-current={activeSection === 'friends' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'friends' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Amigos <span className="ml-2 rounded-full bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] text-[#FF4D88]">{friends.friends.length}</span></button>
+              <button type="button" onClick={() => setActiveSection('requests')} aria-current={activeSection === 'requests' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'requests' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Solicitudes{friends.incoming.length > 0 && <span className="ml-2 rounded-full bg-[#FF4D88] px-2 py-0.5 text-[10px] font-black text-white">{friends.incoming.length}</span>}</button>
             </div>
           </div>
         </div>
       </section>
 
       <div className="relative isolate min-h-[680px] overflow-hidden">
-        <ProfileMotionBackdrop covers={backgroundCovers} isLight={isLight} />
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 xl:max-w-[1360px]">
         {notice && <p className={`mb-5 rounded-lg border px-4 py-3 text-xs font-semibold ${notice.type === 'success' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500' : 'border-red-500/20 bg-red-500/10 text-red-400'}`}>{notice.text}</p>}
 
+        <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start xl:grid-cols-[320px_minmax(0,1fr)_320px]">
+          {/* Columna izquierda: quién eres y tu círculo. En móvil va primero, como en Facebook. */}
+          <aside className="order-1 flex flex-col gap-4 lg:col-start-1 lg:row-start-1" aria-label="Presentación y amigos">
+            <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-intro-title">
+              <h2 id="profile-intro-title" className="text-lg font-bold">Presentación</h2>
+              <p className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 ${muted}`}>{profile.bio || 'Cuéntale a la comunidad un poco sobre ti.'}</p>
+              {profile.location && <p className="mt-3 flex items-center gap-2 text-sm"><MapPin size={16} />{profile.location}</p>}
+              {configuredSocials.length > 0 && (
+                <div className={`mt-4 flex flex-wrap gap-2 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
+                  {configuredSocials.map((field) => field.key === 'discord' && !profile.social_links[field.key].startsWith('http')
+                    ? <span key={field.key} className={`rounded-lg px-3 py-2 text-xs font-bold ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}: {profile.social_links[field.key]}</span>
+                    : <a key={field.key} href={profile.social_links[field.key]} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors hover:text-[#FF4D88] ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}</a>)}
+                </div>
+              )}
+            </section>
+
+
+            <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-friends-preview">
+              <div className="flex items-center justify-between">
+                <h2 id="profile-friends-preview" className="text-lg font-bold">Amigos</h2>
+                <button type="button" onClick={() => setActiveSection('friends')} className="text-xs font-semibold text-[#FF4D88]">Ver todos</button>
+              </div>
+              <p className={`mb-3 text-xs ${muted}`}>{friends.friends.length} {friends.friends.length === 1 ? 'amigo' : 'amigos'}</p>
+              {friends.friends.length === 0
+                ? <p className={`text-xs ${muted}`}>Aún no tienes amigos. Envía solicitudes desde el perfil de otros lectores.</p>
+                : <div className="grid grid-cols-3 gap-2">{friends.friends.slice(0, 6).map(renderFriendTile)}</div>}
+            </section>
+          </aside>
+
+          <div className="order-2 min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:row-span-1">
         {activeSection === 'summary' && (
           <div className="mx-auto max-w-3xl">
             <div className="space-y-4">
@@ -444,19 +475,7 @@ export const ProfilePage = () => {
             </section>
 
             {posts.map((post) => (
-              <article key={post.id} className={`overflow-hidden rounded-xl border ${card}`}>
-                <div className="flex items-center gap-3 p-4">
-                  <div className={`h-11 w-11 shrink-0 overflow-hidden rounded-full ${isLight ? 'bg-[#e4e6eb]' : 'bg-[#3a3b3c]'}`}>
-                    {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center"><User size={19} className={muted} /></span>}
-                  </div>
-                  <div><h3 className="text-sm font-black">{post.author?.username || profile.username}</h3><time dateTime={post.created_at} className={`text-[10px] ${muted}`}>{formatPostDate(post.created_at)} · Perfil Mukai</time></div>
-                </div>
-                {post.content && <p className="whitespace-pre-wrap px-4 pb-4 text-sm leading-6">{post.content}</p>}
-                {post.media_url && (post.media_type === 'image'
-                  ? <img src={post.media_url} alt="Contenido de la publicación" className="max-h-[620px] w-full border-t border-current/10 object-contain" />
-                  : <video src={post.media_url} controls preload="metadata" className="max-h-[620px] w-full border-t border-current/10 bg-black object-contain" />)}
-                <div className={`mx-4 flex h-10 items-center border-t text-[10px] font-semibold ${muted} ${isLight ? 'border-black/10' : 'border-white/10'}`}>Publicado en tu perfil</div>
-              </article>
+              <ProfilePostCard key={post.id} initialPost={post} isLight={isLight} onShared={shared => setPosts(current => [shared, ...current.filter(item => item.id !== shared.id)])} />
             ))}
 
             {posts.length === 0 && <div className={`rounded-xl border border-dashed py-12 text-center ${isLight ? 'border-black/15 bg-white/45' : 'border-white/15 bg-white/[0.025]'}`}><ImageIcon size={30} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">Comparte tu primera actualización</p><p className={`mt-1 text-xs ${muted}`}>Publica una idea, una imagen o un video para tu comunidad.</p></div>}
@@ -466,7 +485,7 @@ export const ProfilePage = () => {
         )}
 
         {activeSection === 'information' && (
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
+          <div className="grid items-start gap-4">
             <article className={`rounded-xl border p-5 ${card}`}>
               <h2 className="text-xl font-black tracking-tight">Presentación</h2>
               {editing ? <><input value={profile.location} maxLength={80} onChange={(event) => setProfile((current) => ({ ...current, location: event.target.value }))} placeholder="Ciudad o país" className={`mt-4 w-full rounded-lg border px-4 py-3 text-sm outline-none focus:border-[#FF4D88]/60 ${input}`} /><textarea value={profile.bio} maxLength={800} onChange={(event) => setProfile((current) => ({ ...current, bio: event.target.value }))} placeholder="Cuéntale a la comunidad qué mangas te gustan..." className={`mt-3 min-h-36 w-full resize-none rounded-lg border px-4 py-3 text-sm leading-6 outline-none focus:border-[#FF4D88]/60 ${input}`} /></> : <p className={`mt-3 whitespace-pre-wrap text-sm leading-6 ${isLight ? 'text-black/70' : 'text-white/70'}`}>{profile.bio || 'Añade una descripción para que otros lectores te conozcan.'}</p>}
@@ -510,14 +529,58 @@ export const ProfilePage = () => {
           <section className={`mx-auto max-w-5xl rounded-xl border p-5 ${card}`} aria-labelledby="profile-friends-title">
               <div className="flex items-center justify-between"><div><h2 id="profile-friends-title" className="text-xl font-black tracking-tight">Amigos</h2><p className={`mt-0.5 text-xs ${muted}`}>Tu comunidad de lectura</p></div><span className="grid h-10 min-w-10 place-items-center rounded-full bg-[#FF4D88]/10 px-3 text-xs font-black text-[#FF4D88]">{friends.friends.length}</span></div>
 
-              {friends.incoming.length > 0 && <div className="mt-5"><h3 className={`mb-2 text-[10px] font-black uppercase tracking-wider ${muted}`}>Solicitudes recibidas</h3><div className="space-y-2">{friends.incoming.map((entry) => <div key={entry.request_id} className={`flex items-center gap-3 rounded-lg p-2.5 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><Link to={`/usuarios/${entry.user.id}`}><UserAvatar entry={entry} /></Link><Link to={`/usuarios/${entry.user.id}`} className="min-w-0 flex-1 truncate text-sm font-bold hover:text-[#FF4D88]">{entry.user.username}</Link><button type="button" onClick={() => void handleRequest(entry.request_id, 'accept')} disabled={actionId === entry.request_id} aria-label="Aceptar" className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FF4D88] text-white"><Check size={15} /></button><button type="button" onClick={() => void handleRequest(entry.request_id, 'reject')} disabled={actionId === entry.request_id} aria-label="Rechazar" className={`flex h-9 w-9 items-center justify-center rounded-lg ${isLight ? 'bg-[#e4e6eb] text-black' : 'bg-[#4e4f50] text-white'}`}><X size={15} /></button></div>)}</div></div>}
 
               <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{friends.friends.map((entry) => <div key={entry.user.id} className={`group flex items-center gap-3 rounded-lg p-3 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><Link to={`/usuarios/${entry.user.id}`}><UserAvatar entry={entry} size="h-12 w-12" /></Link><Link to={`/usuarios/${entry.user.id}`} className="min-w-0 flex-1 truncate text-sm font-bold hover:text-[#FF4D88]">{entry.user.username}</Link><button type="button" onClick={() => openChat(entry.user)} aria-label={`Chatear con ${entry.user.username}`} className="flex h-8 w-8 items-center justify-center rounded-full text-[#FF4D88] hover:bg-[#FF4D88]/10"><MessageCircle size={16} /></button><button type="button" onClick={() => void handleRemove(entry)} disabled={actionId === entry.user.id} aria-label="Eliminar amistad" className={`flex h-8 w-8 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${isLight ? 'text-black/35 hover:bg-red-500/10 hover:text-red-500' : 'text-white/30 hover:bg-red-500/10 hover:text-red-400'}`}><UserMinus size={14} /></button></div>)}</div>
               {friends.friends.length === 0 && <div className={`mt-5 rounded-xl border border-dashed py-16 text-center ${isLight ? 'border-black/15 bg-[#f7f8fa]' : 'border-white/15 bg-white/[0.025]'}`}><Users size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">Tu lista está vacía</p><p className={`mx-auto mt-1 max-w-sm text-xs leading-relaxed ${muted}`}>Las solicitudes se envían desde el perfil público de cada lector.</p></div>}
 
-              {friends.outgoing.length > 0 && <div className={`mt-5 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}><h3 className={`mb-2 text-[10px] font-black uppercase tracking-wider ${muted}`}>Solicitudes enviadas</h3><div className="flex flex-wrap gap-2">{friends.outgoing.map((entry) => <div key={entry.request_id} className={`flex items-center overflow-hidden rounded-full pl-2 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><Link to={`/usuarios/${entry.user.id}`} className="flex items-center gap-2 py-1.5 pl-1 text-[10px] font-bold hover:text-[#FF4D88]"><UserAvatar entry={entry} size="h-5 w-5" />{entry.user.username}</Link><button type="button" onClick={() => void handleCancelRequest(entry)} disabled={actionId === entry.request_id} aria-label={`Cancelar solicitud a ${entry.user.username}`} title="Cancelar solicitud" className={`ml-1 flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]' : 'text-white/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]'}`}>{actionId === entry.request_id ? <Loader2 size={13} className="animate-spin" /> : <X size={14} />}</button></div>)}</div></div>}
             </section>
         )}
+
+        {activeSection === 'requests' && (
+          <section className={`mx-auto max-w-3xl rounded-xl border p-5 ${card}`} aria-labelledby="profile-requests-title">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 id="profile-requests-title" className="flex items-center gap-2 text-xl font-black tracking-tight"><UserPlus size={20} className="text-[#FF4D88]" />Solicitudes</h2>
+                <p className={`mt-0.5 text-xs ${muted}`}>Personas que quieren ser tus amigos.</p>
+              </div>
+              <span className="grid h-10 min-w-10 place-items-center rounded-full bg-[#FF4D88]/10 px-3 text-xs font-black text-[#FF4D88]">{friends.incoming.length}</span>
+            </div>
+
+            {friends.incoming.length === 0
+              ? <div className={`mt-5 rounded-xl border border-dashed py-16 text-center ${isLight ? 'border-black/15 bg-[#f7f8fa]' : 'border-white/15 bg-white/[0.025]'}`}><UserPlus size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">No tienes solicitudes pendientes</p><p className={`mx-auto mt-1 max-w-sm text-xs leading-relaxed ${muted}`}>Cuando alguien te envíe una solicitud aparecerá aquí para que la aceptes o la rechaces.</p></div>
+              : <div className="mt-5 space-y-2">
+                  {friends.incoming.map((entry) => (
+                    <div key={entry.request_id} className={`flex items-center gap-3 rounded-lg p-3 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>
+                      <Link to={`/usuarios/${entry.user.id}`}><UserAvatar entry={entry} size="h-12 w-12" /></Link>
+                      <Link to={`/usuarios/${entry.user.id}`} className="min-w-0 flex-1 truncate text-sm font-bold hover:text-[#FF4D88]">{entry.user.username}</Link>
+                      <button type="button" onClick={() => void handleRequest(entry.request_id, 'accept')} disabled={actionId === entry.request_id} className="flex h-10 items-center gap-2 rounded-lg bg-[#FF4D88] px-4 text-xs font-black text-white disabled:opacity-50">{actionId === entry.request_id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}<span className="hidden sm:inline">Aceptar</span></button>
+                      <button type="button" onClick={() => void handleRequest(entry.request_id, 'reject')} disabled={actionId === entry.request_id} className={`flex h-10 items-center gap-2 rounded-lg px-4 text-xs font-black disabled:opacity-50 ${isLight ? 'bg-[#e4e6eb] text-black hover:bg-[#d8dadf]' : 'bg-[#4e4f50] text-white hover:bg-[#5a5b5c]'}`}><X size={15} /><span className="hidden sm:inline">Rechazar</span></button>
+                    </div>
+                  ))}
+                </div>}
+
+            {friends.outgoing.length > 0 && (
+              <div className={`mt-6 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
+                <h3 className={`mb-2 text-[10px] font-black uppercase tracking-wider ${muted}`}>Solicitudes enviadas</h3>
+                <div className="flex flex-wrap gap-2">
+                  {friends.outgoing.map((entry) => (
+                    <div key={entry.request_id} className={`flex items-center overflow-hidden rounded-full pl-2 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>
+                      <Link to={`/usuarios/${entry.user.id}`} className="flex items-center gap-2 py-1.5 pl-1 text-[11px] font-bold hover:text-[#FF4D88]"><UserAvatar entry={entry} size="h-6 w-6" />{entry.user.username}</Link>
+                      <button type="button" onClick={() => void handleCancelRequest(entry)} disabled={actionId === entry.request_id} aria-label={`Cancelar solicitud a ${entry.user.username}`} title="Cancelar solicitud" className={`ml-1 flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]' : 'text-white/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]'}`}>{actionId === entry.request_id ? <Loader2 size={13} className="animate-spin" /> : <X size={14} />}</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+          </div>
+
+          {/* Columna derecha: recomendaciones. En movil cierran el muro. */}
+          <aside className="order-3 flex flex-col gap-4 lg:col-start-1 lg:row-start-2 xl:col-start-3 xl:row-start-1" aria-label="Mangas recomendados">
+            <MangaRecommendationSidebar items={recommendations} isLight={isLight} title="Mangas recomendados" compactDesktop />
+          </aside>
+        </div>
         </div>
       </div>
     </main>

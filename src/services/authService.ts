@@ -129,6 +129,7 @@ const clearIfUnauthorized = (res: Response): boolean => {
 export const refreshUser = async (): Promise<MMUser | null> => {
   const token = getStoredToken();
   if (!token) return null;
+  const initialAvatar = getStoredUser()?.avatar;
 
   try {
     const res = await fetch(`${WP_AUTH}/me`, {
@@ -139,9 +140,13 @@ export const refreshUser = async (): Promise<MMUser | null> => {
     if (clearIfUnauthorized(res)) return null;
 
     const data = await readJson<any>(res);
+    if (getStoredToken() !== token) return null;
     if (data?.success && data.user) {
+      const latest = getStoredUser();
       const user = {
         ...data.user,
+        // A profile upload that finished during this request must win the race.
+        ...(latest?.avatar !== initialAvatar ? { avatar: latest?.avatar } : {}),
         isPremium: !!(data.user.isPremium || data.user.is_premium),
         premiumExpiry: data.user.premiumExpiry ?? data.user.premium_expiry ?? null,
       };

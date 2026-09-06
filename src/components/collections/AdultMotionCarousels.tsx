@@ -3,7 +3,9 @@ import { Bookmark, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useSavedMangas } from '../../hooks/useSavedMangas';
 import type { MangaCapitulo } from '../../types/manga';
+import { allMangaTags } from '../../utils/collectionTags';
 
 const cleanTitle = (value = '') => value
   .replace(/[-–]?\s*(Capitulo|Capítulo|Chapter|Volumen|Episodio)\s*\d+.*$/i, '')
@@ -36,7 +38,8 @@ export function AdultHeroCoverflow({
 }: AdultHeroCoverflowProps) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  // Guardado real: mismo estado que la ficha y la página de guardados.
+  const { isSaved, toggle: toggleSaved } = useSavedMangas();
   const [isCompact, setIsCompact] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches);
   const active = items[activeIndex];
 
@@ -53,7 +56,8 @@ export function AdultHeroCoverflow({
   const title = cleanTitle(active.titulo);
   const description = cleanDescription(title, active.descripcion)
     || 'Una historia intensa de romance, deseo y fantasía seleccionada para lectores adultos.';
-  const tags = (active.genres?.length ? active.genres : [active.tipo || 'Manga']).slice(0, 4);
+  const tags = allMangaTags(active, 'adult');
+  const isBookmarked = isSaved(active.id);
 
   return (
     <div className="desktop-content-shell relative z-10 mx-auto flex min-h-[960px] w-full max-w-[1500px] flex-col px-5 pb-14 pt-28 sm:px-8 lg:min-h-[850px] lg:px-16 lg:pb-10 lg:pt-24">
@@ -91,10 +95,10 @@ export function AdultHeroCoverflow({
                 }}
                 transition={{ type: 'spring', stiffness: 195, damping: 25, mass: 0.9 }}
                 style={{ pointerEvents: distance <= 2 ? 'auto' : 'none' }}
-                className={`group relative h-full w-full overflow-hidden rounded-[24px] border text-left ${isActive ? 'cursor-grab shadow-[0_28px_85px_rgba(255,77,136,0.3)] active:cursor-grabbing' : 'cursor-pointer'} ${isLight ? 'border-black/12 bg-white' : 'border-white/15 bg-[#13060c]'}`}
+                className={`group relative h-full w-full overflow-hidden rounded-[24px] border text-left ${isActive ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${isLight ? 'border-black/12 bg-white' : 'border-white/15 bg-[#13060c]'}`}
                 aria-label={isActive ? `Leer ${cleanTitle(manga.titulo)}` : `Mostrar ${cleanTitle(manga.titulo)}`}
               >
-                <img src={manga.portada} alt={cleanTitle(manga.titulo)} draggable={false} className="h-full w-full select-none object-cover transition-transform duration-500 group-hover:scale-105" />
+                <img src={manga.portada} alt={`Portada del manga ${cleanTitle(manga.titulo)}`} draggable={false} className="h-full w-full select-none object-cover transition-transform duration-500 group-hover:scale-105" />
                 <span className="absolute inset-0 bg-gradient-to-t from-black via-black/5 to-transparent" />
               </motion.button>
             </div>
@@ -110,21 +114,25 @@ export function AdultHeroCoverflow({
       </div>
 
       <AnimatePresence mode="wait" initial={false}>
+        {/* La ficha acompaña al giro con un fundido plano, sin saltos verticales. */}
         <motion.div
           key={active.id}
-          initial={{ opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -14 }}
-          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.26, ease: 'easeOut' }}
           className={`mx-auto mt-4 grid w-full max-w-[1160px] gap-6 rounded-[24px] border p-6 backdrop-blur-xl lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:gap-9 ${isLight ? 'border-black/10 bg-white/65' : 'border-white/10 bg-black/45'}`}
         >
           <div className="min-w-0">
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className="bg-[#FF4D88] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white">Mangas para hombres +19</span>
+              <span className="bg-[#FF4D88] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white">Mangas para mujeres +19</span>
             </div>
-            <h1 className="line-clamp-3 text-[clamp(1.3rem,2.2vw,2.25rem)] font-black uppercase italic leading-[0.98] tracking-[-0.04em]">{title}</h1>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {tags.map((tag) => <span key={tag} className={`border px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] ${isLight ? 'border-black/15 bg-white/45 text-black/70' : 'border-white/15 bg-white/[0.05] text-white/70'}`}>{tag}</span>)}
+            <h2 className="line-clamp-3 text-[clamp(1.3rem,2.2vw,2.25rem)] font-black uppercase italic leading-[0.98] tracking-[-0.04em]">{title}</h2>
+            {/* Todas las etiquetas en una sola fila: en móvil se desplaza; en
+                escritorio las que no caben saltan a una segunda fila que queda
+                recortada, así nunca se ve una etiqueta cortada a la mitad. */}
+            <div className="manga-tag-row mt-5 flex flex-nowrap gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:max-h-[30px] sm:flex-wrap sm:overflow-hidden">
+              {tags.map((tag) => <span key={tag} className={`shrink-0 whitespace-nowrap border px-3 py-1.5 text-[9px] font-black uppercase leading-[13px] tracking-[0.14em] ${isLight ? 'border-black/15 bg-white/45 text-black/70' : 'border-white/15 bg-white/[0.05] text-white/70'}`}>{tag}</span>)}
             </div>
           </div>
 
@@ -135,9 +143,10 @@ export function AdultHeroCoverflow({
               <h2 className={`text-[12px] font-black uppercase tracking-[0.18em] ${isLight ? 'text-black' : 'text-white'}`}>Sinopsis</h2>
             </div>
             <p className={`line-clamp-4 text-justify text-[14px] font-medium leading-7 sm:text-[15px] ${isLight ? 'text-black/70' : 'text-white/75'}`}>{description}</p>
-            <div className="mt-auto flex flex-wrap justify-start gap-3 pt-6">
-              <button type="button" onClick={() => navigate(`/manga/${active.id}`)} className="flex h-12 items-center gap-2 rounded-[7px] bg-[#FF4D88] px-6 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black"><Play size={15} fill="currentColor" /> Leer ahora</button>
-              <button type="button" onClick={() => setIsBookmarked((current) => !current)} className={`flex h-12 items-center gap-2 rounded-[7px] border px-6 text-[11px] font-black uppercase tracking-[0.14em] transition ${isBookmarked ? 'border-[#FF4D88] bg-[#FF4D88]/15 text-[#FF4D88]' : isLight ? 'border-black/20 bg-white/50 text-black hover:border-[#FF4D88]' : 'border-white/20 bg-black/25 text-white hover:border-[#FF4D88]'}`}><Bookmark size={15} fill={isBookmarked ? 'currentColor' : 'none'} /> {isBookmarked ? 'Guardado' : 'Guardar'}</button>
+            {/* En móvil los dos botones comparten fila repartiéndose el ancho. */}
+            <div className="mt-auto flex flex-nowrap items-center justify-start gap-3 pt-6">
+              <button type="button" onClick={() => navigate(`/manga/${active.id}`)} className="flex h-12 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[7px] bg-[#FF4D88] px-4 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-white hover:text-black sm:flex-none sm:px-6"><Play size={15} fill="currentColor" /> Leer ahora</button>
+              <button type="button" onClick={() => void toggleSaved(active.id)} className={`flex h-12 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[7px] border px-4 text-[11px] font-black uppercase tracking-[0.14em] transition sm:flex-none sm:px-6 ${isBookmarked ? 'border-[#FF4D88] bg-[#FF4D88]/15 text-[#FF4D88]' : isLight ? 'border-black/20 bg-white/50 text-black hover:border-[#FF4D88]' : 'border-white/20 bg-black/25 text-white hover:border-[#FF4D88]'}`}><Bookmark size={15} fill={isBookmarked ? 'currentColor' : 'none'} /> {isBookmarked ? 'Guardado' : 'Guardar'}</button>
             </div>
           </div>
         </motion.div>

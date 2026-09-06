@@ -12,17 +12,15 @@ import {
   Phone,
   User,
   UserPlus,
-  Video,
   X,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { ProfileMotionBackdrop, type ProfileBackdropCover } from '../components/social';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { ProfilePostCard } from '../components/social/ProfilePostCard';
 import { getStoredToken, getStoredUser } from '../services/authService';
 import { removeFriend, respondFriendRequest, sendFriendRequest } from '../services/friendsService';
-import { getUltimosCapitulos } from '../services/mangaService';
 import { getPublicProfile, openChat, type PublicProfile } from '../services/socialService';
 import { finishGlobalLoading, startGlobalLoading } from '../utils/globalLoading';
-import { getSharedAuthCovers } from '../utils/authCoverCache';
 
 const SOCIAL_LABELS: Record<string, string> = {
   facebook: 'Facebook',
@@ -37,40 +35,12 @@ const SOCIAL_LABELS: Record<string, string> = {
 
 type PublicProfileSection = 'summary' | 'information';
 
-const buildProfileCovers = (items: Awaited<ReturnType<typeof getUltimosCapitulos>>): ProfileBackdropCover[] => {
-  const seen = new Set<string>();
-  return items.reduce<ProfileBackdropCover[]>((result, manga) => {
-    const id = manga.eroSeri || manga.id;
-    const key = String(id);
-    if (!id || seen.has(key) || !manga.portada) return result;
-    seen.add(key);
-    result.push({ id, title: manga.titulo, cover: manga.portada });
-    return result;
-  }, []).slice(0, 10);
-};
-
-const getCachedProfileCovers = (): ProfileBackdropCover[] => (getSharedAuthCovers() || [])
-  .slice(0, 10)
-  .map((cover, index) => ({ id: `cached-public-profile-${index}`, title: cover.title, cover: cover.src }));
-
 const formatProfileDate = (value: string) => {
   if (!value) return '';
   const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.getTime())
     ? value
     : new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
-};
-
-const formatPostDate = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat('es-PE', {
-      day: 'numeric',
-      month: 'short',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(date);
 };
 
 export const PublicProfilePage = () => {
@@ -80,11 +50,12 @@ export const PublicProfilePage = () => {
   const isLight = theme === 'light';
   const currentUser = getStoredUser();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [backgroundCovers, setBackgroundCovers] = useState<ProfileBackdropCover[]>(getCachedProfileCovers);
   const [activeSection, setActiveSection] = useState<PublicProfileSection>('summary');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+
+  useDocumentTitle(profile ? `Perfil de ${profile.username}` : undefined);
 
   const load = useCallback(async (showPageLoading = false) => {
     if (showPageLoading) setLoading(true);
@@ -102,13 +73,7 @@ export const PublicProfilePage = () => {
     const loadingScope = `public-profile:${id}`;
     setActiveSection('summary');
     startGlobalLoading(14, loadingScope);
-    void Promise.all([
-      load(true),
-      getUltimosCapitulos()
-        .then((items) => buildProfileCovers(items))
-        .then((covers) => setBackgroundCovers(covers.length > 0 ? covers : getCachedProfileCovers()))
-        .catch(() => setBackgroundCovers(getCachedProfileCovers())),
-    ]).finally(() => finishGlobalLoading(loadingScope));
+    void load(true).finally(() => finishGlobalLoading(loadingScope));
     return () => finishGlobalLoading(loadingScope);
   }, [id, load]);
 
@@ -282,7 +247,6 @@ export const PublicProfilePage = () => {
       </section>
 
       <div className="relative isolate min-h-[680px] overflow-hidden">
-        <ProfileMotionBackdrop covers={backgroundCovers} isLight={isLight} />
         <div className="relative z-10 mx-auto max-w-6xl px-3 py-4 sm:px-6">
         {error && (
           <p className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-500">{error}</p>
@@ -345,36 +309,7 @@ export const PublicProfilePage = () => {
                   <p className={`mt-1 text-sm ${secondaryText}`}>Cuando {profile.username} publique algo, aparecerá aquí.</p>
                 </div>
               ) : profile.posts.map((post) => (
-                <article key={post.id} className={`overflow-hidden rounded-xl border ${cardClass}`}>
-                  <header className="flex items-center gap-3 px-4 pb-3 pt-4">
-                    <div className={`flex h-10 w-10 shrink-0 overflow-hidden rounded-full ${isLight ? 'bg-zinc-100' : 'bg-zinc-900'}`}>
-                      {post.author.avatar_url ? (
-                        <img src={post.author.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <User size={18} className={`m-auto ${isLight ? 'text-black/25' : 'text-white/25'}`} />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{post.author.username}</p>
-                      <p className={`text-xs ${secondaryText}`}>{formatPostDate(post.created_at)} · Perfil Mukai</p>
-                    </div>
-                    {post.media_type === 'video' ? <Video size={18} className="text-[#FF4D88]" />
-                      : post.media_type === 'image' ? <ImageIcon size={18} className="text-[#FF4D88]" />
-                        : null}
-                  </header>
-
-                  {post.content && (
-                    <p className={`whitespace-pre-wrap px-4 pb-4 text-[15px] leading-6 ${isLight ? 'text-black/80' : 'text-white/80'}`}>
-                      {post.content}
-                    </p>
-                  )}
-                  {post.media_url && post.media_type === 'video' && (
-                    <video controls preload="metadata" src={post.media_url} className="max-h-[620px] w-full bg-black object-contain" />
-                  )}
-                  {post.media_url && post.media_type === 'image' && (
-                    <img src={post.media_url} alt="Publicación" loading="lazy" className="max-h-[620px] w-full bg-black/5 object-contain" />
-                  )}
-                </article>
+                <ProfilePostCard key={post.id} initialPost={post} isLight={isLight} />
               ))}
             </section>
           </div>

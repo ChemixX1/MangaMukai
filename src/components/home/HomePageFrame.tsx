@@ -19,9 +19,19 @@ interface HomePageFrameProps {
   afterHero?: ReactNode;
   afterLatest?: ReactNode;
   latestSection?: ReactNode;
+  popularSection?: ReactNode;
+  youthSection?: ReactNode;
+  /** La colección B&N no usa la tira de filtros. */
+  hideFilterStrip?: boolean;
   menSection?: ReactNode;
   youthLatestSection?: ReactNode;
   pageClassName?: string;
+  /**
+   * H1 de la página. Los títulos visibles del hero son nombres de manga que
+   * rotan, así que el encabezado real de la página va aquí para que buscadores y
+   * lectores de pantalla sepan de qué trata.
+   */
+  pageHeading?: string;
 }
 
 /**
@@ -33,9 +43,13 @@ export function HomePageFrame({
   afterHero,
   afterLatest,
   latestSection,
+  popularSection,
+  youthSection,
+  hideFilterStrip = false,
   menSection,
   youthLatestSection,
   pageClassName = '',
+  pageHeading = 'Leer manga online gratis en español',
 }: HomePageFrameProps) {
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -51,6 +65,7 @@ export function HomePageFrame({
   return (
     <div className={`home-shell home-theme-${theme} flex min-h-screen flex-col overflow-x-hidden font-sans selection:bg-red-600 selection:text-white ${isReady ? 'home-data-ready' : 'home-data-pending'} ${pageClassName}`}>
       <div className="home-stage flex flex-1 flex-col transition-colors duration-300">
+        <h1 className="sr-only">{pageHeading}</h1>
         <section className="home-block home-block-hero relative z-40 bg-black">
           {hero}
         </section>
@@ -61,16 +76,18 @@ export function HomePageFrame({
           <div className={`absolute inset-0 z-0 transition-colors duration-300 ${theme === 'light' ? 'bg-[linear-gradient(180deg,#f5f6f8_0%,#eef2f7_100%)]' : 'bg-black'}`} />
 
           <div className="relative z-20 flex flex-col gap-24">
-            <section className="home-block home-block-filter">
-              <FilterStrip activeCategory={null} onCategoryChange={handleCategoryClick} />
-            </section>
+            {!hideFilterStrip && (
+              <section className="home-block home-block-filter">
+                <FilterStrip activeCategory={null} onCategoryChange={handleCategoryClick} />
+              </section>
+            )}
 
-            <section className="home-block home-block-popular"><PopularCarousel /></section>
+            <section className="home-block home-block-popular">{popularSection ?? <PopularCarousel />}</section>
             <section className="home-block home-block-news"><News /></section>
             <section className="home-block home-block-latest">{latestSection ?? <Latest />}</section>
             {afterLatest}
             <section className="home-block home-block-men relative z-30 -mt-10 md:-mt-14 lg:-mt-16">{menSection ?? <LatestUpdates />}</section>
-            <section className="home-block home-block-youth"><YouthCarousel /></section>
+            <section className="home-block home-block-youth">{youthSection ?? <YouthCarousel youthOnly />}</section>
             <section className="home-block home-block-youth-news"><News variant="youth" /></section>
             <section className="home-block home-block-youth-latest">{youthLatestSection ?? <YouthLatest />}</section>
             <section className="home-block home-block-releases -mt-4 sm:mt-0"><NewReleases /></section>

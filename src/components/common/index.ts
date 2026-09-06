@@ -1,6 +1,5 @@
 export { Countdown } from './Countdown';
 export { BibliotecaClock } from './BibliotecaClock';
-export { MangaDetailClock } from './MangaDetailClock';
 export {
   DetailBook3DIcon,
   DetailCalendarIcon,
@@ -19,5 +18,6 @@ export {
 } from './MangaDetailIcons';
 export { DepthText } from './DepthText';
 export { GlobalLoader } from './GlobalLoader';
+export { MangaDetailClock } from './MangaDetailClock';
 export { MangaMetaBar } from './MangaMetaBar';
 export { PaginationControls } from './PaginationControls';

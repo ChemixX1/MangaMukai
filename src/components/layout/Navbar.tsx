@@ -1,14 +1,15 @@
-import { lazy, Suspense, useState, useEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
 import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Search, X, AlarmClock, Bell, ChevronRight, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
-import { AlarmAlert, CoinMarketModal, SearchModal, TimerModal } from "../modals";
+import { Menu, Search, X, AlarmClock, Bell, Coins, Crown, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
+import { AlarmAlert, SearchModal, TimerModal } from "../modals";
 import { DetailCoin3DIcon } from "../common";
 import { ChatWindow, MessagesPanel, NotificationsPanel } from "../social";
+import { FOOTER_SOCIALS } from "./Footer";
 import { useTheme } from "../../hooks/useTheme";
 import { getUltimosCapitulos } from "../../services/mangaService";
 import { lockPageScroll } from "../../utils/scrollLock";
-import premiumCrownIcon from "../../assets/icons/premium-crown.svg";
+import { openSubscriptionModal } from "../../utils/subscriptionModal";
 import authPopoverBackground from "../../assets/modals/auth-login.webp";
 import profilePopoverBackground from "../../assets/modals/auth-register.jpg";
 import { preloadImages } from "../../utils/preloadImages";
@@ -26,9 +27,8 @@ import { getInteractions } from "../../services/interactionsService";
 import { getConversations, getNotifications, syncMangaSubscriptions } from "../../services/socialService";
 import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "../../services/wordpressService";
 
-const loadSubscriptionModal = () =>
-  import("../modals/SubscriptionModal").then((module) => ({ default: module.SubscriptionModal }));
-const SubscriptionModal = lazy(loadSubscriptionModal);
+// El modal vive montado una sola vez en App: aquí solo se precarga y se abre.
+const loadSubscriptionModal = () => import("../modals/SubscriptionModal");
 
 const MOBILE_NAV_LINKS = [
   { name: "Inicio", href: "/" },
@@ -66,14 +66,13 @@ export const Navbar = () => {
   const headerUsesDarkText = isLightMode;
   const [currentUser, setCurrentUser] = useState<MMUser | null>(getCurrentStoredUser);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [isCoinModalOpen, setIsCoinModalOpen] = useState(false);
-  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [sessionNotice, setSessionNotice] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [isMobileScrolled, setIsMobileScrolled] = useState(false);
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // --- LÓGICA DEL TEMPORIZADOR ---
@@ -89,9 +88,9 @@ export const Navbar = () => {
   }, [isMobileMenuOpen]);
 
   useEffect(() => {
-    if (!currentUser || !isMobileMenuOpen) return;
+    if (!currentUser || !showUserMenu) return;
     void loadSubscriptionModal();
-  }, [currentUser, isMobileMenuOpen]);
+  }, [currentUser, showUserMenu]);
 
   useEffect(() => {
     const updateMobileScrollState = () => setIsMobileScrolled(window.scrollY > 12);
@@ -99,6 +98,27 @@ export const Navbar = () => {
     window.addEventListener('scroll', updateMobileScrollState, { passive: true });
     return () => window.removeEventListener('scroll', updateMobileScrollState);
   }, []);
+
+  /** La cabecera se esconde al bajar y reaparece en cuanto se sube. */
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      setIsHeaderHidden(false);
+      return;
+    }
+
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const currentY = window.scrollY;
+      const delta = currentY - lastY;
+      // Umbral pequeño para que el rebote del scroll no la haga parpadear.
+      if (Math.abs(delta) < 6) return;
+      lastY = currentY;
+      setIsHeaderHidden(currentY > 90 && delta > 0);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [isMobileMenuOpen]);
 
   const refreshSocialCounts = useCallback(async () => {
     if (!getCurrentStoredUser()) {
@@ -240,17 +260,25 @@ export const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
-    clearAuth();
     setSessionNotice(false);
     setShowUserMenu(false);
     setShowMessages(false);
     setShowNotifications(false);
     setIsMobileMenuOpen(false);
+    // Recarga completa al terminar: así no queda en memoria nada de la cuenta
+    // (monedas, guardados, mensajes) que siguiera vivo en algún componente.
+    void clearAuth().finally(() => window.location.reload());
+  };
+
+  const goToRecharge = () => {
+    setShowUserMenu(false);
+    navigate('/recargar', { state: { returnTo: `${location.pathname}${location.search}` } });
   };
 
   const openAuthPage = (view: 'login' | 'register') => {
     setSessionNotice(false);
     setIsMobileMenuOpen(false);
+    setShowUserMenu(false);
     navigate(`/auth/${view}`);
   };
 
@@ -261,7 +289,6 @@ export const Navbar = () => {
     setShowUserMenu(false);
     setShowMessages(false);
     setShowNotifications(false);
-    setIsCoinModalOpen(false);
     setSessionNotice(false);
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
@@ -274,13 +301,16 @@ export const Navbar = () => {
 
   return (
     <>
-      <header className={`${isMobileMenuOpen ? 'fixed' : isProfileRoute ? 'sticky' : 'absolute'} site-navbar-surface left-0 top-0 z-[100] w-full py-3 sm:py-3`}>
+      <header
+        className={`${isProfileRoute && !isMobileMenuOpen ? 'sticky' : 'fixed'} site-navbar-surface left-0 top-0 z-[100] w-full py-3 transition-transform duration-300 sm:py-3`}
+        style={{ transform: isHeaderHidden ? 'translateY(-100%)' : 'translateY(0)' }}
+      >
         <div className="desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16 flex justify-between items-center">
             
             {/* 1. IZQUIERDA */}
             <div className="flex items-center gap-4 lg:gap-10"> 
-              <Link to="/" onClick={handleLogoClick} className="group flex h-10 items-center lg:-translate-y-0.5" aria-label="Volver al inicio de MangaMukai">
-                <span className={`select-none text-2xl font-[1000] uppercase italic leading-none tracking-tighter transition-colors sm:text-3xl ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+              <Link to="/" onClick={handleLogoClick} className={`group h-10 items-center lg:-translate-y-0.5 ${isMobileMenuOpen ? 'invisible lg:visible flex' : 'flex'}`} aria-label="Volver al inicio de MangaMukai">
+                <span className={`select-none text-[22px] min-[390px]:text-2xl font-[1000] uppercase italic leading-none tracking-tighter transition-colors sm:text-3xl ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                     MANGA<span className="text-[#FF4D88]">MUKAI</span>
                 </span>
               </Link>
@@ -307,20 +337,21 @@ export const Navbar = () => {
             </div>
 
             {/* 2. DERECHA */}
-            <div className="flex items-center gap-1 sm:gap-6 lg:translate-y-0.5">
+            <div className="flex items-center gap-0 sm:gap-1 lg:gap-6 lg:translate-y-0.5">
                 
-                {/* Herramientas (Buscador y RELOJ) */}
-                <div className={`relative hidden items-center gap-0 min-[360px]:flex sm:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} border-r pr-1 sm:mr-1 sm:pr-6`}>
+                <div className={isMobileMenuOpen ? 'hidden lg:contents' : 'contents'}>
+                {/* Herramientas: la alarma móvil está en el menú principal. */}
+                <div className={`relative hidden items-center gap-0 min-[360px]:flex lg:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} lg:border-r lg:mr-1 lg:pr-6`}>
                     <button 
                         onClick={() => setIsSearchOpen(true)}
                         aria-label="Buscar mangas"
                         title="Buscar mangas"
-                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} rounded-full p-2 transition-colors`}
+                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} -mr-1.5 rounded-full p-2 transition-colors lg:mr-0`}
                     >
                         <Search size={20} strokeWidth={2.5} />
                     </button>
                     
-                    <div className="relative">
+                    <div className="relative hidden lg:block">
                         <button 
                             onClick={() => setIsTimerModalOpen(!isTimerModalOpen)}
                             aria-label="Abrir temporizador"
@@ -355,10 +386,10 @@ export const Navbar = () => {
 
                 {/* ── Monedas en navbar (solo si hay sesión) ── */}
                 {currentUser && (
-                  <div className="hidden sm:flex items-center">
+                  <div className="hidden lg:flex items-center">
                     <button
                       type="button"
-                      onClick={() => setIsCoinModalOpen(true)}
+                      onClick={() => goToRecharge()}
                       aria-label={`Abrir mercado de monedas. Saldo: ${currentUser.coins ?? 0}`}
                       title="Abrir mercado de monedas"
                       className={`group flex items-center gap-2 rounded-xl border px-2.5 py-1.5 shadow-sm transition-all duration-200 hover:-translate-y-px ${headerUsesDarkText ? 'border-[#D99A16]/35 bg-[#FFF5D8]/95 hover:border-[#D99A16]/55 hover:bg-[#ffefbf]' : 'border-[#FFC53D]/25 bg-[#FFC53D]/10 hover:border-[#FFC53D]/45 hover:bg-[#FFC53D]/15'}`}
@@ -370,7 +401,7 @@ export const Navbar = () => {
                 )}
 
                 {currentUser ? (
-                  <div className="relative hidden items-center gap-1 sm:flex" ref={userMenuRef}>
+                  <div className="relative flex items-center gap-1" ref={userMenuRef}>
                     <div className="relative">
                       <button
                         onClick={() => { setShowUserMenu((value) => !value); setShowMessages(false); setShowNotifications(false); }}
@@ -383,34 +414,38 @@ export const Navbar = () => {
                       </button>
 
                       {showUserMenu && (
-                        <div className={`auth-user-popover profile-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
+                        <div className={`auth-user-popover profile-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} fixed inset-x-4 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-2xl lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-2 lg:max-h-[calc(100dvh-4.5rem)] lg:w-[300px] border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
                           <img src={profilePopoverBackground} alt="" aria-hidden="true" className="auth-user-popover-background absolute inset-0 h-full w-full object-cover object-[55%_center]" />
                           <div aria-hidden="true" className="auth-user-popover-scrim absolute inset-0" />
                           <div className="relative z-10">
                             <div className={`flex items-center gap-3 border-b p-4 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
+                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} aria-label="Ver mi perfil" className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FF4D88]">
                               {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className={`h-11 w-11 rounded-full border object-cover ${isLightMode ? 'border-black/20' : 'border-white/25'}`} /> : <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-transparent ${isLightMode ? 'border-black/20 text-black' : 'border-white/25 text-white'}`}><UserIcon size={20} /></span>}
-                              <div className="min-w-0"><p className="truncate font-[Montserrat] text-[15px] font-semibold uppercase tracking-[0.035em]">{currentUser.username}</p><p className={`truncate font-[Montserrat] text-[11px] font-semibold ${isLightMode ? 'text-black/55' : 'text-white/55'}`}>{currentUser.email}</p></div>
+                              </Link>
+                              <div className="min-w-0"><p className="truncate font-[Montserrat] text-[15px] font-bold uppercase tracking-[0.035em]">{currentUser.username}</p><p className={`truncate font-[Montserrat] text-[11px] font-semibold ${isLightMode ? 'text-black/55' : 'text-white/55'}`}>{currentUser.email}</p></div>
                             </div>
                             <div className="flex flex-col gap-0.5 px-2 pb-2">
-                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><UserIcon size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Mi Perfil</Link>
+                              <button type="button" onClick={goToRecharge} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><Coins size={17} /> Recargar monedas</button>
+                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option hidden lg:flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><UserIcon size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Mi Perfil</Link>
                               <Link to="/saved" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><Bookmark size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Guardados</Link>
                               <button type="button" onClick={() => { setShowUserMenu(false); setShowMessages(true); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><MessageCircle size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[9px] text-white">{unreadMessages}</span>}</button>
+                              <button type="button" onClick={() => { setShowUserMenu(false); openSubscriptionModal(); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><Crown size={17} /> Suscripción</button>
                             </div>
-                            <div className={`border-t px-2 pb-2 pt-1 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}><button onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10"><LogOut size={17} /> Cerrar Sesión</button></div>
+                            <div className={`hidden border-t px-2 pb-2 pt-1 lg:block ${isLightMode ? 'border-black/10' : 'border-white/10'}`}><button onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10"><LogOut size={17} /> Cerrar Sesión</button></div>
                           </div>
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); setShowMessages(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}>
+                    <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); setShowMessages(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative hidden lg:flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}>
                       <Bell size={20} strokeWidth={2.4} />
                       {unreadNotifications > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[8px] font-black leading-none text-white">{Math.min(99, unreadNotifications)}</span>}
                     </button>
                   </div>
                 ) : (
-                  <div className="auth-google-sans relative hidden sm:block" ref={userMenuRef}>
+                  <div className="auth-google-sans relative" ref={userMenuRef}>
                     <button type="button" aria-label="Abrir opciones de acceso" aria-expanded={showUserMenu} onClick={() => setShowUserMenu((visible) => !visible)} className={`flex h-10 w-10 items-center justify-center rounded-full border bg-transparent transition-colors ${headerUsesDarkText ? 'border-black/10 text-zinc-800 hover:border-[#FF4D88] hover:text-[#FF4D88]' : 'border-white/15 text-white hover:border-[#FF4D88] hover:text-[#FF4D88]'}`}><UserIcon size={20} strokeWidth={2.4} /></button>
                     {showUserMenu && (
-                      <div className={`auth-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} absolute right-0 mt-3 w-[300px] overflow-hidden rounded-[24px] border p-4 shadow-[0_22px_60px_rgba(0,0,0,0.22)] ${headerUsesDarkText ? 'border-black/10 bg-white text-zinc-950' : 'border-white/10 bg-[#0a0a0d] text-white'}`}>
+                      <div className={`auth-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} fixed inset-x-4 top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-[24px] lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-3 lg:max-h-[calc(100dvh-4.5rem)] lg:min-h-[290px] lg:w-[340px] border p-4 lg:p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] ${headerUsesDarkText ? 'border-black/10 bg-white text-zinc-950' : 'border-white/10 bg-[#0a0a0d] text-white'}`}>
                         <img src={authPopoverBackground} alt="" aria-hidden="true" className="auth-user-popover-background absolute inset-0 h-full w-full object-cover" />
                         <div aria-hidden="true" className="auth-user-popover-scrim absolute inset-0" />
                         <div className="relative z-10">
@@ -426,13 +461,14 @@ export const Navbar = () => {
                   </div>
                 )}
                 
-                <span aria-hidden="true" className="h-10 w-10 shrink-0 lg:hidden" />
+                </div>
+                <span aria-hidden="true" className="ml-3 h-10 w-10 shrink-0 lg:hidden" />
 
                 <button
                   type="button"
                   aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
                   aria-expanded={isMobileMenuOpen}
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  onClick={() => { setIsMobileMenuOpen(!isMobileMenuOpen); setShowUserMenu(false); setShowMessages(false); setShowNotifications(false); }}
                   className={`fixed right-4 top-4 z-[120] rounded-lg border p-2 sm:right-8 sm:top-6 lg:hidden transition-[background-color,border-color,color,opacity,box-shadow,backdrop-filter] duration-300 ${isMobileScrolled ? 'opacity-[0.85] shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-md' : 'opacity-100 shadow-lg'} ${theme === 'light' || isLightMode ? (isMobileScrolled ? 'border-black/10 bg-white/75 text-black' : 'border-zinc-200 bg-white text-black') : (isMobileScrolled ? 'border-white/15 bg-black/65 text-white' : 'border-white/10 bg-black text-white')}`}
                 >
                     {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -473,8 +509,21 @@ export const Navbar = () => {
           <div aria-hidden="true" className="absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-[#FF4D88]/10 blur-[90px]" />
           <div aria-hidden="true" className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[#6d28d9]/10 blur-[90px]" />
 
-          <div className="relative flex h-[100dvh] flex-col overflow-y-auto overscroll-contain px-6 pb-6 pt-32 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <nav aria-label="Navegación móvil" className={`flex flex-col items-center justify-center ${currentUser ? 'min-h-[250px] shrink-0 py-2' : 'min-h-[310px] flex-1 py-4'}`}>
+          {/* Notificaciones: solo el icono, justo debajo del botón de cerrar. */}
+          {currentUser && (
+            <button
+              type="button"
+              aria-label="Abrir notificaciones"
+              onClick={() => { setShowMessages(false); setShowNotifications(true); }}
+              className={`absolute right-4 top-[4.25rem] z-[95] flex h-11 w-11 items-center justify-center transition-colors sm:right-8 sm:top-[5rem] ${isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
+            >
+              <Bell size={26} strokeWidth={2} />
+              {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[8px] text-white">{Math.min(99, unreadNotifications)}</span>}
+            </button>
+          )}
+
+          <div className="relative flex h-[100dvh] flex-col overflow-y-auto overscroll-contain px-6 pb-6 pt-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav aria-label="Navegación móvil" className="flex min-h-[310px] flex-1 flex-col items-center justify-center py-4">
               {MOBILE_NAV_LINKS.map(link => {
                 const isActive = location.pathname === link.href;
                 return (
@@ -494,100 +543,46 @@ export const Navbar = () => {
                 );
               })}
 
-              {!currentUser && (
-                <div className={`mt-4 grid w-full max-w-sm grid-cols-2 gap-2 border-t pt-5 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                  <button onClick={() => openAuthPage('login')} className={`audiowide-library h-[52px] rounded-xl border text-[12px] font-normal uppercase tracking-normal transition-colors ${isLightMode ? 'border-black/20 text-black hover:bg-black/5' : 'border-white/20 text-white hover:bg-white/5'}`}>
-                    Ingresar
-                  </button>
-                  <button onClick={() => openAuthPage('register')} className="audiowide-library h-[52px] rounded-xl bg-[#FF4D88] text-[12px] font-normal uppercase tracking-normal text-white shadow-[0_0_20px_rgba(255,77,136,0.28)]">
-                    Crear Cuenta
+              <div className="mt-5 w-full max-w-sm pt-5">
+                <div className={`flex items-center justify-center gap-3 rounded-xl border bg-transparent px-3 py-2 ${isLightMode ? 'border-zinc-500' : 'border-zinc-600'}`}>
+                  <button type="button" onClick={() => { setIsMobileMenuOpen(false); setIsTimerModalOpen(true); }}
+                    className={`inline-flex min-h-11 items-center gap-1.5 font-['Montserrat'] text-[13px] font-semibold ${isTimerActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black' : 'text-white'}`}>
+                    <AlarmClock size={18} strokeWidth={2} /> Alarma
                   </button>
                 </div>
-              )}
+              </div>
             </nav>
 
             {currentUser && (
-              <div className="shrink-0 pt-2">
-                <div className="mb-4 flex flex-col gap-3">
-                    <div className={`flex items-center gap-3 rounded-xl border p-3 ${isLightMode ? 'border-black/10 bg-white/35' : 'border-white/10 bg-white/[0.03]'}`}>
-                      {currentUser.avatar ? (
-                        <img src={currentUser.avatar} alt="avatar" className="h-10 w-10 rounded-full object-cover ring-2 ring-[#FF4D88]/40" />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FF4D88]">
-                          <UserIcon size={18} className="text-white" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className={`truncate text-sm font-black ${isLightMode ? 'text-black' : 'text-white'}`}>{currentUser.username}</p>
-                        <p className={`truncate text-[10px] ${isLightMode ? 'text-black/50' : 'text-white/40'}`}>{currentUser.email}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        aria-label="Cerrar sesión"
-                        title="Cerrar sesión"
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/5 text-red-400 transition-colors hover:bg-red-500/15 hover:text-red-300"
-                      >
-                        <LogOut size={16} strokeWidth={2.4} />
-                      </button>
-                    </div>
-
-                    <button type="button" onClick={() => { setIsMobileMenuOpen(false); setIsCoinModalOpen(true); }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#FF4D88]/20 bg-[#FF4D88]/[0.06] px-3 py-2.5 text-left transition-colors hover:bg-[#FF4D88]/10">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-                          <DetailCoin3DIcon size={40} className="h-10 w-10 object-contain drop-shadow-[0_7px_10px_rgba(180,83,9,0.3)]" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className={`mobile-account-label truncate text-[9px] font-bold uppercase tracking-normal ${isLightMode ? 'text-black' : 'text-white'}`}>Monedas disponibles</p>
-                          <p className="font-[Montserrat] text-base font-bold leading-tight text-[#E4A11B]">{currentUser.coins ?? 0}</p>
-                        </div>
-                      </div>
-                      <ChevronRight size={17} className="shrink-0 text-[#FF4D88]" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => { setIsMobileMenuOpen(false); setIsSubscriptionModalOpen(true); }}
-                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#FF4D88]/20 bg-[#FF4D88]/[0.06] px-3 py-2.5 text-left transition-colors hover:bg-[#FF4D88]/10"
-                    >
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center">
-                          <img src={premiumCrownIcon} alt="" aria-hidden="true" className="h-10 w-10 object-contain" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className={`mobile-account-label block truncate text-[9px] font-bold uppercase tracking-normal ${isLightMode ? 'text-black' : 'text-white'}`}>Suscripción</span>
-                          <span className="block text-sm font-black leading-tight text-[#FF4D88]">Mukai PRO</span>
-                        </span>
-                      </span>
-                      <ChevronRight size={16} className="shrink-0 text-[#FF4D88]" />
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Link to="/perfil" onClick={() => setIsMobileMenuOpen(false)} className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-[10px] font-black uppercase tracking-wider ${isLightMode ? 'border-black/10 text-black/70' : 'border-white/10 text-white/70'}`}>
-                        <UserIcon size={15} className="text-[#FF4D88]" /> Mi Perfil
-                      </Link>
-                      <Link to="/saved" onClick={() => setIsMobileMenuOpen(false)} className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-[10px] font-black uppercase tracking-wider ${isLightMode ? 'border-black/10 text-black/70' : 'border-white/10 text-white/70'}`}>
-                        <Bookmark size={15} className="text-[#FF4D88]" /> Guardados
-                      </Link>
-                      <button type="button" onClick={() => { setIsMobileMenuOpen(false); setShowMessages(true); }} className={`relative flex h-11 items-center justify-center gap-2 rounded-xl border text-[10px] font-black uppercase tracking-wider ${isLightMode ? 'border-black/10 text-black/70' : 'border-white/10 text-white/70'}`}>
-                        <MessageCircle size={15} className="text-[#FF4D88]" /> Mensajes
-                        {unreadMessages > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#FF4D88]" />}
-                      </button>
-                      <button type="button" onClick={() => { setIsMobileMenuOpen(false); setShowNotifications(true); }} className={`relative flex h-11 items-center justify-center gap-2 rounded-xl border text-[10px] font-black uppercase tracking-wider ${isLightMode ? 'border-black/10 text-black/70' : 'border-white/10 text-white/70'}`}>
-                        <Bell size={15} className="text-[#FF4D88]" /> Alertas
-                        {unreadNotifications > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#FF4D88]" />}
-                      </button>
-                    </div>
-                </div>
-              </div>
+              <button type="button" onClick={handleLogout}
+                className="mx-auto mt-6 flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-3 font-['Montserrat'] text-sm font-semibold text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10">
+                <LogOut size={18} /> Cerrar sesión
+              </button>
             )}
+
+            <div className="mt-auto flex shrink-0 items-center justify-center gap-2.5 pt-6">
+              {FOOTER_SOCIALS.filter(({ name }) => !['Discord', 'Telegram', 'Youtube'].includes(name)).map(({ name, href, icon: Icon }) => (
+                <a
+                  key={name}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={name}
+                  aria-label={name}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`grid h-14 w-14 place-items-center rounded-2xl border transition-colors ${isLightMode ? 'border-zinc-300 bg-white text-black/70 hover:border-[#FF4D88] hover:text-[#FF4D88]' : 'border-white/15 bg-white/[0.04] text-white/70 hover:border-[#FF4D88] hover:text-[#FF4D88]'}`}
+                >
+                  <Icon className="h-6 w-6" />
+                </a>
+              ))}
+            </div>
 
           </div>
         </div>
       )}
 
       <MessagesPanel isOpen={showMessages} isLight={isLightMode} onClose={() => setShowMessages(false)} onUnreadChange={setUnreadMessages} />
-      <NotificationsPanel isOpen={showNotifications} isLight={isLightMode} onClose={() => setShowNotifications(false)} onUnreadChange={setUnreadNotifications} />
+      <NotificationsPanel onNavigate={() => setIsMobileMenuOpen(false)} isOpen={showNotifications} isLight={isLightMode} onClose={() => setShowNotifications(false)} onUnreadChange={setUnreadNotifications} />
       {currentUser && <ChatWindow isLight={isLightMode} onUnreadChange={refreshSocialCounts} />}
 
       <TimerModal
@@ -600,20 +595,6 @@ export const Navbar = () => {
       />
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <AlarmAlert isOpen={isAlarmAlertOpen} onClose={() => setIsAlarmAlertOpen(false)} />
-      <CoinMarketModal 
-        isOpen={isCoinModalOpen} 
-        onClose={() => setIsCoinModalOpen(false)} 
-        username={currentUser?.username || ''} 
-        userId={currentUser?.id?.toString() || ''} 
-      />
-      {isSubscriptionModalOpen && (
-        <Suspense fallback={<div aria-hidden="true" className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-xl" />}>
-          <SubscriptionModal
-            isOpen={isSubscriptionModalOpen}
-            onClose={() => setIsSubscriptionModalOpen(false)}
-          />
-        </Suspense>
-      )}
     </>
   );
 };

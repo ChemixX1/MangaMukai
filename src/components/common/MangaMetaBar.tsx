@@ -8,6 +8,10 @@ interface MangaMetaBarProps {
   date: string;
   accentClassName?: string;
   className?: string;
+  // Cuando es true, todos los datos (CH, Gratis/Pago y fecha) usan el color de acento.
+  accentAll?: boolean;
+  /** Color del ticket de "Gratis": rosa por defecto o celeste para las secciones de hombres. */
+  ticketTone?: 'pink' | 'blue';
 }
 
 export const MangaMetaBar = ({
@@ -16,7 +20,10 @@ export const MangaMetaBar = ({
   date,
   accentClassName = 'text-[#FF4D88]',
   className = '',
+  accentAll = false,
+  ticketTone = 'pink',
 }: MangaMetaBarProps) => {
+  const blueTicket = accentAll || ticketTone === 'blue';
   const isNew = date.trim().toLowerCase() === 'new';
   const rowRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -93,11 +100,11 @@ export const MangaMetaBar = ({
 
         <div className="home-card-slot-divider h-[1em] w-px shrink-0 bg-white/20" />
 
-        <div className={`flex shrink-0 items-center gap-[0.3em] ${isFree ? 'text-white' : 'text-yellow-400'}`}>
+        <div className={`flex shrink-0 items-center gap-[0.3em] ${accentAll ? accentClassName : isFree ? (ticketTone === 'blue' ? 'text-[#00C2FF]' : 'text-white') : 'text-yellow-400'}`}>
           {isFree ? (
             <DetailTicket3DIcon
               size={21}
-              className="-my-1 h-[21px] w-[21px] shrink-0 scale-110 object-contain drop-shadow-[0_4px_5px_rgba(180,83,9,0.22)]"
+              className={`-my-1 h-[21px] w-[21px] shrink-0 scale-110 object-contain ${blueTicket ? 'hue-rotate-[215deg] saturate-[1.15] drop-shadow-[0_4px_5px_rgba(6,140,190,0.3)]' : 'drop-shadow-[0_4px_5px_rgba(180,83,9,0.22)]'}`}
             />
           ) : (
             <DetailCoin3DIcon
@@ -110,7 +117,7 @@ export const MangaMetaBar = ({
 
         <div className="home-card-slot-divider h-[1em] w-px shrink-0 bg-white/20" />
 
-        <div className={`flex shrink-0 items-center gap-[0.3em] ${isNew ? accentClassName : 'text-gray-300'}`}>
+        <div className={`flex shrink-0 items-center gap-[0.3em] ${accentAll || isNew ? accentClassName : 'text-gray-300'}`}>
           {isNew ? (
             <Flame className="h-[1.05em] w-[1.05em] shrink-0" fill="currentColor" />
           ) : (
