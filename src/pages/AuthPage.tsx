@@ -19,6 +19,7 @@ import { MANGAMUKAI_API, SOCIAL_LOGIN_SESSION_URL, socialLoginUrl, wordpressUrl 
 import { useTheme } from "../hooks/useTheme";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { saveAuth } from "../services/authService";
+import { clearSocialReturn, readSocialReturn, rememberSocialReturn, safeAuthReturn } from "../utils/socialLoginReturn";
 import { getUltimosCapitulos } from "../services/mangaService";
 import {
   getSharedAuthCovers,
@@ -92,6 +93,24 @@ const SOCIAL_AUTH = [
     className: "border-black/10 bg-white text-zinc-900 hover:bg-zinc-100",
   },
 ] as const;
+
+const providerLabel = (provider: string | null) => (provider === "discord" ? "Discord" : "Google");
+
+const SOCIAL_ERROR_MESSAGES: Record<string, string> = {
+  user_denied: "Cancelaste el acceso con {provider}.",
+  no_email: "{provider} no compartió un correo verificado. Prueba con otra cuenta o crea tu cuenta con tu correo.",
+  register_failed: "No se pudo crear tu cuenta con {provider}. Inténtalo nuevamente.",
+  awaiting_email_confirmation: "Tu cuenta todavía no está activada. Revisa tu correo para confirmarla.",
+  awaiting_admin_review: "Tu cuenta está pendiente de aprobación.",
+  inactive: "Tu cuenta está desactivada. Escríbenos si crees que es un error.",
+  rejected: "Tu cuenta está desactivada. Escríbenos si crees que es un error.",
+};
+
+const socialErrorMessage = (code: string, provider: string | null) =>
+  (SOCIAL_ERROR_MESSAGES[code] ?? "No se pudo completar el acceso con {provider}. Inténtalo nuevamente.").replace(
+    "{provider}",
+    providerLabel(provider),
+  );
 
 const makeColumn = (covers: CoverItem[], offset: number) =>
   Array.from({ length: 8 }, (_, index) => covers[(offset * 8 + index) % covers.length]);
@@ -325,8 +344,11 @@ export const AuthPage = () => {
   const { theme } = useTheme();
   const isLight = theme === "light";
   const isLogin = location.pathname.endsWith("/login");
-  const requestedReturn = location.state?.returnTo || new URLSearchParams(location.search).get("returnTo") || "/";
-  const returnTo = typeof requestedReturn === "string" && requestedReturn.startsWith("/") && !requestedReturn.startsWith("//") && !requestedReturn.includes("\\") && !requestedReturn.startsWith("/auth/") ? requestedReturn : "/";
+  const [socialReturnTo] = useState(() => {
+    const query = new URLSearchParams(location.search);
+    return readSocialReturn(query.get("social") || query.get("return_provider"));
+  });
+  const returnTo = safeAuthReturn(location.state?.returnTo || new URLSearchParams(location.search).get("returnTo") || socialReturnTo || "/");
   const reducedMotion = useReducedMotion();
 
   const [email, setEmail] = useState("");
@@ -347,11 +369,12 @@ export const AuthPage = () => {
 
   useEffect(() => {
     if (!success) return;
-    // Carga completa en vez de navegación interna: vale igual para el formulario
-    // y para Google/Discord, y toda la app arranca ya con la sesión nueva.
-    const timer = window.setTimeout(() => window.location.assign(returnTo), reducedMotion ? 350 : 850);
+    // Navegación interna: saveAuth ya avisó a la barra y a los servicios con
+    // AUTH_CHANGED_EVENT, así que no hace falta recargar toda la app (con
+    // Google/Discord eso sumaba una segunda carga completa tras los saltos por WordPress).
+    const timer = window.setTimeout(() => navigate(returnTo, { replace: true }), reducedMotion ? 350 : 850);
     return () => window.clearTimeout(timer);
-  }, [success, returnTo, reducedMotion]);
+  }, [success, returnTo, reducedMotion, navigate]);
 
   useEffect(() => {
     const cachedCovers = getSharedAuthCovers();
@@ -398,6 +421,18 @@ export const AuthPage = () => {
   useDocumentTitle(isLogin ? "Iniciar sesión" : "Crear cuenta");
 
   useEffect(() => {
+    // WordPress devuelve aquí los fallos del proveedor (acceso cancelado, correo sin
+    // verificar, cuenta pendiente) en vez de mostrar su propia página de error.
+    const query = new URLSearchParams(location.search);
+    const code = query.get("social_error");
+    if (!code) return;
+    setError(socialErrorMessage(code, query.get("social_provider")));
+    const cleanUrl = new URL(window.location.href);
+    ["social_error", "social_provider"].forEach((key) => cleanUrl.searchParams.delete(key));
+    window.history.replaceState(window.history.state, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+  }, [location.search]);
+
+  useEffect(() => {
     const query = new URLSearchParams(location.search);
     const provider = query.get("social") || query.get("return_provider");
     const socialCode = query.get("social_code") || "";
@@ -412,11 +447,17 @@ export const AuthPage = () => {
       }
       if (!active) return;
       saveAuth(data.token, data.user, true);
+      clearSocialReturn();
+      // Discard the temporary OAuth code before loading the next page.
+      const cleanUrl = new URL(window.location.href);
+      ['social', 'return_provider', 'social_code'].forEach((key) => cleanUrl.searchParams.delete(key));
+      window.history.replaceState(window.history.state, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
       setSuccess(`Acceso con ${provider === "google" ? "Google" : "Discord"} completado.`);
     }).catch((caught) => {
       if (!active) return;
       setError(caught instanceof Error ? caught.message : "No se pudo completar el inicio de sesión social.");
-      navigate("/auth/login", { replace: true });
+      clearSocialReturn();
+      navigate("/auth/login", { replace: true, state: { returnTo } });
     }).finally(() => {
       if (active) setLoading(false);
     });
@@ -516,6 +557,11 @@ export const AuthPage = () => {
                 <a
                   key={social.provider}
                   href={socialLoginUrl(social.provider)}
+                  onClick={(event) => {
+                    if (loading || success) { event.preventDefault(); return; }
+                    rememberSocialReturn(social.provider, returnTo);
+                  }}
+                  aria-disabled={loading || !!success}
                   className={`flex min-h-[54px] items-center justify-center gap-2 rounded-[24px] border px-3 py-3 text-center text-[13px] font-semibold tracking-normal transition-colors ${social.className}`}
                 >
                   <img src={social.icon} alt="" className="h-[18px] w-[18px]" decoding="async" />

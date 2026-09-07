@@ -145,6 +145,9 @@ export const refreshUser = async (): Promise<MMUser | null> => {
       const latest = getStoredUser();
       const user = {
         ...data.user,
+        // El plugin legado responde /me con username = user_login; el nombre visible
+        // (el que se edita en /perfil y muestra el navbar) es display_name.
+        username: data.user.display_name || data.user.username,
         // A profile upload that finished during this request must win the race.
         ...(latest?.avatar !== initialAvatar ? { avatar: latest?.avatar } : {}),
         isPremium: !!(data.user.isPremium || data.user.is_premium),

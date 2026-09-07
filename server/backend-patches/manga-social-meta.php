@@ -47,7 +47,9 @@ if (!$cover_url && is_string($custom_cover) && filter_var($custom_cover, FILTER_
     $cover_url = $custom_cover;
 }
 if (!$cover_url) {
-    $cover_url = $site_url . '/assets/imagen1-C8Sivx-G.webp';
+    // Imagen sin hash servida desde public/: los bundles de /assets/ cambian de
+    // nombre en cada build y se limpian, asi que no sirven como referencia fija.
+    $cover_url = $site_url . '/og-default.webp';
 }
 $cover_url = set_url_scheme($cover_url, 'https');
 

@@ -34,6 +34,16 @@ RewriteCond %{HTTP_HOST} ^www\.mangamukai\.com [NC]
 RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
 RewriteRule ^ https://mangamukai.com%{REQUEST_URI} [R=301,L,NE]
 
+# Never serve logs, backups or development leftovers from the web root.
+# debug_auth.log used to expose live session tokens; the PHP that wrote it is gone,
+# but the file and the .php.bak-* copies stay readable unless blocked here.
+RewriteRule ^(src|node_modules|\.vscode)(/|$) - [F,L]
+RewriteRule (^|/)(error_log|debug_auth\.log|\.env|package(-lock)?\.json|tsconfig[^/]*\.json|vite\.config\.ts)$ - [NC,F,L]
+RewriteRule \.(log|bak|save|tmp|orig|sql)(\.|-|$) - [NC,F,L]
+RewriteRule \.(php|js|css)\.(bak|before|codex)[^/]*$ - [NC,F,L]
+RewriteRule (^|/)[^/]+\.before-[^/]*$ - [NC,F,L]
+RewriteRule ^mangamukai-[^/]*\.zip$ - [NC,F,L]
+
 # PayPal IPN callbacks must reach WordPress even though / serves React.
 RewriteCond %{QUERY_STRING} (^|&)mm_(coin|sub)_ipn=1(&|$)
 RewriteRule ^$ /index.php [L]

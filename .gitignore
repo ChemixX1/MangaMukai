@@ -40,3 +40,6 @@ dist-ssr
 !tsconfig.app.json
 !tsconfig.node.json
 !.vscode/extensions.json
+
+# Clave compartida de la herramienta local de moderacion (se genera sola; se publica con el deploy, nunca a git)
+server/wp-content/mu-plugins/mangamukai-moderation-key.php

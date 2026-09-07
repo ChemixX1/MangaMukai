@@ -34,6 +34,9 @@ MangaMukai-WebSite1/
 
 `src/config/api.ts` es el único punto de configuración de la conexión con WordPress. `npm run build` compila el frontend y copia `server/` dentro de `dist/` para generar el paquete completo de despliegue.
 
+Qué hay en el servidor de producción, qué parte viene de este repo y qué vive
+solo allí se documenta en [docs/servidor.md](docs/servidor.md).
+
 ## Desarrollo
 
 ```bash

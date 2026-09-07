@@ -346,7 +346,7 @@ export const Navbar = () => {
                         onClick={() => setIsSearchOpen(true)}
                         aria-label="Buscar mangas"
                         title="Buscar mangas"
-                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} -mr-1.5 rounded-full p-2 transition-colors lg:mr-0`}
+                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} mr-1 rounded-full p-2 transition-colors lg:mr-0`}
                     >
                         <Search size={20} strokeWidth={2.5} />
                     </button>

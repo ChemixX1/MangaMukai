@@ -17,7 +17,7 @@
   Ruta al credential XML (creado con: Get-Credential | Export-Clixml <ruta>).
 
 .PARAMETER FtpHost
-  Host FTP. Por defecto la IP directa (evita el problema de DNS local del router).
+  Nombre del servidor que coincide con su certificado TLS.
 
 .PARAMETER NoBuild
   Sube el dist/ existente sin recompilar.
@@ -32,7 +32,8 @@
 #>
 param(
   [string]$CredPath = "$env:USERPROFILE\.ssh\mangamukai-deploy-ftps.xml",
-  [string]$FtpHost  = "50.31.188.151",
+  [string]$FtpHost  = "lake-9070.banahosting.com",
+  [string]$FtpAddress = "50.31.188.151",
   [switch]$NoBuild,
   [switch]$DryRun
 )
@@ -58,12 +59,19 @@ if (-not (Test-Path $CredPath)) {
 }
 
 $cred = Import-Clixml $CredPath
-$cfg  = "user = `"$($cred.UserName):$($cred.GetNetworkCredential().Password)`"`nssl-reqd`ninsecure`nconnect-timeout = 20"
+$curlUser = ($cred.UserName + ':' + $cred.GetNetworkCredential().Password).Replace('\', '\\').Replace('"', '\"')
+$cfg  = "user = `"$curlUser`"`nssl-reqd`nconnect-timeout = 20`nresolve = `"${FtpHost}:21:${FtpAddress}`""
 $tmp  = [System.IO.Path]::GetTempFileName()
 [System.IO.File]::WriteAllText($tmp, $cfg, (New-Object System.Text.UTF8Encoding $false))
 
 try {
-  $files = Get-ChildItem -Path $dist -Recurse -File
+  # Publicar el shell solo cuando todos sus assets y endpoints esten disponibles.
+  $files = Get-ChildItem -LiteralPath $dist -Recurse -File -Force | Sort-Object @{Expression={
+    if ($_.FullName -eq (Join-Path $dist 'index.html')) { 3 }
+    elseif ($_.FullName -eq (Join-Path $dist '.htaccess')) { 2 }
+    elseif ($_.FullName.StartsWith((Join-Path $dist 'assets') + [IO.Path]::DirectorySeparatorChar)) { 0 }
+    else { 1 }
+  }}, FullName
   Write-Host ("==> {0} archivos -> ftps://{1}/  (raiz = public_html)" -f $files.Count, $FtpHost) -ForegroundColor Cyan
 
   $ok = 0; $fail = 0; $failed = @()
@@ -73,13 +81,14 @@ try {
     $url = "ftp://$FtpHost/$enc"
     if ($DryRun) { Write-Host "  [dry] $rel"; continue }
 
-    & curl.exe -s -S -K $tmp --ftp-create-dirs -T $f.FullName $url
+    & curl.exe -s -S -K $tmp --retry 2 --ftp-create-dirs -T $f.FullName $url
     if ($LASTEXITCODE -eq 0) {
       $ok++
       Write-Host ("  OK   {0}" -f $rel)
     } else {
       $fail++; $failed += $rel
       Write-Host ("  FALLO ({0}) {1}" -f $LASTEXITCODE, $rel) -ForegroundColor Red
+      throw "Carga interrumpida en $rel. No se publicara el nuevo index.html."
     }
   }
 

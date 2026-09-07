@@ -46,7 +46,25 @@ if (!file_exists($wp_root . '/wp-load.php')) {
     exit;
 }
 
+// wp-load.php, los plugins y el tema se incluyen en el ambito global de este
+// script, asi que cualquier variable suya con el mismo nombre pisa a las de
+// aqui. Con $path clobbereado, isset($static_routes[$path]) lanzaba
+// "Illegal offset type" y toda ruta React caia con error 500.
+$mm_route_ctx = [
+    'wp_root'    => $wp_root,
+    'index_file' => $index_file,
+    'site_url'   => $site_url,
+    'path'       => $path,
+    'cache_file' => $cache_file,
+];
+
 require_once $wp_root . '/wp-load.php';
+
+$wp_root    = $mm_route_ctx['wp_root'];
+$index_file = $mm_route_ctx['index_file'];
+$site_url   = $mm_route_ctx['site_url'];
+$path       = $mm_route_ctx['path'];
+$cache_file = $mm_route_ctx['cache_file'];
 
 /* -------------------------------------------------------------------------
  * Utilidades
