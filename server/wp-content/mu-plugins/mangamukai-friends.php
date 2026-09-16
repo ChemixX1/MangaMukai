@@ -1,13 +1,15 @@
 <?php
 /**
  * Plugin Name: MangaMukai Social
- * Description: Perfiles publicos, amistades, chat, notificaciones y seguimiento de mangas para React.
- * Version: 3.1.0
+ * Description: Perfiles publicos, seguidores, chat, notificaciones, lecturas y seguimiento de mangas para React.
+ * Version: 4.1.0
  */
 
 if (!defined('ABSPATH')) exit;
 
-const MM_SOCIAL_DB_VERSION = '3.1.0';
+const MM_SOCIAL_DB_VERSION = '4.0.0';
+// Minutos sin actividad tras los que un lector deja de mostrarse como "Conectado".
+const MM_SOCIAL_ONLINE_MINUTES = 3;
 
 function mm_social_table($suffix) {
     global $wpdb;
@@ -26,6 +28,8 @@ function mm_social_install_schema() {
     $comment_refs = mm_social_table('comment_refs');
     $subscriptions = mm_social_table('manga_subscriptions');
     $posts = mm_social_table('profile_posts');
+    $follows = mm_social_table('follows');
+    $reads = mm_social_table('manga_reads');
 
     dbDelta("CREATE TABLE {$friendships} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -100,11 +104,58 @@ function mm_social_install_schema() {
         KEY status (status),
         UNIQUE KEY user_shared (user_id,shared_post_id)
     ) {$charset};");
-    if ($wpdb->get_var("SHOW COLUMNS FROM {$posts} LIKE 'shared_post_id'") === 'shared_post_id') {
+    // Seguir es unidireccional: una fila por (quien sigue, a quien sigue).
+    dbDelta("CREATE TABLE {$follows} (
+        follower_id bigint(20) unsigned NOT NULL,
+        following_id bigint(20) unsigned NOT NULL,
+        created_at datetime NOT NULL,
+        PRIMARY KEY  (follower_id,following_id),
+        KEY following_id (following_id,created_at)
+    ) {$charset};");
+    // Mangas leidos: una fila por (lector, serie); chapters cuenta capitulos abiertos.
+    dbDelta("CREATE TABLE {$reads} (
+        user_id bigint(20) unsigned NOT NULL,
+        manga_id bigint(20) unsigned NOT NULL,
+        chapters int(10) unsigned NOT NULL DEFAULT 1,
+        last_chapter_id bigint(20) unsigned NOT NULL DEFAULT 0,
+        first_read_at datetime NOT NULL,
+        last_read_at datetime NOT NULL,
+        PRIMARY KEY  (user_id,manga_id),
+        KEY user_last (user_id,last_read_at)
+    ) {$charset};");
+    mm_social_migrate_friendships_to_follows();
+    if ($wpdb->get_var("SHOW COLUMNS FROM {$posts} LIKE 'shared_post_id'") === 'shared_post_id'
+        && $wpdb->get_var("SHOW TABLES LIKE '{$follows}'") === $follows) {
         update_option('mm_social_db_version', MM_SOCIAL_DB_VERSION, false);
     }
 }
 add_action('init', 'mm_social_install_schema', 5);
+
+/**
+ * Las amistades previas se convierten en seguimientos: aceptada = se siguen mutuamente,
+ * pendiente = quien la envio sigue al otro. INSERT IGNORE la hace idempotente.
+ */
+function mm_social_migrate_friendships_to_follows() {
+    global $wpdb;
+    $friendships = mm_social_table('friendships');
+    $follows = mm_social_table('follows');
+    if ($wpdb->get_var("SHOW TABLES LIKE '{$friendships}'") !== $friendships) return;
+    $wpdb->query("INSERT IGNORE INTO {$follows} (follower_id, following_id, created_at)
+        SELECT requester_id, IF(requester_id = user_low, user_high, user_low), created_at
+        FROM {$friendships} WHERE status IN ('accepted','pending')");
+    $wpdb->query("INSERT IGNORE INTO {$follows} (follower_id, following_id, created_at)
+        SELECT IF(requester_id = user_low, user_high, user_low), requester_id, updated_at
+        FROM {$friendships} WHERE status = 'accepted'");
+}
+
+/** Marca al usuario como activo (como mucho una escritura por minuto). */
+function mm_social_touch_presence($user_id) {
+    $user_id = (int) $user_id;
+    if (!$user_id) return;
+    $last = (int) get_user_meta($user_id, 'mm_last_active', true);
+    if (time() - $last < 60) return;
+    update_user_meta($user_id, 'mm_last_active', time());
+}
 
 function mm_social_auth_permission(WP_REST_Request $request) {
     $user = function_exists('mm_get_request_user')
@@ -116,6 +167,7 @@ function mm_social_auth_permission(WP_REST_Request $request) {
         // Vincular aquí el Bearer token evita depender de una cookie de WordPress,
         // que no está disponible cuando React se ejecuta desde localhost.
         wp_set_current_user((int) $user->ID);
+        mm_social_touch_presence($user->ID);
         return true;
     }
 
@@ -163,17 +215,23 @@ function mm_social_public_user($user_id, $detailed = false) {
     $user = get_userdata((int) $user_id);
     if (!$user) return null;
     $meta = mm_social_profile_meta($user->ID);
+    $last_active = (int) get_user_meta($user->ID, 'mm_last_active', true);
     $result = [
         'id' => (int) $user->ID,
         'username' => (string) ($user->display_name ?: $user->user_login),
         'avatar_url' => $meta['avatar_url'] ?: (string) get_avatar_url($user->ID, ['size' => $detailed ? 256 : 96]),
         'is_pro' => (bool) get_user_meta($user->ID, 'mm_is_pro', true),
+        'is_online' => $last_active > 0 && (time() - $last_active) < MM_SOCIAL_ONLINE_MINUTES * 60,
+        'last_active' => $last_active ? gmdate('Y-m-d\TH:i:s\Z', $last_active) : null,
+        'created_at' => str_replace(' ', 'T', $user->user_registered) . 'Z',
     ];
     if ($detailed) {
+        $counts = mm_social_follow_counts($user->ID);
         $result += [
             'bio' => $meta['bio'], 'location' => $meta['location'],
             'banner_url' => $meta['banner_url'], 'banner_color' => $meta['banner_color'],
-            'created_at' => str_replace(' ', 'T', $user->user_registered) . 'Z',
+            'followers_count' => $counts['followers'], 'following_count' => $counts['following'],
+            'mangas_read_count' => mm_social_mangas_read_count($user->ID),
             'birth_date' => $meta['show_birth_date'] ? $meta['birth_date'] : '',
             'phone' => $meta['show_phone'] && $meta['phone'] !== '' ? trim($meta['country_code'] . ' ' . $meta['phone']) : '',
             'social_links' => array_merge([
@@ -202,6 +260,29 @@ function mm_social_friendship_status($viewer_id, $profile_id) {
     ];
 }
 
+function mm_social_is_following($follower, $following) {
+    global $wpdb;
+    if (!$follower || !$following) return false;
+    return (bool) $wpdb->get_var($wpdb->prepare(
+        'SELECT 1 FROM ' . mm_social_table('follows') . ' WHERE follower_id=%d AND following_id=%d',
+        (int) $follower, (int) $following
+    ));
+}
+
+function mm_social_follow_counts($user_id) {
+    global $wpdb;
+    $table = mm_social_table('follows');
+    return [
+        'followers' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE following_id=%d", (int) $user_id)),
+        'following' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE follower_id=%d", (int) $user_id)),
+    ];
+}
+
+function mm_social_mangas_read_count($user_id) {
+    global $wpdb;
+    return (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . mm_social_table('manga_reads') . ' WHERE user_id=%d', (int) $user_id));
+}
+
 function mm_social_are_friends($first, $second) {
     global $wpdb;
     [$low, $high] = mm_social_pair($first, $second);
@@ -209,6 +290,12 @@ function mm_social_are_friends($first, $second) {
         'SELECT id FROM ' . mm_social_table('friendships') . " WHERE user_low=%d AND user_high=%d AND status='accepted'",
         $low, $high
     ));
+}
+
+// El chat es abierto: basta con que el destinatario exista y no sea uno mismo.
+function mm_social_can_chat_with($current, $other) {
+    $other = (int) $other;
+    return $other > 0 && $other !== (int) $current && get_userdata($other) instanceof WP_User;
 }
 
 function mm_social_create_notification($user_id, $actor_id, $type, $entity_id, $payload, $dedupe_key) {
@@ -234,11 +321,109 @@ function mm_social_get_public_profile(WP_REST_Request $request) {
     $id = absint($request->get_param('id'));
     $profile = mm_social_public_user($id, true);
     if (!$profile) return new WP_Error('mm_social_profile_missing', 'Perfil no encontrado.', ['status' => 404]);
-    $relationship = mm_social_friendship_status(get_current_user_id(), $id);
-    $profile['friendship_status'] = $relationship['status'];
-    $profile['friend_request_id'] = $relationship['request_id'];
+    $viewer_id = get_current_user_id();
+    if ($viewer_id) mm_social_touch_presence($viewer_id);
+    $following = mm_social_is_following($viewer_id, $id);
+    $follows_you = mm_social_is_following($id, $viewer_id);
+    $profile['follow_status'] = !$viewer_id ? 'guest' : ($viewer_id === $id ? 'self' : ($following ? 'following' : 'none'));
+    $profile['follows_you'] = $follows_you;
+    // Compatibilidad con bundles antiguos que aun leen friendship_status.
+    $profile['friendship_status'] = !$viewer_id ? 'guest' : ($viewer_id === $id ? 'self'
+        : ($following && $follows_you ? 'friends' : ($following ? 'pending_sent' : ($follows_you ? 'pending_received' : 'none'))));
+    $profile['friend_request_id'] = 0;
     $profile['posts'] = mm_social_posts_for_user($id, 18);
     return rest_ensure_response(['success' => true, 'profile' => $profile]);
+}
+
+function mm_social_follow_user(WP_REST_Request $request) {
+    global $wpdb;
+    $current = get_current_user_id();
+    $target = absint($request->get_param('user_id'));
+    if (!$target || $target === $current || !get_userdata($target)) {
+        return new WP_Error('mm_social_invalid_user', 'Usuario no valido.', ['status' => 400]);
+    }
+    $table = mm_social_table('follows');
+    $inserted = $wpdb->query($wpdb->prepare(
+        "INSERT IGNORE INTO {$table} (follower_id, following_id, created_at) VALUES (%d, %d, %s)",
+        $current, $target, current_time('mysql', true)
+    ));
+    if ($inserted) mm_social_create_notification($target, $current, 'follow', $current, [], 'follow:' . $current . ':' . $target);
+    $counts = mm_social_follow_counts($target);
+    return rest_ensure_response(['success' => true, 'following' => true, 'followers_count' => $counts['followers']]);
+}
+
+function mm_social_unfollow_user(WP_REST_Request $request) {
+    global $wpdb;
+    $current = get_current_user_id();
+    $target = absint($request->get_param('id'));
+    if (!$target || $target === $current) return new WP_Error('mm_social_invalid_user', 'Usuario no valido.', ['status' => 400]);
+    $wpdb->delete(mm_social_table('follows'), ['follower_id' => $current, 'following_id' => $target], ['%d', '%d']);
+    $wpdb->delete(mm_social_table('notifications'), ['dedupe_key' => 'follow:' . $current . ':' . $target], ['%s']);
+    $counts = mm_social_follow_counts($target);
+    return rest_ensure_response(['success' => true, 'following' => false, 'followers_count' => $counts['followers']]);
+}
+
+/** Seguidores y seguidos de un usuario (por defecto, el de la sesion). Publico. */
+function mm_social_get_follows(WP_REST_Request $request) {
+    global $wpdb;
+    if (function_exists('mm_get_request_user')) {
+        $viewer = mm_get_request_user($request);
+        if ($viewer instanceof WP_User && $viewer->ID) wp_set_current_user((int) $viewer->ID);
+    }
+    $user_id = absint($request->get_param('user_id')) ?: get_current_user_id();
+    if (!$user_id) return new WP_Error('mm_social_unauthorized', 'Debes iniciar sesion.', ['status' => 401]);
+    $table = mm_social_table('follows');
+    $viewer_id = get_current_user_id();
+    $viewer_following = $viewer_id ? array_map('intval', $wpdb->get_col($wpdb->prepare("SELECT following_id FROM {$table} WHERE follower_id=%d", $viewer_id))) : [];
+    $build = static function ($rows, $column) use ($viewer_following) {
+        $items = [];
+        foreach ($rows as $row) {
+            $user = mm_social_public_user((int) $row->$column);
+            if (!$user) continue;
+            $items[] = [
+                'user' => $user,
+                'created_at' => str_replace(' ', 'T', $row->created_at) . 'Z',
+                'viewer_follows' => in_array((int) $row->$column, $viewer_following, true),
+            ];
+        }
+        return $items;
+    };
+    $followers = $wpdb->get_results($wpdb->prepare("SELECT follower_id, created_at FROM {$table} WHERE following_id=%d ORDER BY created_at DESC LIMIT 300", $user_id));
+    $following = $wpdb->get_results($wpdb->prepare("SELECT following_id, created_at FROM {$table} WHERE follower_id=%d ORDER BY created_at DESC LIMIT 300", $user_id));
+    return rest_ensure_response([
+        'success' => true,
+        'followers' => $build($followers, 'follower_id'),
+        'following' => $build($following, 'following_id'),
+    ]);
+}
+
+/** Registra que el lector abrio un capitulo de una serie; devuelve cuantas series lleva. */
+function mm_social_record_manga_read(WP_REST_Request $request) {
+    global $wpdb;
+    $current = get_current_user_id();
+    $manga_id = absint($request->get_param('manga_id'));
+    $chapter_id = absint($request->get_param('chapter_id'));
+    if (!$manga_id) return new WP_Error('mm_social_invalid_manga', 'Serie no valida.', ['status' => 400]);
+    $table = mm_social_table('manga_reads');
+    $now = current_time('mysql', true);
+    $wpdb->query($wpdb->prepare(
+        "INSERT INTO {$table} (user_id, manga_id, chapters, last_chapter_id, first_read_at, last_read_at) VALUES (%d, %d, 1, %d, %s, %s)
+         ON DUPLICATE KEY UPDATE chapters = chapters + IF(last_chapter_id = VALUES(last_chapter_id), 0, 1), last_chapter_id = VALUES(last_chapter_id), last_read_at = VALUES(last_read_at)",
+        $current, $manga_id, $chapter_id, $now, $now
+    ));
+    return rest_ensure_response(['success' => true, 'mangas_read_count' => mm_social_mangas_read_count($current)]);
+}
+
+/** Busqueda de lectores para iniciar un chat: cualquier usuario menos uno mismo. */
+function mm_social_search_all_users(WP_REST_Request $request) {
+    $current = get_current_user_id();
+    $query = sanitize_text_field((string) $request->get_param('q'));
+    if (strlen($query) < 2) return rest_ensure_response(['success' => true, 'users' => []]);
+    $users = get_users([
+        'number' => 12, 'search' => '*' . $query . '*', 'search_columns' => ['user_login', 'display_name'],
+        'exclude' => [$current], 'orderby' => 'display_name', 'order' => 'ASC', 'fields' => 'ID',
+    ]);
+    return rest_ensure_response(['success' => true, 'users' => array_values(array_filter(array_map('mm_social_public_user', $users)))]);
 }
 
 function mm_social_friends_overview() {
@@ -373,7 +558,7 @@ function mm_social_get_messages(WP_REST_Request $request) {
     global $wpdb;
     $current = get_current_user_id();
     $other = absint($request->get_param('id'));
-    if (!$other || !mm_social_are_friends($current, $other)) return new WP_Error('mm_social_chat_forbidden', 'Solo puedes conversar con tus amigos.', ['status' => 403]);
+    if (!mm_social_can_chat_with($current, $other)) return new WP_Error('mm_social_chat_forbidden', 'No se puede abrir esta conversación.', ['status' => 403]);
     $before = absint($request->get_param('before')) ?: PHP_INT_MAX;
     $rows = $wpdb->get_results($wpdb->prepare(
         'SELECT * FROM ' . mm_social_table('messages') . ' WHERE ((sender_id=%d AND recipient_id=%d) OR (sender_id=%d AND recipient_id=%d)) AND id<%d ORDER BY id DESC LIMIT 61',
@@ -388,7 +573,7 @@ function mm_social_send_message(WP_REST_Request $request) {
     $current = get_current_user_id();
     $recipient = absint($request->get_param('recipient_id'));
     $body = trim(sanitize_textarea_field((string) $request->get_param('body')));
-    if (!$recipient || !mm_social_are_friends($current, $recipient)) return new WP_Error('mm_social_chat_forbidden', 'Solo puedes conversar con tus amigos.', ['status' => 403]);
+    if (!mm_social_can_chat_with($current, $recipient)) return new WP_Error('mm_social_chat_forbidden', 'No se puede enviar un mensaje a este usuario.', ['status' => 403]);
     $body_length = function_exists('mb_strlen') ? mb_strlen($body) : strlen($body);
     if ($body === '' || $body_length > 2000) return new WP_Error('mm_social_invalid_message', 'El mensaje debe tener entre 1 y 2000 caracteres.', ['status' => 400]);
     $ok = $wpdb->insert(mm_social_table('messages'), [
@@ -581,13 +766,89 @@ add_filter('upload_mimes', static function ($mimes) {
 });
 
 add_action('post_updated', static function ($post_id, $after, $before) {
-    if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id) || $after->post_status !== 'publish' || $after->post_modified_gmt === $before->post_modified_gmt) return;
+    if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id) || $after->post_type !== 'manga' || $after->post_status !== 'publish' || $after->post_modified_gmt === $before->post_modified_gmt) return;
     global $wpdb;
     $subscribers = $wpdb->get_col($wpdb->prepare('SELECT user_id FROM ' . mm_social_table('manga_subscriptions') . ' WHERE manga_id=%d', $post_id));
     foreach ($subscribers as $user_id) {
-        mm_social_create_notification((int) $user_id, 0, 'manga_update', $post_id, ['manga_id' => (int) $post_id, 'title' => get_the_title($post_id)], 'manga_update:' . $post_id . ':' . $after->post_modified_gmt);
+        mm_social_create_notification((int) $user_id, 0, 'manga_update', $post_id, ['manga_id' => (int) $post_id, 'title' => get_the_title($post_id), 'cover' => mm_social_series_cover($post_id)], 'manga_update:' . $post_id . ':' . $after->post_modified_gmt . ':' . (int) $user_id);
     }
 }, 10, 3);
+
+/* ── Capítulo nuevo y manga nuevo ─────────────────────────────────────────────
+   Los capítulos son `post` con meta ero_seri (id de la serie, CPT `manga`). Se
+   avisa una sola vez por capítulo/serie (meta de control) y se comprueba tanto
+   en save_post como al escribirse ero_seri, porque el tema guarda esa meta
+   después de publicar. */
+
+function mm_social_series_cover($series_id) {
+    $url = get_the_post_thumbnail_url((int) $series_id, 'medium');
+    return $url ? set_url_scheme($url, 'https') : '';
+}
+
+function mm_social_chapter_image($chapter_id) {
+    if (function_exists('mm_chapter_cover_url')) {
+        $url = mm_chapter_cover_url($chapter_id);
+        if ($url) return $url;
+    }
+    $url = get_the_post_thumbnail_url((int) $chapter_id, 'medium_large');
+    return $url ? set_url_scheme($url, 'https') : '';
+}
+
+/** Aviso a los suscriptores de la serie cuando un capítulo queda publicado. */
+function mm_social_maybe_notify_chapter($post_id) {
+    $post = get_post($post_id);
+    if (!$post || $post->post_type !== 'post' || $post->post_status !== 'publish') return;
+    if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) return;
+    if (get_post_meta($post_id, '_mm_chapter_notified', true)) return;
+    $series_id = absint(get_post_meta($post_id, 'ero_seri', true));
+    if (!$series_id) return;
+    $series = get_post($series_id);
+    if (!$series || $series->post_status !== 'publish') return;
+    update_post_meta($post_id, '_mm_chapter_notified', current_time('mysql', true));
+
+    global $wpdb;
+    $subscribers = $wpdb->get_col($wpdb->prepare('SELECT user_id FROM ' . mm_social_table('manga_subscriptions') . ' WHERE manga_id=%d', $series_id));
+    if (!$subscribers) return;
+    $sell = function_exists('mmfix_sell_info') ? mmfix_sell_info($post_id) : ['is_paid' => false, 'price' => 0];
+    $payload = [
+        'manga_id' => (int) $series_id,
+        'title' => get_the_title($series_id),
+        'chapter_id' => (int) $post_id,
+        'chapter_number' => (float) get_post_meta($post_id, 'ero_chapter', true),
+        'chapter_title' => get_the_title($post_id),
+        'image' => mm_social_chapter_image($post_id),
+        'cover' => mm_social_series_cover($series_id),
+        'is_paid' => !empty($sell['is_paid']),
+        'price' => (int) ($sell['price'] ?? 0),
+    ];
+    foreach ($subscribers as $user_id) {
+        mm_social_create_notification((int) $user_id, 0, 'chapter_new', $post_id, $payload, 'chapter_new:' . $post_id . ':' . (int) $user_id);
+    }
+}
+add_action('save_post', 'mm_social_maybe_notify_chapter', 99);
+add_action('added_post_meta', static function ($meta_id, $post_id, $key) { if ($key === 'ero_seri') mm_social_maybe_notify_chapter($post_id); }, 10, 3);
+add_action('updated_post_meta', static function ($meta_id, $post_id, $key) { if ($key === 'ero_seri') mm_social_maybe_notify_chapter($post_id); }, 10, 3);
+
+/** Aviso a todos los lectores cuando se publica una serie nueva (una fila por usuario, en una sola consulta). */
+function mm_social_maybe_notify_new_manga($post_id) {
+    $post = get_post($post_id);
+    if (!$post || $post->post_type !== 'manga' || $post->post_status !== 'publish') return;
+    if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) return;
+    if (get_post_meta($post_id, '_mm_manga_notified', true)) return;
+    update_post_meta($post_id, '_mm_manga_notified', current_time('mysql', true));
+
+    global $wpdb;
+    $table = mm_social_table('notifications');
+    $payload = wp_json_encode(['manga_id' => (int) $post_id, 'title' => get_the_title($post_id), 'cover' => mm_social_series_cover($post_id)]);
+    $wpdb->query($wpdb->prepare(
+        "INSERT IGNORE INTO {$table} (user_id, actor_id, type, entity_id, payload, dedupe_key, created_at, read_at)
+         SELECT ID, NULL, 'manga_new', %s, %s, CONCAT('manga_new:', %d, ':', ID), %s, NULL FROM {$wpdb->users}",
+        (string) $post_id, $payload, (int) $post_id, current_time('mysql', true)
+    ));
+    // Los avisos masivos caducan: se limpian los de más de 60 días para que la tabla no crezca sin freno.
+    $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE type IN ('manga_new','chapter_new','manga_update') AND created_at < %s", gmdate('Y-m-d H:i:s', time() - 60 * DAY_IN_SECONDS)));
+}
+add_action('save_post', 'mm_social_maybe_notify_new_manga', 99);
 
 function mm_social_response_data($response) {
     if (is_wp_error($response)) return [];
@@ -769,6 +1030,11 @@ add_action('rest_api_init', static function () {
     register_rest_route('mangamukai/v1', '/friends/request', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_send_friend_request', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/friends/respond', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_respond_friend_request', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/friends/(?P<id>\d+)', ['methods' => WP_REST_Server::DELETABLE, 'callback' => 'mm_social_remove_friend', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/follow', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_follow_user', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/follow/(?P<id>\d+)', ['methods' => WP_REST_Server::DELETABLE, 'callback' => 'mm_social_unfollow_user', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/follows', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_follows', 'permission_callback' => '__return_true']);
+    register_rest_route('mangamukai/v1', '/social/reads', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_record_manga_read', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/users/search', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_search_all_users', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/messages/conversations', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_conversations', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/messages/read', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_mark_messages_read', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/messages/(?P<id>\d+)', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_messages', 'permission_callback' => $auth]);

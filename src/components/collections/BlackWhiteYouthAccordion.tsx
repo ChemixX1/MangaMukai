@@ -53,9 +53,10 @@ export function BlackWhiteYouthAccordion() {
     <section className={`relative overflow-hidden pb-0 transition-colors duration-500 ${isLightMode ? 'bg-[#eef1f4] text-black' : 'bg-[#08090b] text-white'}`} aria-labelledby="bn-youth-title">
       <div className="relative z-20 h-[80px] w-full md:h-24">
         <div aria-hidden="true" className="home-men-ramp pointer-events-none absolute bottom-[-8px] left-0 h-10 w-full bg-gradient-to-r from-[#67E8F9] via-[#38BDF8] to-[#3B82F6]" />
-        <div className="desktop-content-shell relative z-10 mx-auto flex h-full w-full max-w-[1500px] items-end px-5 pb-1 md:items-center md:pb-0 lg:px-16">
-          <h2 id="bn-youth-title" className="flex -translate-y-1 items-center gap-3 text-[23px] font-black uppercase italic tracking-[-0.035em] md:text-4xl">
-            <Mars className="h-7 w-7 shrink-0 text-[#00C2FF] sm:h-8 sm:w-8" strokeWidth={3} />
+        {/* En móvil el título va más a la izquierda y algo más pequeño para no pisar el escalón de la rampa (72 %). */}
+        <div className="desktop-content-shell relative z-10 mx-auto flex h-full w-full max-w-[1500px] items-end px-3 pb-1 sm:px-5 md:items-center md:pb-0 lg:px-16">
+          <h2 id="bn-youth-title" className="flex -translate-y-1 items-center gap-2 text-[20px] font-black uppercase italic tracking-[-0.035em] sm:gap-3 sm:text-[23px] md:text-4xl">
+            <Mars className="h-6 w-6 shrink-0 text-[#00C2FF] sm:h-8 sm:w-8" strokeWidth={3} />
             Mangas <span className="text-[#00C2FF]">juveniles</span>
           </h2>
         </div>
@@ -96,7 +97,7 @@ export function BlackWhiteYouthAccordion() {
                   <AnimatePresence initial={false} mode="wait">
                     {isActive ? (
                       <motion.div key={`open-${manga.id}`} className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-7" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 14 }} transition={{ duration: 0.32 }}>
-                        <div className="mb-3 flex flex-wrap gap-2">{tags.map((tag) => <span key={tag} className="bg-[#00C2FF] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-black">{tag}</span>)}</div>
+                        <div className="mb-3 flex flex-wrap gap-2">{tags.map((tag) => <span key={tag} className={`px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] ${isLightMode ? 'bg-black text-white' : 'bg-white text-black'}`}>{tag}</span>)}</div>
                         <h3 className="line-clamp-2 max-w-2xl text-2xl font-black uppercase italic leading-[1.02] tracking-[-0.035em] text-white sm:text-3xl">{title}</h3>
                         <p className="mt-3 line-clamp-3 max-w-2xl text-[13px] font-medium leading-6 text-white/75 sm:text-sm">{description}</p>
                         <div className="relative z-30 mt-5 flex flex-wrap items-center gap-3">

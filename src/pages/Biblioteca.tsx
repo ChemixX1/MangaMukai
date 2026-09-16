@@ -1,8 +1,11 @@
-import { useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   BookOpen,
+  CalendarDays,
   ChevronDown,
+  ChevronRight,
   Clock,
+  Flame,
   Mars,
   RotateCcw,
   Search,
@@ -16,12 +19,25 @@ import { Footer } from "../components/layout";
 import { Particles } from "../components/backgrounds/Particles";
 import { BibliotecaClock, DepthText, PaginationControls } from "../components/common";
 import { useTheme } from "../hooks/useTheme";
-import { getUltimosCapitulos } from "../services/mangaService";
+import { getLatestMenUpdates, getLatestWomenUpdates, getUltimosCapitulos } from "../services/mangaService";
 import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from "../utils/globalLoading";
 import { preloadImages } from "../utils/preloadImages";
 import type { MangaCapitulo } from "../types/manga";
 
 const ITEMS_PER_PAGE = 30;
+
+/* "Novedades recientes" del antiguo buscador: los 4 estrenos más nuevos entre mujer y hombre. */
+let cachedRecentReleases: MangaCapitulo[] | null = null;
+const loadRecentReleases = async () => {
+  if (cachedRecentReleases) return cachedRecentReleases;
+  const [women, men] = await Promise.all([getLatestWomenUpdates(2), getLatestMenUpdates(2)]);
+  const unique = new Map<string, MangaCapitulo>();
+  [...women, ...men].forEach((manga) => unique.set(String(manga.id), manga));
+  cachedRecentReleases = [...unique.values()]
+    .sort((a, b) => Date.parse(b.rawFecha || "") - Date.parse(a.rawFecha || ""))
+    .slice(0, 4);
+  return cachedRecentReleases;
+};
 const BIBLIOTECA_PARTICLE_COLORS = ["#ffffff"];
 type Audience = "Hombre" | "Mujer";
 
@@ -64,6 +80,27 @@ export const Biblioteca = () => {
   const isMasculine = selectedAudience === "Hombre";
   const accentColor = isMasculine ? "#00C2FF" : "#FF4D88";
   const deferredSearchTerm = useDeferredValue(searchTerm);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [recentReleases, setRecentReleases] = useState<MangaCapitulo[]>(cachedRecentReleases || []);
+
+  useEffect(() => {
+    let active = true;
+    void loadRecentReleases().then((releases) => { if (active) setRecentReleases(releases); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  // La lupa del navbar (y /biblioteca#buscar) aterrizan con el campo enfocado y a la vista.
+  useEffect(() => {
+    const wantsFocus = location.state?.focusSearch === true || location.hash === '#buscar';
+    if (!wantsFocus) return;
+    const timer = window.setTimeout(() => {
+      const input = searchInputRef.current;
+      if (!input) return;
+      input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      input.focus({ preventScroll: true });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [location.key, location.hash, location.state]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -169,7 +206,7 @@ export const Biblioteca = () => {
   const resultsTitle = selectedTag
     || (selectedAudience === "Mujer" ? "Mangas para mujeres" : null)
     || (selectedAudience === "Hombre" ? "Mangas para hombres" : null)
-    || (searchTerm ? "Resultados" : "Todos los mangas");
+    || (searchTerm ? "Resultados encontrados" : "Todos los mangas");
 
   useEffect(() => {
     if (loading || items.length <= currentPage * ITEMS_PER_PAGE) return;
@@ -296,30 +333,34 @@ export const Biblioteca = () => {
 
             <BibliotecaClock isLight={isLight} />
 
-            <label className="group relative block">
+            {/* Campo con el diseño del antiguo buscador: grande, itálico y en mayúsculas, con línea degradada debajo. */}
+            <label className="group relative block pb-3 lg:col-span-1">
               <span className="sr-only">Buscar manga</span>
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-[var(--accent)]" size={18} style={{ "--accent": accentColor } as CSSProperties} />
+              <Search className="absolute left-0 top-[calc(50%-6px)] -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-[var(--accent)]" size={22} style={{ "--accent": accentColor } as CSSProperties} />
               <input
+                ref={searchInputRef}
+                id="buscar"
                 type="search"
-                placeholder="Buscar manga..."
+                placeholder="¿Qué quieres leer hoy?"
                 value={searchTerm}
                 onChange={(event) => {
                   setSearchTerm(event.target.value);
                   setCurrentPage(1);
                 }}
-                className={`w-full rounded-2xl border py-3.5 pl-11 pr-10 text-sm outline-none transition caret-[var(--accent)] selection:bg-[var(--accent)] selection:text-white focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)] placeholder:text-zinc-500 ${isLight ? "border-black/10 bg-zinc-50 text-black" : "border-white/10 bg-black/35 text-white"}`}
-                style={{ "--accent": accentColor, "--accent-ring": `${accentColor}26` } as CSSProperties}
+                className={`h-12 w-full bg-transparent pl-9 pr-9 text-lg font-[900] italic uppercase tracking-tight outline-none caret-[var(--accent)] selection:bg-[var(--accent)] selection:text-white sm:text-xl [&::-webkit-search-cancel-button]:hidden ${isLight ? "text-zinc-950 placeholder:text-zinc-400" : "text-white placeholder:text-zinc-600"}`}
+                style={{ "--accent": accentColor } as CSSProperties}
               />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => { setSearchTerm(""); setCurrentPage(1); }}
                   aria-label="Borrar búsqueda"
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${isLight ? "text-black/40 hover:bg-black/5 hover:text-black" : "text-white/35 hover:bg-white/10 hover:text-white"}`}
+                  className={`absolute right-0 top-[calc(50%-6px)] -translate-y-1/2 rounded-full border p-1.5 transition ${isLight ? "border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-black" : "border-white/5 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white"}`}
                 >
                   <X size={14} />
                 </button>
               )}
+              <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent to-transparent" style={{ "--tw-gradient-via": `${accentColor}80`, backgroundImage: `linear-gradient(to right, transparent, ${accentColor}99, transparent)` } as CSSProperties} />
             </label>
 
             <div className="space-y-4 lg:contents">
@@ -404,7 +445,39 @@ export const Biblioteca = () => {
           </div>
         </aside>
 
-        <main id="biblioteca-anchor" className="mt-12 min-w-0 scroll-mt-24 sm:mt-14 lg:mt-16">
+        <main id="biblioteca-anchor" className="mt-10 min-w-0 scroll-mt-24 sm:mt-12 lg:mt-14">
+          {!searchTerm && recentReleases.length > 0 && (
+            <section aria-label="Novedades recientes" className="mb-10">
+              <div className="mb-3 flex items-center gap-2 opacity-80">
+                <Flame size={14} className="text-orange-500" />
+                <span className={`text-xs font-[800] uppercase tracking-widest ${isLight ? "text-zinc-600" : "text-zinc-400"}`}>Novedades recientes</span>
+              </div>
+              <div className="grid auto-rows-min grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {recentReleases.map((manga) => (
+                  <Link
+                    key={manga.id}
+                    to={`/manga/${manga.id}`}
+                    className={`group relative flex min-h-[96px] items-center gap-3 overflow-hidden rounded-xl border p-2.5 text-left transition-all duration-300 ${isLight ? "border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-white" : "border-white/5 bg-zinc-900/40 hover:border-white/10 hover:bg-white/5"}`}
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-r from-[#FF4D88]/0 transition-all duration-500 ${isLight ? "to-[#FF4D88]/[0.03] group-hover:to-[#FF4D88]/[0.07]" : "to-[#FF4D88]/5 group-hover:to-[#FF4D88]/10"}`} />
+                    <div className="relative h-[75px] w-[50px] flex-shrink-0 overflow-hidden rounded shadow-lg transition-all duration-500 group-hover:scale-105">
+                      <img src={manga.portada} alt={manga.titulo} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                    </div>
+                    <div className="z-10 flex min-w-0 flex-1 flex-col gap-1">
+                      <h3 className={`line-clamp-2 w-full text-sm font-[800] uppercase italic leading-snug tracking-tight transition-colors group-hover:text-[#FF4D88] ${isLight ? "text-zinc-950" : "text-white"}`}>{manga.titulo}</h3>
+                      <div className={`mt-1 flex w-fit items-center gap-1.5 rounded-md border border-[#FF4D88]/30 bg-[#FF4D88]/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide ${isLight ? "text-zinc-900" : "text-white"}`}>
+                        <CalendarDays size={13} className="shrink-0 text-[#FF4D88]" strokeWidth={2.4} />
+                        <span className="truncate">Subido {manga.fecha}</span>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className={`transition-all duration-300 group-hover:translate-x-1 ${isLight ? "text-zinc-300 group-hover:text-zinc-800" : "text-zinc-800 group-hover:text-white"}`} />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
           <div className={`mb-5 border-b pb-5 text-center ${isLight ? "border-black/[0.08]" : "border-white/[0.08]"}`}>
             <h2 className={`google-sans-library text-2xl font-black uppercase tracking-tight sm:text-3xl ${isLight ? "text-zinc-950" : "text-white"}`}>
               {resultsTitle}

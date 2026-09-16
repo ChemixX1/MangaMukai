@@ -66,17 +66,18 @@ const exchangeSocialSession = (code: string) => {
   return request;
 };
 
+// `example` es el formato nacional del móvil (sin prefijo ni cero inicial) que se muestra como placeholder.
 const COUNTRY_CODES = [
-  { code: "+51", iso: "pe", country: "Perú" },
-  { code: "+54", iso: "ar", country: "Argentina" },
-  { code: "+591", iso: "bo", country: "Bolivia" },
-  { code: "+56", iso: "cl", country: "Chile" },
-  { code: "+57", iso: "co", country: "Colombia" },
-  { code: "+593", iso: "ec", country: "Ecuador" },
-  { code: "+34", iso: "es", country: "España" },
-  { code: "+52", iso: "mx", country: "México" },
-  { code: "+1", iso: "us", country: "Estados Unidos" },
-  { code: "+58", iso: "ve", country: "Venezuela" },
+  { code: "+51", iso: "pe", country: "Perú", example: "965 894 123" },
+  { code: "+54", iso: "ar", country: "Argentina", example: "11 2345 6789" },
+  { code: "+591", iso: "bo", country: "Bolivia", example: "712 34567" },
+  { code: "+56", iso: "cl", country: "Chile", example: "9 6123 4567" },
+  { code: "+57", iso: "co", country: "Colombia", example: "310 123 4567" },
+  { code: "+593", iso: "ec", country: "Ecuador", example: "99 123 4567" },
+  { code: "+34", iso: "es", country: "España", example: "612 345 678" },
+  { code: "+52", iso: "mx", country: "México", example: "55 1234 5678" },
+  { code: "+1", iso: "us", country: "Estados Unidos", example: "202 555 0123" },
+  { code: "+58", iso: "ve", country: "Venezuela", example: "412 123 4567" },
 ];
 
 const SOCIAL_AUTH = [
@@ -357,6 +358,7 @@ export const AuthPage = () => {
   const [birthDate, setBirthDate] = useState("");
   const [countryCode, setCountryCode] = useState("+51");
   const [phone, setPhone] = useState("");
+  const phoneExample = (COUNTRY_CODES.find((country) => country.code === countryCode) ?? COUNTRY_CODES[0]).example;
   const [rememberSession, setRememberSession] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -648,7 +650,7 @@ export const AuthPage = () => {
                             autoComplete="tel-national"
                             required
                             aria-label="Teléfono"
-                            placeholder="965 894 123"
+                            placeholder={phoneExample}
                             className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
                           />
                         </span>

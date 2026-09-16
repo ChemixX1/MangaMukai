@@ -2,9 +2,8 @@ import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { migrateOldDataToWordPress } from './services/migrationService';
 import { GlobalLoader } from './components/common';
-import { Navbar } from './components/layout';
+import { MobileTabBar, Navbar } from './components/layout';
 import { SubscriptionModalHost } from './components/modals';
-import { useTheme } from './hooks/useTheme';
 import { applyRouteSeo } from './hooks/useDocumentTitle';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -22,6 +21,11 @@ const ReaderPage = lazy(() => import('./pages/ReaderPage').then(({ ReaderPage: P
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess').then(({ PaymentSuccess: Page }) => ({ default: Page })));
 const CoinMarketPage = lazy(() => import('./pages/CoinMarketPage').then(({ CoinMarketPage: Page }) => ({ default: Page })));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const CharacterChatPage = lazy(() => import('./pages/CharacterChatPage'));
+const ShopPage = lazy(() => import('./pages/ShopPage'));
+const MorePage = lazy(() => import('./pages/MorePage'));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -44,9 +48,11 @@ const RouteSeo = () => {
   return null;
 };
 
+// Colores de página por CSS (`dark:`), no por estado: si App se suscribiera al
+// tema, cada cambio re-renderizaría la ruta completa (la portada entera).
+const pageColors = 'bg-white text-black dark:bg-black dark:text-white';
+
 function AppInner() {
-  const { theme } = useTheme();
-  const pageColors = theme === 'light' ? 'bg-white text-black' : 'bg-black text-white';
   useEffect(() => {
     migrateOldDataToWordPress().catch(console.error);
   }, []);
@@ -57,8 +63,9 @@ function AppInner() {
       <ScrollToTop />
       <RouteSeo />
       <Navbar />
+      <MobileTabBar />
       <SubscriptionModalHost />
-      <div className={`min-h-screen font-sans transition-colors duration-300 ${pageColors}`}>
+      <div className={`mobile-tabbar-space min-h-screen font-sans ${pageColors}`}>
         <Suspense fallback={<div className={`min-h-screen ${pageColors}`} />}>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -66,6 +73,13 @@ function AppInner() {
             <Route path="/contacto" element={<ContactPage />} />
             <Route path="/perfil" element={<ProfilePage />} />
             <Route path="/usuarios/:id" element={<PublicProfilePage />} />
+            <Route path="/mensajes" element={<MessagesPage />} />
+            <Route path="/mensajes/:userId" element={<MessagesPage />} />
+            <Route path="/notificaciones" element={<NotificationsPage />} />
+            <Route path="/chat" element={<CharacterChatPage />} />
+            <Route path="/chat/:characterId" element={<CharacterChatPage />} />
+            <Route path="/tienda" element={<ShopPage />} />
+            <Route path="/mas" element={<MorePage />} />
             <Route path="/saved" element={<SavedMangas />} />
             <Route path="/legal" element={<TermsAndPrivacy />} />
             <Route path="/biblioteca" element={<Biblioteca />} />

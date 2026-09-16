@@ -1,18 +1,39 @@
 import { MANGAMUKAI_API } from '../config/api';
 import { clearStoredAuth, getStoredToken } from './authService';
 import type { ProfileSocialLinks } from './wordpressService';
-import type { FriendUser } from './friendsService';
 import type { ProfilePost } from './profilePostService';
 
 export const OPEN_CHAT_EVENT = 'mm_open_chat';
+/** La página de mensajes lo emite al leer un chat para que el navbar refresque sus contadores. */
+export const SOCIAL_REFRESH_EVENT = 'mm_social_refresh';
 
-export type FriendshipStatus =
-  | 'guest'
-  | 'self'
-  | 'none'
-  | 'friends'
-  | 'pending_sent'
-  | 'pending_received';
+/** Acento del chat (rosa rojizo), compartido por la página de mensajes y sus badges. */
+export const CHAT_ACCENT = '#f43f5e';
+
+export interface FriendUser {
+  id: number;
+  username: string;
+  avatar_url: string;
+  is_pro: boolean;
+  /** Activo en los últimos minutos (lo marca el servidor con cada petición social). */
+  is_online?: boolean;
+  last_active?: string | null;
+  created_at?: string;
+}
+
+export type FollowStatus = 'guest' | 'self' | 'none' | 'following';
+
+export interface FollowEntry {
+  user: FriendUser;
+  created_at: string;
+  /** Si quien consulta ya sigue a este usuario (para el botón Seguir de las listas). */
+  viewer_follows: boolean;
+}
+
+export interface FollowLists {
+  followers: FollowEntry[];
+  following: FollowEntry[];
+}
 
 export interface PublicProfile extends FriendUser {
   bio: string;
@@ -24,8 +45,11 @@ export interface PublicProfile extends FriendUser {
   phone: string;
   social_links: ProfileSocialLinks;
   posts: ProfilePost[];
-  friendship_status: FriendshipStatus;
-  friend_request_id: number;
+  follow_status: FollowStatus;
+  follows_you: boolean;
+  followers_count: number;
+  following_count: number;
+  mangas_read_count: number;
 }
 
 export interface ChatMessage {
@@ -46,15 +70,40 @@ export type SocialNotificationType =
   | 'comment_like'
   | 'comment_reaction'
   | 'comment_reply'
+  | 'post_reaction'
+  | 'post_comment'
+  | 'post_share'
+  | 'follow'
   | 'friend_request'
   | 'friend_accepted'
-  | 'manga_update';
+  | 'manga_update'
+  | 'chapter_new'
+  | 'manga_new';
+
+export interface SocialNotificationPayload {
+  comment_id?: number;
+  parent_comment_id?: number;
+  manga_id?: number;
+  post_id?: number;
+  reaction?: string;
+  title?: string;
+  excerpt?: string;
+  /** chapter_new */
+  chapter_id?: number;
+  chapter_number?: number;
+  chapter_title?: string;
+  image?: string;
+  is_paid?: boolean;
+  price?: number;
+  /** chapter_new / manga_new / manga_update: portada de la serie. */
+  cover?: string;
+}
 
 export interface SocialNotification {
   id: number;
   type: SocialNotificationType;
   entity_id: string;
-  payload: { comment_id?: number; parent_comment_id?: number; manga_id?: number; reaction?: string; title?: string };
+  payload: SocialNotificationPayload;
   actor: FriendUser | null;
   created_at: string;
   read: boolean;
@@ -69,6 +118,11 @@ interface ApiPayload {
   notifications?: SocialNotification[];
   unread_count?: number;
   has_more?: boolean;
+  followers?: FollowEntry[];
+  following?: FollowEntry[];
+  followers_count?: number;
+  mangas_read_count?: number;
+  users?: FriendUser[];
 }
 
 const authHeaders = (json = false): HeadersInit => {
@@ -107,6 +161,59 @@ export const getPublicProfile = async (userId: string | number): Promise<PublicP
   const payload = await ensureResponse(response);
   if (!payload.profile) throw new Error('Perfil no encontrado.');
   return payload.profile;
+};
+
+export const followUser = async (userId: number): Promise<number> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/follow`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: authHeaders(true),
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const payload = await ensureResponse(response);
+  return Number(payload.followers_count || 0);
+};
+
+export const unfollowUser = async (userId: number): Promise<number> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/follow/${userId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: authHeaders(),
+  });
+  const payload = await ensureResponse(response);
+  return Number(payload.followers_count || 0);
+};
+
+/** Listas de seguidores/seguidos; sin `userId` devuelve las del usuario con sesión. */
+export const getFollows = async (userId?: number): Promise<FollowLists> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/follows${userId ? `?user_id=${userId}` : ''}`, {
+    credentials: 'include',
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  const payload = await ensureResponse(response);
+  return { followers: payload.followers || [], following: payload.following || [] };
+};
+
+/** Anota la serie como leída al abrir un capítulo; devuelve el total de series leídas. */
+export const recordMangaRead = async (mangaId: number | string, chapterId?: number | string): Promise<number> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/reads`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: authHeaders(true),
+    body: JSON.stringify({ manga_id: Number(mangaId), chapter_id: Number(chapterId || 0) }),
+  });
+  const payload = await ensureResponse(response);
+  return Number(payload.mangas_read_count || 0);
+};
+
+export const searchUsers = async (query: string): Promise<FriendUser[]> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/users/search?q=${encodeURIComponent(query.trim())}`, {
+    credentials: 'include',
+    headers: authHeaders(),
+  });
+  const payload = await ensureResponse(response);
+  return payload.users || [];
 };
 
 export const getConversations = async (): Promise<{ conversations: Conversation[]; unread: number }> => {
@@ -184,6 +291,7 @@ export const syncMangaSubscriptions = async (
   await ensureResponse(response);
 };
 
+/** Abre el chat con un lector: el navbar escucha el evento y navega a /mensajes/:id. */
 export const openChat = (user: FriendUser) => {
   window.dispatchEvent(new CustomEvent<FriendUser>(OPEN_CHAT_EVENT, { detail: user }));
 };

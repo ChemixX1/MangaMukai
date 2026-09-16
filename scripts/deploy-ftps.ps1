@@ -25,6 +25,13 @@
 .PARAMETER DryRun
   Muestra que archivos se subirian, sin subir nada.
 
+.PARAMETER NoPrune
+  No borra del servidor los bundles viejos de assets/ (por defecto, tras subir,
+  se elimina todo archivo de assets/ remoto que ya no exista en dist/assets/).
+
+.PARAMETER PruneOnly
+  Solo ejecuta la limpieza de assets/ contra el dist/ existente, sin compilar ni subir.
+
 .EXAMPLE
   pwsh scripts/deploy-ftps.ps1
   pwsh scripts/deploy-ftps.ps1 -NoBuild
@@ -35,12 +42,16 @@ param(
   [string]$FtpHost  = "lake-9070.banahosting.com",
   [string]$FtpAddress = "50.31.188.151",
   [switch]$NoBuild,
-  [switch]$DryRun
+  [switch]$DryRun,
+  [switch]$NoPrune,
+  [switch]$PruneOnly
 )
 
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $repo "dist"
+
+if ($PruneOnly) { $NoBuild = $true }
 
 if (-not $NoBuild) {
   Write-Host "==> npm run build" -ForegroundColor Cyan
@@ -75,6 +86,7 @@ try {
   Write-Host ("==> {0} archivos -> ftps://{1}/  (raiz = public_html)" -f $files.Count, $FtpHost) -ForegroundColor Cyan
 
   $ok = 0; $fail = 0; $failed = @()
+  if ($PruneOnly) { $files = @() }
   foreach ($f in $files) {
     $rel = $f.FullName.Substring($dist.Length).TrimStart('\','/').Replace('\','/')
     $enc = ($rel -split '/' | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/'
@@ -92,9 +104,55 @@ try {
     }
   }
 
-  if (-not $DryRun) {
+  if (-not $DryRun -and -not $PruneOnly) {
     Write-Host ("==> Subidos: {0}  Fallidos: {1}" -f $ok, $fail) -ForegroundColor Green
     if ($fail -gt 0) { $failed | ForEach-Object { Write-Host "   - $_" -ForegroundColor Red }; exit 1 }
+  }
+
+  # Limpieza de assets/: Vite nombra cada bundle con hash, asi que cada deploy dejaba
+  # los anteriores acumulandose en el servidor. Solo se toca assets/ (nunca wp-content,
+  # images, etc.) y solo se borra lo que no existe en el dist/ recien subido.
+  if (-not $NoPrune) {
+    $local = @{}
+    Get-ChildItem -LiteralPath (Join-Path $dist 'assets') -File -Force | ForEach-Object { $local[$_.Name] = $true }
+    $listing = & curl.exe -s -S -K $tmp --list-only "ftp://$FtpHost/assets/"
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "==> No se pudo listar assets/ remoto; se omite la limpieza." -ForegroundColor Yellow
+    } else {
+      # Solo el nombre (NLST puede devolver rutas); '.' y '..' se filtran antes de nada.
+      $stale = @($listing | ForEach-Object { (($_ -replace '\r','').Trim() -split '/')[-1] } |
+        Where-Object { $_ -and $_ -ne '.' -and $_ -ne '..' -and -not $local.ContainsKey($_) })
+      if ($stale.Count -eq 0) {
+        Write-Host "==> assets/ remoto sin bundles viejos." -ForegroundColor Green
+      } elseif ($DryRun) {
+        $stale | ForEach-Object { Write-Host "  [dry] borrar assets/$_" }
+      } else {
+        Write-Host ("==> Borrando {0} bundles viejos de assets/" -f $stale.Count) -ForegroundColor Cyan
+        $removed = 0
+        # Lotes de DELE en una misma conexion; el '*' hace que curl siga aunque uno falle.
+        for ($i = 0; $i -lt $stale.Count; $i += 40) {
+          $batch = $stale[$i..([Math]::Min($i + 39, $stale.Count - 1))]
+          $quote = @()
+          foreach ($name in $batch) { $quote += '-Q'; $quote += ('*DELE assets/' + $name) }
+          # Sin redirigir stderr: con ErrorActionPreference=Stop, PowerShell 5.1 convierte
+          # cualquier linea de stderr redirigida en error terminante.
+          & curl.exe -s -S -K $tmp @quote "ftp://$FtpHost/assets/" | Out-Null
+          if ($LASTEXITCODE -ne 0) { Write-Host ("  aviso: curl devolvio {0} en un lote de borrado" -f $LASTEXITCODE) -ForegroundColor Yellow }
+          $removed += $batch.Count
+          $batch | ForEach-Object { Write-Host "  DEL  assets/$_" }
+        }
+        # Verificacion: lo que siga existiendo se reporta, sin abortar el deploy.
+        $after = & curl.exe -s -S -K $tmp --list-only "ftp://$FtpHost/assets/"
+        $left = @($after | ForEach-Object { (($_ -replace '\r','').Trim() -split '/')[-1] } |
+          Where-Object { $_ -and $_ -ne '.' -and $_ -ne '..' -and -not $local.ContainsKey($_) })
+        if ($left.Count -gt 0) {
+          Write-Host ("==> Quedaron {0} archivos sin borrar en assets/:" -f $left.Count) -ForegroundColor Yellow
+          $left | ForEach-Object { Write-Host "   - $_" -ForegroundColor Yellow }
+        } else {
+          Write-Host ("==> Limpieza completa: {0} archivos borrados." -f $removed) -ForegroundColor Green
+        }
+      }
+    }
   }
 } finally {
   Remove-Item $tmp -Force -ErrorAction SilentlyContinue

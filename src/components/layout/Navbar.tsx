@@ -1,17 +1,13 @@
 import { useState, useEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
-import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Search, X, AlarmClock, Bell, Coins, Crown, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
-import { AlarmAlert, SearchModal, TimerModal } from "../modals";
+import { Search, X, AlarmClock, Bell, Coins, Crown, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
+import { AlarmAlert, TimerModal } from "../modals";
 import { DetailCoin3DIcon } from "../common";
-import { ChatWindow, MessagesPanel, NotificationsPanel } from "../social";
-import { FOOTER_SOCIALS } from "./Footer";
+import { NotificationsPanel } from "../social";
 import { useTheme } from "../../hooks/useTheme";
 import { getUltimosCapitulos } from "../../services/mangaService";
-import { lockPageScroll } from "../../utils/scrollLock";
 import { openSubscriptionModal } from "../../utils/subscriptionModal";
 import authPopoverBackground from "../../assets/modals/auth-login.webp";
-import profilePopoverBackground from "../../assets/modals/auth-register.jpg";
 import { preloadImages } from "../../utils/preloadImages";
 import { seedSharedAuthCovers } from "../../utils/authCoverCache";
 import {
@@ -24,18 +20,15 @@ import {
   type MMUser,
 } from "../../services/authService";
 import { getInteractions } from "../../services/interactionsService";
-import { getConversations, getNotifications, syncMangaSubscriptions } from "../../services/socialService";
+import { getConversations, getNotifications, OPEN_CHAT_EVENT, SOCIAL_REFRESH_EVENT, syncMangaSubscriptions, type FriendUser } from "../../services/socialService";
 import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "../../services/wordpressService";
 
 // El modal vive montado una sola vez en App: aquí solo se precarga y se abre.
 const loadSubscriptionModal = () => import("../modals/SubscriptionModal");
 
-const MOBILE_NAV_LINKS = [
-  { name: "Inicio", href: "/" },
-  { name: "Biblioteca", href: "/biblioteca" },
-  { name: "Mangas B&N", href: "/manga-bn" },
-  { name: "Mangas +19", href: "/manga-19", isAdult: true },
-];
+/** La página "Más" lo emite para abrir la alarma, que vive montada aquí. */
+export const OPEN_TIMER_EVENT = 'mm_open_timer';
+
 
 const NavbarFire = ({ size = 16 }: { size?: number }) => (
   <span
@@ -61,17 +54,13 @@ export const Navbar = () => {
   const isLightMode = theme === 'light';
   const isProfileRoute = location.pathname === '/perfil';
 
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const headerUsesDarkText = isLightMode;
   const [currentUser, setCurrentUser] = useState<MMUser | null>(getCurrentStoredUser);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [sessionNotice, setSessionNotice] = useState(false);
-  const [showMessages, setShowMessages] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [isMobileScrolled, setIsMobileScrolled] = useState(false);
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -83,29 +72,12 @@ export const Navbar = () => {
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isMobileMenuOpen) return;
-    return lockPageScroll();
-  }, [isMobileMenuOpen]);
-
-  useEffect(() => {
     if (!currentUser || !showUserMenu) return;
     void loadSubscriptionModal();
   }, [currentUser, showUserMenu]);
 
-  useEffect(() => {
-    const updateMobileScrollState = () => setIsMobileScrolled(window.scrollY > 12);
-    updateMobileScrollState();
-    window.addEventListener('scroll', updateMobileScrollState, { passive: true });
-    return () => window.removeEventListener('scroll', updateMobileScrollState);
-  }, []);
-
   /** La cabecera se esconde al bajar y reaparece en cuanto se sube. */
   useEffect(() => {
-    if (isMobileMenuOpen) {
-      setIsHeaderHidden(false);
-      return;
-    }
-
     let lastY = window.scrollY;
     const onScroll = () => {
       const currentY = window.scrollY;
@@ -118,7 +90,7 @@ export const Navbar = () => {
 
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [isMobileMenuOpen]);
+  }, []);
 
   const refreshSocialCounts = useCallback(async () => {
     if (!getCurrentStoredUser()) {
@@ -141,8 +113,29 @@ export const Navbar = () => {
       ? syncMangaSubscriptions({ mangaIds: interactions.bookmarks }).catch(() => undefined)
       : undefined);
     const interval = window.setInterval(() => void refreshSocialCounts(), 30000);
-    return () => window.clearInterval(interval);
+    const refresh = () => void refreshSocialCounts();
+    window.addEventListener(SOCIAL_REFRESH_EVENT, refresh);
+    return () => { window.clearInterval(interval); window.removeEventListener(SOCIAL_REFRESH_EVENT, refresh); };
   }, [currentUser, refreshSocialCounts]);
+
+  // openChat(usuario) desde cualquier pantalla abre su conversación en la página de mensajes.
+  useEffect(() => {
+    const open = (event: Event) => {
+      const target = (event as CustomEvent<FriendUser>).detail;
+      if (!target?.id) return;
+      setShowUserMenu(false);
+      setShowNotifications(false);
+      navigate(`/mensajes/${target.id}`);
+    };
+    // La alarma se abre también desde la página "Más".
+    const openTimer = () => { setShowUserMenu(false); setShowNotifications(false); setIsTimerModalOpen(true); };
+    window.addEventListener(OPEN_CHAT_EVENT, open);
+    window.addEventListener(OPEN_TIMER_EVENT, openTimer);
+    return () => {
+      window.removeEventListener(OPEN_CHAT_EVENT, open);
+      window.removeEventListener(OPEN_TIMER_EVENT, openTimer);
+    };
+  }, [navigate]);
 
   const startTimer = (minutes: number) => {
     const seconds = minutes * 60;
@@ -209,32 +202,18 @@ export const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    if (currentUser || (!showUserMenu && !isMobileMenuOpen)) return;
+    if (currentUser || !showUserMenu) return;
 
     void getUltimosCapitulos().then((mangas) => {
       const covers = seedSharedAuthCovers(mangas);
       void preloadImages(covers.slice(0, 24).map((cover) => cover.src));
     });
     void import('../../pages/AuthPage');
-  }, [currentUser, isMobileMenuOpen, showUserMenu]);
+  }, [currentUser, showUserMenu]);
 
-  const handleThemeToggle = () => {
-    const root = document.documentElement;
-    const viewTransitionDocument = document as Document & {
-      startViewTransition?: (callback: () => void) => { finished: Promise<void> };
-    };
-
-    if (!viewTransitionDocument.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      toggleTheme();
-      return;
-    }
-
-    root.classList.add('theme-transition-capture');
-    const transition = viewTransitionDocument.startViewTransition(() => {
-      flushSync(() => toggleTheme());
-    });
-    void transition.finished.finally(() => root.classList.remove('theme-transition-capture'));
-  };
+  // Cambio directo: la View Transition capturaba toda la página (imágenes, blur,
+  // carruseles) y con flushSync bloqueaba el hilo; en la portada se notaba mucho.
+  const handleThemeToggle = () => toggleTheme();
 
   // Refrescar monedas desde el servidor al cargar y cada 60s
   useEffect(() => {
@@ -262,9 +241,7 @@ export const Navbar = () => {
   const handleLogout = () => {
     setSessionNotice(false);
     setShowUserMenu(false);
-    setShowMessages(false);
     setShowNotifications(false);
-    setIsMobileMenuOpen(false);
     // Recarga completa al terminar: así no queda en memoria nada de la cuenta
     // (monedas, guardados, mensajes) que siguiera vivo en algún componente.
     void clearAuth().finally(() => window.location.reload());
@@ -277,17 +254,13 @@ export const Navbar = () => {
 
   const openAuthPage = (view: 'login' | 'register') => {
     setSessionNotice(false);
-    setIsMobileMenuOpen(false);
     setShowUserMenu(false);
     navigate(`/auth/${view}`);
   };
 
   const handleLogoClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
-    setIsMobileMenuOpen(false);
-    setIsSearchOpen(false);
     setIsTimerModalOpen(false);
     setShowUserMenu(false);
-    setShowMessages(false);
     setShowNotifications(false);
     setSessionNotice(false);
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -302,14 +275,14 @@ export const Navbar = () => {
   return (
     <>
       <header
-        className={`${isProfileRoute && !isMobileMenuOpen ? 'sticky' : 'fixed'} site-navbar-surface left-0 top-0 z-[100] w-full py-3 transition-transform duration-300 sm:py-3`}
+        className={`${isProfileRoute ? 'sticky' : 'fixed'} site-navbar-surface left-0 top-0 z-[100] w-full py-3 transition-transform duration-300 sm:py-3`}
         style={{ transform: isHeaderHidden ? 'translateY(-100%)' : 'translateY(0)' }}
       >
         <div className="desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16 flex justify-between items-center">
             
             {/* 1. IZQUIERDA */}
             <div className="flex items-center gap-4 lg:gap-10"> 
-              <Link to="/" onClick={handleLogoClick} className={`group h-10 items-center lg:-translate-y-0.5 ${isMobileMenuOpen ? 'invisible lg:visible flex' : 'flex'}`} aria-label="Volver al inicio de MangaMukai">
+              <Link to="/" onClick={handleLogoClick} className="group flex h-10 items-center lg:-translate-y-0.5" aria-label="Volver al inicio de MangaMukai">
                 <span className={`select-none text-[22px] min-[390px]:text-2xl font-[1000] uppercase italic leading-none tracking-tighter transition-colors sm:text-3xl ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
                     MANGA<span className="text-[#FF4D88]">MUKAI</span>
                 </span>
@@ -339,16 +312,29 @@ export const Navbar = () => {
             {/* 2. DERECHA */}
             <div className="flex items-center gap-0 sm:gap-1 lg:gap-6 lg:translate-y-0.5">
                 
-                <div className={isMobileMenuOpen ? 'hidden lg:contents' : 'contents'}>
+                <div className="contents">
                 {/* Herramientas: la alarma móvil está en el menú principal. */}
                 <div className={`relative hidden items-center gap-0 min-[360px]:flex lg:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} lg:border-r lg:mr-1 lg:pr-6`}>
+                    {/* El buscador vive en la Biblioteca: la lupa lleva allí y enfoca el campo. */}
                     <button 
-                        onClick={() => setIsSearchOpen(true)}
+                        onClick={() => { setShowUserMenu(false); setShowNotifications(false); navigate('/biblioteca', { state: { focusSearch: true } }); }}
                         aria-label="Buscar mangas"
                         title="Buscar mangas"
                         className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} mr-1 rounded-full p-2 transition-colors lg:mr-0`}
                     >
                         <Search size={20} strokeWidth={2.5} />
+                    </button>
+
+                    {/* Móvil: campana a la derecha de la lupa; abre la página de notificaciones. */}
+                    <button
+                      type="button"
+                      onClick={() => { setShowUserMenu(false); setShowNotifications(false); navigate(currentUser ? '/notificaciones' : '/auth/login', currentUser ? undefined : { state: { returnTo: '/notificaciones' } }); }}
+                      aria-label="Notificaciones"
+                      title="Notificaciones"
+                      className={`relative mr-1 rounded-full p-2 transition-colors lg:hidden ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
+                    >
+                      <Bell size={20} strokeWidth={2.5} />
+                      {unreadNotifications > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[8px] font-black leading-none text-white">{Math.min(99, unreadNotifications)}</span>}
                     </button>
                     
                     <div className="relative hidden lg:block">
@@ -373,12 +359,13 @@ export const Navbar = () => {
                         
                     </div>
 
+                    {/* En móvil el tema se cambia desde la página "Más". */}
                     <button
                       type="button"
                       onClick={handleThemeToggle}
                       title={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
                       aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
-                      className={`rounded-full p-2 transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
+                      className={`hidden rounded-full p-2 transition-colors lg:block ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
                     >
                       {theme === 'light' ? <Moon size={20} strokeWidth={2.5} /> : <Sun size={20} strokeWidth={2.5} />}
                     </button>
@@ -400,23 +387,23 @@ export const Navbar = () => {
                   </div>
                 )}
 
+                {/* Perfil y acceso solo en escritorio: en móvil todo esto vive en la página "Más". */}
                 {currentUser ? (
-                  <div className="relative flex items-center gap-1" ref={userMenuRef}>
+                  <div className="relative hidden items-center gap-1 lg:flex" ref={userMenuRef}>
                     <div className="relative">
                       <button
-                        onClick={() => { setShowUserMenu((value) => !value); setShowMessages(false); setShowNotifications(false); }}
+                        onClick={() => { setShowUserMenu((value) => !value); setShowNotifications(false); }}
                         aria-label={`Abrir perfil de ${currentUser.username}`}
                         aria-expanded={showUserMenu}
                         title={currentUser.username}
-                        className={`flex h-10 w-10 items-center justify-center rounded-full border bg-transparent transition-colors ${headerUsesDarkText ? 'border-black/20 text-black hover:border-black/40 hover:text-[#FF4D88]' : 'border-white/25 text-white hover:border-white/45 hover:text-[#FF4D88]'}`}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors lg:border ${headerUsesDarkText ? 'text-black hover:text-[#FF4D88] lg:border-black/20 lg:hover:border-black/40' : 'text-white hover:text-[#FF4D88] lg:border-white/25 lg:hover:border-white/45'}`}
                       >
                         {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className="h-8 w-8 rounded-full object-cover" /> : <UserIcon size={20} strokeWidth={2.4} />}
                       </button>
 
                       {showUserMenu && (
-                        <div className={`auth-user-popover profile-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} fixed inset-x-4 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-2xl lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-2 lg:max-h-[calc(100dvh-4.5rem)] lg:w-[300px] border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
-                          <img src={profilePopoverBackground} alt="" aria-hidden="true" className="auth-user-popover-background absolute inset-0 h-full w-full object-cover object-[55%_center]" />
-                          <div aria-hidden="true" className="auth-user-popover-scrim absolute inset-0" />
+                        // Fondo sólido (blanco/negro según el tema), sin imagen ni degradado.
+                        <div className={`profile-user-popover fixed inset-x-4 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-2xl lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-2 lg:max-h-[calc(100dvh-4.5rem)] lg:w-[300px] border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
                           <div className="relative z-10">
                             <div className={`flex items-center gap-3 border-b p-4 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
                               <Link to="/perfil" onClick={() => setShowUserMenu(false)} aria-label="Ver mi perfil" className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FF4D88]">
@@ -425,25 +412,26 @@ export const Navbar = () => {
                               <div className="min-w-0"><p className="truncate font-[Montserrat] text-[15px] font-bold uppercase tracking-[0.035em]">{currentUser.username}</p><p className={`truncate font-[Montserrat] text-[11px] font-semibold ${isLightMode ? 'text-black/55' : 'text-white/55'}`}>{currentUser.email}</p></div>
                             </div>
                             <div className="flex flex-col gap-0.5 px-2 pb-2">
-                              <button type="button" onClick={goToRecharge} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><Coins size={17} /> Recargar monedas</button>
-                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option hidden lg:flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><UserIcon size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Mi Perfil</Link>
-                              <Link to="/saved" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><Bookmark size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Guardados</Link>
-                              <button type="button" onClick={() => { setShowUserMenu(false); setShowMessages(true); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><MessageCircle size={17} className={isLightMode ? 'text-black' : 'text-white'} /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[9px] text-white">{unreadMessages}</span>}</button>
-                              <button type="button" onClick={() => { setShowUserMenu(false); openSubscriptionModal(); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black/80 hover:bg-white/45 hover:text-black' : 'text-white/80 hover:bg-black/30 hover:text-white'}`}><Crown size={17} /> Suscripción</button>
+                              <button type="button" onClick={goToRecharge} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Coins size={17} /> Recargar monedas</button>
+                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option hidden lg:flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><UserIcon size={17} /> Mi Perfil</Link>
+                              <Link to="/saved" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Bookmark size={17} /> Guardados</Link>
+                              <Link to="/mensajes" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><MessageCircle size={17} /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[9px] text-white">{unreadMessages}</span>}</Link>
+                              <button type="button" onClick={() => { setShowUserMenu(false); openSubscriptionModal(); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Crown size={17} /> Suscripción</button>
+                              {/* Cerrar sesión va aquí (antes estaba en el menú de hamburguesa en móvil). */}
+                              <button type="button" onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10"><LogOut size={17} /> Cerrar Sesión</button>
                             </div>
-                            <div className={`hidden border-t px-2 pb-2 pt-1 lg:block ${isLightMode ? 'border-black/10' : 'border-white/10'}`}><button onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10"><LogOut size={17} /> Cerrar Sesión</button></div>
                           </div>
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); setShowMessages(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative hidden lg:flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}>
+                    <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative hidden lg:flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}>
                       <Bell size={20} strokeWidth={2.4} />
                       {unreadNotifications > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[8px] font-black leading-none text-white">{Math.min(99, unreadNotifications)}</span>}
                     </button>
                   </div>
                 ) : (
-                  <div className="auth-google-sans relative" ref={userMenuRef}>
-                    <button type="button" aria-label="Abrir opciones de acceso" aria-expanded={showUserMenu} onClick={() => setShowUserMenu((visible) => !visible)} className={`flex h-10 w-10 items-center justify-center rounded-full border bg-transparent transition-colors ${headerUsesDarkText ? 'border-black/10 text-zinc-800 hover:border-[#FF4D88] hover:text-[#FF4D88]' : 'border-white/15 text-white hover:border-[#FF4D88] hover:text-[#FF4D88]'}`}><UserIcon size={20} strokeWidth={2.4} /></button>
+                  <div className="auth-google-sans relative hidden lg:block" ref={userMenuRef}>
+                    <button type="button" aria-label="Abrir opciones de acceso" aria-expanded={showUserMenu} onClick={() => setShowUserMenu((visible) => !visible)} className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors lg:border ${headerUsesDarkText ? 'text-zinc-800 hover:text-[#FF4D88] lg:border-black/10 lg:hover:border-[#FF4D88]' : 'text-white hover:text-[#FF4D88] lg:border-white/15 lg:hover:border-[#FF4D88]'}`}><UserIcon size={20} strokeWidth={2.4} /></button>
                     {showUserMenu && (
                       <div className={`auth-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} fixed inset-x-4 top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-[24px] lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-3 lg:max-h-[calc(100dvh-4.5rem)] lg:min-h-[290px] lg:w-[340px] border p-4 lg:p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] ${headerUsesDarkText ? 'border-black/10 bg-white text-zinc-950' : 'border-white/10 bg-[#0a0a0d] text-white'}`}>
                         <img src={authPopoverBackground} alt="" aria-hidden="true" className="auth-user-popover-background absolute inset-0 h-full w-full object-cover" />
@@ -462,17 +450,6 @@ export const Navbar = () => {
                 )}
                 
                 </div>
-                <span aria-hidden="true" className="ml-3 h-10 w-10 shrink-0 lg:hidden" />
-
-                <button
-                  type="button"
-                  aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-                  aria-expanded={isMobileMenuOpen}
-                  onClick={() => { setIsMobileMenuOpen(!isMobileMenuOpen); setShowUserMenu(false); setShowMessages(false); setShowNotifications(false); }}
-                  className={`fixed right-4 top-4 z-[120] rounded-lg border p-2 sm:right-8 sm:top-6 lg:hidden transition-[background-color,border-color,color,opacity,box-shadow,backdrop-filter] duration-300 ${isMobileScrolled ? 'opacity-[0.85] shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-md' : 'opacity-100 shadow-lg'} ${theme === 'light' || isLightMode ? (isMobileScrolled ? 'border-black/10 bg-white/75 text-black' : 'border-zinc-200 bg-white text-black') : (isMobileScrolled ? 'border-white/15 bg-black/65 text-white' : 'border-white/10 bg-black text-white')}`}
-                >
-                    {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-                </button>
             </div>
         </div>
       </header>
@@ -498,92 +475,7 @@ export const Navbar = () => {
         </div>
       )}
 
-      {/* --- MENÚ MÓVIL FULL SCREEN --- */}
-      {isMobileMenuOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menú principal"
-          className={`fixed inset-0 z-[90] isolate overflow-hidden lg:hidden ${isLightMode ? 'bg-white text-black' : 'bg-black text-white'}`}
-        >
-          <div aria-hidden="true" className="absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-[#FF4D88]/10 blur-[90px]" />
-          <div aria-hidden="true" className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[#6d28d9]/10 blur-[90px]" />
-
-          {/* Notificaciones: solo el icono, justo debajo del botón de cerrar. */}
-          {currentUser && (
-            <button
-              type="button"
-              aria-label="Abrir notificaciones"
-              onClick={() => { setShowMessages(false); setShowNotifications(true); }}
-              className={`absolute right-4 top-[4.25rem] z-[95] flex h-11 w-11 items-center justify-center transition-colors sm:right-8 sm:top-[5rem] ${isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
-            >
-              <Bell size={26} strokeWidth={2} />
-              {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[8px] text-white">{Math.min(99, unreadNotifications)}</span>}
-            </button>
-          )}
-
-          <div className="relative flex h-[100dvh] flex-col overflow-y-auto overscroll-contain px-6 pb-6 pt-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <nav aria-label="Navegación móvil" className="flex min-h-[310px] flex-1 flex-col items-center justify-center py-4">
-              {MOBILE_NAV_LINKS.map(link => {
-                const isActive = location.pathname === link.href;
-                return (
-                  <Link
-                    key={link.name}
-                    to={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`navbar-primary-link group relative flex w-full max-w-sm items-center justify-center py-3.5 text-center text-[clamp(1.1rem,5.4vw,1.35rem)] tracking-[0.02em] transition-colors ${isActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white hover:text-[#FF4D88]'}`}
-                  >
-                    <span className={`inline-flex items-center justify-center gap-2 ${link.isAdult ? 'navbar-adult-option' : ''}`}>
-                      {link.isAdult && <NavbarFire size={22} />}
-                      {link.name}
-                    </span>
-                    <span aria-hidden="true" className={`absolute bottom-2 left-1/2 h-0.5 -translate-x-1/2 bg-[#FF4D88] transition-all duration-300 ${isActive ? 'w-20' : 'w-0 group-hover:w-20 group-focus-visible:w-20'}`} />
-                  </Link>
-                );
-              })}
-
-              <div className="mt-5 w-full max-w-sm pt-5">
-                <div className={`flex items-center justify-center gap-3 rounded-xl border bg-transparent px-3 py-2 ${isLightMode ? 'border-zinc-500' : 'border-zinc-600'}`}>
-                  <button type="button" onClick={() => { setIsMobileMenuOpen(false); setIsTimerModalOpen(true); }}
-                    className={`inline-flex min-h-11 items-center gap-1.5 font-['Montserrat'] text-[13px] font-semibold ${isTimerActive ? 'text-[#FF4D88]' : isLightMode ? 'text-black' : 'text-white'}`}>
-                    <AlarmClock size={18} strokeWidth={2} /> Alarma
-                  </button>
-                </div>
-              </div>
-            </nav>
-
-            {currentUser && (
-              <button type="button" onClick={handleLogout}
-                className="mx-auto mt-6 flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-5 py-3 font-['Montserrat'] text-sm font-semibold text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10">
-                <LogOut size={18} /> Cerrar sesión
-              </button>
-            )}
-
-            <div className="mt-auto flex shrink-0 items-center justify-center gap-2.5 pt-6">
-              {FOOTER_SOCIALS.filter(({ name }) => !['Discord', 'Telegram', 'Youtube'].includes(name)).map(({ name, href, icon: Icon }) => (
-                <a
-                  key={name}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={name}
-                  aria-label={name}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`grid h-14 w-14 place-items-center rounded-2xl border transition-colors ${isLightMode ? 'border-zinc-300 bg-white text-black/70 hover:border-[#FF4D88] hover:text-[#FF4D88]' : 'border-white/15 bg-white/[0.04] text-white/70 hover:border-[#FF4D88] hover:text-[#FF4D88]'}`}
-                >
-                  <Icon className="h-6 w-6" />
-                </a>
-              ))}
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      <MessagesPanel isOpen={showMessages} isLight={isLightMode} onClose={() => setShowMessages(false)} onUnreadChange={setUnreadMessages} />
-      <NotificationsPanel onNavigate={() => setIsMobileMenuOpen(false)} isOpen={showNotifications} isLight={isLightMode} onClose={() => setShowNotifications(false)} onUnreadChange={setUnreadNotifications} />
-      {currentUser && <ChatWindow isLight={isLightMode} onUnreadChange={refreshSocialCounts} />}
+      <NotificationsPanel isOpen={showNotifications} isLight={isLightMode} onClose={() => setShowNotifications(false)} onUnreadChange={setUnreadNotifications} />
 
       <TimerModal
         isOpen={isTimerModalOpen}
@@ -593,7 +485,6 @@ export const Navbar = () => {
         activeTimer={timeLeft}
         isActive={isTimerActive}
       />
-      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <AlarmAlert isOpen={isAlarmAlertOpen} onClose={() => setIsAlarmAlertOpen(false)} />
     </>
   );

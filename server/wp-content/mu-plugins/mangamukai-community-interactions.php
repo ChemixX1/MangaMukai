@@ -92,6 +92,12 @@ function mm_interactions_posts($request) {
         $table = mm_social_table('post_reactions');
         $ok = $reaction === '' ? $wpdb->delete($table, ['post_id' => $post->id, 'user_id' => $current], ['%d', '%d'])
             : $wpdb->replace($table, ['post_id' => $post->id, 'user_id' => $current, 'reaction' => $reaction, 'updated_at' => current_time('mysql', true)], ['%d', '%d', '%s', '%s']);
+        // Aviso al dueño de la publicación (se retira si se quita la reacción).
+        if (function_exists('mm_social_create_notification')) {
+            $dedupe = 'post_reaction:' . (int) $post->id . ':' . $current;
+            if ($reaction === '') $wpdb->delete(mm_social_table('notifications'), ['dedupe_key' => $dedupe], ['%s']);
+            else mm_social_create_notification((int) $post->user_id, $current, 'post_reaction', $post->id, ['post_id' => (int) $post->id, 'reaction' => $reaction], $dedupe);
+        }
         if ($ok === false) return new WP_Error('mm_write_failed', 'No se pudo guardar la reacción.', ['status' => 500]);
     } elseif ($action === 'comments') {
         $content = trim(sanitize_textarea_field((string) $request['content']));
@@ -100,6 +106,9 @@ function mm_interactions_posts($request) {
         $table = mm_social_table('post_comments');
         if (!$wpdb->insert($table, ['post_id' => $post->id, 'user_id' => $current, 'content' => $content, 'created_at' => current_time('mysql', true)], ['%d', '%d', '%s', '%s'])) return new WP_Error('mm_write_failed', 'No se pudo guardar el comentario.', ['status' => 500]);
         $comment = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id=%d", $wpdb->insert_id));
+        if (function_exists('mm_social_create_notification')) {
+            mm_social_create_notification((int) $post->user_id, $current, 'post_comment', $post->id, ['post_id' => (int) $post->id, 'comment_id' => (int) $comment->id, 'excerpt' => mb_substr($content, 0, 80)], 'post_comment:' . (int) $comment->id);
+        }
         return new WP_REST_Response(['success' => true, 'comment' => mm_interactions_comment_payload($comment), 'post' => mm_social_post_payload($post)], 201);
     } elseif ($action === 'share') {
         if (!empty($post->shared_post_id)) $post = mm_interactions_post($post->shared_post_id);
@@ -110,6 +119,9 @@ function mm_interactions_posts($request) {
             VALUES (%d,'',%d,'public','published',%s,%s) ON DUPLICATE KEY UPDATE status='published',updated_at=VALUES(updated_at)", $current, $post->id, $now, $now));
         if ($ok === false) return new WP_Error('mm_write_failed', 'No se pudo compartir la publicación.', ['status' => 500]);
         $shared = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE user_id=%d AND shared_post_id=%d", $current, $post->id));
+        if (function_exists('mm_social_create_notification')) {
+            mm_social_create_notification((int) $post->user_id, $current, 'post_share', $post->id, ['post_id' => (int) $post->id], 'post_share:' . (int) $post->id . ':' . $current);
+        }
         return rest_ensure_response(['success' => true, 'post' => mm_social_post_payload($post), 'shared' => mm_social_post_payload($shared)]);
     } else return new WP_Error('mm_action_invalid', 'Acción no válida.', ['status' => 400]);
     return rest_ensure_response(['success' => true, 'post' => mm_social_post_payload($post)]);

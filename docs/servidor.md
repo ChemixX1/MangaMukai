@@ -21,10 +21,12 @@ lo que hay aquí se publica tal cual:
 | `server/wp-content/plugins/manga-auth-legacy-fix/` | `/wp-content/plugins/manga-auth-legacy-fix/` (desde 2026-09-06; sobrescribe `/login`, `/register`, `/me`, `/coins`, `/chapters/*` con prioridad 99) |
 | `server/wp-content/plugins/manga-paypal-payments/` | `/wp-content/plugins/manga-paypal-payments/` (desde 2026-09-06; monedas y suscripción por PayPal, y **es quien responde `/me`** con prioridad 100) |
 
-El deploy **sobrescribe y añade, nunca borra**. Por eso los bundles con hash
-antiguos se acumulan en `/assets/` y hay que limpiarlos de vez en cuando (se
-conservan siempre los de los dos últimos deploys para no romper pestañas
-abiertas).
+El deploy **sobrescribe y añade**; desde el 2026-09-15, tras subir, además
+**borra de `/assets/` todo bundle que no exista en el `dist/` recién subido**
+(solo esa carpeta; nunca `wp-content`, `images`, etc.). Las pestañas abiertas
+con un bundle viejo recargan sola la página al fallar el import. Opciones:
+`-NoPrune` (no borrar), `-PruneOnly` (solo limpiar, sin compilar ni subir) y
+`-DryRun` (listar lo que se subiría/borraría).
 
 ## Lo que solo existe en el servidor
 
@@ -64,6 +66,45 @@ No está versionado aquí. Antes de tocarlo, descargarlo por FTPS.
   `.well-known/` (ACME), `llms.txt`, `ads.txt`, `robots.txt`, `litespeed.conf`,
   `.private/`.
 - `wp-config.php` (secretos; nunca descargar a un sitio compartido).
+
+## Social: seguidores, lecturas y presencia
+
+`mangamukai-friends.php` (v4.0.0, 2026-09-15) sustituyó las amistades por
+**seguir** (unidireccional). Tablas nuevas, creadas por `dbDelta` en `init`
+cuando cambia `mm_social_db_version`:
+
+- `wp_mm_follows` (`follower_id`, `following_id`, `created_at`). Las amistades
+  previas de `wp_mm_friendships` se migraron con `INSERT IGNORE` (aceptada =
+  mutuo, pendiente = quien la envió sigue al otro); la tabla vieja y sus rutas
+  `/friends/*` siguen existiendo pero el cliente ya no las usa.
+- `wp_mm_manga_reads` (`user_id`, `manga_id`, `chapters`, `last_chapter_id`,
+  fechas). El lector hace `POST /social/reads` al abrir un capítulo con sesión;
+  "Mangas leídos" del perfil es el número de filas del usuario.
+- Presencia: `user_meta.mm_last_active` (epoch) se actualiza como mucho una vez
+  por minuto en cada petición social autenticada; `is_online` = activo en los
+  últimos 3 min (`MM_SOCIAL_ONLINE_MINUTES`). El chat lo muestra como
+  "Conectado / No conectado".
+
+**Pendiente de desplegar (2026-09-15, solo en local por ahora)**: v4.1.0 añade
+notificaciones `chapter_new` (a los suscriptores de la serie cuando un capítulo
+—`post` con meta `ero_seri`— queda publicado; se marca `_mm_chapter_notified`
+en el capítulo y se dispara en `save_post` o al escribirse `ero_seri`),
+`manga_new` (a todos los usuarios cuando se publica un CPT `manga`, una fila
+por usuario en un solo `INSERT … SELECT`; meta `_mm_manga_notified`; los avisos
+masivos de más de 60 días se borran) y, en
+`mangamukai-community-interactions.php`, `post_reaction`, `post_comment` y
+`post_share` para el dueño de la publicación. También se corrigió `manga_update`,
+cuya `dedupe_key` era la misma para todos los suscriptores (solo llegaba a uno).
+El cliente pinta estos tipos como tarjetas en `/notificaciones`
+(`src/components/social/NotificationCard.tsx`).
+
+Rutas nuevas: `POST /social/follow`, `DELETE /social/follow/{id}`,
+`GET /social/follows[?user_id]` (público), `POST /social/reads`,
+`GET /social/users/search?q=` (cualquier lector, para iniciar un chat).
+`/social/profile/{id}` devuelve `follow_status`, `follows_you`,
+`followers_count`, `following_count`, `mangas_read_count`, `is_online`.
+El chat (`/social/messages*`) **ya no exige amistad**: cualquier usuario con
+sesión puede escribir a otro.
 
 ## Moderación de mensajes privados
 

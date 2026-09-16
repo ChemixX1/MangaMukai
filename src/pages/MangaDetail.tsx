@@ -555,7 +555,9 @@ export const MangaDetail = () => {
 
               {/* Etiquetas de la ficha y "Me gusta", antes encima de la portada:
                   ahora en una sola fila bajo el contador de likes y lectores. */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 xl:flex xl:flex-wrap">
+                {/* En móvil las etiquetas van centradas y el corazón a la derecha; en escritorio, en fila. */}
+                <div className="col-start-2 flex flex-wrap items-center justify-center gap-2 xl:justify-start">
                 <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-[#FF4D88] px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">
                   Estreno
                 </span>
@@ -569,12 +571,13 @@ export const MangaDetail = () => {
                     <Palette size={14} strokeWidth={2.3} aria-hidden="true" />
                   </span>
                 )}
+                </div>
                 <button
                   type="button"
                   onClick={handleLike}
                   disabled={interactionBusy !== ''}
                   aria-label={isLiked ? 'Quitar Me gusta' : 'Me gusta'}
-                  className={`ml-auto flex shrink-0 items-center justify-center bg-transparent transition-all hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60 ${isLiked ? 'text-[#FF4D88]' : isLightMode ? 'text-black/70 hover:text-[#FF4D88]' : 'text-white/80 hover:text-[#FF4D88]'}`}
+                  className={`col-start-3 flex shrink-0 items-center justify-center justify-self-end bg-transparent xl:ml-auto transition-all hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60 ${isLiked ? 'text-[#FF4D88]' : isLightMode ? 'text-black/70 hover:text-[#FF4D88]' : 'text-white/80 hover:text-[#FF4D88]'}`}
                 >
                   {interactionBusy === 'like' ? <Loader2 size={24} className="animate-spin" /> : <Heart size={24} fill={isLiked ? 'currentColor' : 'none'} />}
                 </button>

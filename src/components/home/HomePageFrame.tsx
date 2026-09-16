@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { Footer } from '../layout';
 import { useHomeData } from '../../context/HomeDataContext';
-import { useTheme } from '../../hooks/useTheme';
 import { startGlobalLoading } from '../../utils/globalLoading';
 import FilterStrip from './FilterStrip';
 import { Latest } from './Latest';
@@ -23,6 +22,8 @@ interface HomePageFrameProps {
   youthSection?: ReactNode;
   /** La colección B&N no usa la tira de filtros. */
   hideFilterStrip?: boolean;
+  /** Oculta "Nuevos lanzamientos" (la colección B&N no lo usa). */
+  hideReleases?: boolean;
   menSection?: ReactNode;
   youthLatestSection?: ReactNode;
   pageClassName?: string;
@@ -46,13 +47,13 @@ export function HomePageFrame({
   popularSection,
   youthSection,
   hideFilterStrip = false,
+  hideReleases = false,
   menSection,
   youthLatestSection,
   pageClassName = '',
   pageHeading = 'Leer manga online gratis en español',
 }: HomePageFrameProps) {
   const navigate = useNavigate();
-  const { theme } = useTheme();
   const { isReady } = useHomeData();
 
   const handleCategoryClick = (category: string) => {
@@ -63,8 +64,9 @@ export function HomePageFrame({
   };
 
   return (
-    <div className={`home-shell home-theme-${theme} flex min-h-screen flex-col overflow-x-hidden font-sans selection:bg-red-600 selection:text-white ${isReady ? 'home-data-ready' : 'home-data-pending'} ${pageClassName}`}>
-      <div className="home-stage flex flex-1 flex-col transition-colors duration-300">
+    // El tema llega por las clases home-theme-* de <html> (ver useTheme): este árbol no se re-renderiza al cambiarlo.
+    <div className={`home-shell flex min-h-screen flex-col overflow-x-hidden font-sans selection:bg-red-600 selection:text-white ${isReady ? 'home-data-ready' : 'home-data-pending'} ${pageClassName}`}>
+      <div className="home-stage flex flex-1 flex-col">
         <h1 className="sr-only">{pageHeading}</h1>
         <section className="home-block home-block-hero relative z-40 bg-black">
           {hero}
@@ -72,8 +74,8 @@ export function HomePageFrame({
 
         {afterHero}
 
-        <div className="home-main relative z-10 w-full flex-grow bg-[#050505] pb-20 pt-10 transition-colors duration-300">
-          <div className={`absolute inset-0 z-0 transition-colors duration-300 ${theme === 'light' ? 'bg-[linear-gradient(180deg,#f5f6f8_0%,#eef2f7_100%)]' : 'bg-black'}`} />
+        <div className="home-main relative z-10 w-full flex-grow bg-[#050505] pb-20 pt-10">
+          <div className="absolute inset-0 z-0 bg-[linear-gradient(180deg,#f5f6f8_0%,#eef2f7_100%)] dark:bg-black dark:bg-none" />
 
           <div className="relative z-20 flex flex-col gap-24">
             {!hideFilterStrip && (
@@ -90,7 +92,7 @@ export function HomePageFrame({
             <section className="home-block home-block-youth">{youthSection ?? <YouthCarousel youthOnly />}</section>
             <section className="home-block home-block-youth-news"><News variant="youth" /></section>
             <section className="home-block home-block-youth-latest">{youthLatestSection ?? <YouthLatest />}</section>
-            <section className="home-block home-block-releases -mt-4 sm:mt-0"><NewReleases /></section>
+            {!hideReleases && <section className="home-block home-block-releases -mt-4 sm:mt-0"><NewReleases /></section>}
           </div>
         </div>
 

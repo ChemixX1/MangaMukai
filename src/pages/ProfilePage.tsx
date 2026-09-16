@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ProfilePostCard } from '../components/social/ProfilePostCard';
+import { ProfileStats } from '../components/social/ProfileStats';
 import { MangaRecommendationSidebar, type RecommendationManga } from '../components/manga/MangaRecommendationSidebar';
 import { getUltimosCapitulos } from '../services/mangaService';
 import {
@@ -20,7 +21,7 @@ import {
   Save,
   Send,
   User,
-  UserMinus,
+  UserCheck,
   UserPlus,
   Users,
   Video,
@@ -29,14 +30,14 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import { getStoredToken, getStoredUser, updateStoredUser } from '../services/authService';
 import {
-  emptyFriendsOverview,
-  getFriendsOverview,
-  removeFriend,
-  respondFriendRequest,
-  type FriendEntry,
-  type FriendsOverview,
-} from '../services/friendsService';
-import { openChat } from '../services/socialService';
+  followUser,
+  getFollows,
+  getPublicProfile,
+  openChat,
+  unfollowUser,
+  type FollowEntry,
+  type FollowLists,
+} from '../services/socialService';
 import {
   createProfilePost,
   getProfilePosts,
@@ -89,11 +90,13 @@ const formatProfileDate = (value = '') => {
   return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
 };
 
-const UserAvatar = ({ entry, size = 'h-10 w-10' }: { entry: FriendEntry; size?: string }) => entry.user.avatar_url
+const emptyFollows = (): FollowLists => ({ followers: [], following: [] });
+
+const UserAvatar = ({ entry, size = 'h-10 w-10' }: { entry: FollowEntry; size?: string }) => entry.user.avatar_url
   ? <img src={entry.user.avatar_url} alt="" className={`${size} shrink-0 rounded-full object-cover ring-2 ring-[#FF4D88]/25`} />
   : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#FF4D88] text-sm font-black text-white`}>{entry.user.username.charAt(0).toUpperCase()}</span>;
 
-type ProfileSection = 'summary' | 'information' | 'friends' | 'requests';
+type ProfileSection = 'summary' | 'information' | 'followers' | 'following';
 type PostMedia = { url: string; kind: 'image' | 'video'; name: string; file: File };
 
 export const ProfilePage = () => {
@@ -101,7 +104,8 @@ export const ProfilePage = () => {
   const { theme } = useTheme();
   const isLight = theme === 'light';
   const [profile, setProfile] = useState<WordPressProfile>(() => fallbackProfile());
-  const [friends, setFriends] = useState<FriendsOverview>(() => emptyFriendsOverview());
+  const [follows, setFollows] = useState<FollowLists>(() => emptyFollows());
+  const [mangasRead, setMangasRead] = useState(0);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,9 +147,10 @@ export const ProfilePage = () => {
     startGlobalLoading(12, loadingScope);
     Promise.all([
       getWordPressProfile(user),
-      getFriendsOverview().catch(() => emptyFriendsOverview()),
+      getFollows().catch(() => emptyFollows()),
       getProfilePosts(user.id).catch(() => []),
-    ]).then(([loadedProfile, loadedFriends, loadedPosts]) => {
+      getPublicProfile(user.id).then((social) => social.mangas_read_count).catch(() => 0),
+    ]).then(([loadedProfile, loadedFollows, loadedPosts, loadedReads]) => {
       if (!active) return;
       setProfile(loadedProfile);
       updateStoredUser({
@@ -153,12 +158,13 @@ export const ProfilePage = () => {
         display_name: loadedProfile.username,
         avatar: loadedProfile.avatar_url,
       });
-      setFriends(loadedFriends);
+      setFollows(loadedFollows);
+      setMangasRead(loadedReads);
       setPosts(loadedPosts);
     }).catch(() => {
       if (!active) return;
       setProfile(fallbackProfile(user.username, user.avatar || ''));
-      setFriends(emptyFriendsOverview());
+      setFollows(emptyFollows());
       setNotice({ type: 'error', text: 'No se pudo sincronizar el perfil.' });
     }).finally(() => {
       if (!active) return;
@@ -178,7 +184,7 @@ export const ProfilePage = () => {
     if (avatarConfirmationRef.current) window.clearTimeout(avatarConfirmationRef.current);
   }, []);
 
-  const reloadFriends = async () => setFriends(await getFriendsOverview());
+  const reloadFollows = async () => setFollows(await getFollows());
 
   const handleImage = async (event: ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
     const file = event.target.files?.[0];
@@ -231,41 +237,28 @@ export const ProfilePage = () => {
     }
   };
 
-  const handleRequest = async (requestId: number, action: 'accept' | 'reject') => {
-    setActionId(requestId);
-    setNotice(null);
-    try {
-      await respondFriendRequest(requestId, action);
-      await reloadFriends();
-      setNotice({ type: 'success', text: action === 'accept' ? 'Solicitud aceptada. Ya pueden conversar.' : 'Solicitud rechazada.' });
-    } catch (caught) {
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo responder.' });
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const handleRemove = async (entry: FriendEntry) => {
-    if (!window.confirm(`¿Eliminar a ${entry.user.username} de tus amigos?`)) return;
+  const handleUnfollow = async (entry: FollowEntry) => {
+    if (!window.confirm(`¿Dejar de seguir a ${entry.user.username}?`)) return;
     setActionId(entry.user.id);
+    setNotice(null);
     try {
-      await removeFriend(entry.user.id);
-      await reloadFriends();
+      await unfollowUser(entry.user.id);
+      await reloadFollows();
     } catch (caught) {
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo eliminar la amistad.' });
+      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo dejar de seguir.' });
     } finally {
       setActionId(null);
     }
   };
 
-  const handleCancelRequest = async (entry: FriendEntry) => {
-    setActionId(entry.request_id);
+  const handleFollowBack = async (entry: FollowEntry) => {
+    setActionId(entry.user.id);
     setNotice(null);
     try {
-      await removeFriend(entry.user.id);
-      await reloadFriends();
+      await followUser(entry.user.id);
+      await reloadFollows();
     } catch (caught) {
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo cancelar la solicitud.' });
+      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo seguir.' });
     } finally {
       setActionId(null);
     }
@@ -321,8 +314,8 @@ export const ProfilePage = () => {
   const joined = new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(new Date(profile.created_at));
   const configuredSocials = SOCIAL_FIELDS.filter((field) => profile.social_links[field.key]);
 
-  // Mosaico 3x2: portada del amigo con su nombre sobre una sombra interior que lo mantiene legible.
-  const renderFriendTile = (entry: FriendEntry) => (
+  // Mosaico 3x2: foto del seguidor con su nombre sobre una sombra interior que lo mantiene legible.
+  const renderFollowTile = (entry: FollowEntry) => (
     <Link key={entry.user.id} to={`/usuarios/${entry.user.id}`} title={entry.user.username} className="group relative block aspect-square overflow-hidden rounded-lg">
       {entry.user.avatar_url
         ? <img src={entry.user.avatar_url} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -370,11 +363,21 @@ export const ProfilePage = () => {
               <div className="flex min-w-0 flex-1 flex-col items-center gap-4 pb-1 text-center sm:-translate-y-3 sm:flex-row sm:items-center sm:justify-between sm:text-left">
                 <div className="min-w-0">
                   {editing ? <input value={profile.username} maxLength={60} onChange={(event) => setProfile((current) => ({ ...current, username: event.target.value }))} className={`w-full max-w-xl rounded-lg border px-4 py-3 text-2xl font-black outline-none focus:border-[#FF4D88]/60 ${input}`} /> : <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start"><h1 className="break-words text-3xl font-black tracking-[-0.035em] md:text-4xl">{profile.username}</h1>{profile.is_pro && <span className="rounded bg-yellow-400 px-2 py-1 text-[9px] font-black text-black">MUKAI PRO</span>}</div>}
-                  <div className={`mt-2 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold sm:justify-start ${muted}`}>
+                  {/* En móvil solo van los contadores; la fecha de registro se muestra en escritorio y en el chat. */}
+                  <div className={`mt-2 hidden flex-wrap items-center justify-center gap-3 text-xs font-semibold sm:flex sm:justify-start ${muted}`}>
                     <span className="flex items-center gap-1.5"><CalendarDays size={14} className="text-[#FF4D88]" />Miembro desde {joined}</span>
-                    <span>{friends.friends.length} {friends.friends.length === 1 ? 'amigo' : 'amigos'}</span>
                     <span className="flex items-center gap-1.5"><MapPin size={14} />{profile.location || 'Ubicación sin configurar'}</span>
                   </div>
+                  <ProfileStats
+                    isLight={isLight}
+                    className="mt-3"
+                    onSelect={(key) => { if (key === 'followers' || key === 'following') setActiveSection(key); }}
+                    stats={[
+                      { key: 'followers', label: 'Seguidores', value: follows.followers.length },
+                      { key: 'following', label: 'Siguiendo', value: follows.following.length },
+                      { key: 'reads', label: 'Mangas leídos', value: mangasRead },
+                    ]}
+                  />
                 </div>
                 <div className="flex w-full shrink-0 justify-center gap-2 sm:w-auto">
                   {editing && <button type="button" onClick={() => { setEditing(false); if (user) void getWordPressProfile(user).then(setProfile); }} className={`flex h-10 items-center gap-2 rounded-lg border px-4 text-xs font-bold ${isLight ? 'border-black/10 bg-[#e4e6eb] hover:bg-[#d8dadf]' : 'border-white/10 bg-[#3a3b3c] hover:bg-[#4e4f50]'}`}><X size={16} />Cancelar</button>}
@@ -398,11 +401,12 @@ export const ProfilePage = () => {
               </div>
             </div>
 
-            <div className={`mt-5 flex min-h-14 items-stretch justify-center gap-1 overflow-x-auto border-t sm:justify-start ${isLight ? 'border-black/10' : 'border-white/10'}`} aria-label="Secciones del perfil">
+            {/* "safe center": centradas si caben y, si desbordan en móvil, alineadas al inicio para poder desplazarlas. */}
+            <div className={`mt-5 flex min-h-14 items-stretch gap-1 overflow-x-auto border-t [justify-content:safe_center] sm:justify-start ${isLight ? 'border-black/10' : 'border-white/10'}`} aria-label="Secciones del perfil">
               <button type="button" onClick={() => setActiveSection('summary')} aria-current={activeSection === 'summary' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'summary' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Resumen</button>
               <button type="button" onClick={() => setActiveSection('information')} aria-current={activeSection === 'information' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'information' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Información</button>
-              <button type="button" onClick={() => setActiveSection('friends')} aria-current={activeSection === 'friends' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'friends' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Amigos <span className="ml-2 rounded-full bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] text-[#FF4D88]">{friends.friends.length}</span></button>
-              <button type="button" onClick={() => setActiveSection('requests')} aria-current={activeSection === 'requests' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'requests' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Solicitudes{friends.incoming.length > 0 && <span className="ml-2 rounded-full bg-[#FF4D88] px-2 py-0.5 text-[10px] font-black text-white">{friends.incoming.length}</span>}</button>
+              <button type="button" onClick={() => setActiveSection('followers')} aria-current={activeSection === 'followers' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'followers' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Seguidores <span className="ml-2 rounded-full bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] text-[#FF4D88]">{follows.followers.length}</span></button>
+              <button type="button" onClick={() => setActiveSection('following')} aria-current={activeSection === 'following' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'following' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Siguiendo <span className="ml-2 rounded-full bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] text-[#FF4D88]">{follows.following.length}</span></button>
             </div>
           </div>
         </div>
@@ -414,7 +418,7 @@ export const ProfilePage = () => {
 
         <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start xl:grid-cols-[320px_minmax(0,1fr)_320px]">
           {/* Columna izquierda: quién eres y tu círculo. En móvil va primero, como en Facebook. */}
-          <aside className="order-1 flex flex-col gap-4 lg:col-start-1 lg:row-start-1" aria-label="Presentación y amigos">
+          <aside className="order-1 flex flex-col gap-4 lg:col-start-1 lg:row-start-1" aria-label="Presentación y seguidores">
             <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-intro-title">
               <h2 id="profile-intro-title" className="text-lg font-bold">Presentación</h2>
               <p className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 ${muted}`}>{profile.bio || 'Cuéntale a la comunidad un poco sobre ti.'}</p>
@@ -429,15 +433,15 @@ export const ProfilePage = () => {
             </section>
 
 
-            <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-friends-preview">
+            <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-followers-preview">
               <div className="flex items-center justify-between">
-                <h2 id="profile-friends-preview" className="text-lg font-bold">Amigos</h2>
-                <button type="button" onClick={() => setActiveSection('friends')} className="text-xs font-semibold text-[#FF4D88]">Ver todos</button>
+                <h2 id="profile-followers-preview" className="text-lg font-bold">Seguidores</h2>
+                <button type="button" onClick={() => setActiveSection('followers')} className="text-xs font-semibold text-[#FF4D88]">Ver todos</button>
               </div>
-              <p className={`mb-3 text-xs ${muted}`}>{friends.friends.length} {friends.friends.length === 1 ? 'amigo' : 'amigos'}</p>
-              {friends.friends.length === 0
-                ? <p className={`text-xs ${muted}`}>Aún no tienes amigos. Envía solicitudes desde el perfil de otros lectores.</p>
-                : <div className="grid grid-cols-3 gap-2">{friends.friends.slice(0, 6).map(renderFriendTile)}</div>}
+              <p className={`mb-3 text-xs ${muted}`}>{follows.followers.length} {follows.followers.length === 1 ? 'seguidor' : 'seguidores'}</p>
+              {follows.followers.length === 0
+                ? <p className={`text-xs ${muted}`}>Todavía nadie te sigue. Comparte tu perfil con otros lectores.</p>
+                : <div className="grid grid-cols-3 gap-2">{follows.followers.slice(0, 6).map(renderFollowTile)}</div>}
             </section>
           </aside>
 
@@ -525,55 +529,44 @@ export const ProfilePage = () => {
           </div>
         )}
 
-        {activeSection === 'friends' && (
-          <section className={`mx-auto max-w-5xl rounded-xl border p-5 ${card}`} aria-labelledby="profile-friends-title">
-              <div className="flex items-center justify-between"><div><h2 id="profile-friends-title" className="text-xl font-black tracking-tight">Amigos</h2><p className={`mt-0.5 text-xs ${muted}`}>Tu comunidad de lectura</p></div><span className="grid h-10 min-w-10 place-items-center rounded-full bg-[#FF4D88]/10 px-3 text-xs font-black text-[#FF4D88]">{friends.friends.length}</span></div>
-
-
-              <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{friends.friends.map((entry) => <div key={entry.user.id} className={`group flex items-center gap-3 rounded-lg p-3 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}><Link to={`/usuarios/${entry.user.id}`}><UserAvatar entry={entry} size="h-12 w-12" /></Link><Link to={`/usuarios/${entry.user.id}`} className="min-w-0 flex-1 truncate text-sm font-bold hover:text-[#FF4D88]">{entry.user.username}</Link><button type="button" onClick={() => openChat(entry.user)} aria-label={`Chatear con ${entry.user.username}`} className="flex h-8 w-8 items-center justify-center rounded-full text-[#FF4D88] hover:bg-[#FF4D88]/10"><MessageCircle size={16} /></button><button type="button" onClick={() => void handleRemove(entry)} disabled={actionId === entry.user.id} aria-label="Eliminar amistad" className={`flex h-8 w-8 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${isLight ? 'text-black/35 hover:bg-red-500/10 hover:text-red-500' : 'text-white/30 hover:bg-red-500/10 hover:text-red-400'}`}><UserMinus size={14} /></button></div>)}</div>
-              {friends.friends.length === 0 && <div className={`mt-5 rounded-xl border border-dashed py-16 text-center ${isLight ? 'border-black/15 bg-[#f7f8fa]' : 'border-white/15 bg-white/[0.025]'}`}><Users size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">Tu lista está vacía</p><p className={`mx-auto mt-1 max-w-sm text-xs leading-relaxed ${muted}`}>Las solicitudes se envían desde el perfil público de cada lector.</p></div>}
-
-            </section>
-        )}
-
-        {activeSection === 'requests' && (
-          <section className={`mx-auto max-w-3xl rounded-xl border p-5 ${card}`} aria-labelledby="profile-requests-title">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 id="profile-requests-title" className="flex items-center gap-2 text-xl font-black tracking-tight"><UserPlus size={20} className="text-[#FF4D88]" />Solicitudes</h2>
-                <p className={`mt-0.5 text-xs ${muted}`}>Personas que quieren ser tus amigos.</p>
+        {(activeSection === 'followers' || activeSection === 'following') && (() => {
+          const showingFollowers = activeSection === 'followers';
+          const entries = showingFollowers ? follows.followers : follows.following;
+          return (
+            <section className={`mx-auto max-w-5xl rounded-xl border p-5 ${card}`} aria-labelledby="profile-follow-title">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h2 id="profile-follow-title" className="flex items-center gap-2 text-xl font-black tracking-tight">{showingFollowers ? <Users size={20} className="text-[#FF4D88]" /> : <UserCheck size={20} className="text-[#FF4D88]" />}{showingFollowers ? 'Seguidores' : 'Siguiendo'}</h2>
+                  <p className={`mt-0.5 text-xs ${muted}`}>{showingFollowers ? 'Lectores que siguen tu perfil.' : 'Perfiles que sigues.'}</p>
+                </div>
+                <span className="grid h-10 min-w-10 place-items-center rounded-full bg-[#FF4D88]/10 px-3 text-xs font-black text-[#FF4D88]">{entries.length}</span>
               </div>
-              <span className="grid h-10 min-w-10 place-items-center rounded-full bg-[#FF4D88]/10 px-3 text-xs font-black text-[#FF4D88]">{friends.incoming.length}</span>
-            </div>
 
-            {friends.incoming.length === 0
-              ? <div className={`mt-5 rounded-xl border border-dashed py-16 text-center ${isLight ? 'border-black/15 bg-[#f7f8fa]' : 'border-white/15 bg-white/[0.025]'}`}><UserPlus size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">No tienes solicitudes pendientes</p><p className={`mx-auto mt-1 max-w-sm text-xs leading-relaxed ${muted}`}>Cuando alguien te envíe una solicitud aparecerá aquí para que la aceptes o la rechaces.</p></div>
-              : <div className="mt-5 space-y-2">
-                  {friends.incoming.map((entry) => (
-                    <div key={entry.request_id} className={`flex items-center gap-3 rounded-lg p-3 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>
+              {entries.length === 0 ? (
+                <div className={`mt-5 rounded-xl border border-dashed py-16 text-center ${isLight ? 'border-black/15 bg-[#f7f8fa]' : 'border-white/15 bg-white/[0.025]'}`}>
+                  <UserPlus size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} />
+                  <p className="text-sm font-bold">{showingFollowers ? 'Todavía nadie te sigue' : 'Aún no sigues a nadie'}</p>
+                  <p className={`mx-auto mt-1 max-w-sm text-xs leading-relaxed ${muted}`}>{showingFollowers ? 'Cuando alguien te siga aparecerá aquí.' : 'Sigue a otros lectores desde su perfil público.'}</p>
+                </div>
+              ) : (
+                <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {entries.map((entry) => (
+                    <div key={entry.user.id} className={`flex items-center gap-3 rounded-lg p-3 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>
                       <Link to={`/usuarios/${entry.user.id}`}><UserAvatar entry={entry} size="h-12 w-12" /></Link>
                       <Link to={`/usuarios/${entry.user.id}`} className="min-w-0 flex-1 truncate text-sm font-bold hover:text-[#FF4D88]">{entry.user.username}</Link>
-                      <button type="button" onClick={() => void handleRequest(entry.request_id, 'accept')} disabled={actionId === entry.request_id} className="flex h-10 items-center gap-2 rounded-lg bg-[#FF4D88] px-4 text-xs font-black text-white disabled:opacity-50">{actionId === entry.request_id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}<span className="hidden sm:inline">Aceptar</span></button>
-                      <button type="button" onClick={() => void handleRequest(entry.request_id, 'reject')} disabled={actionId === entry.request_id} className={`flex h-10 items-center gap-2 rounded-lg px-4 text-xs font-black disabled:opacity-50 ${isLight ? 'bg-[#e4e6eb] text-black hover:bg-[#d8dadf]' : 'bg-[#4e4f50] text-white hover:bg-[#5a5b5c]'}`}><X size={15} /><span className="hidden sm:inline">Rechazar</span></button>
-                    </div>
-                  ))}
-                </div>}
-
-            {friends.outgoing.length > 0 && (
-              <div className={`mt-6 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
-                <h3 className={`mb-2 text-[10px] font-black uppercase tracking-wider ${muted}`}>Solicitudes enviadas</h3>
-                <div className="flex flex-wrap gap-2">
-                  {friends.outgoing.map((entry) => (
-                    <div key={entry.request_id} className={`flex items-center overflow-hidden rounded-full pl-2 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>
-                      <Link to={`/usuarios/${entry.user.id}`} className="flex items-center gap-2 py-1.5 pl-1 text-[11px] font-bold hover:text-[#FF4D88]"><UserAvatar entry={entry} size="h-6 w-6" />{entry.user.username}</Link>
-                      <button type="button" onClick={() => void handleCancelRequest(entry)} disabled={actionId === entry.request_id} aria-label={`Cancelar solicitud a ${entry.user.username}`} title="Cancelar solicitud" className={`ml-1 flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]' : 'text-white/45 hover:bg-[#FF4D88]/10 hover:text-[#FF4D88]'}`}>{actionId === entry.request_id ? <Loader2 size={13} className="animate-spin" /> : <X size={14} />}</button>
+                      <button type="button" onClick={() => openChat(entry.user)} aria-label={`Chatear con ${entry.user.username}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FF4D88] hover:bg-[#FF4D88]/10"><MessageCircle size={16} /></button>
+                      {showingFollowers && !entry.viewer_follows ? (
+                        <button type="button" onClick={() => void handleFollowBack(entry)} disabled={actionId === entry.user.id} className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[#FF4D88] px-3 text-[10px] font-black text-white disabled:opacity-50">{actionId === entry.user.id ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}Seguir</button>
+                      ) : (
+                        <button type="button" onClick={() => void handleUnfollow(entry)} disabled={actionId === entry.user.id} title="Dejar de seguir" className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[10px] font-black disabled:opacity-50 ${isLight ? 'bg-[#e4e6eb] text-black hover:bg-[#d8dadf]' : 'bg-[#4e4f50] text-white hover:bg-[#5a5b5c]'}`}>{actionId === entry.user.id ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}Siguiendo</button>
+                      )}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </section>
-        )}
+              )}
+            </section>
+          );
+        })()}
           </div>
 
           {/* Columna derecha: recomendaciones. En movil cierran el muro. */}

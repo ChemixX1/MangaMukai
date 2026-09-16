@@ -69,10 +69,10 @@ export const Footer = () => {
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8">
         
         {/* === SECCIÓN SUPERIOR === */}
-        <div className="py-20 grid grid-cols-1 lg:grid-cols-12 gap-16">
+        <div className="grid grid-cols-1 gap-8 py-10 md:gap-16 md:py-20 lg:grid-cols-12">
           
           {/* COLUMNA IZQUIERDA: Branding */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="flex flex-col gap-4 md:gap-6 lg:col-span-4">
             <Link to="/" className="group flex items-center gap-3 w-fit">
                 <div className="relative">
                     {/* Brillo Rosa Metálico */}
@@ -87,11 +87,11 @@ export const Footer = () => {
                     </span>
                 </div>
             </Link>
-            <p className={`max-w-sm text-sm font-medium leading-relaxed ${isLight ? "text-black/65" : "text-neutral-400"}`}>
+            <p className={`hidden max-w-sm text-sm font-medium leading-relaxed md:block ${isLight ? "text-black/65" : "text-neutral-400"}`}>
               Tu plataforma de lectura digital optimizada. Disfruta de la mejor experiencia con calidad premium, velocidad warp y diseño de vanguardia.
             </p>
             
-            <div className="flex gap-3 flex-wrap font-mono">
+            <div className="hidden flex-wrap gap-3 font-mono md:flex">
               <div className={`rounded px-3 py-1 text-[10px] uppercase tracking-wider ${isLight ? "border border-black/10 bg-zinc-100 text-black/65" : "bg-[#1a1a1a]"}`}>
                 Disfruta
               </div>
@@ -102,9 +102,9 @@ export const Footer = () => {
           </div>
 
           {/* COLUMNA CENTRO: Links */}
-          <div className="lg:col-span-4 grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 gap-6 md:gap-8 lg:col-span-4">
             
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4 md:gap-6">
                 <h4 className={`flex items-center gap-2 text-xs font-[900] uppercase tracking-[0.2em] ${isLight ? "text-black" : "text-white"}`}>
                   <span className="w-1.5 h-1.5 bg-[#FF4D88] rounded-full shadow-[0_0_8px_#FF4D88]"></span>
                   Navegación
@@ -121,7 +121,7 @@ export const Footer = () => {
                 </ul>
             </div>
 
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4 md:gap-6">
                 <h4 className={`flex items-center gap-2 text-xs font-[900] uppercase tracking-[0.2em] ${isLight ? "text-black" : "text-white"}`}>
                   <span className="w-1.5 h-1.5 bg-[#FF4D88] rounded-full shadow-[0_0_8px_#FF4D88]"></span>
                   Legal
@@ -140,7 +140,7 @@ export const Footer = () => {
           </div>
 
           {/* COLUMNA DERECHA: Newsletter */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="flex flex-col gap-4 md:gap-6 lg:col-span-4">
             <h4 className={`text-xs font-[900] uppercase tracking-[0.2em] ${isLight ? "text-black" : "text-white"}`}>
               Mantente al Dia
             </h4>
@@ -162,24 +162,27 @@ export const Footer = () => {
         </div>
 
         {/* === REDES SOCIALES === */}
-        <div className={`border-t py-10 ${isLight ? "border-black/[0.07]" : "border-white/5"}`}>
-          <div className="flex flex-wrap justify-center items-center gap-6">
+        <div className={`border-t py-6 md:py-10 ${isLight ? "border-black/[0.07]" : "border-white/5"}`}>
+          {/* Móvil: solo iconos, 4 por fila (dos filas). Escritorio: píldoras con nombre. */}
+          <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6">
             {FOOTER_SOCIALS.map((social, idx) => (
               <a 
                 key={idx}
                 href={social.href}
                 target="_blank" 
                 rel="noreferrer"
-                className="group relative"
+                title={social.name}
+                aria-label={social.name}
+                className="group relative basis-[calc(25%-0.5625rem)] md:basis-auto"
               >
                 <div 
-                  className={`relative flex items-center gap-3 rounded-2xl border px-6 py-4 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-[#FF4D88]/30 ${isLight ? "border-black/[0.08] bg-white group-hover:bg-zinc-50" : "border-white/5 bg-[#0F0F0F] group-hover:bg-[#151515]"}`}
+                  className={`relative flex items-center justify-center gap-3 rounded-2xl border px-3 py-3.5 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-[#FF4D88]/30 md:px-6 md:py-4 ${isLight ? "border-black/[0.08] bg-white group-hover:bg-zinc-50" : "border-white/5 bg-[#0F0F0F] group-hover:bg-[#151515]"}`}
                 >
                   <social.icon 
                     size={20} 
                     className={`${isLight ? "text-black/55" : "text-neutral-400"} transition-colors duration-300 group-hover:text-[#FF4D88]`}
                   />
-                  <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${isLight ? "text-black/60 group-hover:text-black" : "text-neutral-400 group-hover:text-white"}`}>
+                  <span className={`hidden text-xs font-bold uppercase tracking-wider transition-colors md:inline ${isLight ? "text-black/60 group-hover:text-black" : "text-neutral-400 group-hover:text-white"}`}>
                     {social.name}
                   </span>
                 </div>
@@ -189,31 +192,25 @@ export const Footer = () => {
         </div>
 
         {/* === DISCLAIMER === */}
-        <div className={`border-t py-10 ${isLight ? "border-black/[0.07]" : "border-white/5"}`}>
-          <div className={`rounded-xl border p-8 ${isLight ? "border-black/[0.08] bg-zinc-50" : "border-white/5 bg-black"}`}>
-             <p className={`mx-auto max-w-4xl text-center text-sm font-medium leading-relaxed tracking-wide ${isLight ? "text-black/60" : "text-neutral-400"}`}>
+        <div className={`border-t py-6 md:py-10 ${isLight ? "border-black/[0.07]" : "border-white/5"}`}>
+          <div className={`rounded-xl border p-5 md:p-8 ${isLight ? "border-black/[0.08] bg-zinc-50" : "border-white/5 bg-black"}`}>
+             <p className={`mx-auto max-w-4xl text-center text-xs font-medium leading-relaxed tracking-wide md:text-sm ${isLight ? "text-black/60" : "text-neutral-400"}`}>
                All the comics on this website are only previews of the original comics. There may be many language errors, character names, and story lines. For the original version, please buy the comic if it's available in your city.
              </p>
           </div>
         </div>
 
         {/* === BARRA INFERIOR === */}
-        <div className={`flex flex-col items-center justify-between gap-4 border-t py-6 font-mono text-[10px] uppercase tracking-widest md:flex-row ${isLight ? "border-black/[0.07] text-black/45" : "border-white/5 text-neutral-600"}`}>
-          <div className="flex items-center gap-4">
-            <p>
-              &copy; {new Date().getFullYear()} MangaMukai Corp.
-            </p>
-            <div className={`hidden h-3 w-px md:block ${isLight ? "bg-black/15" : "bg-neutral-800"}`}></div>
-            <p>
-              Architect: <span className={`font-bold transition-colors group-hover:text-[#FF4D88] ${isLight ? "text-black" : "text-white"}`}>ChemixX7</span>
-            </p>
-          </div>
-          <div className="flex gap-6 items-center">
-            <span className={`flex cursor-pointer items-center gap-2 transition-colors ${isLight ? "hover:text-black" : "hover:text-white"}`}>
-                <span>Server Status</span>
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_#22c55e]"></div>
-            </span>
-          </div>
+        <div className={`flex items-center justify-start border-t py-4 font-mono text-[10px] uppercase tracking-widest md:py-6 ${isLight ? "border-black/[0.07] text-black/45" : "border-white/5 text-neutral-600"}`}>
+          <a
+            href="https://chemixx7.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`group inline-flex items-center gap-1.5 no-underline transition-colors hover:no-underline ${isLight ? "hover:text-black" : "hover:text-white"}`}
+          >
+            <span>Developer:</span>
+            <span className={`font-bold transition-colors ${isLight ? "text-black" : "text-white"} group-hover:text-[#FF4D88]`}>7osemanuelmejia</span>
+          </a>
         </div>
 
       </div>

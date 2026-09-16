@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Lock, AlertCircle, Clock, Sparkles, Zap } from "lucide-react";
+import { X, Lock, AlertCircle, Clock, Sparkles, Zap, Home, LogIn } from "lucide-react";
 import { Countdown, DetailCoin3DIcon } from "../common";
 import logoModal from "../../assets/modals/purchase-logo.webp";
 import { useTheme } from "../../hooks/useTheme";
@@ -17,11 +17,16 @@ interface PurchaseModalProps {
   userBalance: number;
   loading: boolean;
   freeAt: string | null;
+  /** Sustituye "Cancelar" por "Regresar" con la casita (el lector vuelve a la ficha del manga). */
+  onBack?: () => void;
+  /** Sin sesión: el botón de acción pasa a "Iniciar sesión" (llama a onRecharge). */
+  loginRequired?: boolean;
 }
 
 export const PurchaseModal = ({
   isOpen, onClose, onConfirm, onRecharge,
-  chapterNumber, price, userBalance, loading, freeAt
+  chapterNumber, price, userBalance, loading, freeAt,
+  onBack, loginRequired = false,
 }: PurchaseModalProps) => {
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -33,7 +38,7 @@ export const PurchaseModal = ({
 
   if (!isOpen) return null;
 
-  const canAfford = userBalance >= price;
+  const canAfford = !loginRequired && userBalance >= price;
   const isFutureFree = freeAt && new Date(freeAt) > new Date();
 
   return createPortal(
@@ -201,7 +206,23 @@ export const PurchaseModal = ({
               </motion.div>
 
               {/* Error Message */}
-              {!canAfford && (
+              {loginRequired ? (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="relative overflow-hidden rounded-xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/10 to-transparent p-3 md:p-4"
+                >
+                  <div className="relative flex items-start gap-3">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                      <LogIn size={16} className="text-yellow-400 md:w-[18px] md:h-[18px]" />
+                    </div>
+                    <p className="flex-1 text-[10px] md:text-xs text-yellow-100/90 leading-relaxed">
+                      Inicia sesión para comprar este capítulo con tus monedas.
+                    </p>
+                  </div>
+                </motion.div>
+              ) : !canAfford && (
                 <motion.div 
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -229,11 +250,11 @@ export const PurchaseModal = ({
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={onClose} 
+                  onClick={onBack ?? onClose}
                   disabled={loading}
-                  className="py-3 md:py-4 rounded-xl text-xs md:text-sm font-bold uppercase tracking-wider text-white/50 hover:text-white hover:bg-white/5 transition-all duration-300 border border-white/5 hover:border-white/10 disabled:opacity-50 disabled:pointer-events-none"
+                  className="flex items-center justify-center gap-2 py-3 md:py-4 rounded-xl text-xs md:text-sm font-bold uppercase tracking-wider text-white/50 hover:text-white hover:bg-white/5 transition-all duration-300 border border-white/5 hover:border-white/10 disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  Cancelar
+                  {onBack ? <><Home size={15} /> Regresar</> : 'Cancelar'}
                 </motion.button>
                 
                 {canAfford ? (
@@ -259,8 +280,8 @@ export const PurchaseModal = ({
                     className="relative py-3 md:py-4 rounded-xl text-xs md:text-sm font-bold uppercase tracking-wider overflow-hidden bg-gradient-to-br from-white/10 to-white/5 border border-white/20 hover:border-white/30 text-white transition-all duration-300"
                   >
                     <span className="flex items-center justify-center gap-2">
-                      <DetailCoin3DIcon size={20} className="h-5 w-5 object-contain" />
-                      Recargar
+                      {loginRequired ? <LogIn size={16} /> : <DetailCoin3DIcon size={20} className="h-5 w-5 object-contain" />}
+                      {loginRequired ? 'Iniciar sesión' : 'Recargar'}
                     </span>
                   </motion.button>
                 )}

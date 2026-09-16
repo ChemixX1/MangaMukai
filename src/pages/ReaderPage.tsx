@@ -2,7 +2,9 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getStoredUser, getStoredToken, buyChapter, refreshUser, getUnlockedChapters, AUTH_CHANGED_EVENT } from "../services/authService";
 import { Loader2, ChevronLeft, ChevronRight, Home, Coins, Lock } from "lucide-react";
-import { trackChapterView } from "../services/mangaService";
+import { PurchaseModal } from "../components/modals";
+import { getMangaById, trackChapterView } from "../services/mangaService";
+import { recordMangaRead } from "../services/socialService";
 import { FOOTER_SOCIALS } from "../components/layout/Footer";
 import { MangaComments } from "../components/manga/MangaComments";
 import { MangaMusicCard } from "../components/manga/MangaMusicCard";
@@ -46,6 +48,10 @@ export const ReaderPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
+  // Capítulo de pago sin comprar: se compra aquí mismo sobre un fondo desenfocado (la portada,
+  // nunca páginas reales: el servidor no las entrega hasta la compra).
+  const [lock, setLock] = useState<{ price: number; requiresLogin: boolean; freeAt: string | null } | null>(null);
+  const [lockManga, setLockManga] = useState<{ cover: string; title: string } | null>(null);
   const [chapterOptions, setChapterOptions] = useState<Array<{ id: string; number: number }>>([]);
   const [chapterComments, setChapterComments] = useState<MangaComment[]>([]);
 
@@ -128,6 +134,7 @@ export const ReaderPage = () => {
     const cached = session.peek(chapterId);
     setLoading(!cached);
     setError(cached?.error || null);
+    setLock(cached?.locked ? { price: cached.price, requiresLogin: cached.requiresLogin, freeAt: null } : null);
     setImages(cached?.images.map((url, index) => ({ id: String(index), image_url: url, page_number: index + 1 })) || []);
     setChapterComments([]);
     window.scrollTo(0, 0);
@@ -153,7 +160,17 @@ export const ReaderPage = () => {
         setNavData({ prevId: previous ? String(previous.id) : null, nextId: next ? String(next.id) : null, mangaId: data.mangaId, title: data.title, chapterNum: data.number, nextChapterNum: next?.chapter_number || null, nextIsPaid: !!next?.is_paid, nextPrice: next?.price_coins || 0, isNextUnlocked: !next?.is_paid || unlocked.has(String(next.id)) });
         setImages(data.images.map((url, index) => ({ id: String(index), image_url: url, page_number: index + 1 })));
         setError(data.error);
-        if (data.mangaId && !data.error) void trackChapterView(chapterId, data.mangaId);
+        // Sin sesión el servidor no manda el precio (401): se toma del listado de capítulos.
+        const currentChapter = chapters.find(chapter => String(chapter.id) === chapterId);
+        setLock(data.locked ? { price: data.price || currentChapter?.price_coins || 0, requiresLogin: data.requiresLogin, freeAt: currentChapter?.free_at ?? null } : null);
+        if (data.locked && data.mangaId) {
+          void getMangaById(data.mangaId).then((manga) => { if (active && manga) setLockManga({ cover: manga.portada || '', title: manga.titulo || '' }); }).catch(() => undefined);
+        }
+        if (data.mangaId && !data.error && !data.locked) {
+          void trackChapterView(chapterId, data.mangaId);
+          // Cuenta la serie como leída en el perfil (solo con sesión).
+          if (getStoredToken()) void recordMangaRead(data.mangaId, chapterId).catch(() => undefined);
+        }
         session.warmAround(chapters, chapterId, unlocked);
       } catch (caught) {
         if (active) setError(caught instanceof Error ? caught.message : 'No se pudo cargar el capítulo.');
@@ -215,11 +232,76 @@ export const ReaderPage = () => {
     }
   };
 
+  // Compra del capítulo actual (bloqueado) sin salir del lector.
+  const handleUnlockCurrent = async () => {
+    if (!chapterId || !lock || unlocking) return;
+    if (!userId || lock.requiresLogin) {
+      navigate('/auth/login', { state: { returnTo: `/read/${chapterId}` } });
+      return;
+    }
+    if (userCoins < lock.price) {
+      goToRecharge();
+      return;
+    }
+    setUnlocking(true);
+    try {
+      const result = await buyChapter(chapterId);
+      if (result.success) {
+        setUserCoins(result.coins);
+        unlockedRef.current?.add(chapterId);
+        sessionRef.current?.invalidate(chapterId);
+        setLock(null);
+        setLoading(true);
+        // Vuelve a pedir el capítulo: el servidor ya lo entrega comprado.
+        setAuthGeneration((value) => value + 1);
+      } else if (result.message.includes('saldo') || result.message.includes('insuficiente')) {
+        goToRecharge();
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo desbloquear'));
+      }
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
   if (loading && firstReaderLoad.current) return (
     <div className={`flex min-h-screen items-center justify-center ${pageSurface}`}>
       <MukaiLoaderWheel size={72} isLight={isLight} />
     </div>
   );
+  if (lock) {
+    const goToManga = () => navigate(navData?.mangaId ? `/manga/${navData.mangaId}` : '/');
+    const loginRequired = !userId || lock.requiresLogin;
+    return (
+      <div className={`reader-page relative min-h-screen overflow-hidden ${pageSurface}`}>
+        {/* Fondo: la portada repetida como "páginas" muy desenfocadas. Solo es la portada pública. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col items-center gap-3 pt-24 select-none">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="h-[520px] w-full max-w-[720px] overflow-hidden rounded-xl bg-zinc-700/40">
+              {lockManga?.cover && <img src={lockManga.cover} alt="" className="h-full w-full scale-110 object-cover blur-2xl" draggable={false} />}
+            </div>
+          ))}
+        </div>
+        <div className={`absolute inset-0 ${isLight ? 'bg-white/60' : 'bg-black/65'}`} />
+
+        {/* El mismo modal de compra de la ficha; "Regresar" vuelve a la serie. */}
+        <PurchaseModal
+          isOpen
+          onClose={goToManga}
+          onBack={goToManga}
+          onConfirm={() => void handleUnlockCurrent()}
+          onRecharge={() => { if (loginRequired) navigate('/auth/login', { state: { returnTo: `/read/${chapterId}` } }); else goToRecharge(); }}
+          chapterNumber={navData?.chapterNum || ''}
+          price={lock.price}
+          userBalance={userCoins}
+          loading={unlocking}
+          freeAt={lock.freeAt}
+          loginRequired={loginRequired}
+        />
+      </div>
+    );
+  }
+
   if (error) return (
     <div className={`min-h-screen flex flex-col items-center justify-center gap-6 px-4 ${pageSurface}`}>
       <Lock className="w-16 h-16 text-yellow-400" />
@@ -236,7 +318,7 @@ export const ReaderPage = () => {
   const showLockState = navData?.nextIsPaid && !navData?.isNextUnlocked;
 
   return (
-    <div className={`min-h-screen relative flex flex-col items-center transition-colors ${pageSurface}`}>
+    <div className={`reader-page min-h-screen relative flex flex-col items-center transition-colors ${pageSurface}`}>
 
       {/* CONTENEDOR PRINCIPAL */}
       <div className="w-full max-w-[1100px] mx-auto flex flex-col items-center gap-6 pt-28 px-0 lg:px-4 pb-20 relative">

@@ -8,6 +8,10 @@ export interface ReaderBundle {
   number: number;
   images: string[];
   error: string | null;
+  /** Capítulo de pago no comprado: el servidor no manda páginas (402/401). */
+  locked: boolean;
+  price: number;
+  requiresLogin: boolean;
 }
 export interface ReaderSibling {
   id: string | number;
@@ -15,6 +19,7 @@ export interface ReaderSibling {
   title?: string;
   is_paid: boolean;
   price_coins: number;
+  free_at?: string | null;
 }
 const cancelled = () => new DOMException('Reader session stopped', 'AbortError');
 
@@ -58,7 +63,18 @@ export class ReaderPrefetchSession {
     ]).then(([metadata, content]) => {
       if (this.disposed || controller.signal.aborted) throw cancelled();
       const images = content.success && Array.isArray(content.images) ? content.images.filter((url: unknown): url is string => typeof url === 'string') : [];
-      const bundle: ReaderBundle = { id, title: metadata.title?.rendered || `Capítulo ${metadata.ero_chapter}`, mangaId: String(metadata.ero_seri || ''), number: Number(metadata.ero_chapter) || 0, images, error: images.length ? null : content.message || 'Este capítulo no tiene páginas disponibles.' };
+      const locked = !content.success && !!content.locked;
+      const bundle: ReaderBundle = {
+        id,
+        title: metadata.title?.rendered || `Capítulo ${metadata.ero_chapter}`,
+        mangaId: String(metadata.ero_seri || ''),
+        number: Number(metadata.ero_chapter) || 0,
+        images,
+        locked,
+        price: Number(content.price || 0),
+        requiresLogin: locked && !token,
+        error: images.length || locked ? null : content.message || 'Este capítulo no tiene páginas disponibles.',
+      };
       this.cache.set(id, bundle);
       // Keep metadata bounded; already downloaded images remain in the browser's HTTP cache.
       if (this.cache.size > 48) for (const key of this.cache.keys()) { if (key !== this.focused && key !== id) { this.cache.delete(key); break; } }

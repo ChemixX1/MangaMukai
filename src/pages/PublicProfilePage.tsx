@@ -11,15 +11,15 @@ import {
   MessageCircle,
   Phone,
   User,
+  UserCheck,
   UserPlus,
-  X,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { ProfilePostCard } from '../components/social/ProfilePostCard';
+import { ProfileStats } from '../components/social/ProfileStats';
 import { getStoredToken, getStoredUser } from '../services/authService';
-import { removeFriend, respondFriendRequest, sendFriendRequest } from '../services/friendsService';
-import { getPublicProfile, openChat, type PublicProfile } from '../services/socialService';
+import { followUser, getPublicProfile, openChat, unfollowUser, type PublicProfile } from '../services/socialService';
 import { finishGlobalLoading, startGlobalLoading } from '../utils/globalLoading';
 
 const SOCIAL_LABELS: Record<string, string> = {
@@ -81,36 +81,39 @@ export const PublicProfilePage = () => {
     ? Object.entries(profile.social_links).filter(([, value]) => Boolean(value?.trim()))
     : [], [profile]);
 
-  const handleRelationship = async () => {
-    if (!profile || working) return;
-    if (!getStoredToken()) {
-      navigate('/auth/login', { state: { returnTo: `/usuarios/${profile.id}` } });
-      return;
-    }
-    if (profile.friendship_status === 'self') {
+  const requireSession = () => {
+    if (getStoredToken()) return true;
+    navigate('/auth/login', { state: { returnTo: `/usuarios/${id}` } });
+    return false;
+  };
+
+  const handleFollow = async () => {
+    if (!profile || working || !requireSession()) return;
+    if (profile.follow_status === 'self') {
       navigate('/perfil');
       return;
     }
-    if (profile.friendship_status === 'friends') {
-      openChat(profile);
-      return;
-    }
+    if (profile.follow_status === 'following' && !window.confirm(`¿Dejar de seguir a ${profile.username}?`)) return;
 
     setWorking(true);
     try {
-      if (profile.friendship_status === 'pending_sent') {
-        await removeFriend(profile.id);
-      } else if (profile.friendship_status === 'pending_received') {
-        await respondFriendRequest(profile.friend_request_id, 'accept');
-      } else if (profile.friendship_status === 'none' || profile.friendship_status === 'guest') {
-        await sendFriendRequest(profile.id);
-      }
-      await load(false);
+      const followers = profile.follow_status === 'following' ? await unfollowUser(profile.id) : await followUser(profile.id);
+      setProfile((current) => current ? {
+        ...current,
+        follow_status: current.follow_status === 'following' ? 'none' : 'following',
+        followers_count: followers,
+      } : current);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No se pudo completar la solicitud.');
+      setError(caught instanceof Error ? caught.message : 'No se pudo completar la acción.');
     } finally {
       setWorking(false);
     }
+  };
+
+  // El chat no depende de seguir: cualquier lector con sesión puede escribir.
+  const handleMessage = () => {
+    if (!profile || !requireSession()) return;
+    openChat(profile);
   };
 
   if (loading) {
@@ -131,15 +134,9 @@ export const PublicProfilePage = () => {
   }
 
   const joined = new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(new Date(profile.created_at));
-  const buttonText = profile.friendship_status === 'self'
-    ? 'Editar mi perfil'
-    : profile.friendship_status === 'friends'
-      ? 'Enviar mensaje'
-      : profile.friendship_status === 'pending_sent'
-        ? 'Cancelar solicitud'
-        : profile.friendship_status === 'pending_received'
-          ? 'Aceptar solicitud'
-          : 'Agregar amigo';
+  const isSelf = profile.follow_status === 'self';
+  const isFollowing = profile.follow_status === 'following';
+  const followText = isSelf ? 'Editar mi perfil' : isFollowing ? 'Siguiendo' : 'Seguir';
   const cardClass = isLight
     ? 'border-black/[.08] bg-white shadow-[0_1px_2px_rgba(0,0,0,.12)]'
     : 'border-white/[.08] bg-[#242526] shadow-[0_1px_2px_rgba(0,0,0,.45)]';
@@ -203,25 +200,47 @@ export const PublicProfilePage = () => {
                     </span>
                   )}
                 </div>
-                <p className={`mt-1 flex items-center justify-center gap-1.5 text-sm font-semibold sm:justify-start ${secondaryText}`}>
+                <p className={`mt-1 hidden items-center justify-center gap-1.5 text-sm font-semibold sm:flex sm:justify-start ${secondaryText}`}>
                   <CalendarDays size={15} className="shrink-0 text-[#FF4D88]" />
                   Miembro de Manga Mukai desde {joined}
+                  {profile.follows_you && !isSelf && <span className="ml-1 rounded-full bg-[#FF4D88]/15 px-2 py-0.5 text-[10px] font-black text-[#FF4D88]">Te sigue</span>}
                 </p>
+                <ProfileStats
+                  isLight={isLight}
+                  className="mt-3"
+                  stats={[
+                    { key: 'followers', label: 'Seguidores', value: profile.followers_count },
+                    { key: 'following', label: 'Siguiendo', value: profile.following_count },
+                    { key: 'reads', label: 'Mangas leídos', value: profile.mangas_read_count },
+                  ]}
+                />
               </div>
 
-              <button
-                type="button"
-                onClick={() => void handleRelationship()}
-                disabled={working}
-                className={`mb-1 flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-default disabled:opacity-60 sm:w-auto ${profile.friendship_status === 'friends' || profile.friendship_status === 'pending_sent' ? isLight ? 'bg-[#e4e6eb] text-[#050505] hover:bg-[#d8dadf]' : 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]' : 'bg-[#FF4D88] text-white hover:bg-[#ff347b]'}`}
-              >
-                {working ? <Loader2 size={17} className="animate-spin" />
-                  : profile.friendship_status === 'self' ? <Edit3 size={17} />
-                    : profile.friendship_status === 'friends' ? <MessageCircle size={18} />
-                      : profile.friendship_status === 'pending_sent' ? <X size={17} />
+              <div className="mb-1 flex w-full shrink-0 items-center gap-2 sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => void handleFollow()}
+                  disabled={working}
+                  aria-pressed={isSelf ? undefined : isFollowing}
+                  className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-default disabled:opacity-60 sm:flex-none ${isFollowing ? isLight ? 'bg-[#e4e6eb] text-[#050505] hover:bg-[#d8dadf]' : 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]' : 'bg-[#FF4D88] text-white hover:bg-[#ff347b]'}`}
+                >
+                  {working ? <Loader2 size={17} className="animate-spin" />
+                    : isSelf ? <Edit3 size={17} />
+                      : isFollowing ? <UserCheck size={18} />
                         : <UserPlus size={18} />}
-                {buttonText}
-              </button>
+                  {followText}
+                </button>
+                {!isSelf && (
+                  <button
+                    type="button"
+                    onClick={handleMessage}
+                    className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all hover:-translate-y-0.5 sm:flex-none ${isLight ? 'bg-[#e4e6eb] text-[#050505] hover:bg-[#d8dadf]' : 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]'}`}
+                  >
+                    <MessageCircle size={18} />
+                    Mensaje
+                  </button>
+                )}
+              </div>
             </div>
 
             <nav className={`flex justify-center border-t sm:justify-start ${isLight ? 'border-black/10' : 'border-white/10'}`} aria-label="Secciones del perfil">

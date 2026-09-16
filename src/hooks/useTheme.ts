@@ -11,8 +11,28 @@ function readTheme(): ThemeMode {
 }
 
 function applyTheme(theme: ThemeMode) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme;
+  const root = document.documentElement;
+  root.classList.toggle("dark", theme === "dark");
+  // Las reglas `.home-theme-* .home-...` del CSS cuelgan de <html>, así la portada
+  // cambia de tema solo con CSS, sin re-renderizar todo su árbol de React.
+  root.classList.toggle("home-theme-dark", theme === "dark");
+  root.classList.toggle("home-theme-light", theme === "light");
+  root.style.colorScheme = theme;
+}
+
+/**
+ * Cambia el tema en un solo repintado: mientras se aplica la clase se
+ * suspenden las transiciones CSS (`.theme-switching`) para no animar cientos de
+ * `transition-colors` a la vez, que era lo que hacía sentir pesado el cambio.
+ */
+function applyThemeInstantly(theme: ThemeMode) {
+  const root = document.documentElement;
+  root.classList.add("theme-switching");
+  applyTheme(theme);
+  const release = () => root.classList.remove("theme-switching");
+  window.requestAnimationFrame(() => window.requestAnimationFrame(release));
+  // rAF no corre con la pestaña en segundo plano; el temporizador garantiza la salida.
+  window.setTimeout(release, 160);
 }
 
 export const useTheme = () => {
@@ -34,7 +54,7 @@ export const useTheme = () => {
 
   const setThemeMode = useCallback((nextTheme: ThemeMode) => {
     localStorage.setItem(STORAGE_KEY, nextTheme);
-    applyTheme(nextTheme);
+    applyThemeInstantly(nextTheme);
     window.dispatchEvent(new CustomEvent<ThemeMode>(THEME_CHANGED_EVENT, { detail: nextTheme }));
   }, []);
 

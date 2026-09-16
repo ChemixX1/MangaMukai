@@ -635,35 +635,21 @@ html {
   .home-popular-marquee-card { width: 214px; }
 }
 
-@keyframes theme-root-fade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+/* Barra inferior tipo app: las páginas dejan hueco debajo en móvil/tablet. El
+   lector no la muestra, así que no lo necesita. */
+@media (max-width: 1023px) {
+  .mobile-tabbar-space:not(:has(.reader-page)) {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
 }
 
-@keyframes theme-root-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 560ms;
-  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
-  mix-blend-mode: normal;
-}
-
-::view-transition-old(root) { animation-name: theme-root-fade-out; }
-::view-transition-new(root) { animation-name: theme-root-fade-in; }
-
-.theme-transition-capture .home-hero,
-.theme-transition-capture .home-hero *,
-.theme-transition-capture .home-filter-strip,
-.theme-transition-capture .home-filter-strip * {
+/* Cambio de tema en un solo repintado: useTheme pone esta clase en <html> un par
+   de frames para que ningún `transition-colors` se anime en cascada. */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
   transition: none !important;
-}
-
-.theme-transition-capture .home-filter-strip .beam {
-  animation-play-state: paused !important;
 }
 
 @media (min-width: 1024px) {
@@ -1398,9 +1384,10 @@ html.dark .auth-navbar-gradient::before {
 
 html.dark .site-navbar-surface {
   border-bottom-color: rgba(255, 255, 255, 0.1);
-  background: rgba(13, 14, 18, 0.96);
+  background: #000;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
 }
+
 
 .content-navbar-gradient {
   isolation: isolate;
@@ -1535,8 +1522,8 @@ html.dark .site-navbar-surface {
   letter-spacing: 0;
 }
 
-/* Reloj sobre la portada de la ficha. La fecha va en Audiowide y el contador en
-   Orbitron, la misma tipografía que las cifras de la tarjeta de estadísticas. */
+/* Reloj sobre la portada de la ficha. La fecha va en Audiowide, las cifras en
+   Michroma y los dos puntos en Orbitron. */
 .manga-detail-clock {
   width: 100%;
 }
@@ -1595,10 +1582,10 @@ html.dark .site-navbar-surface {
 }
 
 .manga-detail-clock-value {
-  font-family: "Orbitron", sans-serif;
+  font-family: "Michroma", sans-serif;
   font-size: clamp(1.2rem, 3.4vw, 1.5rem);
-  font-weight: 600;
-  letter-spacing: -0.05em;
+  font-weight: 400;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -1804,13 +1791,6 @@ html.dark .site-navbar-surface {
 .manga-music-card .manga-music-lock-overlay {
   background-clip: padding-box;
   transition-property: none !important;
-}
-
-.theme-transition-capture .manga-music-card,
-.theme-transition-capture .manga-music-card * {
-  transition-property: none !important;
-  transition-duration: 0s !important;
-  animation-play-state: paused !important;
 }
 
 .manga-related-item-title {
@@ -2587,14 +2567,6 @@ html.dark .site-navbar-surface {
   text-transform: none;
 }
 
-.theme-transition-capture .biblioteca-page,
-.theme-transition-capture .biblioteca-page *,
-.theme-transition-capture .manga-detail-page,
-.theme-transition-capture .manga-detail-page * {
-  transition-property: none !important;
-  transition-duration: 0s !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .manga-chapter-new-flame,
   .manga-related-star {
@@ -2912,9 +2884,12 @@ html.dark .site-navbar-surface {
    Los acentos de marca (rosa, celeste, ámbar, violeta y los colores de las
    redes) pasan a tinta negra o blanca según el tema. Las portadas de los mangas
    quedan intactas: por eso se tiñe por color declarado y no con un filtro sobre
-   la página, que arrastraría también las imágenes. */
-.manga-bn-page { --bn-ink: #0f172a; }
-.manga-bn-page.home-theme-dark { --bn-ink: #ffffff; }
+   la página, que arrastraría también las imágenes.
+   --bn-ink: texto, iconos y bordes. --bn-ink-bg: rellenos (píldoras, etiquetas,
+   cajas de icono); en oscuro es un gris medio para que el texto blanco de esos
+   elementos siga leyéndose (con el relleno blanco desaparecía). */
+.manga-bn-page { --bn-ink: #0f172a; --bn-ink-bg: #0f172a; --bn-on-ink: #ffffff; }
+.home-theme-dark .manga-bn-page { --bn-ink: #d4d4d8; --bn-ink-bg: #3f3f46; --bn-on-ink: #f4f4f5; }
 
 .manga-bn-page [class^="text-[#FF4D88]"],
 .manga-bn-page [class*=" text-[#FF4D88]"],
@@ -2947,7 +2922,7 @@ html.dark .site-navbar-surface {
 .manga-bn-page [class*=" bg-violet"],
 .manga-bn-page [class^="bg-yellow"],
 .manga-bn-page [class*=" bg-yellow"] {
-  background-color: var(--bn-ink) !important;
+  background-color: var(--bn-ink-bg) !important;
 }
 
 .manga-bn-page [class^="border-[#FF4D88]"],
@@ -2967,8 +2942,8 @@ html.dark .site-navbar-surface {
   background-image: linear-gradient(90deg, #9ca3af, #4b5563, #1f2937) !important;
 }
 
-.manga-bn-page.home-theme-dark .home-men-ramp,
-.manga-bn-page.home-theme-dark [class*="from-[#67E8F9]"] {
+.home-theme-dark .manga-bn-page .home-men-ramp,
+.home-theme-dark .manga-bn-page [class*="from-[#67E8F9]"] {
   background-image: linear-gradient(90deg, #e5e7eb, #9ca3af, #4b5563) !important;
 }
 
@@ -3014,7 +2989,7 @@ html.dark .site-navbar-surface {
 .manga-bn-page [class*=" bg-purple"],
 .manga-bn-page [class^="bg-green"],
 .manga-bn-page [class*=" bg-green"] {
-  background-color: var(--bn-ink) !important;
+  background-color: var(--bn-ink-bg) !important;
 }
 
 .manga-bn-page [class^="border-violet"],
@@ -3032,19 +3007,19 @@ html.dark .site-navbar-surface {
 
 /* Monocromo B&N en modo claro: los recuadros de la interfaz se quedan en blanco
    (el tinte de marca los dejaba en negro sólido). */
-.manga-bn-page.home-theme-light .home-news-mini div[class*="bg-[#"],
-.manga-bn-page.home-theme-light .home-pagination-page,
-.manga-bn-page.home-theme-light .home-pagination-nav {
+.home-theme-light .manga-bn-page .home-news-mini div[class*="bg-[#"],
+.home-theme-light .manga-bn-page .home-pagination-page,
+.home-theme-light .manga-bn-page .home-pagination-nav {
   background-color: #ffffff !important;
   color: #000000 !important;
 }
 
 /* La página activa se distingue por el borde, no por el relleno. */
-.manga-bn-page.home-theme-light .home-pagination-page[data-active="true"] {
+.home-theme-light .manga-bn-page .home-pagination-page[data-active="true"] {
   border-color: #0f172a !important;
 }
 
-.manga-bn-page.home-theme-dark .home-pagination-page[data-active="true"] {
+.home-theme-dark .manga-bn-page .home-pagination-page[data-active="true"] {
   background-color: #ffffff !important;
   color: #000000 !important;
 }
@@ -3053,7 +3028,7 @@ html.dark .site-navbar-surface {
    ratón: si se aplicaran siempre, teñían el botón en reposo. */
 .manga-bn-page [class*="hover:bg-[#FF4D88]"]:hover,
 .manga-bn-page [class*="hover:bg-[#00C2FF]"]:hover {
-  background-color: var(--bn-ink) !important;
+  background-color: var(--bn-ink-bg) !important;
 }
 
 .manga-bn-page [class*="hover:text-[#FF4D88]"]:hover,
@@ -3064,4 +3039,14 @@ html.dark .site-navbar-surface {
 .manga-bn-page [class*="hover:border-[#FF4D88]"]:hover,
 .manga-bn-page [class*="hover:border-[#00C2FF]"]:hover {
   border-color: var(--bn-ink) !important;
+}
+
+/* Cajas de icono (Discord, Telegram) y etiquetas que llevaban texto negro sobre
+   el acento: el contenido toma el color inverso al relleno. Va al final del
+   bloque para ganar a las reglas de texto/borde de arriba. */
+.manga-bn-page [class*=" bg-[#5865F2]"],
+.manga-bn-page [class*=" bg-[#229ED9]"],
+.home-theme-dark .manga-bn-page [class*="bg-[#00C2FF]"][class*="text-black"],
+.home-theme-dark .manga-bn-page [class*="bg-[#FF4D88]"][class*="text-black"] {
+  color: var(--bn-on-ink) !important;
 }

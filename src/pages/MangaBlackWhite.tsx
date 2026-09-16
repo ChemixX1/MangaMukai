@@ -11,6 +11,8 @@ import { useTheme } from '../hooks/useTheme';
 import { filterMenBlackWhite, filterWomenBlackWhite } from '../utils/womenBlackWhite';
 
 function MangaBlackWhiteContent() {
+  // Las series B&N suelen entrar antes que su primer capítulo: `includeUpcoming`
+  // las lista igual (portada y título) para que la sección no desaparezca.
   const { latestWomen, latestMen } = useHomeData();
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -33,6 +35,7 @@ function MangaBlackWhiteContent() {
           sectionId="bn-latest-editorial"
           accent="pink"
           rowTone="neutral"
+          includeUpcoming
         />
       )}
       menSection={<BlackWhiteYouthAccordion />}
@@ -44,9 +47,11 @@ function MangaBlackWhiteContent() {
           sectionId="bn-latest-youth-gallery"
           accent="blue"
           rowTone="neutral"
+          includeUpcoming
         />
       )}
       hideFilterStrip
+      hideReleases
       pageClassName="manga-bn-page"
       pageHeading="Manga en blanco y negro: shounen, seinen y acción"
     />

@@ -65,6 +65,16 @@ export const routeSeo = (pathname: string): RouteSeo => {
       return { section: 'Mi perfil', description: 'Área privada de MangaMukai.', noindex: true };
     case '/saved':
       return { section: 'Mis guardados', description: 'Área privada de MangaMukai.', noindex: true };
+    case '/mensajes':
+      return { section: 'Mensajes', description: 'Área privada de MangaMukai.', noindex: true };
+    case '/notificaciones':
+      return { section: 'Notificaciones', description: 'Área privada de MangaMukai.', noindex: true };
+    case '/chat':
+      return { section: 'Mukai Chat', description: 'Conversa con personajes de manga en MangaMukai.' };
+    case '/tienda':
+      return { section: 'Tienda', description: 'Productos y colecciones de MangaMukai.' };
+    case '/mas':
+      return { section: 'Más', description: 'Área privada de MangaMukai.', noindex: true };
     case '/recargar':
       return { section: 'Recargar monedas', description: 'Área privada de MangaMukai.', noindex: true };
     case '/pago-exitoso':
@@ -82,6 +92,12 @@ export const routeSeo = (pathname: string): RouteSeo => {
 
   if (path.startsWith('/auth/') || path.startsWith('/usuarios/')) {
     return { section: 'Perfil de usuario', description: 'Área privada de MangaMukai.', noindex: true };
+  }
+  if (path.startsWith('/mensajes/')) {
+    return { section: 'Mensajes', description: 'Área privada de MangaMukai.', noindex: true };
+  }
+  if (path.startsWith('/chat/')) {
+    return { section: 'Mukai Chat', description: 'Conversa con personajes de manga en MangaMukai.' };
   }
   if (path.startsWith('/manga/')) {
     return { section: 'Ficha del manga', description: DEFAULT_DESCRIPTION };
