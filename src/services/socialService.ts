@@ -50,6 +50,8 @@ export interface PublicProfile extends FriendUser {
   followers_count: number;
   following_count: number;
   mangas_read_count: number;
+  /** Capítulos distintos abiertos (suma por serie). Llega tras el despliegue del plugin de amigos. */
+  chapters_read_count?: number;
 }
 
 export interface ChatMessage {
@@ -109,6 +111,38 @@ export interface SocialNotification {
   read: boolean;
 }
 
+export interface LibraryChapter {
+  manga_id: number;
+  title: string;
+  cover: string;
+  chapter_id: number;
+  chapter_number: number;
+  chapter_title: string;
+  image: string;
+}
+
+export interface LibraryReading extends LibraryChapter {
+  chapters_read: number;
+  last_read_at: string;
+}
+
+export interface LibraryLikedChapter extends LibraryChapter {
+  reaction: string;
+}
+
+export interface LibraryManga {
+  manga_id: number;
+  title: string;
+  cover: string;
+}
+
+export interface SocialLibrary {
+  /** Series con el último capítulo abierto (la más reciente primero). */
+  reading: LibraryReading[];
+  liked_chapters: LibraryLikedChapter[];
+  liked_mangas: LibraryManga[];
+}
+
 interface ApiPayload {
   success?: boolean;
   profile?: PublicProfile;
@@ -123,6 +157,9 @@ interface ApiPayload {
   followers_count?: number;
   mangas_read_count?: number;
   users?: FriendUser[];
+  reading?: LibraryReading[];
+  liked_chapters?: LibraryLikedChapter[];
+  liked_mangas?: LibraryManga[];
 }
 
 const authHeaders = (json = false): HeadersInit => {
@@ -193,6 +230,35 @@ export const getFollows = async (userId?: number): Promise<FollowLists> => {
   });
   const payload = await ensureResponse(response);
   return { followers: payload.followers || [], following: payload.following || [] };
+};
+
+/** Biblioteca personal del lector: leyendo, capítulos y mangas con me gusta (pestañas de "Más"). */
+export const getSocialLibrary = async (): Promise<SocialLibrary> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/library`, {
+    credentials: 'include',
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  const payload = await ensureResponse(response);
+  return {
+    reading: payload.reading || [],
+    liked_chapters: payload.liked_chapters || [],
+    liked_mangas: payload.liked_mangas || [],
+  };
+};
+
+/**
+ * Progreso de un capítulo en el lector: al abrirlo (completed=false) y al llegar
+ * al final (completed=true). Alimenta la pestaña Actividad de "Más".
+ */
+export const recordChapterProgress = async (chapterId: number | string, mangaId: number | string, completed: boolean): Promise<void> => {
+  const response = await fetch(`${MANGAMUKAI_API}/social/reading-progress`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: authHeaders(true),
+    body: JSON.stringify({ chapter_id: Number(chapterId), manga_id: Number(mangaId), completed }),
+  });
+  await ensureResponse(response);
 };
 
 /** Anota la serie como leída al abrir un capítulo; devuelve el total de series leídas. */

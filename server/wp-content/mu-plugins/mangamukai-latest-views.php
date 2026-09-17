@@ -1,17 +1,24 @@
 <?php
 /**
  * Plugin Name: MangaMukai Latest Views
- * Description: Anade totalViews (vistas reales por serie) a /mangamukai/v1/latest-men y /latest-women, sumando wpb_post_views_count de los capitulos por ero_seri, igual que hace /popular. Es aditivo: no modifica el resto de la respuesta.
- * Version: 1.0.0
+ * Description: Anade totalViews (vistas reales por serie) a /mangamukai/v1/latest-men, /latest-women y /catalog, sumando wpb_post_views_count de los capitulos por ero_seri, igual que hace /popular. Es aditivo: no modifica el resto de la respuesta.
+ * Version: 1.1.0
  */
 
 if (!defined('ABSPATH')) exit;
 
 /**
- * Enriquecer las respuestas de latest-men / latest-women con totalViews.
+ * Enriquecer las respuestas de latest-men / latest-women / catalog con totalViews.
  * Corre despues del handler (tambien sobre la respuesta cacheada), agrega solo
  * el campo totalViews a cada manga y no altera nada mas.
+ *
+ * El catalogo trae todas las series (~500): su mapa de vistas se guarda en un
+ * transient el mismo tiempo que el propio catalogo para no sumar los capitulos
+ * de todas las series en cada peticion. ?refresh=1 lo recalcula.
  */
+define('MM_CATALOG_VIEWS_TRANSIENT', 'mm_catalog_views_map');
+define('MM_CATALOG_VIEWS_TTL', 15 * 60); // igual que mm_catalog_v2
+
 add_filter('rest_post_dispatch', 'mm_latest_views_enrich', 20, 3);
 
 function mm_latest_views_enrich($response, $server, $request) {
@@ -19,8 +26,10 @@ function mm_latest_views_enrich($response, $server, $request) {
         return $response;
     }
 
-    $route = (string) $request->get_route();
-    if (strpos($route, '/mangamukai/v1/latest-men') === false
+    $route      = (string) $request->get_route();
+    $is_catalog = strpos($route, '/mangamukai/v1/catalog') !== false;
+    if (!$is_catalog
+        && strpos($route, '/mangamukai/v1/latest-men') === false
         && strpos($route, '/mangamukai/v1/latest-women') === false) {
         return $response;
     }
@@ -41,7 +50,15 @@ function mm_latest_views_enrich($response, $server, $request) {
         return $response;
     }
 
-    $views = mm_latest_views_map($ids);
+    if ($is_catalog) {
+        $views = $request->get_param('refresh') === '1' ? false : get_transient(MM_CATALOG_VIEWS_TRANSIENT);
+        if (!is_array($views)) {
+            $views = mm_latest_views_map($ids);
+            set_transient(MM_CATALOG_VIEWS_TRANSIENT, $views, MM_CATALOG_VIEWS_TTL);
+        }
+    } else {
+        $views = mm_latest_views_map($ids);
+    }
 
     foreach ($data['mangas'] as &$manga) {
         $id = isset($manga['id']) ? (int) $manga['id'] : 0;

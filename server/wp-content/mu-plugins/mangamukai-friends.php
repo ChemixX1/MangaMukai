@@ -2,12 +2,12 @@
 /**
  * Plugin Name: MangaMukai Social
  * Description: Perfiles publicos, seguidores, chat, notificaciones, lecturas y seguimiento de mangas para React.
- * Version: 4.1.0
+ * Version: 4.3.0
  */
 
 if (!defined('ABSPATH')) exit;
 
-const MM_SOCIAL_DB_VERSION = '4.0.0';
+const MM_SOCIAL_DB_VERSION = '4.3.0';
 // Minutos sin actividad tras los que un lector deja de mostrarse como "Conectado".
 const MM_SOCIAL_ONLINE_MINUTES = 3;
 
@@ -30,6 +30,7 @@ function mm_social_install_schema() {
     $posts = mm_social_table('profile_posts');
     $follows = mm_social_table('follows');
     $reads = mm_social_table('manga_reads');
+    $progress = mm_social_table('chapter_progress');
 
     dbDelta("CREATE TABLE {$friendships} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -123,9 +124,21 @@ function mm_social_install_schema() {
         PRIMARY KEY  (user_id,manga_id),
         KEY user_last (user_id,last_read_at)
     ) {$charset};");
+    // Progreso por capitulo: completed pasa a 1 cuando el lector llega al final del capitulo.
+    dbDelta("CREATE TABLE {$progress} (
+        user_id bigint(20) unsigned NOT NULL,
+        chapter_id bigint(20) unsigned NOT NULL,
+        manga_id bigint(20) unsigned NOT NULL DEFAULT 0,
+        completed tinyint(1) unsigned NOT NULL DEFAULT 0,
+        started_at datetime NOT NULL,
+        updated_at datetime NOT NULL,
+        PRIMARY KEY  (user_id,chapter_id),
+        KEY user_updated (user_id,completed,updated_at)
+    ) {$charset};");
     mm_social_migrate_friendships_to_follows();
     if ($wpdb->get_var("SHOW COLUMNS FROM {$posts} LIKE 'shared_post_id'") === 'shared_post_id'
-        && $wpdb->get_var("SHOW TABLES LIKE '{$follows}'") === $follows) {
+        && $wpdb->get_var("SHOW TABLES LIKE '{$follows}'") === $follows
+        && $wpdb->get_var("SHOW TABLES LIKE '{$progress}'") === $progress) {
         update_option('mm_social_db_version', MM_SOCIAL_DB_VERSION, false);
     }
 }
@@ -232,6 +245,7 @@ function mm_social_public_user($user_id, $detailed = false) {
             'banner_url' => $meta['banner_url'], 'banner_color' => $meta['banner_color'],
             'followers_count' => $counts['followers'], 'following_count' => $counts['following'],
             'mangas_read_count' => mm_social_mangas_read_count($user->ID),
+            'chapters_read_count' => mm_social_chapters_read_count($user->ID),
             'birth_date' => $meta['show_birth_date'] ? $meta['birth_date'] : '',
             'phone' => $meta['show_phone'] && $meta['phone'] !== '' ? trim($meta['country_code'] . ' ' . $meta['phone']) : '',
             'social_links' => array_merge([
@@ -281,6 +295,122 @@ function mm_social_follow_counts($user_id) {
 function mm_social_mangas_read_count($user_id) {
     global $wpdb;
     return (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . mm_social_table('manga_reads') . ' WHERE user_id=%d', (int) $user_id));
+}
+
+/**
+ * Biblioteca personal del lector (pestanas de "Mas"): series que esta leyendo
+ * con el ultimo capitulo abierto, capitulos con reaccion y mangas con me gusta.
+ */
+function mm_social_get_library() {
+    global $wpdb;
+    $user_id = get_current_user_id();
+    $reads = mm_social_table('manga_reads');
+    $reactions = mm_social_table('entity_reactions');
+
+    $chapter_payload = static function ($chapter_id) {
+        $chapter = get_post((int) $chapter_id);
+        if (!$chapter || $chapter->post_status !== 'publish') return null;
+        $series_id = absint(get_post_meta($chapter->ID, 'ero_seri', true));
+        if (!$series_id) return null;
+        return [
+            'manga_id' => $series_id,
+            'title' => get_the_title($series_id),
+            'cover' => mm_social_series_cover($series_id),
+            'chapter_id' => (int) $chapter->ID,
+            'chapter_number' => (float) get_post_meta($chapter->ID, 'ero_chapter', true),
+            'chapter_title' => get_the_title($chapter),
+            'image' => mm_social_chapter_image($chapter->ID),
+        ];
+    };
+
+    // Actividad: capitulos abiertos en el lector sin llegar al final (los mas recientes primero).
+    // Mientras no haya progreso registrado de una serie, vale su ultimo capitulo abierto,
+    // salvo que ya conste como terminado.
+    $progress = mm_social_table('chapter_progress');
+    $reading = [];
+    $seen = [];
+    $completed = array_map('intval', (array) $wpdb->get_col($wpdb->prepare("SELECT chapter_id FROM {$progress} WHERE user_id=%d AND completed=1", $user_id)));
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT chapter_id, manga_id, updated_at FROM {$progress} WHERE user_id=%d AND completed=0 ORDER BY updated_at DESC LIMIT 40",
+        $user_id
+    ));
+    foreach ((array) $rows as $row) {
+        $item = $chapter_payload($row->chapter_id);
+        if (!$item) continue;
+        $seen[(int) $row->chapter_id] = true;
+        $item['chapters_read'] = 0;
+        $item['last_read_at'] = str_replace(' ', 'T', (string) $row->updated_at) . 'Z';
+        $reading[] = $item;
+    }
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT manga_id, last_chapter_id, chapters, last_read_at FROM {$reads} WHERE user_id=%d AND last_chapter_id > 0 ORDER BY last_read_at DESC LIMIT 30",
+        $user_id
+    ));
+    foreach ((array) $rows as $row) {
+        $chapter_id = (int) $row->last_chapter_id;
+        if (isset($seen[$chapter_id]) || in_array($chapter_id, $completed, true)) continue;
+        $item = $chapter_payload($chapter_id);
+        if (!$item) continue;
+        $seen[$chapter_id] = true;
+        $item['chapters_read'] = (int) $row->chapters;
+        $item['last_read_at'] = str_replace(' ', 'T', (string) $row->last_read_at) . 'Z';
+        $reading[] = $item;
+    }
+    usort($reading, static function ($a, $b) { return strcmp($b['last_read_at'], $a['last_read_at']); });
+    $reading = array_slice($reading, 0, 40);
+
+    // Me gusta > capitulos: reacciones del lector sobre capitulos.
+    $liked_chapters = [];
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT target_id, reaction, updated_at FROM {$reactions} WHERE user_id=%d AND target_type='chapter' ORDER BY updated_at DESC LIMIT 60",
+        $user_id
+    ));
+    foreach ((array) $rows as $row) {
+        $item = $chapter_payload($row->target_id);
+        if (!$item) continue;
+        $item['reaction'] = (string) $row->reaction;
+        $liked_chapters[] = $item;
+    }
+
+    // Me gusta > mangas: corazon de la ficha (meta del usuario) y reacciones sobre la serie.
+    $ids = get_user_meta($user_id, 'mm_user_likes', true);
+    $ids = is_array($ids) ? array_map('absint', $ids) : [];
+    $reacted = $wpdb->get_col($wpdb->prepare("SELECT target_id FROM {$reactions} WHERE user_id=%d AND target_type='manga' ORDER BY updated_at DESC", $user_id));
+    $liked_mangas = [];
+    foreach (array_unique(array_merge($ids, array_map('absint', (array) $reacted))) as $series_id) {
+        $series = get_post($series_id);
+        if (!$series || $series->post_status !== 'publish') continue;
+        $liked_mangas[] = ['manga_id' => (int) $series_id, 'title' => get_the_title($series_id), 'cover' => mm_social_series_cover($series_id)];
+    }
+
+    return rest_ensure_response(['success' => true, 'reading' => $reading, 'liked_chapters' => $liked_chapters, 'liked_mangas' => $liked_mangas]);
+}
+
+/**
+ * POST /social/reading-progress { chapter_id, manga_id, completed }
+ * Anota que el lector abrio el capitulo; con completed=1 (llego al final) queda
+ * terminado y sale de Actividad. Un capitulo terminado no vuelve a "en curso".
+ */
+function mm_social_record_chapter_progress(WP_REST_Request $request) {
+    global $wpdb;
+    $user_id = get_current_user_id();
+    $chapter_id = absint($request->get_param('chapter_id'));
+    $manga_id = absint($request->get_param('manga_id'));
+    $completed = filter_var($request->get_param('completed'), FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+    if (!$chapter_id) return new WP_Error('mm_social_progress_chapter', 'Falta el capitulo.', ['status' => 400]);
+    $now = current_time('mysql', true);
+    $wpdb->query($wpdb->prepare(
+        'INSERT INTO ' . mm_social_table('chapter_progress') . ' (user_id, chapter_id, manga_id, completed, started_at, updated_at) VALUES (%d, %d, %d, %d, %s, %s)
+         ON DUPLICATE KEY UPDATE completed = GREATEST(completed, VALUES(completed)), manga_id = IF(manga_id = 0, VALUES(manga_id), manga_id), updated_at = VALUES(updated_at)',
+        $user_id, $chapter_id, $manga_id, $completed, $now, $now
+    ));
+    return rest_ensure_response(['success' => true, 'completed' => (bool) $completed]);
+}
+
+/** Capitulos leidos: suma de `chapters` (cada capitulo distinto abierto) de todas las series del lector. */
+function mm_social_chapters_read_count($user_id) {
+    global $wpdb;
+    return (int) $wpdb->get_var($wpdb->prepare('SELECT COALESCE(SUM(chapters), 0) FROM ' . mm_social_table('manga_reads') . ' WHERE user_id=%d', (int) $user_id));
 }
 
 function mm_social_are_friends($first, $second) {
@@ -1034,6 +1164,8 @@ add_action('rest_api_init', static function () {
     register_rest_route('mangamukai/v1', '/social/follow/(?P<id>\d+)', ['methods' => WP_REST_Server::DELETABLE, 'callback' => 'mm_social_unfollow_user', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/follows', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_follows', 'permission_callback' => '__return_true']);
     register_rest_route('mangamukai/v1', '/social/reads', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_record_manga_read', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/library', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_library', 'permission_callback' => $auth]);
+    register_rest_route('mangamukai/v1', '/social/reading-progress', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_record_chapter_progress', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/users/search', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_search_all_users', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/messages/conversations', ['methods' => WP_REST_Server::READABLE, 'callback' => 'mm_social_get_conversations', 'permission_callback' => $auth]);
     register_rest_route('mangamukai/v1', '/social/messages/read', ['methods' => WP_REST_Server::CREATABLE, 'callback' => 'mm_social_mark_messages_read', 'permission_callback' => $auth]);

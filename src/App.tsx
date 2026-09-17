@@ -2,9 +2,12 @@ import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { migrateOldDataToWordPress } from './services/migrationService';
 import { GlobalLoader } from './components/common';
-import { MobileTabBar, Navbar } from './components/layout';
+import { MobileSectionHeader, MobileTabBar, Navbar } from './components/layout';
 import { SubscriptionModalHost } from './components/modals';
 import { applyRouteSeo } from './hooks/useDocumentTitle';
+
+// Se abre al instante desde el lápiz de "Más": va en el bundle principal, sin chunk que esperar.
+import EditProfilePage from './pages/EditProfilePage';
 
 const Home = lazy(() => import('./pages/Home'));
 const MangaBlackWhite = lazy(() => import('./pages/MangaBlackWhite'));
@@ -64,6 +67,7 @@ function AppInner() {
       <RouteSeo />
       <Navbar />
       <MobileTabBar />
+      <MobileSectionHeader />
       <SubscriptionModalHost />
       <div className={`mobile-tabbar-space min-h-screen font-sans ${pageColors}`}>
         <Suspense fallback={<div className={`min-h-screen ${pageColors}`} />}>
@@ -80,6 +84,7 @@ function AppInner() {
             <Route path="/chat/:characterId" element={<CharacterChatPage />} />
             <Route path="/tienda" element={<ShopPage />} />
             <Route path="/mas" element={<MorePage />} />
+            <Route path="/perfil/editar" element={<EditProfilePage />} />
             <Route path="/saved" element={<SavedMangas />} />
             <Route path="/legal" element={<TermsAndPrivacy />} />
             <Route path="/biblioteca" element={<Biblioteca />} />

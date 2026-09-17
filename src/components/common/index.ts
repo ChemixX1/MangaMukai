@@ -1,4 +1,5 @@
 export { Countdown } from './Countdown';
+export { BellGlyph, CoinsStack, EditPencilGlyph, PostGlyph, ReaderBookGlyph, SavedGlyph, SearchGlyph } from './BrandIcons';
 export { BibliotecaClock } from './BibliotecaClock';
 export {
   DetailBook3DIcon,

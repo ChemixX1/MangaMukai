@@ -1,45 +1,51 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import {
-  BookOpen,
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Flame,
-  Mars,
-  RotateCcw,
-  Search,
-  SlidersHorizontal,
-  Star,
-  Venus,
-  X,
-} from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Footer } from "../components/layout";
-import { Particles } from "../components/backgrounds/Particles";
-import { BibliotecaClock, DepthText, PaginationControls } from "../components/common";
+import { Eye } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
-import { getLatestMenUpdates, getLatestWomenUpdates, getUltimosCapitulos } from "../services/mangaService";
-import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from "../utils/globalLoading";
-import { preloadImages } from "../utils/preloadImages";
+import { setSearchTerm, useSearchFilter, useSearchTerm, type SearchFilter } from "../hooks/useSearchTerm";
+import { getPopularMenByViews, getPopularWomenByViews, getUltimosCapitulos } from "../services/mangaService";
+import { buildViewsIndex, displayViews, withKnownViews } from "../utils/seriesViews";
+import { toTitleCase } from "../utils/titleCase";
+import { hasBlackWhiteTag, hasHotTag } from "../utils/womenBlackWhite";
 import type { MangaCapitulo } from "../types/manga";
 
-const ITEMS_PER_PAGE = 30;
+const RESULTS_PAGE_SIZE = 30;
+const TOP_SEARCHED_COUNT = 5;
+/* "Nuevos lanzamientos": uno grande y tres debajo. */
+const NEW_RELEASES_COUNT = 4;
+const DAY_MS = 86_400_000;
 
-/* "Novedades recientes" del antiguo buscador: los 4 estrenos más nuevos entre mujer y hombre. */
-let cachedRecentReleases: MangaCapitulo[] | null = null;
-const loadRecentReleases = async () => {
-  if (cachedRecentReleases) return cachedRecentReleases;
-  const [women, men] = await Promise.all([getLatestWomenUpdates(2), getLatestMenUpdates(2)]);
-  const unique = new Map<string, MangaCapitulo>();
-  [...women, ...men].forEach((manga) => unique.set(String(manga.id), manga));
-  cachedRecentReleases = [...unique.values()]
-    .sort((a, b) => Date.parse(b.rawFecha || "") - Date.parse(a.rawFecha || ""))
-    .slice(0, 4);
-  return cachedRecentReleases;
+/* Tintes de las tarjetas de género, en el orden en que se pintan (rosa, azul, índigo, naranja, rosa, lila). */
+const GENRE_TILE_COLORS = ["#f26f9d", "#5d9be6", "#7c8fe8", "#f0885e", "#f27fa6", "#a97fe0"];
+
+/* Etiquetas del catálogo que no son géneros: público, edad, formato o series concretas. */
+const NON_GENRE_TAGS = new Set(["Mujer", "Hombre", "HOT", "PRE", "Hentai", "Anime", "B/N", "Manga", "Manhwa", "Manhua", "Comic", "Manga para Adultos"]);
+const isGenreTag = (tag: string) => !NON_GENRE_TAGS.has(tag) && !/^\+\d+$/.test(tag) && !/^Manga\s/i.test(tag);
+
+interface GenreTile {
+  genre: string;
+  cover: string;
+  color: string;
+}
+
+/** Los géneros con más títulos, cada uno con la portada de un manga distinto que lo tenga. */
+const buildGenreTiles = (catalog: MangaCapitulo[], limit = 6): GenreTile[] => {
+  const counts = new Map<string, number>();
+  catalog.forEach((manga) => (manga.genres || []).forEach((genre) => {
+    if (isGenreTag(genre)) counts.set(genre, (counts.get(genre) || 0) + 1);
+  }));
+
+  const usedCovers = new Set<string>();
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
+    .slice(0, limit)
+    .map(([genre], index) => {
+      const withGenre = catalog.filter((manga) => manga.portada && (manga.genres || []).includes(genre));
+      const manga = withGenre.find((candidate) => !usedCovers.has(candidate.portada)) || withGenre[0];
+      if (manga) usedCovers.add(manga.portada);
+      return { genre, cover: manga?.portada || "", color: GENRE_TILE_COLORS[index % GENRE_TILE_COLORS.length] };
+    });
 };
-const BIBLIOTECA_PARTICLE_COLORS = ["#ffffff"];
-type Audience = "Hombre" | "Mujer";
 
 const normalizeSearchValue = (value: string) => value
   .normalize("NFD")
@@ -47,516 +53,250 @@ const normalizeSearchValue = (value: string) => value
   .toLocaleLowerCase("es")
   .trim();
 
-const getAudience = (value: unknown): Audience | null => {
-  if (typeof value !== "string") return null;
-  const normalized = normalizeSearchValue(value);
-  if (["hombre", "masculino", "men"].includes(normalized)) return "Hombre";
-  if (["mujer", "femenino", "women"].includes(normalized)) return "Mujer";
+const filterCatalog = (catalog: MangaCapitulo[], term: string) => {
+  const terms = normalizeSearchValue(term).split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return [];
+  return catalog.filter((manga) => {
+    const haystack = normalizeSearchValue([manga.titulo, manga.tipo, ...(manga.genres || [])].filter(Boolean).join(" "));
+    return terms.every((word) => haystack.includes(word));
+  });
+};
+
+/** Pestaña activa bajo el buscador: todo, solo B&N o solo HOT. */
+const matchesFilter = (manga: MangaCapitulo, filter: SearchFilter) =>
+  filter === "todos" ? true : filter === "bn" ? hasBlackWhiteTag(manga) : hasHotTag(manga);
+
+const formatViews = (views = 0) => {
+  if (views >= 1_000_000) return `${(views / 1_000_000).toFixed(views >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`;
+  if (views >= 1_000) return `${(views / 1_000).toFixed(views >= 10_000 ? 0 : 1).replace(/\.0$/, "")}K`;
+  return String(views);
+};
+
+// Las fechas llegan como "2026-09-09 13:52:03"; Safari solo entiende la forma con "T".
+const parseDate = (value?: string) => (value ? Date.parse(value.replace(" ", "T")) : Number.NaN);
+
+/** NEW si la serie es reciente; UP si tuvo capítulo esta semana. */
+const getFreshness = (manga: MangaCapitulo): "NEW" | "UP" | null => {
+  const now = Date.now();
+  const published = parseDate(manga.publishedAt);
+  if (!Number.isNaN(published) && now - published < 14 * DAY_MS) return "NEW";
+  const updated = parseDate(manga.rawFecha);
+  if (!Number.isNaN(updated) && now - updated < 7 * DAY_MS) return "UP";
   return null;
 };
 
-type IdleWindow = Window & typeof globalThis & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-  cancelIdleCallback?: (handle: number) => void;
+const FreshnessBadge = ({ manga, className = "" }: { manga: MangaCapitulo; className?: string }) => {
+  const freshness = getFreshness(manga);
+  if (!freshness) return null;
+  return (
+    <span className={`inline-flex items-center px-1.5 py-[3px] text-[9px] font-black leading-none tracking-wide text-white ${freshness === "NEW" ? "bg-[#ff5c2b]" : "bg-[#ff2e4c]"} ${className}`}>
+      {freshness}
+    </span>
+  );
 };
 
-type NetworkNavigator = Navigator & {
-  connection?: { saveData?: boolean; effectiveType?: string };
+/** Fecha de lanzamiento de la serie (o de su última subida si no la trae). */
+const releaseTime = (manga: MangaCapitulo) => {
+  const published = parseDate(manga.publishedAt);
+  return Number.isNaN(published) ? parseDate(manga.rawFecha) || 0 : published;
 };
 
+/**
+ * Biblioteca (móvil primero): el campo de búsqueda vive en el navbar; aquí van
+ * los cinco más buscados, las tarjetas por género, los últimos lanzamientos y,
+ * al escribir, los resultados sobre el catálogo.
+ */
 export const Biblioteca = () => {
-  const [allItems, setAllItems] = useState<MangaCapitulo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedAudience, setSelectedAudience] = useState<Audience | null>(null);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const location = useLocation();
   const { theme } = useTheme();
   const isLight = theme === "light";
-  const isMasculine = selectedAudience === "Hombre";
-  const accentColor = isMasculine ? "#00C2FF" : "#FF4D88";
+  const location = useLocation();
+  const searchTerm = useSearchTerm();
+  const searchFilter = useSearchFilter();
   const deferredSearchTerm = useDeferredValue(searchTerm);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const [recentReleases, setRecentReleases] = useState<MangaCapitulo[]>(cachedRecentReleases || []);
 
-  useEffect(() => {
-    let active = true;
-    void loadRecentReleases().then((releases) => { if (active) setRecentReleases(releases); }).catch(() => undefined);
-    return () => { active = false; };
-  }, []);
+  const [allCatalog, setAllCatalog] = useState<MangaCapitulo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [visibleResults, setVisibleResults] = useState(RESULTS_PAGE_SIZE);
 
-  // La lupa del navbar (y /biblioteca#buscar) aterrizan con el campo enfocado y a la vista.
-  useEffect(() => {
-    const wantsFocus = location.state?.focusSearch === true || location.hash === '#buscar';
-    if (!wantsFocus) return;
-    const timer = window.setTimeout(() => {
-      const input = searchInputRef.current;
-      if (!input) return;
-      input.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      input.focus({ preventScroll: true });
-    }, 120);
-    return () => window.clearTimeout(timer);
-  }, [location.key, location.hash, location.state]);
-
+  // ?buscar= permite compartir una búsqueda (y es el destino del SearchAction del
+  // JSON-LD); la portada llega con state.filterCategory al tocar un género.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const audienceFromUrl = getAudience(params.get("audience"));
-    const genreFromUrl = params.get("genre");
-    const searchFromNavigation = location.state?.searchTerm;
-    const filterFromNavigation = location.state?.filterCategory;
-    const audienceFromNavigation = getAudience(filterFromNavigation);
-    const audienceFromGenre = getAudience(genreFromUrl);
-
-    // ?buscar= permite compartir una búsqueda y es el destino del SearchAction
-    // declarado en el JSON-LD del sitio.
-    const searchFromUrl = params.get("buscar") || params.get("q") || "";
-    setSearchTerm(typeof searchFromNavigation === "string" ? searchFromNavigation : searchFromUrl);
-    setSelectedAudience(audienceFromUrl || audienceFromNavigation || audienceFromGenre);
-
-    if (typeof filterFromNavigation === "string" && !audienceFromNavigation) {
-      setSelectedTag(filterFromNavigation);
-    } else if (genreFromUrl && !audienceFromGenre) {
-      setSelectedTag(genreFromUrl);
-    } else {
-      setSelectedTag(null);
-    }
-
-    setCurrentPage(1);
-    window.history.replaceState({}, document.title);
+    const fromUrl = params.get("buscar") || params.get("q") || "";
+    const category = location.state?.filterCategory;
+    const fromState = typeof category === "string" && !["Mujer", "Hombre", "Todos"].includes(category) ? category : "";
+    const seed = fromState || fromUrl;
+    if (seed) setSearchTerm(seed);
+    if (location.state) window.history.replaceState({ ...window.history.state, usr: null }, document.title);
   }, [location.key, location.search, location.state]);
 
   useEffect(() => {
     let cancelled = false;
-
-    const loadLibrary = async () => {
-      startGlobalLoading(10);
-      setLoading(true);
-      try {
-        const data = await getUltimosCapitulos();
+    // El catálogo llega sin vistas: se completan con las de los rankings históricos.
+    Promise.all([getUltimosCapitulos(), getPopularWomenByViews("historical", false), getPopularMenByViews("historical", false)])
+      .then(([catalogData, popularWomen, popularMen]) => {
         if (cancelled) return;
-
-        const tags = new Set<string>();
-        data.forEach((manga) => {
-          (manga.genres || []).forEach((genre) => { if (genre) tags.add(genre); });
-          if (manga.tipo) tags.add(manga.tipo);
-        });
-
-        updateGlobalLoading(78);
-        await preloadImages(data.slice(0, 8).map((manga) => manga.portada).filter(Boolean));
-        if (cancelled) return;
-
-        setAllItems(data);
-        setAvailableTags(Array.from(tags).sort((a, b) => a.localeCompare(b, "es")));
-        setLoading(false);
-        window.requestAnimationFrame(() => finishGlobalLoading());
-      } catch (error) {
-        console.error("Biblioteca preload error:", error);
-        if (cancelled) return;
-        setLoading(false);
-        finishGlobalLoading();
-      }
-    };
-
-    void loadLibrary();
-    return () => {
-      cancelled = true;
-      finishGlobalLoading();
-    };
+        setAllCatalog(withKnownViews(catalogData, buildViewsIndex(popularWomen, popularMen)));
+      })
+      .catch((error) => console.error("Biblioteca load error:", error))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  const items = useMemo(() => {
-    let filtered = allItems;
+  useEffect(() => { setVisibleResults(RESULTS_PAGE_SIZE); }, [deferredSearchTerm, searchFilter]);
 
-    if (deferredSearchTerm.trim()) {
-      const terms = normalizeSearchValue(deferredSearchTerm).split(/\s+/).filter(Boolean);
-      filtered = filtered.filter((manga) => {
-        const searchableMetadata = normalizeSearchValue([
-          manga.titulo,
-          manga.tipo,
-          manga.genero,
-          ...(manga.genres || []),
-        ].filter(Boolean).join(" "));
+  const catalog = useMemo(() => allCatalog.filter((manga) => matchesFilter(manga, searchFilter)), [allCatalog, searchFilter]);
+  // "+ Buscados": las cinco series con más vistas de la pestaña activa, de mayor a menor
+  // (con la cifra que se muestra, para que el orden coincida con lo que se lee).
+  const topSearched = useMemo(() => [...catalog].sort((a, b) => displayViews(b) - displayViews(a)).slice(0, TOP_SEARCHED_COUNT), [catalog]);
+  // "Nuevos lanzamientos": las series publicadas más recientemente, de la más nueva a la más antigua.
+  const newReleases = useMemo(() => [...catalog].sort((a, b) => releaseTime(b) - releaseTime(a)).slice(0, NEW_RELEASES_COUNT), [catalog]);
 
-        return terms.every((term) => searchableMetadata.includes(term));
-      });
-    }
+  const genreTiles = useMemo(() => buildGenreTiles(catalog), [catalog]);
+  const results = useMemo(() => filterCatalog(catalog, deferredSearchTerm), [catalog, deferredSearchTerm]);
+  const isSearching = deferredSearchTerm.trim().length > 0;
 
-    if (selectedAudience) {
-      filtered = filtered.filter((manga) => manga.genero === selectedAudience);
-    }
+  // Al pasar de explorar a resultados (o volver) se empieza desde arriba.
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); }, [isSearching]);
 
-    if (selectedTag) {
-      filtered = filtered.filter((manga) => (
-        (manga.genres || []).includes(selectedTag) || manga.tipo === selectedTag
-      ));
-    }
-
-    return filtered;
-  }, [allItems, deferredSearchTerm, selectedAudience, selectedTag]);
-
-  const totalPages = Math.max(1, Math.ceil(items.length / ITEMS_PER_PAGE));
-  const pageStart = (currentPage - 1) * ITEMS_PER_PAGE;
-  const pageItems = items.slice(pageStart, pageStart + ITEMS_PER_PAGE);
-  const sortedTags = availableTags.filter((tag) => !getAudience(tag));
-  const hasFilters = Boolean(searchTerm || selectedAudience || selectedTag);
-  const resultsTitle = selectedTag
-    || (selectedAudience === "Mujer" ? "Mangas para mujeres" : null)
-    || (selectedAudience === "Hombre" ? "Mangas para hombres" : null)
-    || (searchTerm ? "Resultados encontrados" : "Todos los mangas");
-
-  useEffect(() => {
-    if (loading || items.length <= currentPage * ITEMS_PER_PAGE) return;
-
-    const connection = (navigator as NetworkNavigator).connection;
-    if (connection?.saveData || connection?.effectiveType?.includes("2g")) return;
-
-    const nextPageStart = currentPage * ITEMS_PER_PAGE;
-    const followingPageStart = (currentPage + 1) * ITEMS_PER_PAGE;
-    const sources = [
-      ...items.slice(nextPageStart, nextPageStart + 6),
-      ...items.slice(followingPageStart, followingPageStart + 4),
-    ].map((manga) => manga.portada).filter(Boolean);
-
-    if (sources.length === 0) return;
-
-    let cancelled = false;
-    let timeoutId: number | undefined;
-    let idleId: number | undefined;
-    const idleWindow = window as IdleWindow;
-    const warmNextPages = () => {
-      if (!cancelled) void preloadImages(sources);
-    };
-
-    if (idleWindow.requestIdleCallback) {
-      idleId = idleWindow.requestIdleCallback(warmNextPages, { timeout: 1600 });
-    } else {
-      timeoutId = window.setTimeout(warmNextPages, 700);
-    }
-
-    return () => {
-      cancelled = true;
-      if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-    };
-  }, [currentPage, items, loading]);
-
-  const selectAudience = (audience: Audience) => {
-    setSelectedAudience((current) => current === audience ? null : audience);
-    setCurrentPage(1);
-  };
-
-  const clearFilters = () => {
-    setSearchTerm("");
-    setSelectedAudience(null);
-    setSelectedTag(null);
-    setCurrentPage(1);
-  };
+  const skeleton = isLight ? "bg-black/[0.06]" : "bg-white/[0.08]";
 
   return (
-    <div className={`biblioteca-page relative flex min-h-screen flex-col overflow-x-clip font-sans transition-colors duration-300 ${isLight ? "biblioteca-theme-light bg-white text-zinc-950" : "biblioteca-theme-dark bg-black text-gray-100"}`}>
-      {!isLight && (
-        <div className="pointer-events-none fixed inset-0 z-0 opacity-60" aria-hidden="true">
-          <Particles
-            particleColors={BIBLIOTECA_PARTICLE_COLORS}
-            particleCount={200}
-            particleSpread={10}
-            speed={0.1}
-            particleBaseSize={100}
-            moveParticlesOnHover
-            alphaParticles={false}
-            disableRotation={false}
-            pixelRatio={1}
-          />
-        </div>
-      )}
-      <section
-        className="relative z-10 transition-colors duration-300"
-        style={{
-          backgroundImage: isLight
-            ? `radial-gradient(circle at 50% -20%, ${isMasculine ? "rgba(0,194,255,.15)" : "rgba(255,77,136,.13)"}, transparent 40%)`
-            : `radial-gradient(circle at 50% -20%, ${isMasculine ? "rgba(0,194,255,.16)" : "rgba(255,77,136,.15)"}, transparent 40%)`,
-        }}
-      >
-        <div className="desktop-content-shell relative mx-auto w-full px-4 pb-4 pt-28 text-center sm:px-8 sm:pb-5 sm:pt-36 lg:px-16 lg:pb-2 lg:pt-40">
-          <h1 className="mx-auto flex max-w-full justify-center pr-[0.08em]">
-            {/* El logotipo se dibuja con capas de texto: esta línea da al H1 un
-                nombre accesible y con las palabras clave de la página. */}
-            <span className="sr-only">Biblioteca de manga en español</span>
-            <DepthText
-              text="Biblioteca Mukai"
-              parts={[
-                {
-                  text: "Biblioteca",
-                  faceColor: isLight ? "#000000" : "#ffffff",
-                  depthColor: isLight ? "#c7c7c7" : "#403d46",
-                  faceBlend: isLight ? 0 : undefined,
-                },
-                {
-                  text: "Mukai",
-                  faceColor: accentColor,
-                  depthColor: isMasculine ? "#006d99" : "#8f184e",
-                },
-              ]}
-              layers={34}
-              depth={2.4}
-              depthColor={isLight ? "#c7c7c7" : "#403d46"}
-              tilt={7.5}
-              pointerTracking={false}
-              smoothing={0.14}
-              perspective={900}
-              autoOrbit={false}
-              orbitSpeed={0.35}
-              fontSize="clamp(1.85rem, 8.2vw, 5.35rem)"
-              fontWeight={1000}
-              shadow
-            />
-          </h1>
-          <p className={`mx-auto mt-5 max-w-2xl text-sm leading-relaxed sm:text-base ${isLight ? "text-zinc-600" : "text-zinc-400"}`}>
-            Busca por título, explora géneros y encuentra tu próxima historia en un solo lugar
-          </p>
-        </div>
-      </section>
-
-      <div className="desktop-content-shell relative z-10 mx-auto flex w-full flex-1 flex-col px-4 pb-16 pt-2 sm:px-8 sm:pt-3 lg:px-16 lg:pt-2">
-        <aside id="filtros" className="scroll-mt-24">
-          <div className={`grid items-center gap-4 rounded-3xl border p-4 transition-colors duration-300 sm:p-5 lg:grid-cols-[minmax(200px,0.85fr)_190px_minmax(160px,1.1fr)_minmax(245px,1.2fr)] lg:gap-5 ${isLight ? "border-black/[0.09] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.09)]" : "border-white/[0.08] bg-[#0b0b0e] shadow-[0_24px_70px_rgba(0,0,0,0.28)]"}`}>
-            <div className={`relative flex items-center justify-center border-b pb-4 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5 ${isLight ? "border-black/[0.08]" : "border-white/[0.07]"}`}>
-              <h2 className={`audiowide-library w-full px-11 text-center text-xl leading-tight lg:px-0 lg:text-lg xl:text-xl ${isLight ? "text-zinc-950" : "text-white"}`}>Busca tu manga favorito</h2>
-              <div className="absolute right-0 flex h-10 w-10 items-center justify-center rounded-xl border lg:hidden" style={{ color: accentColor, borderColor: `${accentColor}40`, backgroundColor: `${accentColor}16` }}>
-                <Clock size={18} />
+    <div className={`biblioteca-page min-h-screen transition-colors duration-300 ${isLight ? "bg-white text-zinc-950" : "bg-black text-gray-100"}`}>
+      <div className="mx-auto w-full max-w-lg px-4 pb-10 pt-[140px]">
+        {isSearching ? (
+          <section aria-label="Resultados de búsqueda">
+            {loading ? (
+              <div className="grid grid-cols-2 gap-2.5">
+                {Array.from({ length: 6 }).map((_, index) => <div key={index} className={`aspect-[3/4] animate-pulse rounded-xl ${skeleton}`} />)}
               </div>
-            </div>
-
-            <BibliotecaClock isLight={isLight} />
-
-            {/* Campo con el diseño del antiguo buscador: grande, itálico y en mayúsculas, con línea degradada debajo. */}
-            <label className="group relative block pb-3 lg:col-span-1">
-              <span className="sr-only">Buscar manga</span>
-              <Search className="absolute left-0 top-[calc(50%-6px)] -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-[var(--accent)]" size={22} style={{ "--accent": accentColor } as CSSProperties} />
-              <input
-                ref={searchInputRef}
-                id="buscar"
-                type="search"
-                placeholder="¿Qué quieres leer hoy?"
-                value={searchTerm}
-                onChange={(event) => {
-                  setSearchTerm(event.target.value);
-                  setCurrentPage(1);
-                }}
-                className={`h-12 w-full bg-transparent pl-9 pr-9 text-lg font-[900] italic uppercase tracking-tight outline-none caret-[var(--accent)] selection:bg-[var(--accent)] selection:text-white sm:text-xl [&::-webkit-search-cancel-button]:hidden ${isLight ? "text-zinc-950 placeholder:text-zinc-400" : "text-white placeholder:text-zinc-600"}`}
-                style={{ "--accent": accentColor } as CSSProperties}
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => { setSearchTerm(""); setCurrentPage(1); }}
-                  aria-label="Borrar búsqueda"
-                  className={`absolute right-0 top-[calc(50%-6px)] -translate-y-1/2 rounded-full border p-1.5 transition ${isLight ? "border-zinc-200 bg-zinc-100 text-zinc-500 hover:bg-zinc-200 hover:text-black" : "border-white/5 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white"}`}
-                >
-                  <X size={14} />
-                </button>
-              )}
-              <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent to-transparent" style={{ "--tw-gradient-via": `${accentColor}80`, backgroundImage: `linear-gradient(to right, transparent, ${accentColor}99, transparent)` } as CSSProperties} />
-            </label>
-
-            <div className="space-y-4 lg:contents">
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen((open) => !open)}
-                  aria-expanded={filtersOpen}
-                  aria-controls="biblioteca-filter-options"
-                  className={`open-sans-library-filters flex min-h-11 flex-1 items-center justify-between rounded-xl border px-3 text-sm font-bold normal-case tracking-normal transition ${isLight ? "border-black/[0.09] bg-zinc-50 text-zinc-700 hover:bg-zinc-100" : "border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:border-white/20 hover:text-white"}`}
-                >
-                  <span className="flex items-center gap-2"><SlidersHorizontal size={16} style={{ color: accentColor }} /> Filtros</span>
-                  <ChevronDown size={15} className={`transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`} />
-                </button>
-                {([
-                  { audience: "Hombre" as const, label: "Masculino", icon: Mars, color: "#00C2FF" },
-                  { audience: "Mujer" as const, label: "Femenino", icon: Venus, color: "#FF4D88" },
-                ]).map(({ audience, label, icon: AudienceIcon, color }) => {
-                  const isActive = selectedAudience === audience;
-                  return (
-                    <button
-                      key={audience}
-                      type="button"
-                      aria-label={label}
-                      title={label}
-                      aria-pressed={isActive}
-                      onClick={() => selectAudience(audience)}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition duration-200 hover:-translate-y-0.5"
-                      style={{
-                        borderColor: isActive ? color : isLight ? "rgba(0,0,0,.09)" : "rgba(255,255,255,.08)",
-                        backgroundColor: isLight ? "#fafafa" : "rgba(255,255,255,.035)",
-                        color,
-                        boxShadow: isActive ? `0 0 0 2px ${color}45, 0 9px 22px ${color}20` : "none",
-                      }}
-                    >
-                      <AudienceIcon size={20} strokeWidth={3.5} />
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  disabled={!hasFilters}
-                  aria-label="Limpiar filtros"
-                  title="Limpiar filtros"
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-25 ${isLight ? "border-black/[0.09] bg-zinc-50 text-zinc-600 hover:bg-zinc-100" : "border-white/[0.08] bg-white/[0.035] text-zinc-300 hover:bg-white/[0.08]"}`}
-                >
-                  <RotateCcw size={16} strokeWidth={2.6} />
-                </button>
-              </div>
-
-              {filtersOpen && (
-                <div id="biblioteca-filter-options" className={`max-h-[165px] touch-pan-y overflow-y-auto overscroll-contain border-t pr-2 pt-4 [scrollbar-gutter:stable] [scrollbar-width:thin] lg:col-span-4 ${isLight ? "border-black/[0.08]" : "border-white/[0.07]"}`}>
-                  {availableTags.length > 0 && (
-                    <div>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:[grid-template-columns:repeat(auto-fit,minmax(130px,1fr))]">
-                        {sortedTags.map((tag) => {
-                          const isActive = selectedTag === tag;
-                          return (
-                            <button
-                              key={tag}
-                              type="button"
-                              aria-pressed={isActive}
-                              onClick={() => {
-                                setSelectedTag(isActive ? null : tag);
-                                setCurrentPage(1);
-                              }}
-                              className={`open-sans-library-filters flex h-11 items-center justify-center overflow-hidden rounded-lg border px-2 py-2 text-center text-xs font-bold normal-case leading-tight tracking-normal transition ${isActive ? "" : isLight ? "border-black/[0.09] bg-zinc-50 text-zinc-600 hover:border-black/20 hover:text-black" : "border-white/[0.08] bg-white/[0.035] text-zinc-400 hover:border-white/20 hover:text-white"}`}
-                              style={isActive ? { borderColor: accentColor, backgroundColor: accentColor, color: isMasculine ? "#001018" : "#fff", boxShadow: `0 8px 24px ${accentColor}30` } : undefined}
-                            >
-                              {tag}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                    </div>
-                  )}
+            ) : results.length === 0 ? null : (
+              <>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {results.slice(0, visibleResults).map((manga) => <MangaCard key={manga.id} manga={manga} isLight={isLight} />)}
                 </div>
-              )}
-            </div>
-          </div>
-        </aside>
-
-        <main id="biblioteca-anchor" className="mt-10 min-w-0 scroll-mt-24 sm:mt-12 lg:mt-14">
-          {!searchTerm && recentReleases.length > 0 && (
-            <section aria-label="Novedades recientes" className="mb-10">
-              <div className="mb-3 flex items-center gap-2 opacity-80">
-                <Flame size={14} className="text-orange-500" />
-                <span className={`text-xs font-[800] uppercase tracking-widest ${isLight ? "text-zinc-600" : "text-zinc-400"}`}>Novedades recientes</span>
-              </div>
-              <div className="grid auto-rows-min grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {recentReleases.map((manga) => (
-                  <Link
-                    key={manga.id}
-                    to={`/manga/${manga.id}`}
-                    className={`group relative flex min-h-[96px] items-center gap-3 overflow-hidden rounded-xl border p-2.5 text-left transition-all duration-300 ${isLight ? "border-zinc-200 bg-zinc-50 hover:border-zinc-300 hover:bg-white" : "border-white/5 bg-zinc-900/40 hover:border-white/10 hover:bg-white/5"}`}
+                {results.length > visibleResults && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleResults((count) => count + RESULTS_PAGE_SIZE)}
+                    className={`mt-5 flex h-11 w-full items-center justify-center rounded-full text-[11px] font-black uppercase tracking-wider transition ${isLight ? "bg-black text-white hover:bg-zinc-800" : "bg-white text-black hover:bg-zinc-200"}`}
                   >
-                    <div className={`absolute inset-0 bg-gradient-to-r from-[#FF4D88]/0 transition-all duration-500 ${isLight ? "to-[#FF4D88]/[0.03] group-hover:to-[#FF4D88]/[0.07]" : "to-[#FF4D88]/5 group-hover:to-[#FF4D88]/10"}`} />
-                    <div className="relative h-[75px] w-[50px] flex-shrink-0 overflow-hidden rounded shadow-lg transition-all duration-500 group-hover:scale-105">
-                      <img src={manga.portada} alt={manga.titulo} className="h-full w-full object-cover" loading="lazy" decoding="async" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    </div>
-                    <div className="z-10 flex min-w-0 flex-1 flex-col gap-1">
-                      <h3 className={`line-clamp-2 w-full text-sm font-[800] uppercase italic leading-snug tracking-tight transition-colors group-hover:text-[#FF4D88] ${isLight ? "text-zinc-950" : "text-white"}`}>{manga.titulo}</h3>
-                      <div className={`mt-1 flex w-fit items-center gap-1.5 rounded-md border border-[#FF4D88]/30 bg-[#FF4D88]/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide ${isLight ? "text-zinc-900" : "text-white"}`}>
-                        <CalendarDays size={13} className="shrink-0 text-[#FF4D88]" strokeWidth={2.4} />
-                        <span className="truncate">Subido {manga.fecha}</span>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className={`transition-all duration-300 group-hover:translate-x-1 ${isLight ? "text-zinc-300 group-hover:text-zinc-800" : "text-zinc-800 group-hover:text-white"}`} />
-                  </Link>
-                ))}
+                    Ver más
+                  </button>
+                )}
+              </>
+            )}
+          </section>
+        ) : (
+          <>
+            {/* "+ Buscados": cinco filas ordenadas por vistas, con portada pequeña,
+                título, etiqueta rosa con el tipo y contador negro con el ojo. */}
+            <section aria-label="Más buscados">
+              <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">+ Buscados</h2>
+              {loading ? (
+                <div className="space-y-1">
+                  {Array.from({ length: TOP_SEARCHED_COUNT }).map((_, index) => <div key={index} className={`h-[84px] animate-pulse rounded-xl ${skeleton}`} />)}
+                </div>
+              ) : (
+                <ol className="space-y-1">
+                  {topSearched.map((manga) => (
+                    <li key={manga.id}>
+                      <Link to={`/manga/${manga.id}`} className={`group flex items-center gap-3 rounded-xl p-1.5 transition-colors ${isLight ? "hover:bg-black/[0.04]" : "hover:bg-white/[0.06]"}`}>
+                        <img src={manga.portada} alt={`Portada del manga ${manga.titulo}`} className="h-[72px] w-[68px] shrink-0 rounded-lg object-cover object-top bg-zinc-900" loading="lazy" decoding="async" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="line-clamp-2 font-[Montserrat] text-[13px] font-normal leading-snug">{toTitleCase(manga.titulo)}</h3>
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <span className="rounded-md bg-[#FF4D88] px-2 py-1 font-[Montserrat] text-[10px] font-bold uppercase leading-none tracking-wide text-white">{manga.tipo || "Manga"}</span>
+                            {/* Vistas reales (suma de capítulos por serie) y, mientras no lleguen a 1K, la cifra provisional de displayViews. */}
+                            <span className={`flex items-center gap-1 rounded-md px-2 py-1 font-[Montserrat] text-[10px] font-bold leading-none text-white ${isLight ? "bg-black" : "border border-white/10 bg-[#1c1c21]"}`}>
+                              <Eye size={12} strokeWidth={2.5} aria-hidden="true" />
+                              <span className="tabular-nums">{formatViews(displayViews(manga))}</span>
+                              <span className="sr-only">vistas</span>
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
+            {/* Tarjetas por género: portada de un manga del género con un tinte de color y la etiqueta abajo. */}
+            <section aria-label="Explorar por género" className="mt-7">
+              <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Explorar por género</h2>
+              <div className="grid grid-cols-2 gap-2.5">
+                {loading
+                  ? Array.from({ length: 6 }).map((_, index) => <div key={index} className={`aspect-[2/1] animate-pulse rounded-2xl ${skeleton}`} />)
+                  : genreTiles.map((tile) => (
+                    <button
+                      key={tile.genre}
+                      type="button"
+                      onClick={() => setSearchTerm(tile.genre)}
+                      className="group relative aspect-[2/1] overflow-hidden rounded-2xl text-left shadow-[0_6px_18px_rgba(0,0,0,0.12)] transition-transform duration-300 active:scale-[0.97]"
+                      style={{ backgroundColor: tile.color }}
+                    >
+                      {tile.cover && <img src={tile.cover} alt="" className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />}
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-0"
+                        style={{ "--tint": tile.color, backgroundImage: "linear-gradient(to top, var(--tint) 0%, color-mix(in srgb, var(--tint) 55%, transparent) 45%, transparent 100%)" } as CSSProperties}
+                      />
+                      <span className="absolute bottom-2.5 left-3 text-[15px] font-[800] leading-none text-white [text-shadow:0_1px_6px_rgba(0,0,0,.25)]">{tile.genre}</span>
+                    </button>
+                  ))}
               </div>
             </section>
-          )}
 
-          <div className={`mb-5 border-b pb-5 text-center ${isLight ? "border-black/[0.08]" : "border-white/[0.08]"}`}>
-            <h2 className={`google-sans-library text-2xl font-black uppercase tracking-tight sm:text-3xl ${isLight ? "text-zinc-950" : "text-white"}`}>
-              {resultsTitle}
-            </h2>
-          </div>
-
-          {loading ? (
-            <div className="mx-auto grid w-full max-w-[1180px] grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
-              {Array.from({ length: 10 }).map((_, index) => (
-                <div key={index} className={`aspect-[2/3] animate-pulse rounded-2xl ${isLight ? "bg-black/[0.06]" : "bg-white/[0.06]"}`} />
-              ))}
-            </div>
-          ) : items.length === 0 ? (
-            <div className={`mx-auto flex min-h-[420px] w-full max-w-[1180px] flex-col items-center justify-center gap-4 rounded-3xl border border-dashed px-6 text-center ${isLight ? "border-black/10 bg-zinc-50" : "border-white/10 bg-white/[0.02]"}`}>
-              <div className={`flex h-16 w-16 items-center justify-center rounded-2xl border ${isLight ? "border-black/10 bg-white" : "border-white/10 bg-white/[0.04]"}`}>
-                <BookOpen size={28} className={isLight ? "text-black/30" : "text-white/25"} />
-              </div>
-              <div>
-                <h3 className={`text-lg font-black ${isLight ? "text-zinc-950" : "text-white"}`}>No encontramos coincidencias</h3>
-                <p className="mt-1 text-sm text-zinc-500">Prueba otro título o elimina los filtros activos</p>
-              </div>
-              <button onClick={clearFilters} className={`rounded-full px-5 py-2.5 text-[10px] font-black uppercase tracking-wider transition ${isLight ? "bg-black text-white hover:bg-zinc-800" : "bg-white text-black hover:bg-zinc-200"}`}>
-                Ver toda la biblioteca
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="mx-auto grid w-full max-w-[1180px] grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
-                {pageItems.map((manga, index) => (
-                  <Link
-                    to={`/manga/${manga.id}`}
-                    key={manga.id}
-                    className="biblioteca-cover-card group relative block min-w-0"
-                    style={{ "--card-accent": accentColor } as CSSProperties}
-                  >
-                    <div className={`biblioteca-cover-card-surface relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_14px_34px_rgba(0,0,0,0.18)] ${isLight ? "biblioteca-cover-card-light" : "biblioteca-cover-card-dark"}`}>
-                      <img
-                        src={manga.portada}
-                        alt={`Portada del manga ${manga.titulo}`}
-                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.06]"
-                        loading={index < 6 ? "eager" : "lazy"}
-                        decoding="async"
-                      />
-                      <div className={isLight ? "absolute inset-x-0 bottom-0 h-[36%] bg-gradient-to-t from-white via-white/85 to-transparent" : "absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent opacity-90 transition-opacity duration-300"} />
-                      <div className={`biblioteca-cover-top-shade ${isLight ? "biblioteca-cover-top-shade-light" : "biblioteca-cover-top-shade-dark"}`} />
-                      <div className={`absolute left-2 top-2 flex items-center gap-1 rounded-md border px-1.5 py-1 text-[8px] font-black shadow-lg backdrop-blur-md sm:left-2.5 sm:top-2.5 sm:text-[9px] ${isLight ? "border-black/10 bg-white/85 text-zinc-950" : "border-white/15 bg-black/70 text-white"}`}>
-                        <Star size={10} className="fill-yellow-400 text-yellow-400" /> 10
-                      </div>
-                      {manga.tipo && (
-                        <span className={`absolute right-2 top-2 max-w-[48%] truncate rounded-md border px-1.5 py-1 text-[8px] font-black uppercase shadow-lg backdrop-blur-md sm:right-2.5 sm:top-2.5 sm:text-[9px] ${isLight ? "border-black/10 bg-white/85 text-zinc-950" : "border-white/15 bg-black/70 text-white"}`}>
-                          {manga.tipo}
-                        </span>
-                      )}
-                      <div className="absolute inset-x-0 bottom-0 px-3 pb-3 pt-12 sm:px-4 sm:pb-4">
-                        <h3 className={`line-clamp-2 text-center text-[11px] font-[900] uppercase leading-snug tracking-tight transition-colors group-hover:text-[var(--card-accent)] sm:text-xs ${isLight ? "text-zinc-950 [text-shadow:0_1px_10px_rgba(255,255,255,.95)]" : "text-white [text-shadow:0_2px_12px_rgba(0,0,0,.95)]"}`}>
-                          {manga.titulo}
+            {/* "Nuevos lanzamientos": el más reciente en grande y los tres siguientes debajo. */}
+            <section aria-label="Nuevos lanzamientos" className="mt-7">
+              <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Nuevos lanzamientos</h2>
+              {loading || newReleases.length === 0 ? (
+                <>
+                  <div className={`aspect-[4/5] animate-pulse rounded-2xl ${skeleton}`} />
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {Array.from({ length: 3 }).map((_, index) => <div key={index} className={`aspect-[3/4] animate-pulse rounded-xl ${skeleton}`} />)}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Link to={`/manga/${newReleases[0].id}`} className="group block">
+                    <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_14px_34px_rgba(0,0,0,0.18)]">
+                      <img src={newReleases[0].portada} alt={`Portada del manga ${newReleases[0].titulo}`} className="h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.04]" loading="lazy" decoding="async" />
+                      <FreshnessBadge manga={newReleases[0]} className="absolute left-0 top-0 rounded-br-lg px-2.5 py-1.5 text-[11px]" />
+                      <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+                      <div className="absolute inset-x-0 bottom-0 px-4 pb-4">
+                        <h3 className="cover-display-title line-clamp-2 text-[30px] leading-[1] text-white [text-shadow:0_2px_14px_rgba(0,0,0,.6)]">
+                          {newReleases[0].titulo}
                         </h3>
                       </div>
                     </div>
                   </Link>
-                ))}
-              </div>
-
-              {totalPages > 1 && (
-                <PaginationControls
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  accent={isMasculine ? "blue" : "pink"}
-                  scrollTargetId="biblioteca-anchor"
-                  theme={isLight ? "light" : "dark"}
-                />
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {newReleases.slice(1).map((manga) => <MangaCard key={manga.id} manga={manga} isLight={isLight} tall />)}
+                  </div>
+                </>
               )}
-            </>
-          )}
-        </main>
+            </section>
+          </>
+        )}
       </div>
-
-      <Footer />
     </div>
   );
 };
+
+/** Tarjeta vertical: portada con el título encima. `tall` la alarga (fila de lanzamientos). */
+const MangaCard = ({ manga, isLight, tall = false }: { manga: MangaCapitulo; isLight: boolean; tall?: boolean }) => (
+  <Link to={`/manga/${manga.id}`} className={`group block overflow-hidden rounded-xl ${isLight ? "bg-zinc-100" : "bg-[#141416]"}`}>
+    <div className={`relative overflow-hidden bg-zinc-900 ${tall ? "aspect-[3/5]" : "aspect-[3/4]"}`}>
+      <img src={manga.portada} alt={`Portada del manga ${manga.titulo}`} className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
+      <FreshnessBadge manga={manga} className="absolute left-0 top-0 rounded-br-md" />
+      <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 px-2 pb-2">
+        <h4 className="cover-display-title line-clamp-2 text-[15px] leading-[1.05] text-white [text-shadow:0_1px_8px_rgba(0,0,0,.7)]">
+          {manga.titulo}
+        </h4>
+      </div>
+    </div>
+  </Link>
+);

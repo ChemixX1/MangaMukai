@@ -802,6 +802,29 @@ html {
   font-style: normal;
 }
 
+/* Títulos sobre portada en Guardados / Me gusta (Más): Reggae One, trazo tipo pincel japonés. */
+.cover-brush-title {
+  font-family: "Reggae One", "Changa One", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+/* Título de la serie en la tarjeta de Actividad (Más): Luckiest Guy, como en el diseño. */
+.activity-series-title {
+  font-family: "Luckiest Guy", "Changa One", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* Títulos sobre portada (Biblioteca): Changa One en cursiva y mayúsculas, con aire agresivo. */
+.cover-display-title {
+  font-family: "Changa One", sans-serif;
+  font-weight: 400;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
 .raleway-navbar {
   font-family: "Raleway", sans-serif;
   font-optical-sizing: auto;
@@ -1386,6 +1409,27 @@ html.dark .site-navbar-surface {
   border-bottom-color: rgba(255, 255, 255, 0.1);
   background: #000;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
+}
+
+/* Buscador móvil del navbar (/biblioteca): la lupa vuela con FLIP desde su sitio
+   habitual; aquí solo entran en fundido el fondo de la píldora, el campo y la X. */
+@keyframes navbar-search-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.navbar-search-pill::before,
+.navbar-search-pill > input {
+  animation: navbar-search-fade-in 0.32s ease-out 0.08s both;
+}
+.navbar-search-close {
+  animation: navbar-search-fade-in 0.28s ease-out 0.16s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .navbar-search-pill::before,
+  .navbar-search-pill > input,
+  .navbar-search-close {
+    animation: none;
+  }
 }
 
 

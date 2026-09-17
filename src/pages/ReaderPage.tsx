@@ -4,7 +4,7 @@ import { getStoredUser, getStoredToken, buyChapter, refreshUser, getUnlockedChap
 import { Loader2, ChevronLeft, ChevronRight, Home, Coins, Lock } from "lucide-react";
 import { PurchaseModal } from "../components/modals";
 import { getMangaById, trackChapterView } from "../services/mangaService";
-import { recordMangaRead } from "../services/socialService";
+import { recordChapterProgress, recordMangaRead } from "../services/socialService";
 import { FOOTER_SOCIALS } from "../components/layout/Footer";
 import { MangaComments } from "../components/manga/MangaComments";
 import { MangaMusicCard } from "../components/manga/MangaMusicCard";
@@ -169,7 +169,11 @@ export const ReaderPage = () => {
         if (data.mangaId && !data.error && !data.locked) {
           void trackChapterView(chapterId, data.mangaId);
           // Cuenta la serie como leída en el perfil (solo con sesión).
-          if (getStoredToken()) void recordMangaRead(data.mangaId, chapterId).catch(() => undefined);
+          if (getStoredToken()) {
+            void recordMangaRead(data.mangaId, chapterId).catch(() => undefined);
+            // Capítulo abierto (aún sin terminar): aparece en Actividad hasta llegar al final.
+            void recordChapterProgress(chapterId, data.mangaId, false).catch(() => undefined);
+          }
         }
         session.warmAround(chapters, chapterId, unlocked);
       } catch (caught) {
@@ -182,6 +186,23 @@ export const ReaderPage = () => {
     })();
     return () => { active = false; commentsController.abort(); };
   }, [chapterId, authGeneration]);
+
+  // Al ver el pie "Fin del capítulo" se da el capítulo por terminado (sale de Actividad).
+  const chapterEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const target = chapterEndRef.current;
+    const mangaId = navData?.mangaId;
+    if (loading || !target || !mangaId || !chapterId || images.length === 0 || !getStoredToken()) return;
+    let reported = false;
+    const observer = new IntersectionObserver((entries) => {
+      if (reported || !entries.some((entry) => entry.isIntersecting)) return;
+      reported = true;
+      observer.disconnect();
+      void recordChapterProgress(chapterId, mangaId, true).catch(() => undefined);
+    }, { threshold: 0.5 });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loading, images.length, navData?.mangaId, chapterId]);
 
   useEffect(() => {
     if (loading || location.hash !== '#comentarios') return;
@@ -355,7 +376,7 @@ export const ReaderPage = () => {
 
           {/* Footer Navegación */}
           <div className={`w-full p-6 md:p-10 flex flex-col gap-8 border-t ${isLight ? 'bg-[#f8fafc] border-black/10' : 'bg-zinc-950 border-zinc-900'}`}>
-             <div className="text-center space-y-2">
+             <div ref={chapterEndRef} className="text-center space-y-2">
               <p className="text-zinc-500 text-[10px] uppercase tracking-[0.2em]">Fin del capítulo {navData?.chapterNum}</p>
               <h3 className="font-black text-xl md:text-2xl tracking-tight">{navData?.title || "Sin título"}</h3>
             </div>

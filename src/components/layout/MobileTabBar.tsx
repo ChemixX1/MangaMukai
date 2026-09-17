@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { isMobileSectionRoute } from '../../utils/mobileSections';
 
 interface IconProps { active: boolean }
 
@@ -65,7 +66,8 @@ const TABS = [
  */
 export const MobileTabBar = () => {
   const { pathname } = useLocation();
-  if (pathname.startsWith('/read/')) return null;
+  // El lector y la edición rápida del perfil van a pantalla completa, sin barra.
+  if (pathname.startsWith('/read/') || pathname === '/perfil/editar' || isMobileSectionRoute(pathname)) return null;
 
   const labelClass = (active: boolean) => `flex h-full w-full flex-col items-center justify-center gap-1.5 pb-0.5 font-[Montserrat] text-[10px] leading-none transition-colors ${active ? 'font-bold text-black dark:text-white' : 'font-semibold text-[#262626] dark:text-[#e4e4e7]'}`;
 

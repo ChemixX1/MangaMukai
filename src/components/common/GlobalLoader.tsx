@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
 import { GLOBAL_LOADING_EVENT, type GlobalLoadingDetail } from '../../utils/globalLoading';
+import { isMobileSectionRoute } from '../../utils/mobileSections';
 import { lockPageScroll } from '../../utils/scrollLock';
 import { MukaiLoaderWheel } from './MukaiLoaderWheel';
 
@@ -10,7 +11,8 @@ const HOME_LOADING_EVENT = 'mangamukai:home-loading';
 const MINIMUM_VISIBLE_TIME = 720;
 const MAXIMUM_VISIBLE_TIME = 10000;
 // El lector trae su propia rueda y precarga los capitulos vecinos: nunca cubrirlo con el loader global.
-const isReaderDestination = (to: string) => /^\/read\/[^/?]+/.test(to);
+// Rutas que se abren sin overlay: el lector, la edición rápida del perfil y las páginas de Recursos.
+const isReaderDestination = (to: string) => /^\/read\/[^/?]+/.test(to) || to.split('?')[0] === '/perfil/editar' || isMobileSectionRoute(to.split('?')[0]);
 const isAuthViewTransition = (from: string, to: string) => {
   const fromPath = from.split('?')[0];
   const toPath = to.split('?')[0];

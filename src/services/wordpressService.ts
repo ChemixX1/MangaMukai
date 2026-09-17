@@ -68,6 +68,12 @@ export const emptySocialLinks = (): ProfileSocialLinks => ({
   github: '',
 });
 
+/**
+ * WordPress devuelve un Gravatar genérico ("mystery man") cuando el usuario no
+ * subió foto; para la app eso es "sin foto" y se pinta el icono de persona.
+ */
+export const isPlaceholderAvatar = (url: string) => !url || /gravatar\.com\/avatar|[?&](d|default)=(mm|mp|identicon|blank)/i.test(url);
+
 const profileFromUser = (user: MMUser): WordPressProfile => ({
   username: user.display_name || user.username,
   bio: '',
@@ -77,7 +83,7 @@ const profileFromUser = (user: MMUser): WordPressProfile => ({
   phone: '',
   show_birth_date: false,
   show_phone: false,
-  avatar_url: user.avatar || '',
+  avatar_url: isPlaceholderAvatar(user.avatar || '') ? '' : (user.avatar || ''),
   banner_url: '',
   banner_color: 'bg-[#FF4D88]',
   is_pro: false,
@@ -151,6 +157,7 @@ export const getWordPressProfile = async (
       return {
         ...fallback,
         ...remoteProfile,
+        avatar_url: isPlaceholderAvatar(remoteProfile.avatar_url || '') ? '' : (remoteProfile.avatar_url || ''),
         social_links: {
           ...fallback.social_links,
           ...(remoteProfile.social_links || {}),

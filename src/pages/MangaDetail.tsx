@@ -11,6 +11,7 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
   Heart,
   List,
   Loader2,
@@ -48,6 +49,7 @@ import { MangaDetailClock } from '../components/common';
 import { Footer } from '../components/layout';
 import { FOOTER_SOCIALS } from '../components/layout/Footer';
 import { useTheme } from '../hooks/useTheme';
+import { toTitleCase } from '../utils/titleCase';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { collectionBadge } from '../utils/womenBlackWhite';
 import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from '../utils/globalLoading';
@@ -78,10 +80,6 @@ const cleanSynopsis = (title: string, synopsis?: string) => {
   }
   return trimmed;
 };
-
-const toTitleCase = (value: string) => value
-  .toLocaleLowerCase('es')
-  .replace(/(^|[\s\-\u2013\u2014/([{\u00bf\u00a1'\u2019])\p{L}/gu, (match) => match.toLocaleUpperCase('es'));
 
 const MANGA_REACTIONS = [
   { id: 'like', symbol: '👍', label: 'Me gusta' },
@@ -470,15 +468,48 @@ export const MangaDetail = () => {
 
   return (
     <main className={`manga-detail-page relative min-h-screen overflow-x-clip transition-colors duration-500 ${isLightMode ? 'manga-detail-theme-light bg-white text-black' : 'manga-detail-theme-dark bg-black text-white'}`}>
-      <div className="fixed inset-0 z-0" aria-hidden="true">
+      {/* Fondo difuminado solo en escritorio: en móvil la portada va a sangre sobre fondo liso. */}
+      <div className="fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
         <img src={manga.portada} alt="" className="h-full w-full origin-top scale-105 object-cover object-top blur-[2px]" />
         <div className={`absolute inset-0 ${isLightMode ? 'bg-[linear-gradient(90deg,rgba(255,255,255,.97),rgba(255,255,255,.91)_52%,rgba(255,255,255,.96))]' : 'bg-[linear-gradient(90deg,rgba(0,0,0,.95),rgba(0,0,0,.84)_52%,rgba(0,0,0,.94))]'}`} />
         <div className={`absolute inset-0 bg-gradient-to-b ${isLightMode ? 'from-white/45 via-transparent to-white' : 'from-black/45 via-transparent to-black'}`} />
       </div>
 
-      <section className="relative z-10 pb-20 pt-28 md:pt-32">
+      {/* Móvil: la portada ocupa toda la parte superior, sin cabecera (el navbar
+          se oculta en esta ruta). El botón flotante devuelve a la página anterior. */}
+      <div className="manga-detail-mobile-hero relative z-10 lg:hidden" data-testid="manga-detail-mobile-hero">
+        {/* La portada se muestra entera (alto según su proporción), con la base curvada y una sombra suave debajo. */}
+        <div className={`relative w-full overflow-hidden rounded-b-[36px] ${isLightMode ? 'bg-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]' : 'bg-black shadow-[0_18px_44px_rgba(0,0,0,0.6)]'}`}>
+          <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} className="block h-auto w-full" fetchPriority="high" />
+          <div className={`absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t ${isLightMode ? 'from-white/70' : 'from-black/70'} to-transparent`} aria-hidden="true" />
+        </div>
+
+        {/* Móvil: título, tipo y título original justo bajo la portada (el reloj y las redes solo van en escritorio). */}
+        <div className="px-5 pt-5 text-center">
+          <h1 className={`font-[Montserrat] text-[22px] font-bold uppercase leading-[1.15] tracking-[-0.02em] ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</h1>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <span className="manga-detail-cover-tag inline-flex items-center rounded-md px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg" style={{ backgroundColor: typeIndicatorColor }}>{manga.tipo || 'Manga'}</span>
+            {coverBadge === 'bn' && <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-zinc-100 px-3 py-2 text-[11px] uppercase leading-none text-black shadow-lg">B&amp;N</span>}
+            {coverBadge === 'hot' && <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">Hot</span>}
+          </div>
+          {manga.tituloOriginal && (
+            <p className={`mx-auto mt-3 w-fit max-w-full rounded-md px-3 py-1 font-[Montserrat] text-[13px] font-medium ${isLightMode ? 'bg-black/[0.06] text-black/70' : 'bg-white/[0.08] text-white/75'}`}>{manga.tituloOriginal}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => { if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1); else navigate('/'); }}
+          aria-label="Volver"
+          title="Volver"
+          className="absolute left-3 top-[calc(env(safe-area-inset-top)+12px)] flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-md transition hover:bg-black/60"
+        >
+          <ChevronLeft size={24} strokeWidth={2.6} className="-ml-0.5" />
+        </button>
+      </div>
+
+      <section className="relative z-10 pb-20 pt-4 lg:pt-32">
         <div className="desktop-content-shell mx-auto w-full max-w-[1780px] px-3 sm:px-5 lg:px-4 2xl:px-6">
-          <div className="mb-2 grid items-center gap-4 xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
+          <div className="mb-2 hidden items-center gap-4 lg:grid xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
             {/* Va en la primera columna para quedar justo encima de la portada. */}
             <div className="mx-auto w-full max-w-[300px] lg:max-w-none xl:col-start-1 xl:row-start-1">
               <MangaDetailClock isLight={isLightMode} />
@@ -494,7 +525,7 @@ export const MangaDetail = () => {
               </div>
             </div>
           </div>
-          <div data-testid="manga-detail-social-divider" className={`mb-5 h-px w-full bg-gradient-to-r from-transparent via-current to-transparent ${isLightMode ? 'text-black/20' : 'text-white/20'}`} aria-hidden="true" />
+          <div data-testid="manga-detail-social-divider" className={`mb-5 hidden h-px w-full bg-gradient-to-r from-transparent via-current to-transparent lg:block ${isLightMode ? 'text-black/20' : 'text-white/20'}`} aria-hidden="true" />
 
           <div className="grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
             <motion.aside
@@ -504,7 +535,7 @@ export const MangaDetail = () => {
               data-testid="manga-detail-left-column"
               className="manga-detail-sticky-column no-scrollbar order-1 mx-auto w-full max-w-[300px] lg:max-w-none xl:col-start-1 xl:row-start-1 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto xl:overscroll-contain"
             >
-              <div className={`manga-detail-cover relative aspect-[3/4.35] overflow-hidden rounded-[8px] border ${isLightMode ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
+              <div className={`manga-detail-cover relative hidden aspect-[3/4.35] overflow-hidden rounded-[8px] border lg:block ${isLightMode ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
                 <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} className="h-full w-full object-cover" />
               </div>
 
@@ -598,9 +629,9 @@ export const MangaDetail = () => {
                 </div>
               )}
               <header className={`border-b pb-5 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                <h1 className={`text-center font-[Montserrat] text-[clamp(1.2rem,1.6vw,1.72rem)] font-bold uppercase leading-[1.16] tracking-[-0.025em] ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</h1>
+                <p className={`hidden text-center font-[Montserrat] text-[clamp(1.2rem,1.6vw,1.72rem)] font-bold uppercase leading-[1.16] tracking-[-0.025em] lg:block ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</p>
                 {manga.tituloOriginal && (
-                  <p className={`mx-auto mt-2 w-fit max-w-full rounded-md px-3 py-1 text-center font-[Montserrat] text-[clamp(0.8rem,1vw,0.95rem)] font-medium backdrop-blur-md ${isLightMode ? 'bg-black/[0.06] text-black/70' : 'bg-white/[0.08] text-white/75'}`}>
+                  <p className={`mx-auto mt-2 hidden w-fit max-w-full rounded-md px-3 py-1 text-center font-[Montserrat] text-[clamp(0.8rem,1vw,0.95rem)] font-medium backdrop-blur-md lg:block ${isLightMode ? 'bg-black/[0.06] text-black/70' : 'bg-white/[0.08] text-white/75'}`}>
                     {manga.tituloOriginal}
                   </p>
                 )}

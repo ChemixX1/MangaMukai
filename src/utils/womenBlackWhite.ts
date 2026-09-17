@@ -11,7 +11,7 @@ const blackWhiteTag = /^(?:manga\s*)?(?:b\s*[&/-]?\s*n|blanco\s*y?\s*negro|monoc
 const tagsOf = (manga: MangaCapitulo) =>
   [manga.tipo, ...(manga.genres || [])].filter(Boolean).map((tag) => String(tag).trim());
 
-const hasBlackWhiteTag = (manga: MangaCapitulo) =>
+export const hasBlackWhiteTag = (manga: MangaCapitulo) =>
   tagsOf(manga).some((tag) => blackWhiteTag.test(tag));
 
 export type Audience = 'Mujer' | 'Hombre';
@@ -54,7 +54,7 @@ export const filterMenBlackWhite = (items: MangaCapitulo[]) => items.filter(isMe
  */
 const hotTag = /^(?:manga\s*)?hot$/i;
 
-const hasHotTag = (manga: MangaCapitulo) => tagsOf(manga).some((tag) => hotTag.test(tag));
+export const hasHotTag = (manga: MangaCapitulo) => tagsOf(manga).some((tag) => hotTag.test(tag));
 
 /** Mangas con público Mujer dentro de la colección +19 (etiqueta HOT obligatoria). */
 export const isWomenHot = (manga: MangaCapitulo) =>

@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Search, X, AlarmClock, Bell, Coins, Crown, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
+import { X, AlarmClock, Coins, Crown, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
 import { AlarmAlert, TimerModal } from "../modals";
-import { DetailCoin3DIcon } from "../common";
+import { BellGlyph, DetailCoin3DIcon, SearchGlyph } from "../common";
 import { NotificationsPanel } from "../social";
 import { useTheme } from "../../hooks/useTheme";
+import { SEARCH_FILTERS, setSearchFilter, setSearchTerm, useSearchFilter, useSearchTerm } from "../../hooks/useSearchTerm";
+import { isMobileSectionRoute } from "../../utils/mobileSections";
 import { getUltimosCapitulos } from "../../services/mangaService";
 import { openSubscriptionModal } from "../../utils/subscriptionModal";
 import authPopoverBackground from "../../assets/modals/auth-login.webp";
@@ -46,7 +48,7 @@ const NavbarFire = ({ size = 16 }: { size?: number }) => (
 const getCurrentStoredUser = () => (getStoredToken() ? getStoredUser() : null);
 
 export const Navbar = () => {
-  
+
   // --- LÓGICA DE COLOR (DARK/LIGHT MODE) ---
   const location = useLocation();
   const navigate = useNavigate();
@@ -63,6 +65,72 @@ export const Navbar = () => {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // --- BUSCADOR MÓVIL ---
+  // En móvil, estar en /biblioteca convierte la cabecera en un buscador: la
+  // lupa viaja a la izquierda, el logo desaparece y una X ocupa el sitio de la
+  // campana. En escritorio (lg) la cabecera no cambia todavía.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
+  const isSearchMode = isMobile && location.pathname === '/biblioteca';
+  const searchTerm = useSearchTerm();
+  const searchFilter = useSearchFilter();
+  // En la ficha de un manga y en "Más" (móvil) la imagen ocupa toda la parte superior: la cabecera no se pinta.
+  const hideHeaderOnMobile = /^\/manga\/[^/]+/.test(location.pathname) || ['/mas', '/perfil/editar'].includes(location.pathname) || isMobileSectionRoute(location.pathname);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchGlyphRef = useRef<HTMLSpanElement>(null);
+  // Posición de la lupa justo antes de cambiar de modo (técnica FLIP): al
+  // renderizarse en su nuevo sitio se anima desde aquí.
+  const searchGlyphFlipRect = useRef<DOMRect | null>(null);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const update = () => setIsMobile(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  useLayoutEffect(() => {
+    const glyph = searchGlyphRef.current;
+    const from = searchGlyphFlipRect.current;
+    searchGlyphFlipRect.current = null;
+    if (!glyph || !from || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const to = glyph.getBoundingClientRect();
+    if (!to.width) return;
+    glyph.animate(
+      [
+        { transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width})`, transformOrigin: 'top left' },
+        { transform: 'translate(0, 0) scale(1)', transformOrigin: 'top left' },
+      ],
+      { duration: 420, easing: 'cubic-bezier(0.22, 0.9, 0.3, 1)' },
+    );
+  }, [isSearchMode]);
+
+  // La lupa del navbar (y cualquier navigate a /biblioteca con focusSearch) deja el campo listo para escribir.
+  useEffect(() => {
+    if (!isSearchMode || location.state?.focusSearch !== true) return;
+    const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus({ preventScroll: true }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [isSearchMode, location.key, location.state]);
+
+  const openSearch = () => {
+    setShowUserMenu(false);
+    setShowNotifications(false);
+    searchGlyphFlipRect.current = searchGlyphRef.current?.getBoundingClientRect() ?? null;
+    if (isSearchMode) {
+      searchInputRef.current?.focus();
+      return;
+    }
+    navigate('/biblioteca', { state: { focusSearch: true } });
+  };
+
+  const closeSearch = () => {
+    searchGlyphFlipRect.current = searchGlyphRef.current?.getBoundingClientRect() ?? null;
+    setSearchTerm('');
+    // Vuelve a donde estaba el usuario; si entró directo a /biblioteca, al inicio.
+    const historyIndex = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (historyIndex > 0) navigate(-1);
+    else navigate('/');
+  };
 
   // --- LÓGICA DEL TEMPORIZADOR ---
   const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
@@ -275,11 +343,75 @@ export const Navbar = () => {
   return (
     <>
       <header
-        className={`${isProfileRoute ? 'sticky' : 'fixed'} site-navbar-surface left-0 top-0 z-[100] w-full py-3 transition-transform duration-300 sm:py-3`}
-        style={{ transform: isHeaderHidden ? 'translateY(-100%)' : 'translateY(0)' }}
+        className={`${isProfileRoute ? 'sticky' : 'fixed'} site-navbar-surface left-0 top-0 z-[100] w-full py-2.5 transition-transform duration-300 lg:py-3 ${hideHeaderOnMobile ? 'hidden lg:block' : ''} ${isSearchMode ? 'pb-0' : ''}`}
+        style={{ transform: isHeaderHidden && !isSearchMode ? 'translateY(-100%)' : 'translateY(0)' }}
       >
         <div className="desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16 flex justify-between items-center">
-            
+          {isSearchMode ? (
+            <div className="w-full">
+              <div className="flex h-12 w-full items-center gap-2">
+                {/* Píldora: la lupa (que llega volando desde la derecha) y el campo hasta justo antes de la X.
+                    El fondo va en ::before para que su fundido no arrastre a la lupa. */}
+                <div className={`navbar-search-pill relative flex h-12 min-w-0 flex-1 items-center gap-2 pl-3 pr-1.5 before:absolute before:inset-0 before:rounded before:border before:content-[''] ${headerUsesDarkText ? 'text-black before:border-black/[0.06] before:bg-[#f2f2f4]' : 'text-white before:border-white/10 before:bg-white/10'}`}>
+                  <span ref={searchGlyphRef} className="relative flex shrink-0 items-center">
+                    <SearchGlyph size={24} />
+                  </span>
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    enterKeyHint="search"
+                    autoComplete="off"
+                    placeholder="Busca títulos, autores o palabras clave"
+                    aria-label="Buscar manga"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    className={`relative h-full min-w-0 flex-1 bg-transparent font-[Montserrat] text-[14px] font-semibold outline-none placeholder:text-[12.5px] placeholder:text-ellipsis [&::-webkit-search-cancel-button]:hidden ${headerUsesDarkText ? 'placeholder:text-zinc-400' : 'placeholder:text-zinc-500'}`}
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchTerm(''); searchInputRef.current?.focus(); }}
+                      aria-label="Borrar búsqueda"
+                      className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-zinc-500 hover:text-black' : 'text-zinc-400 hover:text-white'}`}
+                    >
+                      <X size={12} strokeWidth={2.75} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={closeSearch}
+                  aria-label="Cerrar búsqueda"
+                  title="Cerrar búsqueda"
+                  className={`navbar-search-close -mr-2 rounded-full p-2 transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
+                >
+                  <X size={26} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {/* Pestañas de colección (Inter regular): "Todos" en negro puro; las no seleccionadas, negro tirando a gris. */}
+              <div role="tablist" aria-label="Colección" className="navbar-search-filters mt-6 flex items-end gap-6">
+                {SEARCH_FILTERS.map(({ id, label }) => {
+                  const active = searchFilter === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => { setSearchFilter(id); searchInputRef.current?.focus({ preventScroll: true }); }}
+                      className={`relative pb-2.5 font-[Inter] text-[15px] leading-none transition-colors ${active ? `font-medium ${headerUsesDarkText ? 'text-black' : 'text-white'}` : `font-normal ${headerUsesDarkText ? 'text-[#4b4b50] hover:text-black' : 'text-zinc-400 hover:text-white'}`}`}
+                    >
+                      {label}
+                      {/* Rayita bajo la pestaña activa, apoyada en la línea separadora de la cabecera. */}
+                      {active && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-current" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+          <>
             {/* 1. IZQUIERDA */}
             <div className="flex items-center gap-4 lg:gap-10"> 
               <Link to="/" onClick={handleLogoClick} className="group flex h-10 items-center lg:-translate-y-0.5" aria-label="Volver al inicio de MangaMukai">
@@ -311,21 +443,11 @@ export const Navbar = () => {
 
             {/* 2. DERECHA */}
             <div className="flex items-center gap-0 sm:gap-1 lg:gap-6 lg:translate-y-0.5">
-                
+
                 <div className="contents">
                 {/* Herramientas: la alarma móvil está en el menú principal. */}
                 <div className={`relative hidden items-center gap-0 min-[360px]:flex lg:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} lg:border-r lg:mr-1 lg:pr-6`}>
-                    {/* El buscador vive en la Biblioteca: la lupa lleva allí y enfoca el campo. */}
-                    <button 
-                        onClick={() => { setShowUserMenu(false); setShowNotifications(false); navigate('/biblioteca', { state: { focusSearch: true } }); }}
-                        aria-label="Buscar mangas"
-                        title="Buscar mangas"
-                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} mr-1 rounded-full p-2 transition-colors lg:mr-0`}
-                    >
-                        <Search size={20} strokeWidth={2.5} />
-                    </button>
-
-                    {/* Móvil: campana a la derecha de la lupa; abre la página de notificaciones. */}
+                    {/* Móvil: campana a la izquierda de la lupa; abre la página de notificaciones. */}
                     <button
                       type="button"
                       onClick={() => { setShowUserMenu(false); setShowNotifications(false); navigate(currentUser ? '/notificaciones' : '/auth/login', currentUser ? undefined : { state: { returnTo: '/notificaciones' } }); }}
@@ -333,12 +455,23 @@ export const Navbar = () => {
                       title="Notificaciones"
                       className={`relative mr-1 rounded-full p-2 transition-colors lg:hidden ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
                     >
-                      <Bell size={20} strokeWidth={2.5} />
-                      {unreadNotifications > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[8px] font-black leading-none text-white">{Math.min(99, unreadNotifications)}</span>}
+                      <BellGlyph size={26} />
+                      {/* Punto rojo en la esquina: hay notificaciones sin leer. */}
+                      {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
                     </button>
-                    
+
+                    {/* El buscador vive en la Biblioteca: la lupa lleva allí y enfoca el campo. */}
+                    <button
+                        onClick={openSearch}
+                        aria-label="Buscar mangas"
+                        title="Buscar mangas"
+                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} -mr-2 rounded-full p-2 transition-colors lg:mr-0`}
+                    >
+                        <span ref={searchGlyphRef} className="flex items-center"><SearchGlyph size={26} /></span>
+                    </button>
+
                     <div className="relative hidden lg:block">
-                        <button 
+                        <button
                             onClick={() => setIsTimerModalOpen(!isTimerModalOpen)}
                             aria-label="Abrir temporizador"
                             title="Abrir temporizador"
@@ -351,12 +484,12 @@ export const Navbar = () => {
                             }`}
                         >
                             <AlarmClock size={20} strokeWidth={2.5} className={isTimerActive ? 'animate-pulse' : ''} />
-                            
+
                             {isTimerActive && (
                                 <span className="absolute top-1 right-2 w-2 h-2 bg-[#FF4D88] rounded-full border border-[#02040a] animate-ping"></span>
                             )}
                         </button>
-                        
+
                     </div>
 
                     {/* En móvil el tema se cambia desde la página "Más". */}
@@ -425,8 +558,8 @@ export const Navbar = () => {
                       )}
                     </div>
                     <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative hidden lg:flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}>
-                      <Bell size={20} strokeWidth={2.4} />
-                      {unreadNotifications > 0 && <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[8px] font-black leading-none text-white">{Math.min(99, unreadNotifications)}</span>}
+                      <BellGlyph size={26} />
+                      {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
                     </button>
                   </div>
                 ) : (
@@ -448,9 +581,11 @@ export const Navbar = () => {
                     )}
                   </div>
                 )}
-                
+
                 </div>
             </div>
+          </>
+          )}
         </div>
       </header>
 

@@ -623,6 +623,23 @@ export const getRelatedMangas = async (mangaId: number | string, limit = 10): Pr
 };
 
 // ---------------------------------------------------------------------------
+// 12b. VISTAS POR CAPÍTULO (tabla propia, no la suma de la serie)
+// ---------------------------------------------------------------------------
+export const getChapterViews = async (ids: Array<number | string>): Promise<Record<string, number>> => {
+  const views: Record<string, number> = {};
+  const unique = [...new Set(ids.map(String).filter((id) => id && id !== '0'))];
+  for (let start = 0; start < unique.length; start += 200) {
+    try {
+      const res = await fetch(`${MM_API}/chapters/views?ids=${unique.slice(start, start + 200).join(',')}`);
+      if (!res.ok) continue;
+      const data: { success?: boolean; views?: Record<string, number> } = await res.json();
+      if (data.success && data.views) Object.assign(views, data.views);
+    } catch { /* silent — las vistas no son críticas */ }
+  }
+  return views;
+};
+
+// ---------------------------------------------------------------------------
 // 12. REGISTRAR VISITA A CAPÍTULO
 // ---------------------------------------------------------------------------
 export const trackChapterView = async (chapterId: number | string, mangaId: number | string): Promise<void> => {
