@@ -1,27 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowUp, ArrowUpRight, Check, Info, MessageCircle, Search, Volume2, X } from 'lucide-react';
-import { Footer } from '../components/layout';
-import { Avatar } from '../components/social/LocalCommunityPosts';
+import { Link, useMatch, useParams } from 'react-router-dom';
+import { ArrowLeft, ArrowUp, Check, Info, UserRound, Volume2, X } from 'lucide-react';
 import { chatCharacters, demoReply, type CharacterMessage, type ChatCharacter } from '../data/chatCharacters';
+import { MobileCharacterHome } from '../components/character/mobile/MobileCharacterHome';
+import { MobileCharacterIntro } from '../components/character/mobile/MobileCharacterIntro';
+import { useIsMobileViewport } from '../hooks/useIsMobileViewport';
 import { useExperienceUser, useLocalExperience } from '../hooks/useLocalExperience';
+import { registerCharacterMessage } from '../services/characterChatService';
 import '../styles/experiences.css';
 
+function Avatar({ src, name }: { src?: string; name: string }) {
+  return <span className="exp-avatar">{src ? <img src={src} alt={name} /> : <UserRound size={21} />}</span>;
+}
+
+/**
+ * /chat: en móvil (< lg) la portada de Character del diseño de Figma; en
+ * escritorio sigue vacía a propósito (se rehará más adelante), sin footer.
+ * /chat/:id es la ficha previa del personaje (foto, sinopsis, tu papel) y
+ * /chat/:id/conversacion la conversación en sí.
+ */
 export default function CharacterChatPage() {
   const { characterId } = useParams();
+  const inConversation = useMatch('/chat/:characterId/conversacion') !== null;
   const user = useExperienceUser();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('Todos');
+  const isMobile = useIsMobileViewport();
   const character = chatCharacters.find(item => item.id === characterId);
-  if (character) return <Conversation key={`${user.id}-${character.id}`} character={character} />;
-  const visible = chatCharacters.filter(item => `${item.name} ${item.series}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'Todos' || item.tag === filter));
-  return <><main className="experience character-page"><header className="character-heading"><span className="eyebrow">MUKAI CHAT</span><h1>Al otro lado<br />de la <em>historia</em></h1><p>Elige un personaje y escribe lo que pasa después</p></header>
-    {characterId && <p role="status" className="exp-error">Ese personaje no está disponible. Elige uno de la colección</p>}
-    <div className="character-toolbar"><div className="shop-filters">{['Todos', 'Carismático', 'Reservado', 'Aventurero', 'Divertida'].map(tag => <button key={tag} aria-pressed={filter === tag} onClick={() => setFilter(tag)}>{tag}</button>)}</div><label className="exp-search"><Search size={18} /><input aria-label="Buscar personaje" placeholder="Busca un personaje o manga" value={query} onChange={event => setQuery(event.target.value)} /></label></div>
-    <div className="character-grid">{visible.map(item => <Link to={`/chat/${item.id}`} key={item.id} className={`character-card character-${item.id}`}><div className="character-portrait" style={{ backgroundColor: item.color }}><img src={item.image} alt={item.name} /><span>{item.series}</span><span className="character-start"><ArrowUpRight size={23} /></span></div><div className="character-card-copy"><small>{item.tag}</small><h2>{item.name}</h2><p>{item.description}</p><b>Empezar conversación <MessageCircle size={17} /></b></div></Link>)}</div>
-    {!visible.length && <p className="exp-empty">Prueba con otro nombre o categoría</p>}
-    <details className="chat-explanation"><summary><Info size={19} /> ¿Cómo funciona el chat de personajes?</summary><p>Cada personaje tiene una ficha de personalidad, una forma de hablar y una escena inicial. La IA utiliza esa ficha y los últimos mensajes para continuar la historia contigo</p><p>Sin una conexión configurada, puedes probar una demo de respuestas predefinidas. Una IA real se activa desde el servidor local; la clave nunca se guarda en el navegador. Primero se define el rol y se prueban las respuestas; después se puede ampliar la información de la obra y la memoria</p><p>Los personajes son ficticios. No representan a sus autores. Evita compartir datos personales; tus conversaciones se guardan en este navegador</p></details>
-  </main><Footer /></>;
+  if (character && inConversation) return <Conversation key={`${user.id}-${character.id}`} character={character} />;
+  if (character) return <MobileCharacterIntro character={character} />;
+  if (isMobile) return <MobileCharacterHome />;
+  return <main className="experience character-page min-h-screen" aria-label="Character" />;
 }
 
 function Conversation({ character }: { character: ChatCharacter }) {
@@ -49,7 +56,11 @@ function Conversation({ character }: { character: ChatCharacter }) {
     setBusy(true); setError('');
     const controller = new AbortController(); request.current = controller;
     const next: CharacterMessage[] = [...messages, { id: crypto.randomUUID(), role: 'user', content: input }];
+    const serverMode = mode === 'ai' ? 'ai' : 'demo';
     try {
+      // El servidor anota cada mensaje y aplica la cuota de gratuitos: si se agotó, no hay respuesta.
+      await registerCharacterMessage(character.id, 'user', input, serverMode);
+      if (controller.signal.aborted) return;
       let content: string;
       if (mode === 'demo') content = demoReply(character, input, messages.length / 2);
       else {
@@ -58,7 +69,10 @@ function Conversation({ character }: { character: ChatCharacter }) {
         if (!response.ok || !data.reply) throw new Error(data.error || 'No se pudo obtener una respuesta. Intenta de nuevo.');
         content = data.reply;
       }
-      if (!controller.signal.aborted) { save([...next, { id: crypto.randomUUID(), role: 'assistant', content }]); setText(current => current.trim() === input ? '' : current); }
+      if (!controller.signal.aborted) {
+        save([...next, { id: crypto.randomUUID(), role: 'assistant', content }]); setText(current => current.trim() === input ? '' : current);
+        void registerCharacterMessage(character.id, 'assistant', content, serverMode).catch(() => undefined);
+      }
     } catch (caught) { if (!controller.signal.aborted) setError((caught as Error).message); }
     finally { if (!controller.signal.aborted) setBusy(false); }
   };

@@ -29,3 +29,12 @@ La integración envía `POST https://api.openai.com/v1/responses`, con `store: f
 - El plugin usa `configureServer`: solo existe en el servidor de desarrollo. No se incorpora al sitio estático, al build, a `vite preview` ni a un despliegue del frontend.
 
 Esto es una integración para pruebas locales, **no un backend listo para producción**. Un servicio público necesita un backend propio con autenticación y permisos, controles de abuso y coste por usuario, políticas de privacidad y retención, y una evaluación de las conversaciones y de los personajes. La integración no realiza solicitudes de prueba automáticamente ni llama a la API al consultar disponibilidad.
+
+## Registro y cuota en el servidor (WordPress)
+
+Independiente del modo (demo o IA), cada conversación se anota en el servidor a través del mu-plugin `server/wp-content/mu-plugins/mangamukai-character-chat.php` (se publica con `npm run deploy`):
+
+- Tabla `wp_mm_character_messages`: una fila por mensaje con `user_id` (o `guest_key`, huella de la IP con sal, para invitados), `character_id`, `role` (`user` / `assistant`), `content`, `mode` (`demo` / `ai`) y `created_at` en UTC. Se crea sola la primera vez que carga el plugin.
+- Regla: `MM_CHARACTER_FREE_MESSAGES` = **10 mensajes gratuitos en total por usuario** (solo cuentan los de `role = user`). Al agotarse, `POST /character-chat/messages` responde `402 { error: 'quota_exhausted' }` y la conversación muestra el aviso; no hay todavía consumo de monedas por mensaje.
+- Rutas: `GET /wp-json/mangamukai/v1/character-chat/quota` (`limit`, `used`, `remaining`), `POST …/character-chat/messages` (`character_id`, `role`, `content`, `mode`), `GET …/character-chat/messages?character_id=alex` (historial del propio usuario). Con sesión se envía el Bearer; sin sesión se cuenta por invitado.
+- Cliente: `src/services/characterChatService.ts`. La conversación registra el mensaje del usuario antes de generar la respuesta (si falla la cuota, no hay respuesta) y después anota la del personaje; la portada móvil lee `remaining` para "Te quedan N mensajes gratuitos".

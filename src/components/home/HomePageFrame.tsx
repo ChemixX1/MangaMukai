@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { Footer } from '../layout';
 import { useHomeData } from '../../context/HomeDataContext';
-import { startGlobalLoading } from '../../utils/globalLoading';
 import FilterStrip from './FilterStrip';
 import { Latest } from './Latest';
 import { LatestUpdates } from './LatestMen';
@@ -57,7 +56,6 @@ export function HomePageFrame({
   const { isReady } = useHomeData();
 
   const handleCategoryClick = (category: string) => {
-    startGlobalLoading();
     navigate('/biblioteca#filtros', {
       state: { filterCategory: category },
     });

@@ -104,9 +104,10 @@ const releaseTime = (manga: MangaCapitulo) => {
 /**
  * Biblioteca (móvil primero): el campo de búsqueda vive en el navbar; aquí van
  * los cinco más buscados, las tarjetas por género, los últimos lanzamientos y,
- * al escribir, los resultados sobre el catálogo.
+ * al escribir, los resultados sobre el catálogo. Con `embedded` se pinta dentro
+ * de la ventana del buscador (SearchOverlay), que ya trae el campo y las pestañas.
  */
-export const Biblioteca = () => {
+export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
   const location = useLocation();
@@ -157,13 +158,13 @@ export const Biblioteca = () => {
   const isSearching = deferredSearchTerm.trim().length > 0;
 
   // Al pasar de explorar a resultados (o volver) se empieza desde arriba.
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); }, [isSearching]);
+  useEffect(() => { if (!embedded) window.scrollTo({ top: 0, behavior: "auto" }); }, [embedded, isSearching]);
 
   const skeleton = isLight ? "bg-black/[0.06]" : "bg-white/[0.08]";
 
   return (
     <div className={`biblioteca-page min-h-screen transition-colors duration-300 ${isLight ? "bg-white text-zinc-950" : "bg-black text-gray-100"}`}>
-      <div className="mx-auto w-full max-w-lg px-4 pb-10 pt-[140px]">
+      <div className={`mx-auto w-full max-w-lg px-4 pb-10 ${embedded ? "pt-5" : "pt-[140px]"}`}>
         {isSearching ? (
           <section aria-label="Resultados de búsqueda">
             {loading ? (

@@ -108,7 +108,8 @@ const NewMangaCard = ({ notification, onOpen }: CardProps) => {
   const { payload } = notification;
   return (
     <article className={`relative h-24 w-full overflow-hidden rounded-3xl bg-zinc-800 ${notification.read ? 'opacity-70' : ''}`}>
-      {payload.cover && <img src={payload.cover} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />}
+      {/* La portada de fondo se ve un poco más arriba del centro (la cabeza del personaje suele estar ahí). */}
+      {payload.cover && <img src={payload.cover} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_28%]" loading="lazy" />}
       <div className="absolute inset-0 rounded-3xl bg-black/80" />
       <div className="relative flex h-full items-center gap-2 pl-0.5 pr-4">
         <NewBadge />
@@ -116,8 +117,10 @@ const NewMangaCard = ({ notification, onOpen }: CardProps) => {
           <p className="truncate font-[Montserrat] text-[15px] font-bold leading-5 text-white min-[420px]:text-base">{payload.title || 'Título del manga'}</p>
           <p className="mt-1.5 truncate font-[Michroma] text-[6.5px] font-normal leading-4 text-white min-[420px]:text-[7.5px]">Descubre, disfruta y vive una nueva aventura</p>
         </div>
-        <Link to={notificationRoute(notification)} onClick={(event) => { event.stopPropagation(); onOpen(notification); }} className="flex h-5 shrink-0 translate-y-2 items-center justify-center gap-1 rounded-sm bg-purple-600 px-2 font-[Montserrat] text-[7px] font-bold text-white">
-          Ver manga <ArrowIcon />
+        {/* Botón alto, centrado en la tarjeta y un pelín a la derecha; "Ver" y "manga" en dos filas. */}
+        <Link to={notificationRoute(notification)} onClick={(event) => { event.stopPropagation(); onOpen(notification); }} className="flex h-12 shrink-0 translate-x-1.5 flex-col items-center justify-center rounded-md bg-purple-600 px-2.5 text-center font-[Montserrat] text-[9px] font-bold leading-[13px] text-white">
+          <span>Ver</span>
+          <span className="flex items-center gap-0.5">manga <ArrowIcon /></span>
         </Link>
       </div>
       {!notification.read && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-fuchsia-500" />}

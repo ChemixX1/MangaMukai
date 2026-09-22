@@ -1,5 +1,27 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { isMobileSectionRoute } from '../../utils/mobileSections';
+
+/** La barra se esconde al bajar y reaparece en cuanto se sube (igual que la cabecera). */
+const useHideOnScrollDown = () => {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const currentY = window.scrollY;
+      const delta = currentY - lastY;
+      // Umbral pequeño para que el rebote del scroll no la haga parpadear.
+      if (Math.abs(delta) < 6) return;
+      lastY = currentY;
+      const maxY = document.documentElement.scrollHeight - window.innerHeight;
+      // Al llegar al final (o cerca) siempre a la vista, aunque se haya bajado.
+      setHidden(currentY > 90 && delta > 0 && currentY < maxY - 40);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  return hidden;
+};
 
 interface IconProps { active: boolean }
 
@@ -53,12 +75,14 @@ const TABS = [
   { key: 'mangas', label: 'Mangas', to: '/', Icon: BookIcon, match: (path: string) => path === '/' || path.startsWith('/manga') || path.startsWith('/biblioteca') || path.startsWith('/read/') },
   { key: 'character', label: 'Character', to: '/chat', Icon: FlameIcon, match: (path: string) => path.startsWith('/chat') },
   { key: 'tienda', label: 'Tienda', to: '/tienda', Icon: BagIcon, match: (path: string) => path.startsWith('/tienda') },
-  { key: 'chat', label: 'Chat', to: '/mensajes', Icon: BubbleIcon, match: (path: string) => path.startsWith('/mensajes') },
+  // La pestaña Chat abre la Comunidad; el chat de mensajes (/mensajes) se abre desde su botón flotante.
+  { key: 'chat', label: 'Chat', to: '/comunidad', Icon: BubbleIcon, match: (path: string) => path.startsWith('/comunidad') || path.startsWith('/mensajes') },
   { key: 'more', label: 'Más', to: '/mas', Icon: MoreIcon, match: (path: string) => path.startsWith('/mas') },
 ] as const;
 
 /**
  * Barra inferior tipo app (solo móvil/tablet): Mangas · Character · Tienda · Chat · Más.
+ * "Chat" es la Comunidad (feed tipo X) con el botón flotante que abre los mensajes.
  * Iconos solo contorno; el activo va relleno. Montserrat, negro puro en claro
  * (el resto un negro apenas grisáceo) y blanco puro en oscuro. Fondo blanco/negro
  * puro. "Más" es la página con la cuenta, colecciones, alarma y tema; en el
@@ -66,15 +90,17 @@ const TABS = [
  */
 export const MobileTabBar = () => {
   const { pathname } = useLocation();
-  // El lector y la edición rápida del perfil van a pantalla completa, sin barra.
-  if (pathname.startsWith('/read/') || pathname === '/perfil/editar' || isMobileSectionRoute(pathname)) return null;
+  const hidden = useHideOnScrollDown();
+  // El lector, la edición rápida del perfil y la ficha/conversación de un personaje (/chat/:id…) van a pantalla completa, sin barra.
+  if (pathname.startsWith('/read/') || /^\/chat\/.+/.test(pathname) || pathname === '/perfil/editar' || isMobileSectionRoute(pathname)) return null;
 
   const labelClass = (active: boolean) => `flex h-full w-full flex-col items-center justify-center gap-1.5 pb-0.5 font-[Montserrat] text-[10px] leading-none transition-colors ${active ? 'font-bold text-black dark:text-white' : 'font-semibold text-[#262626] dark:text-[#e4e4e7]'}`;
 
   return (
     <nav
       aria-label="Navegación inferior"
-      className="mobile-tabbar fixed inset-x-0 bottom-0 z-[95] border-t border-black/10 bg-white pb-[env(safe-area-inset-bottom)] text-black [--tabbar-bg:#fff] dark:border-white/10 dark:bg-black dark:text-white dark:[--tabbar-bg:#000] lg:hidden"
+      className="mobile-tabbar fixed inset-x-0 bottom-0 z-[95] border-t border-black/10 bg-white pb-[env(safe-area-inset-bottom)] text-black transition-transform duration-300 [--tabbar-bg:#fff] dark:border-white/10 dark:bg-black dark:text-white dark:[--tabbar-bg:#000] lg:hidden"
+      style={{ transform: hidden ? 'translateY(100%)' : 'translateY(0)' }}
     >
       {/* Márgenes laterales iguales: las cinco opciones quedan algo más al centro. */}
       <ul className="mx-auto grid h-[64px] w-full max-w-md grid-cols-5 px-4">

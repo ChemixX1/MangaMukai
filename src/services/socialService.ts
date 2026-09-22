@@ -323,13 +323,19 @@ export const markConversationRead = async (userId: number): Promise<void> => {
   await ensureResponse(response);
 };
 
+/* El navbar sondea las notificaciones cada 30 s: la última respuesta se guarda para que la
+   página/panel de notificaciones se pinte al instante y solo refresque en segundo plano. */
+let notificationsCache: SocialNotification[] | null = null;
+export const getCachedNotifications = () => notificationsCache;
+
 export const getNotifications = async (): Promise<{ notifications: SocialNotification[]; unread: number }> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/notifications?limit=30`, {
     credentials: 'include',
     headers: authHeaders(),
   });
   const payload = await ensureResponse(response);
-  return { notifications: payload.notifications || [], unread: Number(payload.unread_count || 0) };
+  notificationsCache = payload.notifications || [];
+  return { notifications: notificationsCache, unread: Number(payload.unread_count || 0) };
 };
 
 export const markNotificationsRead = async (id?: number): Promise<void> => {

@@ -6,6 +6,9 @@ import { shopPromotions } from '../data/shopPromotions';
 import { ShopPromotion } from '../components/common/ShopPromotion';
 import shopBackdrop from '../assets/modals/auth-login.webp';
 import { readLocalImage, useExperienceUser, useLocalExperience } from '../hooks/useLocalExperience';
+import { useIsMobileViewport } from '../hooks/useIsMobileViewport';
+import { shopCartKey } from '../hooks/useShopCart';
+import { MobileShop } from '../components/shop/mobile/MobileShop';
 import '../styles/experiences.css';
 import '../styles/shop-redesign.css';
 
@@ -18,16 +21,18 @@ const sampleReviews: Review[] = [
   { id: 'review-3', name: 'Lucía', text: 'Para quienes siempre decimos «un capítulo más». Ya tengo un espacio reservado para mi próxima historia', image: products[2].image, productId: products[2].id, demo: true },
 ];
 
+/** Por debajo de lg la tienda va vacía (versión móvil pendiente); en escritorio, la tienda completa. */
 export default function ShopPage() {
   const user = useExperienceUser();
-  return <Shop key={user.id} />;
+  const isMobile = useIsMobileViewport();
+  return isMobile ? <MobileShop /> : <Shop key={user.id} />;
 }
 function Shop() {
   const user = useExperienceUser();
   const [category, setCategory] = useState('Todo');
   const [sort, setSort] = useState('featured');
   const [selected, setSelected] = useState<Product | null>(null);
-  const [cart, saveCart] = useLocalExperience<Record<string, number>>(`mm-shop-cart-${user.id}`, {});
+  const [cart, saveCart] = useLocalExperience<Record<string, number>>(shopCartKey(user.id), {});
   const [reviews, saveReviews] = useLocalExperience<Review[]>(`mm-shop-reviews-${user.id}`, sampleReviews);
   const [notice, setNotice] = useState('');
   const [reviewName, setReviewName] = useState(user.signedIn ? user.name.split(' ')[0] : '');

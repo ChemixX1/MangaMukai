@@ -1,0 +1,261 @@
+/* Home móvil (< 1024px): la misma composición en ambos temas.
+   Las imágenes y los acentos conservan sus colores originales. */
+
+.mh-root {
+  --mh-surface: #000;
+  --mh-ink: #fff;
+  --mh-rgb: 0, 0, 0;
+  --mh-ink-rgb: 255, 255, 255;
+  --mh-panel: #262626;
+  --mh-cover-base: #1a1a1a;
+  --mh-muted: rgba(255, 255, 255, 0.5);
+  --mh-border: rgba(115, 115, 115, 0.7);
+  --mh-filter-border: rgba(214, 211, 209, 0.75);
+  --mh-pagination-edge: rgba(255, 255, 255, 0.12);
+  --mh-pagination-start: #242424;
+  --mh-pagination-middle: #262626;
+  --mh-rank-silver: #d6d3d1;
+  --mh-inverse-card: #fcfcfc;
+  --mh-inverse-border: #e8e8e8;
+  --mh-legal-ink: rgba(161, 161, 170, 0.9);
+  --mh-telegram-plane: #fff;
+  --mh-hero-cover-border: #fff;
+  --mh-footer-scrim: 0.6;
+  background: var(--mh-surface);
+  color: var(--mh-ink);
+  color-scheme: dark;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root:not(.dark) .mh-root {
+  --mh-surface: #fff;
+  --mh-ink: #000;
+  --mh-rgb: 255, 255, 255;
+  --mh-ink-rgb: 0, 0, 0;
+  --mh-panel: #f0f0f0;
+  --mh-cover-base: #ededed;
+  --mh-muted: rgba(0, 0, 0, 0.6);
+  --mh-border: rgba(115, 115, 115, 0.4);
+  --mh-filter-border: rgba(41, 37, 36, 0.65);
+  --mh-pagination-edge: rgba(0, 0, 0, 0.14);
+  --mh-pagination-start: #ebebeb;
+  --mh-pagination-middle: #f5f5f5;
+  --mh-rank-silver: #4b5563; /* plomo del puesto 2: más oscuro y vivo en claro */
+  --mh-inverse-card: #151515;
+  --mh-inverse-border: #333;
+  --mh-legal-ink: #52525b;
+  /* En claro: el avión de Telegram en negro, el borde de la portada principal
+     al 30 % y el velo del footer algo más sólido. */
+  --mh-telegram-plane: #000;
+  --mh-hero-cover-border: rgba(0, 0, 0, 0.3);
+  --mh-footer-scrim: 0.72;
+  color-scheme: light;
+}
+
+.mh-text { color: var(--mh-ink); }
+.mh-hero-cover-border { border-color: var(--mh-hero-cover-border); }
+.mh-muted { color: var(--mh-muted); }
+.mh-surface { background-color: var(--mh-surface); }
+.mh-panel { background-color: var(--mh-panel); }
+.mh-cover-base { background-color: var(--mh-cover-base); }
+.mh-border { border-color: var(--mh-border); }
+.mh-border-strong { border-color: var(--mh-ink); }
+.mh-inverse { background-color: var(--mh-ink); color: var(--mh-surface); }
+.mh-inverse-text { color: var(--mh-surface); }
+.mh-selected { background-color: var(--mh-ink); color: var(--mh-surface); }
+.mh-period-tabs { border-color: var(--mh-filter-border); }
+.mh-synopsis { background: rgba(var(--mh-ink-rgb), 0.1); }
+.mh-hero-dot { background: rgba(var(--mh-ink-rgb), 0.8); }
+.mh-empty { border-color: rgba(var(--mh-ink-rgb), 0.07); background: rgba(var(--mh-ink-rgb), 0.04); }
+.mh-card-scrim { background: linear-gradient(to top, rgba(var(--mh-rgb), 0.95), rgba(var(--mh-rgb), 0.55), transparent); }
+.mh-root :is(button, a, input):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+
+.mh-font-dela { font-family: "Dela Gothic One", "Montserrat", sans-serif; font-weight: 400; }
+.mh-font-montserrat { font-family: "Montserrat", sans-serif; }
+.mh-font-inter { font-family: "Inter", sans-serif; }
+.mh-font-anta { font-family: "Anta", sans-serif; font-weight: 400; }
+.mh-font-audiowide { font-family: "Audiowide", sans-serif; font-weight: 400; }
+.mh-font-poppins { font-family: "Poppins", sans-serif; }
+.mh-font-goldman { font-family: "Goldman", "Montserrat", sans-serif; }
+.mh-font-google-sans { font-family: "Google Sans Flex", "Montserrat", sans-serif; }
+
+.mh-no-scrollbar::-webkit-scrollbar { display: none; }
+.mh-no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ---- Hero ---- */
+
+/* Fondo: la portada activa bajo un velo del color del tema casi opaco. Es una capa absoluta
+   con la imagen de fondo (nunca un <img> con tamaño propio) y sin filtros ni
+   escala: el desenfoque y el scale obligaban a repintar toda la capa en cada
+   cambio y hacían parpadear los bordes y la píldora blanca de los filtros. */
+.mh-hero-backdrop {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.mh-hero-scrim {
+  background: rgba(var(--mh-rgb), 0.89);
+  box-shadow: 0 4px 4px rgba(157, 157, 157, 0.25);
+}
+
+.mh-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.mh-line-clamp-5 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+
+/* ---- Tendencia Ahora ---- */
+
+.mh-rank-number {
+  font-family: "Montserrat", sans-serif;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 0.8;
+  letter-spacing: -0.04em;
+  text-shadow: 4px 4px 0 var(--mh-surface);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Punto verde de "GRATIS": vivo y parpadeando, sin brillo ni sombra. */
+@keyframes mh-free-dot-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+.mh-free-dot {
+  background: #22e05a;
+  animation: mh-free-dot-blink 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-free-dot { animation: none; }
+}
+
+/* Llama de "NUEVO": se aviva y se apaga desde la base, con un leve vaivén.
+   Solo movimiento: sin cambio de color, ni brillo, ni sombra. */
+@keyframes mh-flame-flicker {
+  0%   { transform: scale(1, 1) rotate(0deg); }
+  12%  { transform: scale(1.06, 1.16) rotate(-4deg); }
+  26%  { transform: scale(0.96, 0.9) rotate(3deg); }
+  40%  { transform: scale(1.1, 1.22) rotate(-2deg); }
+  54%  { transform: scale(0.92, 0.78) rotate(4deg); }
+  68%  { transform: scale(1.04, 1.1) rotate(-3deg); }
+  82%  { transform: scale(0.97, 0.88) rotate(2deg); }
+  100% { transform: scale(1, 1) rotate(0deg); }
+}
+
+.mh-flame-live {
+  transform-origin: 50% 100%;
+  animation: mh-flame-flicker 1.15s ease-in-out infinite;
+}
+
+/* Metadatos "Cap · GRATIS · fecha": tres columnas iguales con cada grupo
+   centrado (icono y palabra juntos) y los separadores justo entre columnas.
+   Ocupa todo el ancho; si el contenido pide más, crece y useFitScale lo encoge. */
+.mh-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr 1px 1fr;
+  align-items: center;
+  justify-items: center;
+  column-gap: 5px;
+  width: max-content;
+  min-width: 100%;
+  flex: none;
+}
+
+/* Separador vertical: ancho fijo, nunca se encoge ni se pierde. */
+.mh-meta-divider {
+  flex: none;
+  width: 1px;
+  min-width: 1px;
+  height: 14px;
+  background: rgba(var(--mh-ink-rgb), 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-flame-live { animation: none; }
+}
+
+/* ---- Paginación (segmentos en flecha) ---- */
+
+.mh-pagination-segment {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 48px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mh-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mh-pagination-segment + .mh-pagination-segment { margin-left: -9px; }
+.mh-pagination-segment:disabled { cursor: default; opacity: 0.45; }
+.mh-pagination-segment[data-center="true"] { z-index: 2; }
+.mh-pagination-segment[data-center="true"]:disabled { opacity: 0.7; }
+.mh-pagination-segment > svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.mh-pagination-segment > span { position: relative; z-index: 1; }
+.mh-pagination-shape { transition: stroke 0.3s ease, stroke-width 0.3s ease; }
+
+/* ---- Tarjetas de Discord y Telegram ---- */
+
+.mh-social-card-shadow { filter: drop-shadow(0 4px 2px rgba(0, 0, 0, 0.25)); }
+.mh-social-card-discord, .mh-social-card-telegram { background: var(--mh-inverse-card); border-color: var(--mh-inverse-border); }
+.mh-recruit-brand { background: rgba(var(--mh-rgb), 0.3); }
+.mh-recruit-wordmark { filter: drop-shadow(0 2px 4px rgba(var(--mh-rgb), 0.6)); }
+
+/* Rectángulo blanco con un chaflán en la esquina que toca la cola del bocadillo. */
+.mh-social-card-discord {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 7px 100%, 0 calc(100% - 10px));
+}
+
+.mh-social-card-telegram {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 7px) 100%, 0 100%);
+}
+
+/* ---- Footer ---- */
+
+.mh-footer-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+}
+
+.mh-footer-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--mh-rgb), var(--mh-footer-scrim));
+}
+
+.mh-newsletter { border-color: rgba(var(--mh-ink-rgb), 0.3); background: rgba(var(--mh-rgb), 0.5); }
+.mh-newsletter-input::placeholder { color: rgba(var(--mh-ink-rgb), 0.55); }
+.mh-legal-link { color: var(--mh-legal-ink); }
+.mh-legal-link:hover { color: var(--mh-ink); }
+
+/* El footer también cubre el espacio reservado para la barra inferior. */
+.mh-footer-inner { padding-bottom: 28px; }
+
+@media (max-width: 1023px) {
+  .mh-root { margin-bottom: calc(-64px - env(safe-area-inset-bottom)); }
+  .mh-footer-inner { padding-bottom: calc(28px + 64px + env(safe-area-inset-bottom)); }
+}
+
+/* Cambio de tema: nada que animar aquí. */
+.theme-switching .mh-root * { transition: none !important; }

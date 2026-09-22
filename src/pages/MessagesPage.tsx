@@ -3,9 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowUp,
-  BookOpen,
-  Check,
-  ChevronDown,
   MessageCircle,
   MoreHorizontal,
   Search,
@@ -30,14 +27,15 @@ import {
   type PublicProfile,
 } from '../services/socialService';
 
-type ListFilter = 'all' | 'unread';
-
 const timeAgo = (value: string) => {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return 'Ahora';
   if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} h`;
-  return `${Math.floor(seconds / 86400)} d`;
+  const days = Math.floor(seconds / 86400);
+  if (days <= 31) return `${days} ${days === 1 ? 'Día' : 'Días'}`;
+  const months = Math.floor(days / 31);
+  return `${months} ${months === 1 ? 'Mes' : 'Meses'}`;
 };
 
 const formatTime = (date: Date) => new Intl.DateTimeFormat('es-PE', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
@@ -65,7 +63,10 @@ const Avatar = ({ user, size = 'h-12 w-12', text = 'text-base' }: { user: Pick<F
   ? <img src={user.avatar_url} alt="" className={`${size} shrink-0 rounded-full object-cover`} />
   : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#FF4D88] font-black text-white ${text}`}>{user.username.charAt(0).toUpperCase()}</span>;
 
-/** Página de mensajes: lista de chats a la izquierda (o a pantalla completa en móvil) y conversación a la derecha. */
+/**
+ * Página de mensajes: lista de chats a la izquierda (o a pantalla completa en móvil) y conversación a la derecha.
+ * Se abre desde el botón "Mensajes" de la Comunidad y va sin navbar: ocupa toda la altura y vuelve con su propia flecha.
+ */
 export const MessagesPage = () => {
   const navigate = useNavigate();
   const { userId = '' } = useParams();
@@ -79,8 +80,6 @@ export const MessagesPage = () => {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState('');
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ListFilter>('all');
-  const [filterOpen, setFilterOpen] = useState(false);
 
   const [partner, setPartner] = useState<PublicProfile | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -104,6 +103,11 @@ export const MessagesPage = () => {
   }, [activeId, currentUser, navigate]);
 
   const notifyNavbar = () => window.dispatchEvent(new Event(SOCIAL_REFRESH_EVENT));
+
+  const goBack = () => {
+    if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1);
+    else navigate('/comunidad');
+  };
 
   const loadConversations = useCallback(async () => {
     try {
@@ -196,8 +200,7 @@ export const MessagesPage = () => {
   };
 
   const visibleConversations = conversations.filter((conversation) =>
-    (filter === 'all' || conversation.unread_count > 0)
-    && conversation.other_user.username.toLowerCase().includes(query.trim().toLowerCase()));
+    conversation.other_user.username.toLowerCase().includes(query.trim().toLowerCase()));
 
   const headerUser = partner || conversations.find((conversation) => conversation.other_user.id === activeId)?.other_user || null;
   const isOnline = Boolean(headerUser?.is_online);
@@ -221,36 +224,25 @@ export const MessagesPage = () => {
   const lastOwnRead = [...messages].reverse().find((message) => message.sender_id === currentUserId && message.read_at);
 
   return (
-    <main className={`messages-page min-h-screen pt-16 transition-colors ${surface}`}>
-      <div className={`mx-auto flex h-[calc(100dvh-4rem-64px-env(safe-area-inset-bottom))] w-full max-w-6xl lg:grid lg:h-[calc(100dvh-4rem)] lg:grid-cols-[360px_minmax(0,1fr)] lg:border-x ${divider}`}>
+    <main className={`messages-page pt-[env(safe-area-inset-top)] transition-colors ${surface}`}>
+      {/* Sin navbar: toda la altura menos la barra inferior en móvil; en escritorio, la pantalla completa. */}
+      <div className={`mx-auto flex h-[calc(100dvh-64px-env(safe-area-inset-bottom)-env(safe-area-inset-top))] w-full max-w-6xl lg:grid lg:h-[100dvh] lg:grid-cols-[360px_minmax(0,1fr)] lg:border-x ${divider}`}>
         {/* ───────── Lista de chats ───────── */}
         <section className={`relative flex min-h-0 w-full min-w-0 flex-col lg:border-r ${divider} ${activeId ? 'hidden lg:flex' : 'flex'}`} aria-label="Chats">
-          <header className={`flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 ${divider}`}>
-            <Link to="/perfil" aria-label="Ir a mi perfil" className="shrink-0 rounded-full">
-              {currentUser?.avatar
-                ? <img src={currentUser.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
-                : <span className={`flex h-8 w-8 items-center justify-center rounded-full ${pill}`}><User size={16} /></span>}
-            </Link>
-            <h1 className="font-[Montserrat] text-lg font-extrabold tracking-tight">Chat</h1>
-            <div className="relative">
-              <button type="button" onClick={() => setFilterOpen((value) => !value)} aria-expanded={filterOpen} className={`flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold ${isLight ? 'border-black/15' : 'border-white/20'}`}>
-                {filter === 'all' ? 'Todo' : 'No leídos'}
-                <ChevronDown size={16} />
-              </button>
-              {filterOpen && (
-                <div className={`absolute right-0 top-12 z-20 w-40 overflow-hidden rounded-xl border shadow-xl ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-[#111]'}`}>
-                  {([['all', 'Todo'], ['unread', 'No leídos']] as Array<[ListFilter, string]>).map(([value, label]) => (
-                    <button key={value} type="button" onClick={() => { setFilter(value); setFilterOpen(false); }} className={`flex w-full items-center justify-between px-4 py-3 text-sm font-semibold ${hover}`}>
-                      {label}
-                      {filter === value && <Check size={15} style={{ color: CHAT_ACCENT }} />}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <header className={`flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3 ${divider}`}>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={goBack} aria-label="Volver" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${hover}`}><ArrowLeft size={20} /></button>
+              <Link to="/perfil" aria-label="Ir a mi perfil" className="shrink-0 rounded-full">
+                {currentUser?.avatar
+                  ? <img src={currentUser.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
+                  : <span className={`flex h-8 w-8 items-center justify-center rounded-full ${pill}`}><User size={16} /></span>}
+              </Link>
             </div>
+            <h1 className="font-[Montserrat] text-lg font-extrabold tracking-tight">Chat</h1>
+            <span aria-hidden="true" className="w-[68px]" />
           </header>
 
-          <label className={`mx-4 mt-3 flex h-11 items-center gap-3 rounded-full px-4 ${pill}`}>
+          <label className={`mx-4 mt-3 flex h-11 items-center gap-3 rounded-[8px] px-4 ${pill}`}>
             <Search size={18} className={muted} />
             <input aria-label="Buscar chat" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:opacity-60" />
             {query && <button type="button" onClick={() => setQuery('')} aria-label="Limpiar búsqueda"><X size={16} /></button>}
@@ -259,12 +251,12 @@ export const MessagesPage = () => {
           {listError && <p role="alert" className="px-4 pt-3 text-xs text-red-500">{listError} <button type="button" onClick={() => void loadConversations()} className="underline">Reintentar</button></p>}
 
           <div className="min-h-0 flex-1 overflow-y-auto pb-24 pt-2 lg:pb-4">
-            {listLoading && <div className="my-8 flex justify-center"><MukaiLoaderWheel isLight={isLight} /></div>}
-            {!listLoading && !listError && visibleConversations.length === 0 && (
+            {/* Mientras carga no se pinta nada; el aviso solo cuando ya se sabe que no hay chats. */}
+            {!listLoading && !listError && conversations.length === 0 && (
               <div className="px-8 py-16 text-center">
                 <MessageCircle size={34} className="mx-auto mb-3" style={{ color: CHAT_ACCENT }} />
-                <p className="text-base font-bold">{conversations.length === 0 ? 'Aún no hay conversaciones' : 'Nada por aquí'}</p>
-                <p className={`mt-1 text-sm ${muted}`}>{conversations.length === 0 ? 'Escribe a cualquier lector desde su perfil o con el botón de nuevo mensaje.' : 'Ningún chat coincide con el filtro.'}</p>
+                <p className="text-base font-bold">Aún no hay conversaciones</p>
+                <p className={`mt-1 text-sm ${muted}`}>Escribe a cualquier lector desde su perfil o con el botón de nuevo mensaje.</p>
               </div>
             )}
             {visibleConversations.map((conversation) => {
@@ -296,16 +288,6 @@ export const MessagesPage = () => {
               );
             })}
           </div>
-
-          <Link
-            to="/"
-            title="Leer manga"
-            className="absolute bottom-6 right-5 flex h-12 items-center gap-2 rounded-full pl-4 pr-5 font-[Montserrat] text-sm font-bold text-white transition-transform hover:scale-105 lg:bottom-5"
-            style={{ backgroundColor: CHAT_ACCENT }}
-          >
-            <BookOpen size={20} />
-            Leer manga
-          </Link>
         </section>
 
         {/* ───────── Conversación ───────── */}
@@ -347,11 +329,10 @@ export const MessagesPage = () => {
                         <p className={`text-sm ${muted}`}>{formatCount(partner.followers_count)} {partner.followers_count === 1 ? 'seguidor' : 'seguidores'}</p>
                         <Link to={`/usuarios/${partner.id}`} className={`mt-3 rounded-full px-5 py-2.5 text-sm font-bold ${pill}`}>Ver perfil</Link>
                       </>
-                    ) : <div className="my-6"><MukaiLoaderWheel isLight={isLight} /></div>}
+                    ) : null}
                   </div>
                 )}
                 {hasMore && <button type="button" disabled={chatLoading} onClick={() => { stickToBottom.current = false; setChatLoading(true); void loadMessages(activeId, messages[0]?.id); }} className="mx-auto mb-4 block text-xs font-bold" style={{ color: CHAT_ACCENT }}>Ver mensajes anteriores</button>}
-                {chatLoading && <div className="my-3 flex justify-center"><MukaiLoaderWheel isLight={isLight} /></div>}
 
                 <div className="space-y-1.5">
                   {rows.map((row) => row.type === 'separator' ? (

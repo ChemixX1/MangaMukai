@@ -61,10 +61,32 @@ export const routeSeo = (pathname: string): RouteSeo => {
         section: 'Términos y privacidad',
         description: 'Términos de uso, política de privacidad y tratamiento de datos de los lectores de MangaMukai.',
       };
+    case '/privacidad':
+      return {
+        section: 'Política de privacidad',
+        description: 'Qué datos recoge MangaMukai, para qué los usa, con quién los comparte y cómo puedes ejercer tus derechos.',
+      };
+    case '/terminos':
+      return {
+        section: 'Términos de servicio',
+        description: 'Condiciones de uso de MangaMukai: cuentas, Mukai Coins, contenido +19, conducta permitida y responsabilidad.',
+      };
+    case '/normas-comunidad':
+      return {
+        section: 'Normas de la comunidad',
+        description: 'Reglas de convivencia de la comunidad y la mensajería de MangaMukai, y cómo se modera.',
+      };
+    case '/cookies':
+      return {
+        section: 'Política de cookies',
+        description: 'Qué cookies y almacenamiento local usa MangaMukai, para qué sirven y cómo puedes gestionarlos.',
+      };
     case '/perfil':
       return { section: 'Mi perfil', description: 'Área privada de MangaMukai.', noindex: true };
     case '/saved':
       return { section: 'Mis guardados', description: 'Área privada de MangaMukai.', noindex: true };
+    case '/comunidad':
+      return { section: 'Comunidad', description: 'Comparte lecturas, recomendaciones y fan art con otros lectores de MangaMukai.' };
     case '/mensajes':
       return { section: 'Mensajes', description: 'Área privada de MangaMukai.', noindex: true };
     case '/notificaciones':

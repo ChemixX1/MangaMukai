@@ -1,33 +1,40 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, X } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { MukaiLoaderWheel } from '../components/common/MukaiLoaderWheel';
 import { NotificationCard, notificationRoute } from '../components/social/NotificationCard';
 import { getStoredToken } from '../services/authService';
 import {
-  CHAT_ACCENT,
+  getCachedNotifications,
   getNotifications,
   markNotificationsRead,
   SOCIAL_REFRESH_EVENT,
   type SocialNotification,
 } from '../services/socialService';
 
-/** Página de notificaciones (sustituye al panel en móvil; se llega desde la página de chats). */
-export const NotificationsPage = () => {
+/** Acento de la sección: el rosa de la marca con un mínimo de rojo. */
+const ACCENT = '#ff4a7d';
+
+/**
+ * Notificaciones (sustituye al panel en móvil). Va sin navbar: solo la X de
+ * cerrar y la lista. Con `embedded` se pinta dentro del panel deslizante de la
+ * campana (NotificationsOverlay): la X cierra el panel en vez de navegar.
+ */
+export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isLight = theme === 'light';
-  const [notifications, setNotifications] = useState<SocialNotification[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Arranca con la última respuesta del navbar (si la hay) y refresca en segundo plano.
+  const [notifications, setNotifications] = useState<SocialNotification[]>(() => getCachedNotifications() || []);
+  const [loading, setLoading] = useState(() => getCachedNotifications() === null);
   const [error, setError] = useState('');
 
   useDocumentTitle('Notificaciones');
 
   useEffect(() => {
-    if (!getStoredToken()) navigate('/auth/login', { replace: true, state: { returnTo: '/notificaciones' } });
-  }, [navigate]);
+    if (!embedded && !getStoredToken()) navigate('/auth/login', { replace: true, state: { returnTo: '/notificaciones' } });
+  }, [embedded, navigate]);
 
   const load = useCallback(async () => {
     try {
@@ -72,17 +79,16 @@ export const NotificationsPage = () => {
   const hover = isLight ? 'hover:bg-black/5' : 'hover:bg-white/[0.06]';
 
   return (
-    <main className={`min-h-screen pt-16 transition-colors ${isLight ? 'bg-white text-black' : 'bg-black text-white'}`}>
+    <main className={`${embedded ? 'min-h-full' : 'min-h-screen'} pt-[env(safe-area-inset-top)] transition-colors ${isLight ? 'bg-white text-black' : 'bg-black text-white'}`}>
       <div className={`mx-auto w-full max-w-2xl lg:border-x ${divider}`}>
         <header className={`flex h-14 items-center gap-2 border-b px-2 sm:px-3 ${divider}`}>
-          <button type="button" onClick={() => navigate(-1)} aria-label="Volver" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${hover}`}><ArrowLeft size={20} /></button>
-          <h1 className="flex min-w-0 flex-1 items-center gap-2 font-[Montserrat] text-lg font-extrabold tracking-tight">
-            <Bell size={18} style={{ color: CHAT_ACCENT }} />
+          <button type="button" onClick={() => (embedded && onClose ? onClose() : navigate(-1))} aria-label="Cerrar" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${hover}`}><X size={24} strokeWidth={2.5} /></button>
+          <h1 className="flex min-w-0 flex-1 items-center gap-2 font-[Montserrat] text-lg font-bold tracking-tight">
             Notificaciones
-            {unread > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black text-white" style={{ backgroundColor: CHAT_ACCENT }}>{unread}</span>}
+            {unread > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black text-white" style={{ backgroundColor: ACCENT }}>{unread}</span>}
           </h1>
           {unread > 0 && (
-            <button type="button" onClick={() => void markAll()} aria-label="Marcar todas como leídas" className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${hover}`} style={{ color: CHAT_ACCENT }}>
+            <button type="button" onClick={() => void markAll()} aria-label="Marcar todas como leídas" className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${hover}`} style={{ color: ACCENT }}>
               <CheckCheck size={16} /> Leído
             </button>
           )}
@@ -90,9 +96,8 @@ export const NotificationsPage = () => {
 
         {error && <p role="alert" className="px-4 pt-3 text-xs text-red-500">{error} <button type="button" onClick={() => void load()} className="underline">Reintentar</button></p>}
 
-        {loading && notifications.length === 0 ? (
-          <div className="flex h-40 items-center justify-center"><MukaiLoaderWheel isLight={isLight} /></div>
-        ) : notifications.length === 0 ? (
+        {/* Mientras carga no se pinta nada; el vacío solo cuando ya se sabe que no hay novedades. */}
+        {loading && notifications.length === 0 ? null : notifications.length === 0 ? (
           <div className="px-8 py-20 text-center">
             <Bell size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/20' : 'text-white/20'}`} />
             <p className="text-base font-bold">Estás al día 😎</p>

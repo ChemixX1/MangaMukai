@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { migrateOldDataToWordPress } from './services/migrationService';
-import { GlobalLoader } from './components/common';
+import { MaintenanceGate } from './components/common/MaintenanceGate';
 import { MobileSectionHeader, MobileTabBar, Navbar } from './components/layout';
 import { SubscriptionModalHost } from './components/modals';
 import { applyRouteSeo } from './hooks/useDocumentTitle';
@@ -25,10 +25,12 @@ const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess').then(({ Payme
 const CoinMarketPage = lazy(() => import('./pages/CoinMarketPage').then(({ CoinMarketPage: Page }) => ({ default: Page })));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const CharacterChatPage = lazy(() => import('./pages/CharacterChatPage'));
 const ShopPage = lazy(() => import('./pages/ShopPage'));
 const MorePage = lazy(() => import('./pages/MorePage'));
+const LegalDocumentPage = lazy(() => import('./pages/LegalDocumentPage').then(({ LegalDocumentPage: Page }) => ({ default: Page })));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -62,7 +64,8 @@ function AppInner() {
 
   return (
     <Router>
-      <GlobalLoader />
+      {/* Pantalla "Volveremos pronto" manual (mantenimiento.json o ?mantenimiento=1). */}
+      <MaintenanceGate />
       <ScrollToTop />
       <RouteSeo />
       <Navbar />
@@ -77,16 +80,22 @@ function AppInner() {
             <Route path="/contacto" element={<ContactPage />} />
             <Route path="/perfil" element={<ProfilePage />} />
             <Route path="/usuarios/:id" element={<PublicProfilePage />} />
+            <Route path="/comunidad" element={<CommunityPage />} />
             <Route path="/mensajes" element={<MessagesPage />} />
             <Route path="/mensajes/:userId" element={<MessagesPage />} />
             <Route path="/notificaciones" element={<NotificationsPage />} />
             <Route path="/chat" element={<CharacterChatPage />} />
             <Route path="/chat/:characterId" element={<CharacterChatPage />} />
+            <Route path="/chat/:characterId/conversacion" element={<CharacterChatPage />} />
             <Route path="/tienda" element={<ShopPage />} />
             <Route path="/mas" element={<MorePage />} />
             <Route path="/perfil/editar" element={<EditProfilePage />} />
             <Route path="/saved" element={<SavedMangas />} />
             <Route path="/legal" element={<TermsAndPrivacy />} />
+            <Route path="/privacidad" element={<LegalDocumentPage slug="privacidad" />} />
+            <Route path="/terminos" element={<LegalDocumentPage slug="terminos" />} />
+            <Route path="/normas-comunidad" element={<LegalDocumentPage slug="normas-comunidad" />} />
+            <Route path="/cookies" element={<LegalDocumentPage slug="cookies" />} />
             <Route path="/biblioteca" element={<Biblioteca />} />
             <Route path="/auth/:view" element={<AuthPage />} />
             <Route path="/login" element={<Navigate to="/auth/login" replace />} />

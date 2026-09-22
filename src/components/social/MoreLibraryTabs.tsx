@@ -125,6 +125,7 @@ export const MoreLibraryTabs = ({ user, isLight }: { user: MMUser; isLight: bool
   const [catalog, setCatalog] = useState<MangaCapitulo[]>([]);
   const [library, setLibrary] = useState<SocialLibrary>(emptyLibrary);
   const [loaded, setLoaded] = useState(false);
+  const [postsLoaded, setPostsLoaded] = useState(false);
   const [chapterViews, setChapterViews] = useState<Record<string, number>>({});
   const [savedLimit, setSavedLimit] = useState(GRID_PAGE);
   const [likedLimit, setLikedLimit] = useState(GRID_PAGE);
@@ -132,14 +133,17 @@ export const MoreLibraryTabs = ({ user, isLight }: { user: MMUser; isLight: bool
 
   useEffect(() => {
     let active = true;
+    // Los posts van por su cuenta: se pintan en cuanto llegan, sin esperar al catálogo ni a la biblioteca.
+    getProfilePosts(user.id)
+      .then((list) => { if (active) setPosts(list); })
+      .catch(() => undefined)
+      .finally(() => { if (active) setPostsLoaded(true); });
     void Promise.allSettled([
-      getProfilePosts(user.id),
       getUltimosCapitulos(),
       getSocialLibrary(),
       getInteractions(),
-    ]).then(([postsResult, catalogResult, libraryResult, interactionsResult]) => {
+    ]).then(([catalogResult, libraryResult, interactionsResult]) => {
       if (!active) return;
-      if (postsResult.status === 'fulfilled') setPosts(postsResult.value);
       const items = catalogResult.status === 'fulfilled' ? catalogResult.value : [];
       setCatalog(items);
       const loadedLibrary = libraryResult.status === 'fulfilled' ? libraryResult.value : emptyLibrary();
@@ -196,9 +200,10 @@ export const MoreLibraryTabs = ({ user, isLight }: { user: MMUser; isLight: bool
 
   const muted = isLight ? 'text-black/45' : 'text-white/45';
 
-  const empty = (text: string) => (
-    <p className={`py-10 text-center font-[Montserrat] text-[13px] font-medium ${muted}`}>{loaded ? text : 'Cargando…'}</p>
-  );
+  // Mientras carga no se pinta nada; el aviso solo aparece cuando ya se sabe que no hay contenido.
+  const empty = (text: string, ready = loaded) => ready ? (
+    <p className={`py-10 text-center font-[Montserrat] text-[13px] font-medium ${muted}`}>{text}</p>
+  ) : null;
 
   const loadMore = (label: string, onClick: () => void) => (
     <button
@@ -270,7 +275,7 @@ export const MoreLibraryTabs = ({ user, isLight }: { user: MMUser; isLight: bool
       </div>
 
       {tab === 'posts' && (
-        posts.length === 0 ? empty('Aún no has publicado nada') : (
+        posts.length === 0 ? empty('Aún no has publicado nada', postsLoaded) : (
           <div className="space-y-3 pt-3">
             {posts.map((post) => (
               <ProfilePostCard key={post.id} initialPost={post} isLight={isLight} onShared={(shared) => setPosts((current) => [shared, ...current.filter((item) => item.id !== shared.id)])} />

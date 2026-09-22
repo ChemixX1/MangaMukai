@@ -1,12 +1,13 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
+import { lazy, Suspense, useState, useEffect, useLayoutEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { X, AlarmClock, Coins, Crown, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame } from "lucide-react";
+import { X, AlarmClock, Coins, Crown, LogOut, MessageCircle, User as UserIcon, Bookmark, Moon, Sun, Flame, ShoppingCart } from "lucide-react";
 import { AlarmAlert, TimerModal } from "../modals";
 import { BellGlyph, DetailCoin3DIcon, SearchGlyph } from "../common";
 import { NotificationsPanel } from "../social";
 import { useTheme } from "../../hooks/useTheme";
 import { SEARCH_FILTERS, setSearchFilter, setSearchTerm, useSearchFilter, useSearchTerm } from "../../hooks/useSearchTerm";
 import { isMobileSectionRoute } from "../../utils/mobileSections";
+import { useShopCart } from "../../hooks/useShopCart";
 import { getUltimosCapitulos } from "../../services/mangaService";
 import { openSubscriptionModal } from "../../utils/subscriptionModal";
 import authPopoverBackground from "../../assets/modals/auth-login.webp";
@@ -27,6 +28,13 @@ import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "../../services
 
 // El modal vive montado una sola vez en App: aquí solo se precarga y se abre.
 const loadSubscriptionModal = () => import("../modals/SubscriptionModal");
+// Las ventanas del buscador (Biblioteca entera) y de notificaciones van en sus chunks y se precargan al montar.
+const loadSearchOverlay = () => import("./SearchOverlay");
+const SearchOverlay = lazy(() => loadSearchOverlay().then(({ SearchOverlay: Overlay }) => ({ default: Overlay })));
+const loadNotificationsOverlay = () => import("./NotificationsOverlay");
+const NotificationsOverlay = lazy(() => loadNotificationsOverlay().then(({ NotificationsOverlay: Overlay }) => ({ default: Overlay })));
+// La del carrito solo se monta (y se carga) en la Tienda móvil.
+const CartOverlay = lazy(() => import("./CartOverlay").then(({ CartOverlay: Overlay }) => ({ default: Overlay })));
 
 /** La página "Más" lo emite para abrir la alarma, que vive montada aquí. */
 export const OPEN_TIMER_EVENT = 'mm_open_timer';
@@ -56,7 +64,6 @@ export const Navbar = () => {
   const isLightMode = theme === 'light';
   const isProfileRoute = location.pathname === '/perfil';
 
-  const headerUsesDarkText = isLightMode;
   const [currentUser, setCurrentUser] = useState<MMUser | null>(getCurrentStoredUser);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [sessionNotice, setSessionNotice] = useState(false);
@@ -72,10 +79,29 @@ export const Navbar = () => {
   // campana. En escritorio (lg) la cabecera no cambia todavía.
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
   const isSearchMode = isMobile && location.pathname === '/biblioteca';
+  // En la Tienda (móvil) la cabecera es la del "Mukai Store": el nombre a la
+  // izquierda en lugar de la campana, sin logo en el centro y el carrito a la derecha.
+  const isStoreMode = isMobile && location.pathname === '/tienda';
+  const headerUsesDarkText = isLightMode;
   const searchTerm = useSearchTerm();
   const searchFilter = useSearchFilter();
   // En la ficha de un manga y en "Más" (móvil) la imagen ocupa toda la parte superior: la cabecera no se pinta.
-  const hideHeaderOnMobile = /^\/manga\/[^/]+/.test(location.pathname) || ['/mas', '/perfil/editar'].includes(location.pathname) || isMobileSectionRoute(location.pathname);
+  // Character Chat (/chat, la ficha /chat/:id y la conversación) va sin cabecera en móvil: solo su flecha de volver.
+  const hideHeaderOnMobile = /^\/manga\/[^/]+/.test(location.pathname) || /^\/chat(\/|$)/.test(location.pathname) || ['/mas', '/perfil/editar'].includes(location.pathname) || isMobileSectionRoute(location.pathname);
+  // El chat de mensajes (botón "Mensajes" de la Comunidad) y las notificaciones van a pantalla
+  // completa: sin cabecera en ningún tamaño. El componente sigue montado para conservar la alarma,
+  // los avisos y el evento openChat.
+  const isMessagesRoute = location.pathname.startsWith('/mensajes') || location.pathname.startsWith('/notificaciones');
+  // Ventana del buscador (lupa): se desliza sobre la página sin cambiar de ruta.
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const closeSearchOverlay = useCallback(() => { setIsSearchOpen(false); setSearchTerm(''); }, []);
+  // Panel de notificaciones (campana móvil): también se desliza sobre la página.
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const closeNotificationsOverlay = useCallback(() => setIsNotificationsOpen(false), []);
+  // Carrito (Tienda móvil, en el sitio de la lupa): ventana lateral hasta el centro de la página.
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const closeCartOverlay = useCallback(() => setIsCartOpen(false), []);
+  const { count: cartCount } = useShopCart();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchGlyphRef = useRef<HTMLSpanElement>(null);
   // Posición de la lupa justo antes de cambiar de modo (técnica FLIP): al
@@ -112,15 +138,22 @@ export const Navbar = () => {
     return () => window.cancelAnimationFrame(frame);
   }, [isSearchMode, location.key, location.state]);
 
+  useEffect(() => { void loadSearchOverlay(); void loadNotificationsOverlay(); }, []);
+
   const openSearch = () => {
     setShowUserMenu(false);
     setShowNotifications(false);
-    searchGlyphFlipRect.current = searchGlyphRef.current?.getBoundingClientRect() ?? null;
     if (isSearchMode) {
       searchInputRef.current?.focus();
       return;
     }
-    navigate('/biblioteca', { state: { focusSearch: true } });
+    setIsSearchOpen(true);
+  };
+
+  const openCart = () => {
+    setShowUserMenu(false);
+    setShowNotifications(false);
+    setIsCartOpen(true);
   };
 
   const closeSearch = () => {
@@ -326,6 +359,21 @@ export const Navbar = () => {
     navigate(`/auth/${view}`);
   };
 
+  /* Móvil: campana que abre la página de notificaciones (en escritorio vive junto al avatar). */
+  const renderMobileBell = (extraClass: string) => (
+    <button
+      type="button"
+      onClick={() => { setShowUserMenu(false); setShowNotifications(false); if (currentUser) setIsNotificationsOpen(true); else navigate('/auth/login', { state: { returnTo: '/notificaciones' } }); }}
+      aria-label="Notificaciones"
+      title="Notificaciones"
+      className={`relative rounded-full p-2 transition-colors lg:hidden ${extraClass} ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'}`}
+    >
+      <BellGlyph size={26} />
+      {/* Punto rojo en la esquina: hay notificaciones sin leer. */}
+      {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
+    </button>
+  );
+
   const handleLogoClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
     setIsTimerModalOpen(false);
     setShowUserMenu(false);
@@ -342,11 +390,12 @@ export const Navbar = () => {
 
   return (
     <>
-      <header
+      {!isMessagesRoute && <header
         className={`${isProfileRoute ? 'sticky' : 'fixed'} site-navbar-surface left-0 top-0 z-[100] w-full py-2.5 transition-transform duration-300 lg:py-3 ${hideHeaderOnMobile ? 'hidden lg:block' : ''} ${isSearchMode ? 'pb-0' : ''}`}
         style={{ transform: isHeaderHidden && !isSearchMode ? 'translateY(-100%)' : 'translateY(0)' }}
       >
-        <div className="desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-16 flex justify-between items-center">
+        {/* Tres columnas iguales: el logo queda centrado de verdad, con los enlaces a la izquierda y las herramientas a la derecha. */}
+        <div className={`desktop-content-shell max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-6 xl:px-16 items-center ${isSearchMode ? 'flex justify-between' : 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]'}`}>
           {isSearchMode ? (
             <div className="w-full">
               <div className="flex h-12 w-full items-center gap-2">
@@ -383,7 +432,7 @@ export const Navbar = () => {
                   onClick={closeSearch}
                   aria-label="Cerrar búsqueda"
                   title="Cerrar búsqueda"
-                  className={`navbar-search-close -mr-2 rounded-full p-2 transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
+                  className={`navbar-search-close -mr-2 rounded-full p-2 transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'}`}
                 >
                   <X size={26} strokeWidth={2.5} />
                 </button>
@@ -412,63 +461,74 @@ export const Navbar = () => {
             </div>
           ) : (
           <>
-            {/* 1. IZQUIERDA */}
-            <div className="flex items-center gap-4 lg:gap-10"> 
-              <Link to="/" onClick={handleLogoClick} className="group flex h-10 items-center lg:-translate-y-0.5" aria-label="Volver al inicio de MangaMukai">
-                <span className={`select-none text-[22px] min-[390px]:text-2xl font-[1000] uppercase italic leading-none tracking-tighter transition-colors sm:text-3xl ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
-                    MANGA<span className="text-[#FF4D88]">MUKAI</span>
-                </span>
+            {/* 1. IZQUIERDA: la campana en móvil (en la Tienda, el nombre "Mukai Store") y los enlaces en escritorio. El logo sigue centrado. */}
+            <div className="flex items-center justify-self-start">
+            {isStoreMode ? (
+              <span className={`select-none whitespace-nowrap text-[22px] min-[390px]:text-2xl font-[1000] uppercase italic leading-none tracking-tighter sm:text-3xl ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                MUKAI <span className="text-[#db2777]">STORE</span>
+              </span>
+            ) : renderMobileBell('-ml-2')}
+            <nav className="hidden h-10 items-center gap-3 whitespace-nowrap lg:-translate-y-0.5 lg:flex xl:gap-8">
+              <Link to="/" className={`navbar-primary-link inline-flex h-full items-center text-[12px] leading-none hover:text-[#ff4a7d] uppercase tracking-[0.045em] transition-colors xl:text-[13px] ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                Inicio
               </Link>
 
-              <nav className="hidden h-10 items-center gap-8 lg:-translate-y-0.5 lg:flex">
-                <Link to="/" className={`navbar-primary-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
-                  Inicio
-                </Link>
+              <Link to="/biblioteca" className={`navbar-primary-link inline-flex h-full items-center text-[12px] leading-none hover:text-[#ff4a7d] uppercase tracking-[0.045em] transition-colors xl:text-[13px] ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                Biblioteca
+              </Link>
 
-                <Link to="/biblioteca" className={`navbar-primary-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
-                  Biblioteca
-                </Link>
-
-                <Link to="/manga-bn" className={`navbar-primary-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
-                  Mangas B&N
-                </Link>
-                <Link to="/manga-19" className={`navbar-primary-link navbar-adult-link inline-flex h-full items-center text-[13px] leading-none hover:text-[#FF4D88] uppercase tracking-[0.045em] transition-colors ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
-                  <span className="navbar-adult-option inline-flex items-center gap-1.5">
-                    <NavbarFire size={17} />
-                    <span className="navbar-adult-label">Mangas <span className="navbar-adult-number">+19</span></span>
-                  </span>
-                </Link>
-              </nav>
+              <Link to="/manga-bn" className={`navbar-primary-link inline-flex h-full items-center text-[12px] leading-none hover:text-[#ff4a7d] uppercase tracking-[0.045em] transition-colors xl:text-[13px] ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                Mangas B&N
+              </Link>
+              <Link to="/manga-19" className={`navbar-primary-link navbar-adult-link inline-flex h-full items-center text-[12px] leading-none hover:text-[#ff4a7d] uppercase tracking-[0.045em] transition-colors xl:text-[13px] ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                <span className="navbar-adult-option inline-flex items-center gap-1.5">
+                  <NavbarFire size={17} />
+                  <span className="navbar-adult-label">Mangas <span className="navbar-adult-number">+19</span></span>
+                </span>
+              </Link>
+            </nav>
             </div>
 
-            {/* 2. DERECHA */}
-            <div className="flex items-center gap-0 sm:gap-1 lg:gap-6 lg:translate-y-0.5">
+            {/* 2. CENTRO: logo (columna fija: en móvil el nav no existe y la rejilla lo colocaría en la primera). En la Tienda móvil no se pinta. */}
+            {!isStoreMode && (
+            <Link to="/" onClick={handleLogoClick} className="group col-start-2 flex h-10 items-center justify-self-center lg:-translate-y-0.5" aria-label="Volver al inicio de MangaMukai">
+              <span className={`select-none whitespace-nowrap text-[22px] min-[390px]:text-2xl font-[1000] uppercase italic leading-none tracking-tighter transition-colors sm:text-3xl lg:text-2xl xl:text-3xl ${headerUsesDarkText ? 'text-black' : 'text-white'}`}>
+                  MANGA<span className="text-[#db2777]">MUKAI</span>
+              </span>
+            </Link>
+            )}
+
+            {/* 3. DERECHA */}
+            <div className="col-start-3 flex items-center justify-self-end gap-0 sm:gap-1 lg:gap-4 lg:translate-y-0.5 xl:gap-6">
 
                 <div className="contents">
                 {/* Herramientas: la alarma móvil está en el menú principal. */}
                 <div className={`relative hidden items-center gap-0 min-[360px]:flex lg:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} lg:border-r lg:mr-1 lg:pr-6`}>
-                    {/* Móvil: campana a la izquierda de la lupa; abre la página de notificaciones. */}
-                    <button
-                      type="button"
-                      onClick={() => { setShowUserMenu(false); setShowNotifications(false); navigate(currentUser ? '/notificaciones' : '/auth/login', currentUser ? undefined : { state: { returnTo: '/notificaciones' } }); }}
-                      aria-label="Notificaciones"
-                      title="Notificaciones"
-                      className={`relative mr-1 rounded-full p-2 transition-colors lg:hidden ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
-                    >
-                      <BellGlyph size={26} />
-                      {/* Punto rojo en la esquina: hay notificaciones sin leer. */}
-                      {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
-                    </button>
 
-                    {/* El buscador vive en la Biblioteca: la lupa lleva allí y enfoca el campo. */}
+                    {isStoreMode ? (
+                    /* Tienda móvil: en el sitio de la lupa va el carrito, que abre su ventana lateral hasta el centro de la página. */
+                    <button
+                        type="button"
+                        onClick={openCart}
+                        aria-label={cartCount > 0 ? `Abrir carrito, ${cartCount} ${cartCount === 1 ? 'producto' : 'productos'}` : 'Abrir carrito'}
+                        title="Carrito"
+                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'} relative -mr-2 rounded-full p-2 transition-colors`}
+                    >
+                        <ShoppingCart size={26} strokeWidth={2.25} />
+                        {/* Globo rosa en la esquina con cuántos productos hay seleccionados. */}
+                        {cartCount > 0 && <span aria-hidden="true" className={`absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff4a7d] px-1 font-[Montserrat] text-[9px] font-bold leading-none text-white ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`}>{cartCount > 9 ? '9+' : cartCount}</span>}
+                    </button>
+                    ) : (
+                    /* El buscador vive en la Biblioteca: la lupa abre su ventana (y en móvil, en /biblioteca, vuela a la píldora). */
                     <button
                         onClick={openSearch}
                         aria-label="Buscar mangas"
                         title="Buscar mangas"
-                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'} -mr-2 rounded-full p-2 transition-colors lg:mr-0`}
+                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'} -mr-2 rounded-full p-2 transition-colors lg:mr-0`}
                     >
                         <span ref={searchGlyphRef} className="flex items-center"><SearchGlyph size={26} /></span>
                     </button>
+                    )}
 
                     <div className="relative hidden lg:block">
                         <button
@@ -477,16 +537,16 @@ export const Navbar = () => {
                             title="Abrir temporizador"
                             className={`transition-colors p-2 rounded-full relative group ${
                                 isTimerActive 
-                                    ? 'text-[#FF4D88] bg-white/5' 
+                                    ? 'text-[#ff4a7d] bg-white/5' 
                                     : headerUsesDarkText
-                                    ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]'
-                                    : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'
+                                    ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]'
+                                    : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'
                             }`}
                         >
                             <AlarmClock size={20} strokeWidth={2.5} className={isTimerActive ? 'animate-pulse' : ''} />
 
                             {isTimerActive && (
-                                <span className="absolute top-1 right-2 w-2 h-2 bg-[#FF4D88] rounded-full border border-[#02040a] animate-ping"></span>
+                                <span className="absolute top-1 right-2 w-2 h-2 bg-[#ff4a7d] rounded-full border border-[#02040a] animate-ping"></span>
                             )}
                         </button>
 
@@ -498,7 +558,7 @@ export const Navbar = () => {
                       onClick={handleThemeToggle}
                       title={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
                       aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
-                      className={`hidden rounded-full p-2 transition-colors lg:block ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}
+                      className={`hidden rounded-full p-2 transition-colors lg:block ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'}`}
                     >
                       {theme === 'light' ? <Moon size={20} strokeWidth={2.5} /> : <Sun size={20} strokeWidth={2.5} />}
                     </button>
@@ -529,7 +589,7 @@ export const Navbar = () => {
                         aria-label={`Abrir perfil de ${currentUser.username}`}
                         aria-expanded={showUserMenu}
                         title={currentUser.username}
-                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors lg:border ${headerUsesDarkText ? 'text-black hover:text-[#FF4D88] lg:border-black/20 lg:hover:border-black/40' : 'text-white hover:text-[#FF4D88] lg:border-white/25 lg:hover:border-white/45'}`}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors lg:border ${headerUsesDarkText ? 'text-black hover:text-[#ff4a7d] lg:border-black/20 lg:hover:border-black/40' : 'text-white hover:text-[#ff4a7d] lg:border-white/25 lg:hover:border-white/45'}`}
                       >
                         {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className="h-8 w-8 rounded-full object-cover" /> : <UserIcon size={20} strokeWidth={2.4} />}
                       </button>
@@ -539,7 +599,7 @@ export const Navbar = () => {
                         <div className={`profile-user-popover fixed inset-x-4 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-2xl lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-2 lg:max-h-[calc(100dvh-4.5rem)] lg:w-[300px] border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
                           <div className="relative z-10">
                             <div className={`flex items-center gap-3 border-b p-4 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} aria-label="Ver mi perfil" className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FF4D88]">
+                              <Link to="/perfil" onClick={() => setShowUserMenu(false)} aria-label="Ver mi perfil" className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#ff4a7d]">
                               {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className={`h-11 w-11 rounded-full border object-cover ${isLightMode ? 'border-black/20' : 'border-white/25'}`} /> : <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-transparent ${isLightMode ? 'border-black/20 text-black' : 'border-white/25 text-white'}`}><UserIcon size={20} /></span>}
                               </Link>
                               <div className="min-w-0"><p className="truncate font-[Montserrat] text-[15px] font-bold uppercase tracking-[0.035em]">{currentUser.username}</p><p className={`truncate font-[Montserrat] text-[11px] font-semibold ${isLightMode ? 'text-black/55' : 'text-white/55'}`}>{currentUser.email}</p></div>
@@ -548,23 +608,23 @@ export const Navbar = () => {
                               <button type="button" onClick={goToRecharge} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Coins size={17} /> Recargar monedas</button>
                               <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option hidden lg:flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><UserIcon size={17} /> Mi Perfil</Link>
                               <Link to="/saved" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Bookmark size={17} /> Guardados</Link>
-                              <Link to="/mensajes" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><MessageCircle size={17} /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF4D88] px-1 text-[9px] text-white">{unreadMessages}</span>}</Link>
+                              <Link to="/mensajes" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><MessageCircle size={17} /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff4a7d] px-1 text-[9px] text-white">{unreadMessages}</span>}</Link>
                               <button type="button" onClick={() => { setShowUserMenu(false); openSubscriptionModal(); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Crown size={17} /> Suscripción</button>
                               {/* Cerrar sesión va aquí (antes estaba en el menú de hamburguesa en móvil). */}
-                              <button type="button" onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#FF4D88] transition-colors hover:bg-[#FF4D88]/10"><LogOut size={17} /> Cerrar Sesión</button>
+                              <button type="button" onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#ff4a7d] transition-colors hover:bg-[#ff4a7d]/10"><LogOut size={17} /> Cerrar Sesión</button>
                             </div>
                           </div>
                         </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative hidden lg:flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#FF4D88]' : 'text-white hover:bg-white/10 hover:text-[#FF4D88]'}`}>
+                    <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative hidden lg:flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'}`}>
                       <BellGlyph size={26} />
                       {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
                     </button>
                   </div>
                 ) : (
                   <div className="auth-google-sans relative hidden lg:block" ref={userMenuRef}>
-                    <button type="button" aria-label="Abrir opciones de acceso" aria-expanded={showUserMenu} onClick={() => setShowUserMenu((visible) => !visible)} className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors lg:border ${headerUsesDarkText ? 'text-zinc-800 hover:text-[#FF4D88] lg:border-black/10 lg:hover:border-[#FF4D88]' : 'text-white hover:text-[#FF4D88] lg:border-white/15 lg:hover:border-[#FF4D88]'}`}><UserIcon size={20} strokeWidth={2.4} /></button>
+                    <button type="button" aria-label="Abrir opciones de acceso" aria-expanded={showUserMenu} onClick={() => setShowUserMenu((visible) => !visible)} className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors lg:border ${headerUsesDarkText ? 'text-zinc-800 hover:text-[#ff4a7d] lg:border-black/10 lg:hover:border-[#ff4a7d]' : 'text-white hover:text-[#ff4a7d] lg:border-white/15 lg:hover:border-[#ff4a7d]'}`}><UserIcon size={20} strokeWidth={2.4} /></button>
                     {showUserMenu && (
                       <div className={`auth-user-popover auth-user-popover-${isLightMode ? 'light' : 'dark'} fixed inset-x-4 top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-[24px] lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-3 lg:max-h-[calc(100dvh-4.5rem)] lg:min-h-[290px] lg:w-[340px] border p-4 lg:p-5 shadow-[0_22px_60px_rgba(0,0,0,0.22)] ${headerUsesDarkText ? 'border-black/10 bg-white text-zinc-950' : 'border-white/10 bg-[#0a0a0d] text-white'}`}>
                         <img src={authPopoverBackground} alt="" aria-hidden="true" className="auth-user-popover-background absolute inset-0 h-full w-full object-cover" />
@@ -574,8 +634,8 @@ export const Navbar = () => {
                             <span aria-hidden="true" className="mb-3 block h-14 w-14 shrink-0 opacity-0" />
                             <p className={`text-[13px] font-normal leading-relaxed ${headerUsesDarkText ? 'text-zinc-700' : 'text-zinc-200'}`}>Listo para disfrutar de lo mejor en mangas</p>
                           </div>
-                          <Link to="/auth/login" onClick={() => setShowUserMenu(false)} className="audiowide-library flex min-h-12 items-center justify-center rounded-[14px] bg-[#FF4D88] px-4 text-[12px] font-normal tracking-normal text-white transition-colors hover:bg-[#ff347b]">Iniciar sesión</Link>
-                          <Link to="/auth/register" onClick={() => setShowUserMenu(false)} className={`audiowide-library mt-2 flex min-h-12 items-center justify-center rounded-[14px] border px-4 text-[12px] font-normal tracking-normal transition-colors ${headerUsesDarkText ? 'border-black/15 bg-white/45 text-zinc-900 hover:border-[#FF4D88] hover:text-[#FF4D88]' : 'border-white/15 bg-black/20 text-zinc-100 hover:border-[#FF4D88] hover:text-[#FF4D88]'}`}>Crear cuenta</Link>
+                          <Link to="/auth/login" onClick={() => setShowUserMenu(false)} className="audiowide-library flex min-h-12 items-center justify-center rounded-[14px] bg-[#ff4a7d] px-4 text-[12px] font-normal tracking-normal text-white transition-colors hover:bg-[#ff347b]">Iniciar sesión</Link>
+                          <Link to="/auth/register" onClick={() => setShowUserMenu(false)} className={`audiowide-library mt-2 flex min-h-12 items-center justify-center rounded-[14px] border px-4 text-[12px] font-normal tracking-normal transition-colors ${headerUsesDarkText ? 'border-black/15 bg-white/45 text-zinc-900 hover:border-[#ff4a7d] hover:text-[#ff4a7d]' : 'border-white/15 bg-black/20 text-zinc-100 hover:border-[#ff4a7d] hover:text-[#ff4a7d]'}`}>Crear cuenta</Link>
                         </div>
                       </div>
                     )}
@@ -587,7 +647,7 @@ export const Navbar = () => {
           </>
           )}
         </div>
-      </header>
+      </header>}
 
       {sessionNotice && !currentUser && (
         <div className="fixed top-20 right-4 left-4 sm:left-auto z-[130] flex max-w-sm items-center gap-3 rounded-xl border border-yellow-400/20 bg-[#0A0A0F] px-4 py-3 text-yellow-100 shadow-2xl">
@@ -611,6 +671,13 @@ export const Navbar = () => {
       )}
 
       <NotificationsPanel isOpen={showNotifications} isLight={isLightMode} onClose={() => setShowNotifications(false)} onUnreadChange={setUnreadNotifications} />
+
+      <Suspense fallback={null}>
+        <SearchOverlay open={isSearchOpen} isLight={isLightMode} onClose={closeSearchOverlay} />
+        <NotificationsOverlay open={isNotificationsOpen} isLight={isLightMode} onClose={closeNotificationsOverlay} />
+        {/* Sigue montado mientras esté abierto al salir de la Tienda, para que el panel se cierre solo con la ruta. */}
+        {(isStoreMode || isCartOpen) && <CartOverlay open={isCartOpen} isLight={isLightMode} onClose={closeCartOverlay} />}
+      </Suspense>
 
       <TimerModal
         isOpen={isTimerModalOpen}

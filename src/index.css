@@ -636,9 +636,10 @@ html {
 }
 
 /* Barra inferior tipo app: las páginas dejan hueco debajo en móvil/tablet. El
-   lector no la muestra, así que no lo necesita. */
+   lector, la conversación con un personaje y su ficha previa no la muestran,
+   así que no lo necesitan. */
 @media (max-width: 1023px) {
-  .mobile-tabbar-space:not(:has(.reader-page)) {
+  .mobile-tabbar-space:not(:has(.reader-page, .conversation-page, .mcc-intro)) {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }
@@ -1396,6 +1397,32 @@ html.dark .auth-navbar-gradient::before {
   background: linear-gradient(to bottom, rgba(8, 8, 11, 0.99) 0%, rgba(8, 8, 11, 0.84) 48%, rgba(8, 8, 11, 0) 100%);
 }
 
+/* Comunidad: al comentar, el bocadillo dibuja su contorno (pathLength=1 en el path). */
+@keyframes community-comment-trace {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.community-comment-trace path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: community-comment-trace 0.8s ease-out forwards;
+}
+/* Like y guardar: al activarse recorren el contorno y después se pintan por dentro. */
+@keyframes community-fill-in {
+  from { fill-opacity: 0; }
+  to { fill-opacity: 1; }
+}
+path.community-fill-trace {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  fill-opacity: 0;
+  animation: community-comment-trace 0.5s ease-out forwards, community-fill-in 0.3s ease-out 0.4s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .community-comment-trace path,
+  path.community-fill-trace { animation-duration: 0.01s, 0.01s; animation-delay: 0s, 0s; }
+}
+
 /* Barra rectangular sólida, separada del contenido al estilo de una red social. */
 .site-navbar-surface {
   isolation: isolate;
@@ -1405,7 +1432,8 @@ html.dark .auth-navbar-gradient::before {
   backdrop-filter: blur(18px) saturate(1.25);
 }
 
-html.dark .site-navbar-surface {
+html.dark .site-navbar-surface,
+.site-navbar-surface.navbar-force-dark {
   border-bottom-color: rgba(255, 255, 255, 0.1);
   background: #000;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
@@ -3093,4 +3121,17 @@ html.dark .site-navbar-surface {
 .home-theme-dark .manga-bn-page [class*="bg-[#00C2FF]"][class*="text-black"],
 .home-theme-dark .manga-bn-page [class*="bg-[#FF4D88]"][class*="text-black"] {
   color: var(--bn-on-ink) !important;
+}
+
+/* Pantalla "Volveremos pronto": los tres puntos aparecen uno a uno, se apagan
+   todos a la vez y vuelven a empezar, sin fin. */
+.emergency-dots span { opacity: 0; animation: 1.8s ease-in-out infinite; }
+.emergency-dots span:nth-child(1) { animation-name: emergency-dot-1; }
+.emergency-dots span:nth-child(2) { animation-name: emergency-dot-2; }
+.emergency-dots span:nth-child(3) { animation-name: emergency-dot-3; }
+@keyframes emergency-dot-1 { 0%, 12% { opacity: 0; } 20%, 78% { opacity: 1; } 86%, 100% { opacity: 0; } }
+@keyframes emergency-dot-2 { 0%, 32% { opacity: 0; } 40%, 78% { opacity: 1; } 86%, 100% { opacity: 0; } }
+@keyframes emergency-dot-3 { 0%, 52% { opacity: 0; } 60%, 78% { opacity: 1; } 86%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .emergency-dots span { opacity: 1; animation: none; }
 }

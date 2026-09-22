@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { MangaCapitulo } from '../types/manga';
 import {
   getPopularWomenByViews,
@@ -19,21 +19,19 @@ interface HomeData {
   latestMen: MangaCapitulo[];
   newReleases: MangaCapitulo[];
   isReady: boolean;
+  /** El servidor no respondió a ninguna petición: la portada quedaría vacía. */
+  isOutage: boolean;
+  /** Vuelve a pedir los datos (la pantalla de emergencia lo hace sola cada pocos segundos). */
+  retry: () => void;
 }
 
-type HomeDataPayload = Omit<HomeData, 'isReady'>;
+type HomeDataPayload = Omit<HomeData, 'isReady' | 'retry'>;
 
-const HOME_LOADING_EVENT = 'mangamukai:home-loading';
-const HOME_REQUEST_COUNT = 7;
+/** Con el servidor caído se reintenta en silencio cada tanto hasta que vuelva. */
+const OUTAGE_RETRY_MS = 15000;
 
 let cachedHomeData: HomeDataPayload | null = null;
 let pendingHomeData: Promise<HomeDataPayload> | null = null;
-
-const emitLoadingProgress = (progress: number, complete = false) => {
-  window.dispatchEvent(new CustomEvent(HOME_LOADING_EVENT, {
-    detail: { progress, complete },
-  }));
-};
 
 /**
  * Solo se espera a las portadas que se ven sin desplazar la página. Antes se
@@ -64,24 +62,14 @@ const loadHomeData = (): Promise<HomeDataPayload> => {
   if (cachedHomeData) return Promise.resolve(cachedHomeData);
   if (pendingHomeData) return pendingHomeData;
 
-  let completedRequests = 0;
-  const track = async <T,>(request: Promise<T>): Promise<T> => {
-    try {
-      return await request;
-    } finally {
-      completedRequests += 1;
-      emitLoadingProgress(8 + Math.round((completedRequests / HOME_REQUEST_COUNT) * 80));
-    }
-  };
-
   pendingHomeData = Promise.all([
-    track(getPopularWomenByViews('weekly', false)),
-    track(getPopularMenByViews('weekly', false)),
-    track(getPopularWomenByViews('historical', false)),
-    track(getPopularMenByViews('historical', false)),
-    track(getLatestWomenUpdates(72)),
-    track(getLatestMenUpdates(72)),
-    track(getNewReleases()),
+    getPopularWomenByViews('weekly', false),
+    getPopularMenByViews('weekly', false),
+    getPopularWomenByViews('historical', false),
+    getPopularMenByViews('historical', false),
+    getLatestWomenUpdates(72),
+    getLatestMenUpdates(72),
+    getNewReleases(),
   ]).then(([
     popularWomenWeekly,
     popularMenWeekly,
@@ -91,7 +79,7 @@ const loadHomeData = (): Promise<HomeDataPayload> => {
     latestMen,
     newReleases,
   ]) => {
-    cachedHomeData = {
+    const payload: HomeDataPayload = {
       popularWeekly: popularWomenWeekly.slice(0, 12),
       popularMenWeekly: popularMenWeekly.slice(0, 12),
       popularHistorical: popularWomen.slice(0, 12),
@@ -99,27 +87,21 @@ const loadHomeData = (): Promise<HomeDataPayload> => {
       latestWomen: latestWomen.slice(0, 72),
       latestMen: latestMen.slice(0, 72),
       newReleases,
+      isOutage: false,
     };
-    return cachedHomeData;
+    // Cada servicio devuelve [] cuando su petición falla (HTTP 500, sin red…). Que
+    // fallen las siete a la vez solo pasa con el servidor caído: no se guarda en
+    // caché, para que el siguiente intento vuelva a preguntar.
+    const lists = [payload.popularWeekly, payload.popularMenWeekly, payload.popularHistorical, payload.popularMenHistorical, payload.latestWomen, payload.latestMen, payload.newReleases];
+    if (lists.every((list) => list.length === 0)) return { ...payload, isOutage: true };
+    cachedHomeData = payload;
+    return payload;
   }).finally(() => {
     pendingHomeData = null;
   });
 
   return pendingHomeData;
 };
-
-const HomeDataContext = createContext<HomeData>({
-  popularWeekly: [],
-  popularMenWeekly: [],
-  popularHistorical: [],
-  popularMenHistorical: [],
-  latestWomen: [],
-  latestMen: [],
-  newReleases: [],
-  isReady: false,
-});
-
-export const useHomeData = () => useContext(HomeDataContext);
 
 const EMPTY_HOME_DATA: HomeData = {
   popularWeekly: [],
@@ -130,44 +112,59 @@ const EMPTY_HOME_DATA: HomeData = {
   latestMen: [],
   newReleases: [],
   isReady: false,
+  isOutage: false,
+  retry: () => {},
 };
+
+const HomeDataContext = createContext<HomeData>(EMPTY_HOME_DATA);
+
+export const useHomeData = () => useContext(HomeDataContext);
 
 export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
   /* Al volver a la portada desde otra página el proveedor se monta de nuevo. Si
      ya hay datos cargados se arranca con ellos, así los listados se pintan en el
      primer fotograma en vez de vaciarse y rellenarse otra vez. */
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((count) => count + 1), []);
   const [data, setData] = useState<HomeData>(
-    () => (cachedHomeData ? { ...cachedHomeData, isReady: true } : EMPTY_HOME_DATA),
+    () => (cachedHomeData ? { ...cachedHomeData, isReady: true, retry } : { ...EMPTY_HOME_DATA, retry }),
   );
 
   useEffect(() => {
     let cancelled = false;
-    emitLoadingProgress(cachedHomeData ? 100 : 8);
+    let retryTimer: number | null = null;
 
     loadHomeData()
       .then(async (payload) => {
         if (cancelled) return;
-        emitLoadingProgress(92);
+        if (payload.isOutage) {
+          // Servidor caído: pantalla de emergencia y nuevo intento en unos segundos.
+          setData({ ...payload, isReady: true, retry });
+          retryTimer = window.setTimeout(retry, OUTAGE_RETRY_MS);
+          return;
+        }
         await preloadCriticalImages(payload);
         if (cancelled) return;
         // Al volver desde la caché el estado inicial ya es esta misma carga: se
         // deja tal cual para no provocar un repintado con datos idénticos.
         setData((current) => (current.isReady && current.popularWeekly === payload.popularWeekly
           ? current
-          : { ...payload, isReady: true }));
-        window.requestAnimationFrame(() => emitLoadingProgress(100, true));
+          : { ...payload, isReady: true, retry }));
       })
       .catch((error) => {
         console.error('HomeDataContext preload error:', error);
         if (cancelled) return;
-        setData(prev => ({ ...prev, isReady: true }));
-        emitLoadingProgress(100, true);
+        // Si los datos llegaron y falló solo la precarga, se pintan igual; sin datos, emergencia.
+        const fallback = cachedHomeData;
+        setData((prev) => (fallback ? { ...fallback, isReady: true, retry } : { ...prev, isReady: true, isOutage: true, retry }));
+        if (!fallback) retryTimer = window.setTimeout(retry, OUTAGE_RETRY_MS);
       });
 
     return () => {
       cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
-  }, []);
+  }, [attempt, retry]);
 
   return <HomeDataContext.Provider value={data}>{children}</HomeDataContext.Provider>;
 };

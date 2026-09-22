@@ -45,6 +45,8 @@ import {
 } from '../services/authService';
 import type { MangaCapitulo } from '../types/manga';
 import { ChapterList, MangaComments, MangaMusicCard, MangaRecommendationSidebar } from '../components/manga';
+import { MobileMangaDetail } from '../components/manga/mobile/MobileMangaDetail';
+import { useIsMobileViewport } from '../hooks/useIsMobileViewport';
 import { MangaDetailClock } from '../components/common';
 import { Footer } from '../components/layout';
 import { FOOTER_SOCIALS } from '../components/layout/Footer';
@@ -52,7 +54,6 @@ import { useTheme } from '../hooks/useTheme';
 import { toTitleCase } from '../utils/titleCase';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { collectionBadge } from '../utils/womenBlackWhite';
-import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from '../utils/globalLoading';
 import { preloadImages } from '../utils/preloadImages';
 
 const formatCompactNumber = (value: number) => new Intl.NumberFormat('es-PE', {
@@ -114,6 +115,8 @@ export const MangaDetail = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isLightMode = theme === 'light';
+  // Por debajo de lg la ficha usa su diseño móvil propio; en escritorio, el clásico.
+  const isMobile = useIsMobileViewport();
   const [isDesktopMusicPlacement, setIsDesktopMusicPlacement] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
   ));
@@ -255,8 +258,6 @@ export const MangaDetail = () => {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    const loadingScope = `manga-detail:${id}`;
-    startGlobalLoading(10, loadingScope);
     setLoading(true);
     setError(null);
     setManga(null);
@@ -278,12 +279,10 @@ export const MangaDetail = () => {
         if (!mangaData) {
           setError('Manga no encontrado.');
           setLoading(false);
-          finishGlobalLoading(loadingScope);
           return;
         }
 
         setManga(mangaData);
-        updateGlobalLoading(36);
         const mangaPostId = mangaData.eroSeri || mangaData.id;
 
         const [chapterData, relatedData, commentData] = await Promise.all([
@@ -293,7 +292,6 @@ export const MangaDetail = () => {
           loadInteractions(String(mangaData.id)),
         ]);
         if (!active) return;
-        updateGlobalLoading(74);
         await preloadImages([
           mangaData.portada,
           ...relatedData.slice(0, 10).map((item) => item.portada),
@@ -303,7 +301,6 @@ export const MangaDetail = () => {
         setRelated(relatedData);
         setInitialComments(commentData);
         setLoading(false);
-        finishGlobalLoading(loadingScope);
 
         void getUltimosCapitulos().then((catalog) => {
           if (!active || catalog.length === 0) return;
@@ -324,7 +321,6 @@ export const MangaDetail = () => {
         if (active) {
           setError('No se pudo cargar el manga.');
           setLoading(false);
-          finishGlobalLoading(loadingScope);
         }
       }
     };
@@ -332,7 +328,6 @@ export const MangaDetail = () => {
     void fetchData();
     return () => {
       active = false;
-      finishGlobalLoading(loadingScope);
     };
   }, [id, loadInteractions]);
 
@@ -465,6 +460,34 @@ export const MangaDetail = () => {
   const typeIndicatorColor = /manhwa|manhua/i.test(manga.tipo || '') ? '#8b5cf6' : '#FF4D88';
   // Distintivo de la portada según la colección a la que pertenece la ficha.
   const coverBadge = collectionBadge(manga);
+
+  if (isMobile) {
+    return (
+      <MobileMangaDetail
+        manga={manga}
+        chapters={chapters}
+        related={related}
+        initialComments={initialComments}
+        isBookmarked={isBookmarked}
+        isLiked={isLiked}
+        likes={engagement.likes}
+        interactionBusy={interactionBusy}
+        onBookmark={() => void handleBookmark()}
+        onLike={() => void handleLike()}
+        reactionCounts={reactionCounts}
+        selectedReaction={selectedReaction}
+        reactionError={reactionError}
+        onReact={handleReaction}
+        purchasedIds={purchasedIds}
+        userCoins={userCoins}
+        userInfo={userInfo}
+        onPurchaseSuccess={handlePurchaseSuccess}
+        onReadFirst={handleReadFirst}
+        hasFirstChapter={Boolean(firstChapter)}
+        synopsis={synopsis}
+      />
+    );
+  }
 
   return (
     <main className={`manga-detail-page relative min-h-screen overflow-x-clip transition-colors duration-500 ${isLightMode ? 'manga-detail-theme-light bg-white text-black' : 'manga-detail-theme-dark bg-black text-white'}`}>

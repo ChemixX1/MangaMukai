@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AUTH_CHANGED_EVENT, getStoredToken, getStoredUser } from '../services/authService';
-import { PROFILE_UPDATED_EVENT } from '../services/wordpressService';
+import { isPlaceholderAvatar, PROFILE_UPDATED_EVENT } from '../services/wordpressService';
 
 export function useExperienceUser() {
   const read = () => getStoredToken() ? getStoredUser() : null;
@@ -12,7 +12,9 @@ export function useExperienceUser() {
     window.addEventListener('storage', sync);
     return () => { window.removeEventListener(AUTH_CHANGED_EVENT, sync); window.removeEventListener(PROFILE_UPDATED_EVENT, sync); window.removeEventListener('storage', sync); };
   }, []);
-  return { id: String(user?.id || 'guest'), name: user?.display_name || user?.username || 'Lector invitado', avatar: user?.avatar || '', signedIn: !!user };
+  // El Gravatar genérico cuenta como "sin foto": así las páginas pintan su avatar por defecto, igual que "Más".
+  const avatar = user?.avatar && !isPlaceholderAvatar(user.avatar) ? user.avatar : '';
+  return { id: String(user?.id || 'guest'), name: user?.display_name || user?.username || 'Lector invitado', avatar, signedIn: !!user };
 }
 
 const LOCAL_EVENT = 'mm-local-experience';

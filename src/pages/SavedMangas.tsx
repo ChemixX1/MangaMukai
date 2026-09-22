@@ -10,7 +10,6 @@ import { getMangaById } from "../services/mangaService";
 import { getStoredUser } from "../services/authService";
 import type { MMUser } from "../services/authService";
 import type { MangaCapitulo } from "../types/manga";
-import { finishGlobalLoading, startGlobalLoading } from "../utils/globalLoading";
 
 // Interfaces
 interface SavedItem {
@@ -25,7 +24,6 @@ interface SavedItem {
   };
 }
 
-const LOADING_SCOPE = 'saved-mangas';
 
 const toSavedItem = (manga: MangaCapitulo): SavedItem => ({
   id: String(manga.id),
@@ -48,17 +46,6 @@ export const SavedMangas = () => {
   const [loading, setLoading] = useState(true);
   const [user] = useState<MMUser | null>(() => getStoredUser());
   const detailsRef = useRef(new Map<string, SavedItem>());
-  const loaderOpenRef = useRef(false);
-
-  // 1. Loader global mientras llega la primera lista
-  useEffect(() => {
-    startGlobalLoading(12, LOADING_SCOPE);
-    loaderOpenRef.current = true;
-    return () => {
-      if (loaderOpenRef.current) finishGlobalLoading(LOADING_SCOPE);
-      loaderOpenRef.current = false;
-    };
-  }, []);
 
   // 2. Cada cambio en los ids (guardar o quitar desde cualquier página) rearma la rejilla
   useEffect(() => {
@@ -85,10 +72,6 @@ export const SavedMangas = () => {
       .finally(() => {
         if (!active) return;
         setLoading(false);
-        if (loaderOpenRef.current) {
-          finishGlobalLoading(LOADING_SCOPE);
-          loaderOpenRef.current = false;
-        }
       });
 
     return () => {

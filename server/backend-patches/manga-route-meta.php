@@ -234,6 +234,30 @@ $static_routes = [
         'description' => 'Términos de uso, política de privacidad y tratamiento de datos de los lectores de MangaMukai.',
         'heading' => 'Términos y privacidad',
     ],
+    '/privacidad' => [
+        'kind' => 'page',
+        'title' => 'Política de privacidad | MangaMukai',
+        'description' => 'Qué datos recoge MangaMukai, para qué los usa, con quién los comparte y cómo puedes ejercer tus derechos.',
+        'heading' => 'Política de privacidad',
+    ],
+    '/terminos' => [
+        'kind' => 'page',
+        'title' => 'Términos de servicio | MangaMukai',
+        'description' => 'Condiciones de uso de MangaMukai: cuentas, Mukai Coins, contenido +19, conducta permitida y responsabilidad.',
+        'heading' => 'Términos de servicio',
+    ],
+    '/normas-comunidad' => [
+        'kind' => 'page',
+        'title' => 'Normas de la comunidad | MangaMukai',
+        'description' => 'Reglas de convivencia de la comunidad y la mensajería de MangaMukai, y cómo se modera.',
+        'heading' => 'Normas de la comunidad',
+    ],
+    '/cookies' => [
+        'kind' => 'page',
+        'title' => 'Política de cookies | MangaMukai',
+        'description' => 'Qué cookies y almacenamiento local usa MangaMukai, para qué sirven y cómo puedes gestionarlos.',
+        'heading' => 'Política de cookies',
+    ],
 ];
 
 // Rutas privadas o transaccionales: se sirven, pero fuera del indice.

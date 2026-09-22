@@ -44,7 +44,6 @@ import {
   uploadProfilePostMedia,
   type ProfilePost,
 } from '../services/profilePostService';
-import { finishGlobalLoading, startGlobalLoading } from '../utils/globalLoading';
 import {
   emptySocialLinks,
   getWordPressProfile,
@@ -143,8 +142,6 @@ export const ProfilePage = () => {
       return;
     }
     let active = true;
-    const loadingScope = 'profile-page';
-    startGlobalLoading(12, loadingScope);
     Promise.all([
       getWordPressProfile(user),
       getFollows().catch(() => emptyFollows()),
@@ -169,11 +166,9 @@ export const ProfilePage = () => {
     }).finally(() => {
       if (!active) return;
       setLoading(false);
-      finishGlobalLoading(loadingScope);
     });
     return () => {
       active = false;
-      finishGlobalLoading(loadingScope);
     };
   }, [navigate, user]);
 

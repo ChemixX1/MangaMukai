@@ -7,7 +7,6 @@ import { PaginationControls } from '../common';
 import { useChapterAccess } from '../../hooks/useChapterAccess';
 import { getChaptersBySeries, type SeriesChapter } from '../../services/mangaService';
 import { getStoredToken, getUnlockedChapters } from '../../services/authService';
-import { startGlobalLoading } from '../../utils/globalLoading';
 import { whenIdle } from '../../utils/whenIdle';
 
 interface AdultLatestUpdatesProps {
@@ -247,7 +246,6 @@ export function AdultLatestUpdates({
                         to={`/read/${chapter.id}`}
                         onClick={(event) => {
                           if (chapter.esGratis) {
-                            startGlobalLoading();
                             return;
                           }
                           event.preventDefault();

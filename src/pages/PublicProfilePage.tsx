@@ -20,7 +20,6 @@ import { ProfilePostCard } from '../components/social/ProfilePostCard';
 import { ProfileStats } from '../components/social/ProfileStats';
 import { getStoredToken, getStoredUser } from '../services/authService';
 import { followUser, getPublicProfile, openChat, unfollowUser, type PublicProfile } from '../services/socialService';
-import { finishGlobalLoading, startGlobalLoading } from '../utils/globalLoading';
 
 const SOCIAL_LABELS: Record<string, string> = {
   facebook: 'Facebook',
@@ -70,11 +69,8 @@ export const PublicProfilePage = () => {
   }, [id]);
 
   useEffect(() => {
-    const loadingScope = `public-profile:${id}`;
     setActiveSection('summary');
-    startGlobalLoading(14, loadingScope);
-    void load(true).finally(() => finishGlobalLoading(loadingScope));
-    return () => finishGlobalLoading(loadingScope);
+    void load(true);
   }, [id, load]);
 
   const links = useMemo(() => profile

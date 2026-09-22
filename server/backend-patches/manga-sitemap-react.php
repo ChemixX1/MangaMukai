@@ -38,7 +38,7 @@ $xml .= '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'
 // Rutas fijas de la aplicacion React. Sin esto solo se envian fichas de manga y
 // la portada y las colecciones dependen de que Google las descubra por enlaces.
 $newest = $mangas ? mysql2date(DATE_W3C, $mangas[0]->post_modified_gmt, false) : gmdate(DATE_W3C);
-foreach (['/', '/biblioteca', '/manga-19', '/manga-bn', '/nosotros', '/contacto', '/legal'] as $static_path) {
+foreach (['/', '/biblioteca', '/manga-19', '/manga-bn', '/nosotros', '/contacto', '/legal', '/privacidad', '/terminos', '/normas-comunidad', '/cookies'] as $static_path) {
     $xml .= "  <url>\n";
     $xml .= '    <loc>' . esc_xml('https://mangamukai.com' . $static_path) . "</loc>\n";
     $xml .= '    <lastmod>' . esc_xml($newest) . "</lastmod>\n";

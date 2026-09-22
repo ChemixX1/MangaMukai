@@ -194,7 +194,7 @@ export const PopularCarousel = ({ filterMangas }: PopularCarouselProps = {}) => 
     };
   }, [items]);
 
-  // La carga inicial queda cubierta por GlobalLoader y no dibuja moldes vacíos.
+  // La carga inicial no dibuja moldes vacíos.
   const showSkeleton = loading && items.length === 0;
   // Cada manga aparece una sola vez por pasada; el bucle infinito lo da la
   // segunda copia de la secuencia, no repetir títulos dentro de la lista.

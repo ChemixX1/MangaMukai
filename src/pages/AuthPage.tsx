@@ -14,7 +14,6 @@ import {
   User,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Footer } from "../components/layout";
 import { MANGAMUKAI_API, SOCIAL_LOGIN_SESSION_URL, socialLoginUrl, wordpressUrl } from "../config/api";
 import { useTheme } from "../hooks/useTheme";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
@@ -709,7 +708,7 @@ export const AuthPage = () => {
                         onChange={(event) => setRememberSession(event.target.checked)}
                         className="auth-remember-checkbox h-3.5 w-3.5 shrink-0 accent-[#FF4D88]"
                       />
-                      Mantener sesión
+                      Mantener
                     </label>
                     <a
                       href={wordpressUrl("wp-login.php?action=lostpassword")}
@@ -753,8 +752,6 @@ export const AuthPage = () => {
           </motion.div>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 };

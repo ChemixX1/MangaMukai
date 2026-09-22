@@ -14,7 +14,6 @@ import { useTheme } from "../hooks/useTheme";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { ReaderChapterSelect } from "../components/manga/ReaderChapterSelect";
 import { ReaderPrefetchSession, type ReaderSibling } from "../services/readerPrefetchSession";
-import { finishGlobalLoading } from "../utils/globalLoading";
 
 interface ChapterImage {
   id: string;
@@ -179,8 +178,6 @@ export const ReaderPage = () => {
       } catch (caught) {
         if (active) setError(caught instanceof Error ? caught.message : 'No se pudo cargar el capítulo.');
       } finally {
-        // El overlay general se retira aquí: dentro del lector manda su rueda.
-        finishGlobalLoading();
         if (active) { firstReaderLoad.current = false; setLoading(false); }
       }
     })();

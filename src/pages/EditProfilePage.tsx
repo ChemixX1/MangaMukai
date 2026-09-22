@@ -38,9 +38,8 @@ const fallbackProfile = (user: MMUser): WordPressProfile => ({
 
 /**
  * Edición rápida del perfil (desde el lápiz de "Más"): foto, portada, nombre y
- * descripción, más la barra de progreso de rango. Se abre al instante: el
- * GlobalLoader la deja pasar y no bloquea mientras carga los datos. Sin navbar
- * ni barra inferior en móvil.
+ * descripción, más la barra de progreso de rango. Se abre al instante y no
+ * bloquea mientras carga los datos. Sin navbar ni barra inferior en móvil.
  */
 const EditProfilePage = () => {
   const navigate = useNavigate();

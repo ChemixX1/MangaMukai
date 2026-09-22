@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FilterStrip from './FilterStrip';
-import { startGlobalLoading } from '../../utils/globalLoading';
 
 const FilterStripTactical = () => {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -9,7 +8,6 @@ const FilterStripTactical = () => {
 
   const handleFilterClick = (category: string) => {
     setActiveFilter(category);
-    startGlobalLoading();
     navigate('/biblioteca', category === 'Todos' ? undefined : { state: { filterCategory: category } });
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronLeft, ChevronRight, Eye, Flame, Play, Star, Tag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { MangaMetaBar } from "../common";
@@ -15,7 +15,6 @@ import { useHomeData } from "../../context/HomeDataContext";
 import { AdultYouthMotionCarousel } from "./AdultYouthMotionCarousel";
 import { collectionTags } from '../../utils/collectionTags';
 import { byTotalViews, filterMenHot, filterWomenHot } from "../../utils/womenBlackWhite";
-import { finishGlobalLoading, startGlobalLoading, updateGlobalLoading } from "../../utils/globalLoading";
 import { preloadImages } from "../../utils/preloadImages";
 import { whenIdle } from "../../utils/whenIdle";
 
@@ -51,7 +50,6 @@ const themes = {
 } as const;
 
 /** El loader global cubre la página +19 hasta que su contenido está completo. */
-const ADULT_LOADER_SCOPE = "collection-adult";
 
 const adultPattern = /\+19|adult|ecchi|hentai|hot|er[oó]tico|maduro|harem|yuri/i;
 const monoPattern = /b\/?n|blanco|negro|shounen|seinen|acci[oó]n|manga juvenil/i;
@@ -96,7 +94,6 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeGenre, setActiveGenre] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const loaderDoneRef = useRef(false);
   const [popularMenMonthly, setPopularMenMonthly] = useState<MangaCapitulo[]>([]);
 
   /* El ranking mensual no está en el contexto del home; se pide aquí (queda en
@@ -182,31 +179,11 @@ export function CollectionLanding({ variant }: CollectionLandingProps) {
   const active = heroItems[activeIndex % Math.max(heroItems.length, 1)];
   const heroCoverKey = heroItems.map((manga) => manga.portada).filter(Boolean).join("|");
 
-  /* La página +19 se muestra entera de una vez: el loader global se mantiene
-     hasta que llegan los listados y las portadas del hero ya están decodificadas. */
+  /* La página +19 adelanta la descarga de las portadas del hero para que
+     aparezcan ya decodificadas cuando llegan los listados. */
   useEffect(() => {
-    if (variant !== "adult") return;
-    startGlobalLoading(12, ADULT_LOADER_SCOPE);
-    return () => {
-      if (!loaderDoneRef.current) finishGlobalLoading(ADULT_LOADER_SCOPE);
-    };
-  }, [variant]);
-
-  useEffect(() => {
-    if (variant !== "adult" || loaderDoneRef.current) return;
-    if (loading || !homeReady) return;
-
-    let cancelled = false;
-    updateGlobalLoading(90);
-    void preloadImages(heroCoverKey.split("|").slice(0, 3)).finally(() => {
-      if (cancelled) return;
-      loaderDoneRef.current = true;
-      finishGlobalLoading(ADULT_LOADER_SCOPE);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    if (variant !== "adult" || loading || !homeReady) return;
+    void preloadImages(heroCoverKey.split("|").slice(0, 3));
   }, [variant, loading, homeReady, heroCoverKey]);
 
   const showPreviousHero = () => {

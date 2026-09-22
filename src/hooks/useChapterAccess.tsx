@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { PurchaseModal } from '../components/modals';
 import { buyChapter, getStoredToken, getUnlockedChapters, refreshUser } from '../services/authService';
 import { getChaptersBySeries } from '../services/mangaService';
-import { startGlobalLoading } from '../utils/globalLoading';
 
 interface OpenChapterOptions {
   chapterId: string | number;
@@ -40,7 +39,6 @@ export const useChapterAccess = () => {
     const readerPath = `/read/${chapterId}`;
 
     if (isFree) {
-      startGlobalLoading();
       navigate(readerPath);
       return;
     }
@@ -55,7 +53,6 @@ export const useChapterAccess = () => {
     try {
       const unlocked = await getUnlockedChapters().catch(() => new Set<string>());
       if (unlocked.has(String(chapterId))) {
-        startGlobalLoading();
         navigate(readerPath);
         return;
       }
@@ -85,7 +82,6 @@ export const useChapterAccess = () => {
       const result = await buyChapter(pending.chapterId);
       if (result.success) {
         setPending(null);
-        startGlobalLoading();
         navigate(`/read/${pending.chapterId}`);
         return;
       }

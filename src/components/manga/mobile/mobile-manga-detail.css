@@ -1,0 +1,324 @@
+/* Ficha de manga en móvil: fondo negro fijo y las tipografías del diseño. */
+.mmd-root {
+  --mmd-pink: #ff008c;
+  --mmd-purple: #b000ad;
+  --mmd-yellow: #ffcd0f;
+  --mmd-orange: #fb923c;
+  --mmd-hairline: rgba(161, 161, 170, 0.25);
+  --mmd-field: rgba(113, 113, 122, 0.1);
+  --mmd-field-border: rgba(161, 161, 170, 0.6);
+  background: #000;
+  color: #fff;
+  color-scheme: dark;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mmd-root :is(button, a):focus-visible { outline: 2px solid var(--mmd-pink); outline-offset: 2px; }
+/* Al escribir solo aparece el cursor: ni marco ni resalte alrededor de la caja. */
+.mmd-root :is(input, textarea, [contenteditable]):focus,
+.mmd-root :is(input, textarea, [contenteditable]):focus-visible { outline: none; box-shadow: none; caret-color: var(--mmd-pink); }
+
+.mmd-anta { font-family: 'Anta', sans-serif; font-weight: 400; }
+.mmd-orbitron { font-family: 'Orbitron', sans-serif; }
+.mmd-montserrat { font-family: 'Montserrat', sans-serif; }
+.mmd-poppins { font-family: 'Poppins', sans-serif; }
+
+/* Barra en pico bajo el contador de "Me gusta" (la forma va en LikeBarShape). */
+.mmd-like-bar { overflow: visible; }
+
+/* Aro de cada reacción: el gris y el rosa se dibujan en su SVG (ReactionRing). */
+.mmd-reaction-ring { transition: opacity 0.2s ease; }
+.mmd-reaction-ring.is-tracing { animation: mmd-ring-trace 0.65s cubic-bezier(0.33, 1, 0.68, 1); }
+
+@keyframes mmd-ring-trace {
+  from { stroke-dasharray: 0 239; }
+  to { stroke-dasharray: 239 0; }
+}
+
+/* Caja de comentario: el marcador de posición del editor con formato. */
+.mmd-comment-editor:empty::before { content: attr(data-placeholder); color: rgba(255, 255, 255, 0.5); pointer-events: none; }
+.mmd-comment-editor { min-height: 80px; }
+
+/* La lista de recomendaciones mantiene la animación de escritorio
+   (.manga-related-marquee-*); aquí solo se quitan sus separaciones. */
+.mmd-recommendations .manga-related-marquee-sequence { gap: 0; padding-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mmd-root .manga-related-marquee-track { animation-play-state: paused; }
+}
+
+
+/* Reference canvas: 440 px (the export's image dimensions and x coordinates).
+   Preserve vertical gaps in flow so real titles, extra chapters and replies
+   can grow without colliding with the next section. */
+.mmd-root { width: 100%; max-width: 440px; margin-inline: auto; display: flow-root; }
+.mmd-cover { aspect-ratio: 440 / 672; }
+.mmd-cover-image { height: 100%; object-fit: cover; object-position: center top; }
+.mmd-root .mmd-cover-shade { height: 19.643%; }
+.mmd-root .mmd-title { bottom: 4px; min-height: 56px; padding-inline: 32px 24px; }
+.mmd-root .mmd-genres { margin-top: 15px; }
+.mmd-root .mmd-original-title { margin-top: 15px; margin-left: 12.7273%; width: 72.7273%; min-height: 26px; }
+.mmd-root .mmd-actions { margin-top: 19px; margin-left: 12.7273%; width: 74.3182%; min-height: 50px; gap: 7px; padding: 0; align-items: start; }
+.mmd-actions > button { min-width: 0; flex-shrink: 1; white-space: nowrap; }
+.mmd-actions > button:first-child { width: 176px; }
+.mmd-actions > button:last-child { width: 144px; margin-top: 2px; }
+.mmd-root .mmd-likes { margin-top: 41px; padding: 0; }
+.mmd-root .mmd-diamond-rule { width: 72.7273%; margin-left: 12.7273%; margin-top: 12px; }
+.mmd-root .mmd-badges { margin-top: 17px; }
+.mmd-root .mmd-metadata { width: 74.5455%; margin-top: 28px; }
+.mmd-root .mmd-meta-row { align-items: start; gap: 10px; }
+.mmd-meta-row > :not(:first-child) { padding-top: 4px; }
+.mmd-music-spacing { margin-top: 22px; }
+.mmd-root .mmd-music { width: min(288px, 80%); margin-left: 16.8182%; }
+.mmd-music > div { height: 160px; aspect-ratio: auto; }
+.mmd-music > div > div { justify-content: start; padding-top: 15px; }
+.mmd-music p:first-of-type { margin-top: 5px; }
+.mmd-music p:last-of-type { margin-top: 5px; }
+.mmd-music a { margin-top: 15px; flex-shrink: 0; }
+.mmd-root .mmd-tabs { width: 88.6364%; margin-top: 46px; }
+.mmd-root .mmd-content { width: 89.0909%; margin-top: 28px; }
+.mmd-root .mmd-chapters-expand { margin-top: 10px; }
+.mmd-chapter-row { padding-left: 5px; }
+.mmd-chapter-link { gap: 8px; }
+.mmd-reactions-spacing { margin-top: 35px; }
+.mmd-root .mmd-reactions { width: 87.2727%; margin-left: 6.8182%; }
+.mmd-root .mmd-reactions-panel { padding: 17px 18px; }
+.mmd-root .mmd-reaction-row { gap: 9px; }
+.mmd-reaction-cell { width: calc((100% - 27px) / 4); flex-shrink: 0; }
+.mmd-root .mmd-reaction { width: 100%; height: auto; aspect-ratio: 1; }
+.mmd-root .mmd-reaction-cell { gap: 7px; }
+.mmd-reaction-cell > span { line-height: 24px; }
+.mmd-root .mmd-reaction-row-last { margin-top: 17px; }
+.mmd-comments-spacing { margin-top: 56px; }
+.mmd-root .mmd-comment-composer { width: 87.2727%; margin-left: 7.0455%; margin-top: 41px; min-height: 164px; padding: 15px 16px 15px 22px; }
+.mmd-comment-composer textarea { display: block; height: 80px; }
+.mmd-root .mmd-comment-formatting { margin-top: 19px; padding-top: 0; gap: 8px; }
+.mmd-root .mmd-comment-list { width: 87.2727%; margin-left: 6.8182%; margin-top: 31px; gap: 41px; }
+.mmd-comment-card { display: flex; flex-direction: column; min-height: 119px; }
+.mmd-comment-card > p { flex-grow: 1; }
+.mmd-comment-actions { flex-wrap: wrap; column-gap: 10px; row-gap: 0; }
+.mmd-root .mmd-comment-replies { padding-left: 60px; margin-top: 31px; }
+.mmd-comment-reply { min-height: 112px; }
+.mmd-recommendations-spacing { margin-top: 37px; }
+.mmd-root .mmd-recommendations { width: 89.0909%; }
+.mmd-root .mmd-recommendations-panel { min-height: 709px; padding: 23px 26px 17px; }
+.mmd-recommendations h2 { white-space: nowrap; }
+.mmd-root .mmd-recommendations .manga-related-marquee { margin-top: 42px; }
+.mmd-root .mmd-recommendation-row { height: 120px; gap: 11px; padding: 0 0 25px; }
+.mmd-recommendation-row > img { height: 94px; }
+.mmd-recommendation-row > span { min-height: 94px; }
+/* El footer es exactamente el del inicio; aquí solo se fija su fondo negro. */
+.mmd-root .mh-footer { --mh-surface: #000; --mh-ink: #fff; --mh-rgb: 0, 0, 0; --mh-ink-rgb: 255, 255, 255; --mh-legal-ink: rgba(161, 161, 170, .9); --mh-footer-scrim: .6; }
+
+
+/* --- Título original: caja difuminada sobre el fondo --- */
+.mmd-root .mmd-original-title {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+/* --- Punto del tipo: parpadeo limpio, sin halo ni sombra --- */
+.mmd-type-dot { animation: mmd-dot-blink 1.6s steps(1, end) infinite; box-shadow: none; filter: none; }
+@keyframes mmd-dot-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0.15; } }
+
+/* --- Pestañas: la píldora blanca se desliza entre las tres --- */
+.mmd-tabs-pill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / 3);
+  border-radius: 9999px;
+  background: #fff;
+  transition: transform 0.36s cubic-bezier(0.22, 0.9, 0.3, 1);
+  will-change: transform;
+}
+.mmd-tabs-pill[data-tab='synopsis'] { transform: translateX(100%); }
+.mmd-tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 400;
+  color: #fff;
+  transition: color 0.26s ease, font-weight 0.26s ease;
+}
+.mmd-tab.is-active { color: #000; font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mmd-tabs-pill { transition: none; }
+  .mmd-type-dot { animation: none; }
+}
+
+/* --- Caja de comentario --- */
+/* La línea separadora solo cubre los botones de formato, no todo el ancho. */
+.mmd-root .mmd-comment-formatting { border-top: 0; position: relative; }
+.mmd-root .mmd-comment-formatting::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 144px;
+  border-top: 0.5px solid rgba(163, 163, 163, 0.3);
+}
+
+/* Negrita, cursiva y subrayado activos: recuadro gris, sin cambiar de color. */
+.mmd-format-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: #fff;
+  background: transparent;
+  transition: background-color 0.18s ease;
+}
+.mmd-format-button.is-active { background: rgba(255, 255, 255, 0.16); }
+
+/* --- Comentarios: tipografías del diseño --- */
+.mmd-comment-author { font-style: italic; font-weight: 900; line-height: 30px; color: #fff; }
+.mmd-comment-handle { font-style: italic; font-weight: 200; line-height: 30px; color: rgba(255, 255, 255, 0.64); text-align: center; }
+.mmd-comment-date { font-style: normal; font-weight: 400; font-size: 8px; line-height: 12px; text-align: justify; color: #fff; }
+
+.mmd-comment-body {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 9px;
+  line-height: 12px;
+  text-align: justify;
+  color: #fff;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.mmd-comment-body.is-reply { font-size: 8px; }
+.mmd-comment-body.is-clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.mmd-comment-body.is-reply.is-clamped { -webkit-line-clamp: 2; }
+
+/* "Ver Todo" se apoya al final de la última línea visible. */
+.mmd-comment-more {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding-left: 10px;
+  background: #000;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 7px;
+  line-height: 12px;
+  text-align: justify;
+  text-decoration-line: underline;
+  color: #ff008c;
+}
+
+
+/* --- Caja de comentario: el cursor arranca donde empieza el marcador --- */
+.mmd-comment-editor { padding-left: 24px; }
+.mmd-composer-prompt { padding-left: 24px; }
+.mmd-composer-prompt > svg { position: absolute; left: 0; top: 2px; }
+
+/* --- Hilo de comentarios: las líneas que unen las fotos de perfil --- */
+/* Tramo vertical bajo el avatar del comentario, hasta el final de su tarjeta. */
+.mmd-thread-rail-v {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--mmd-pink);
+}
+
+/* Cada respuesta continúa el tramo vertical y dibuja el codo hacia su avatar.
+   El avatar del comentario está a 24 px del borde y la lista se sangra 62 px,
+   así que el rail cae 38 px a la izquierda de la respuesta. */
+.mmd-reply-item::before,
+.mmd-reply-item::after {
+  content: '';
+  position: absolute;
+  background: var(--mmd-pink);
+}
+.mmd-reply-item::before { left: -38px; top: -20px; width: 1px; height: 40px; }
+.mmd-reply-item:first-child::before { top: -31px; height: 51px; }
+.mmd-reply-item::after { left: -38px; top: 20px; height: 1px; width: 38px; }
+
+/* --- Reacciones del comentario: se pintan al elegirlas --- */
+.mmd-reaction-glyph { position: relative; display: inline-flex; width: 15px; height: 15px; }
+.mmd-reaction-glyph-off { position: absolute; inset: 0; color: #fff; }
+.mmd-reaction-glyph-on {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  clip-path: inset(100% 0 0 0);
+}
+.mmd-reaction-glyph-on.is-on { opacity: 1; clip-path: inset(0 0 0 0); }
+.mmd-reaction-glyph-on.is-painting { opacity: 1; animation: mmd-reaction-paint 0.5s cubic-bezier(0.33, 1, 0.68, 1) forwards; }
+@keyframes mmd-reaction-paint {
+  from { clip-path: inset(100% 0 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+/* --- Nombre y arroba: la cursiva ya no se recorta --- */
+.mmd-comment-head { column-gap: 6px; min-width: 0; }
+.mmd-comment-author {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 58%;
+  padding-right: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.mmd-comment-handle {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding-right: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+/* Nombres largos: ambos bajan de tamaño para caber en una sola línea. */
+.mmd-comment-head.is-long .mmd-comment-author { font-size: 11px; }
+.mmd-comment-head.is-long .mmd-comment-handle { font-size: 9px; }
+.mmd-comment-head.is-reply .mmd-comment-author { font-size: 11px; }
+.mmd-comment-head.is-reply .mmd-comment-handle { font-size: 9px; }
+.mmd-comment-head.is-reply.is-long .mmd-comment-author { font-size: 10px; }
+.mmd-comment-head.is-reply.is-long .mmd-comment-handle { font-size: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mmd-reaction-glyph-on.is-painting { animation: none; clip-path: inset(0 0 0 0); }
+}
+
+@media (max-width: 400px) {
+  .mmd-actions > button { font-size: 12px; gap: 6px; }
+  .mmd-root .mmd-title { padding-inline: 20px; }
+  .mmd-root .mmd-metadata { width: calc(100% - 48px); }
+  .mmd-meta-row > :not(:first-child) { font-size: 14px; }
+  .mmd-root .mmd-music { margin-inline: auto; }
+  .mmd-root .mmd-chapter-thumbnail { width: 64px; }
+  .mmd-root .mmd-chapter-row { gap: 5px; padding-right: 5px; }
+  .mmd-root .mmd-chapter-link { gap: 6px; }
+  .mmd-root .mmd-chapter-stats { gap: 5px; }
+  .mmd-chapter-stats :is(button, span) { font-size: 12px; gap: 2px; }
+  .mmd-chapter-stats svg { width: 16px; }
+  .mmd-root .mmd-reactions-panel { padding-inline: 12px; }
+  .mmd-root .mmd-comment-list > li > div { gap: 8px; }
+  .mmd-root .mmd-comment-replies { padding-left: 30px; }
+  .mmd-comment-card { padding-inline: 10px; }
+  .mmd-root .mmd-comment-formatting { gap: 8px; flex-wrap: wrap; }
+  .mmd-root .mmd-recommendations-panel { padding-inline: 16px; }
+  .mmd-recommendations h2 { font-size: 16px; }
+}
