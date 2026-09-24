@@ -36,8 +36,8 @@ export const PreviewChat = ({ preview, characterName, characterImage, accent }: 
       <div className="mt-3">
         {/* Narrador */}
         <div className="flex items-start gap-2">
-          <span className="mcc-narrator grid h-8 w-8 shrink-0 place-items-center rounded-full"><NarratorIcon /></span>
-          <div className="mcc-bubble mcc-bubble-scene max-w-[82%] space-y-4" style={{ backgroundColor: `color-mix(in srgb, ${accent} 16%, white)` }}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-zinc-200 text-[#1c1c1e] dark:bg-[#2a2a2e] dark:text-white"><NarratorIcon /></span>
+          <div className="max-w-[82%] space-y-4 rounded-2xl px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-[#1c1c1e]" style={{ backgroundColor: `color-mix(in srgb, ${accent} 16%, white)` }}>
             {preview.scene.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
           </div>
         </div>
@@ -51,18 +51,18 @@ export const PreviewChat = ({ preview, characterName, characterImage, accent }: 
             className="overflow-hidden"
           >
             <div className="flex justify-end pt-3">
-              <div className="mcc-bubble mcc-bubble-user max-w-[82%] space-y-3">
+              <div className="max-w-[82%] space-y-3 rounded-2xl bg-[#e9e9ec] px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-[#1c1c1e] dark:bg-[#f1f1f3]">
                 <p>{preview.user.line}</p>
                 {preview.user.narration && <p className="italic opacity-80">{preview.user.narration}</p>}
               </div>
             </div>
 
             <div className="pt-3">
-              <p className="mh-font-montserrat flex items-center gap-2 text-[11px] font-semibold mh-text">
-                <span className="mcc-avatar block h-7 w-7 overflow-hidden rounded-full"><img src={characterImage} alt="" className="h-full w-full object-cover object-top" /></span>
+              <p className="flex items-center gap-2 font-montserrat text-[11px] font-semibold text-ink">
+                <span className="block h-7 w-7 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-300"><img src={characterImage} alt="" className="h-full w-full object-cover object-top" /></span>
                 {characterName}
               </p>
-              <div className="mcc-bubble mt-1.5 max-w-[82%] space-y-3 text-white" style={{ backgroundColor: accent }}>
+              <div className="mt-1.5 max-w-[82%] space-y-3 rounded-2xl px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-white" style={{ backgroundColor: accent }}>
                 {preview.character.narration && <p className="italic">{preview.character.narration}</p>}
                 <p>{preview.character.line}</p>
               </div>
@@ -75,7 +75,7 @@ export const PreviewChat = ({ preview, characterName, characterImage, accent }: 
               <motion.div
                 key="fade"
                 aria-hidden="true"
-                className="mcc-preview-more pointer-events-none absolute inset-x-0 bottom-0 h-full"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-full bg-gradient-to-b from-surface/15 via-surface/[.92] via-70% to-surface"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -98,7 +98,7 @@ export const PreviewChat = ({ preview, characterName, characterImage, accent }: 
           whileTap={{ scale: 0.88 }}
         >
           <motion.span
-            className="flex mh-text"
+            className="flex text-ink"
             initial={false}
             animate={{ rotate: expanded ? 180 : 0, y: expanded ? 0 : [0, 3, 0] }}
             transition={{

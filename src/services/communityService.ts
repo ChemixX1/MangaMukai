@@ -155,28 +155,6 @@ export const getChapterEngagement = async (ids: Array<string | number>) => {
   return { counts, engagement };
 };
 
-export const toggleCommentLike = async (commentId: number): Promise<boolean> => {
-  const token = getStoredToken();
-  if (!token) return false;
-
-  try {
-    const res = await fetch(`${MANGAMUKAI_API}/comments/like`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ comment_id: commentId }),
-    });
-    if (res.status === 401 || res.status === 403) clearStoredAuth('expired');
-    if (!res.ok) return false;
-    const data = await res.json();
-    return Boolean(data.success);
-  } catch {
-    return false;
-  }
-};
-
 export const notifyCommentReaction = async (
   commentId: number,
   reaction: 'fire' | 'love' | 'haha' | 'sad' | null,

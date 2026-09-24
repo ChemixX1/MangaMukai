@@ -5,11 +5,10 @@ import { Link } from 'react-router-dom';
 import { useHomeData } from '../../../context/HomeDataContext';
 import { getPopularMenByViews, getPopularWomenByViews } from '../../../services/mangaService';
 import type { MangaCapitulo } from '../../../types/manga';
+import { useInfiniteMarquee } from '../../../hooks/useInfiniteMarquee';
+import { cleanTitle, timeAgoEs, uniqueBySeries } from '../../../utils/mangaFormat';
 import { filterYouthMen } from '../../../utils/youthFilter';
-import { CoinStackIcon, CrownIcon, TrendingFlameIcon } from './icons';
-import { ACCENT_HEX, cleanTitle, timeAgoEs, typeBadgeColor, uniqueBySeries, type MobileAccent } from './shared';
-import { useFitScale } from './useFitScale';
-import { useInfiniteMarquee } from './useInfiniteMarquee';
+import { ACCENT_HEX, ChapterMeta, CrownIcon, PillTabs, RankNumber, TrendingFlameIcon, TypeBadge, type Accent } from '../../ui';
 
 type Period = 'Semanal' | 'Mensual' | 'Histórico';
 const PERIODS: Period[] = ['Semanal', 'Mensual', 'Histórico'];
@@ -45,32 +44,9 @@ const toRanked = (mangas: MangaCapitulo[]): RankedManga[] =>
     };
   });
 
-const RANK_COLORS: Record<number, string> = { 1: '#f59e0b', 2: 'var(--mh-rank-silver)', 3: '#f97316' };
-
-/** Pie de la tarjeta: capítulo · gratis/pago · fecha. Si no cabe, se encoge en bloque. */
-const RankedMeta = ({ manga }: { manga: RankedManga }) => {
-  const { outerRef, innerRef } = useFitScale<HTMLDivElement, HTMLDivElement>();
-  return (
-    <div ref={outerRef} className="flex h-9 items-center justify-center overflow-hidden rounded-b-lg mh-panel px-2.5 mh-text">
-      <div ref={innerRef} className="mh-meta-grid">
-        <span className="mh-font-anta shrink-0 whitespace-nowrap text-xs">Cap {manga.chapter}</span>
-        <span aria-hidden="true" className="mh-meta-divider" />
-        <span className="mh-font-audiowide flex shrink-0 items-center gap-[3px] whitespace-nowrap text-[9px]">
-          {manga.isFree
-            ? <span aria-hidden="true" className="mh-free-dot h-1.5 w-1.5 rounded-full" />
-            : <CoinStackIcon size={15} />}
-          {manga.isFree ? 'GRATIS' : 'PAGO'}
-        </span>
-        <span aria-hidden="true" className="mh-meta-divider" />
-        <span className="mh-font-anta shrink-0 whitespace-nowrap text-xs">{manga.date}</span>
-      </div>
-    </div>
-  );
-};
-
 interface MobileTrendingProps {
   audience: 'women' | 'men';
-  accent: MobileAccent;
+  accent: Accent;
 }
 
 /**
@@ -120,35 +96,19 @@ export const MobileTrending = ({ audience, accent }: MobileTrendingProps) => {
   }, [isReady, isMen, period, popularWeekly, popularMenWeekly, popularHistorical, popularMenHistorical, latestWomen, latestMen]);
 
   return (
-    <section className="mh-trending pt-[45px]" aria-busy={loading}>
+    <section className="pt-[45px]" aria-busy={loading}>
       {/* Cabecera */}
       <div className="flex items-center gap-[5px] pl-[21px]">
         <span className="grid h-9 w-9 place-items-center" style={{ color: accentHex }}>
           <TrendingFlameIcon size={36} />
         </span>
-        <h2 className="mh-font-dela text-xl leading-8 mh-text">
+        <h2 className="font-dela text-xl font-normal leading-8 text-ink">
           Tendencia <span style={{ color: accentHex }}>Ahora</span>
         </h2>
       </div>
 
       {/* Periodo */}
-      <div role="tablist" aria-label="Periodo del ranking" className="mx-auto mt-[18px] flex h-11 w-80 max-w-[calc(100%-2rem)] items-center rounded-3xl border mh-period-tabs p-[1px]">
-        {PERIODS.map((option) => {
-          const active = option === period;
-          return (
-            <button
-              key={option}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setPeriod(option)}
-              className={`mh-font-montserrat h-10 flex-1 rounded-3xl text-xs uppercase leading-3 transition-colors ${active ? 'mh-selected font-black' : 'font-bold mh-text'}`}
-            >
-              {option}
-            </button>
-          );
-        })}
-      </div>
+      <PillTabs options={PERIODS} value={period} onChange={setPeriod} label="Periodo del ranking" className="mx-auto mt-[18px] w-80 max-w-[calc(100%-2rem)]" />
 
       {/* Cinta de portadas: la secuencia se repite para que el bucle no se note. */}
       <div
@@ -169,7 +129,6 @@ export const MobileTrending = ({ audience, accent }: MobileTrendingProps) => {
               >
                 {items.map((manga, index) => {
                   const rank = index + 1;
-                  const rankColor = RANK_COLORS[rank] ?? 'var(--mh-ink)';
                   return (
                     <Link
                       key={String(manga.id)}
@@ -179,30 +138,28 @@ export const MobileTrending = ({ audience, accent }: MobileTrendingProps) => {
                       className="block w-[185px] shrink-0"
                       aria-label={`${rank}. ${manga.title}`}
                     >
-                      <div className="relative h-[288px] overflow-hidden rounded-t-xl mh-cover-base">
+                      <div className="relative h-[288px] overflow-hidden rounded-t-xl bg-media">
                         <img src={manga.coverImage} alt={`Portada del manga ${manga.title}`} draggable={false} loading={copy === 0 && index < 2 ? 'eager' : 'lazy'} decoding="async" className="h-full w-full object-cover" />
                         {rank === 1 && (
-                          <span className="absolute right-[3px] top-[6px] grid h-6 w-6 place-items-center rounded-[5px] bg-amber-400 mh-text" aria-hidden="true">
+                          <span className="absolute right-[3px] top-[6px] grid h-6 w-6 place-items-center rounded-[5px] bg-amber-400 text-ink" aria-hidden="true">
                             <CrownIcon size={12} />
                           </span>
                         )}
-                        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[130px] mh-card-scrim" />
+                        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[130px] bg-gradient-to-t from-surface/95 via-surface/55 to-transparent" />
                         <div className="absolute inset-x-0 bottom-0 flex items-end">
-                          <span className="mh-rank-number -mb-[7px] -ml-[14px] shrink-0 text-[84px]" style={{ color: rankColor }} aria-hidden="true">
-                            {rank}
-                          </span>
+                          <RankNumber rank={rank} className="-mb-[7px] -ml-[14px] text-[84px]" />
                           <div className="mb-2 min-w-0 flex-1 pl-[22px] pr-2">
-                            <span className="mh-font-montserrat inline-flex h-2.5 items-center rounded-[3px] px-1.5 text-[7px] font-black uppercase leading-none text-white" style={{ backgroundColor: typeBadgeColor(manga.type, accent) }}>
-                              {manga.type}
-                            </span>
-                            <h3 className="mh-font-montserrat mh-line-clamp-2 mt-1 text-[10px] font-black uppercase leading-3 mh-text">
+                            <TypeBadge type={manga.type} accent={accent} className="h-2.5 rounded-[3px] px-1.5 text-[7px]" />
+                            <h3 className="mt-1 line-clamp-2 font-montserrat text-[10px] font-black uppercase leading-3 text-ink">
                               {manga.title}
                             </h3>
                           </div>
                         </div>
                       </div>
 
-                      <RankedMeta manga={manga} />
+                      <div className="h-9 rounded-b-lg bg-panel px-2.5 text-ink">
+                        <ChapterMeta variant="bar" chapter={manga.chapter} isFree={manga.isFree} date={manga.date} />
+                      </div>
                     </Link>
                   );
                 })}
@@ -211,7 +168,7 @@ export const MobileTrending = ({ audience, accent }: MobileTrendingProps) => {
           </div>
         ) : (
           !loading && (
-            <p className="mh-font-montserrat w-full py-16 text-center text-xs font-bold uppercase tracking-wider mh-muted">
+            <p className="w-full py-16 text-center font-montserrat text-xs font-bold uppercase tracking-wider text-muted">
               No hay resultados en este periodo
             </p>
           )

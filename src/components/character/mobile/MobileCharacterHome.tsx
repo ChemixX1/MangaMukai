@@ -5,12 +5,10 @@ import { chatCharacters, type CharacterMessage } from '../../../data/chatCharact
 import { useExperienceUser } from '../../../hooks/useLocalExperience';
 import { AUTH_CHANGED_EVENT, getStoredToken, getStoredUser } from '../../../services/authService';
 import { FREE_MESSAGE_LIMIT, getCharacterQuota } from '../../../services/characterChatService';
-import { MobileFooter } from '../../home/mobile/MobileFooter';
+import { Footer } from '../../layout/Footer';
 import { CHARACTER_CARDS } from './cards';
 import { ChatBubbleIcon, CoinStackIcon, FlameIcon } from './icons';
 import { OutlinedName } from './OutlinedName';
-import '../../home/mobile/mobile-home.css';
-import './mobile-character.css';
 
 /** Mensajes gratuitos que quedan según el servidor; mientras responde, el límite completo. */
 const useFreeMessages = (userId: string) => {
@@ -71,10 +69,10 @@ export const MobileCharacterHome = () => {
 
   // Con alguna conversación empezada, los chats recientes suben y "Inicia un Nuevo Chat" baja.
   const newChat = (
-    <section aria-labelledby="mcc-new-chat" className={hasRecent ? 'mt-7' : 'mt-10'}>
-      <h2 id="mcc-new-chat" className="mcc-font-koho flex items-center gap-1.5 pl-[15px] text-xl font-semibold leading-5">
+    <section aria-labelledby="character-new-chat" className={hasRecent ? 'mt-7' : 'mt-10'}>
+      <h2 id="character-new-chat" className="flex items-center gap-1.5 pl-[15px] font-koho text-xl font-semibold leading-5">
         {/* Dos ritmos distintos (balanceo lento + lengüeteo rápido): el vaivén nunca se repite igual. */}
-        <span className="mcc-flame shrink-0"><FlameIcon size={24} /></span>
+        <span className="inline-flex shrink-0 origin-bottom animate-flame-sway motion-reduce:animate-none [&>svg]:origin-bottom [&>svg]:animate-flame-lick motion-reduce:[&>svg]:animate-none"><FlameIcon size={24} /></span>
         Inicia un Nuevo Chat
       </h2>
       <div className="mt-7 grid grid-cols-2 gap-x-[15px] gap-y-[17px]">
@@ -91,8 +89,8 @@ export const MobileCharacterHome = () => {
   );
 
   const recent = (
-    <section aria-labelledby="mcc-recent" className={hasRecent ? 'mt-10' : 'mt-7'}>
-      <h2 id="mcc-recent" className="mcc-font-koho flex items-center gap-[5px] pl-[17px] text-xl font-semibold leading-5">
+    <section aria-labelledby="character-recent" className={hasRecent ? 'mt-10' : 'mt-7'}>
+      <h2 id="character-recent" className="flex items-center gap-[5px] pl-[17px] font-koho text-xl font-semibold leading-5">
         <ChatBubbleIcon size={24} className="shrink-0" />
         Chats Recientes
       </h2>
@@ -103,21 +101,21 @@ export const MobileCharacterHome = () => {
               <Link to={`/chat/${chat.id}/conversacion`} className="flex items-start gap-2">
                 {/* El punto verde sobresale del círculo, por eso no va dentro del recorte. */}
                 <span className="relative h-14 w-14 shrink-0">
-                  <span className="mcc-avatar block h-full w-full overflow-hidden rounded-full">
+                  <span className="block h-full w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-300">
                     <img src={chat.image} alt="" className="h-full w-full object-cover object-top" />
                   </span>
                   <span aria-hidden="true" className="absolute bottom-[3px] right-[9px] h-2.5 w-2.5 rounded-full bg-green-500" />
                 </span>
-                <span className="mcc-line flex h-[50px] min-w-0 flex-1 flex-col border-b pt-1.5">
-                  <span className="mcc-font-raleway truncate text-sm font-bold leading-4 tracking-tight">{chat.name}</span>
-                  <span className="mcc-font-raleway mt-1.5 truncate text-[10px] leading-3 tracking-tight">{chat.preview}</span>
+                <span className="flex h-[50px] min-w-0 flex-1 flex-col border-b border-black/15 pt-1.5 dark:border-zinc-600/60">
+                  <span className="truncate font-raleway text-sm font-bold leading-4 tracking-tight">{chat.name}</span>
+                  <span className="mt-1.5 truncate font-raleway text-[10px] leading-3 tracking-tight">{chat.preview}</span>
                 </span>
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mcc-font-raleway mcc-muted mt-8 text-center text-xs leading-4">
+        <p className="mt-8 text-center font-raleway text-xs leading-4 text-black/55 dark:text-white/55">
           Vive las historias de tu personaje favorito
         </p>
       )}
@@ -125,28 +123,28 @@ export const MobileCharacterHome = () => {
   );
 
   return (
-    <div className="mh-root mcc-root">
+    <div className="focus-scope tap-transparent overflow-x-hidden bg-surface text-ink">
       <main className="pb-8 pt-[22px]" aria-label="Character Chat">
-        <div className="mx-auto w-full max-w-[441px]" style={{ paddingInline: 'var(--mcc-inset)' }}>
-          <h1 className="mcc-font-russo text-center text-3xl leading-10">Character Chat</h1>
+        <div className="mx-auto w-full max-w-[441px] px-[clamp(22px,9.5vw,42px)]">
+          <h1 className="text-center font-russo text-3xl font-normal leading-10">Character Chat</h1>
 
           {/* Saldo */}
-          <section aria-label="Monedas" className="mcc-panel mt-[22px] flex h-11 items-center rounded-lg pl-[15px] pr-4">
+          <section aria-label="Monedas" className="mt-[22px] flex h-11 items-center rounded-lg bg-[#f0f0f0] pl-[15px] pr-4 dark:bg-zinc-900">
             <CoinStackIcon size={32} className="shrink-0" />
-            <span className="mh-font-montserrat ml-[5px] truncate text-lg font-medium leading-none">
+            <span className="ml-[5px] truncate font-montserrat text-lg font-medium leading-none">
               {coins.toLocaleString('es-ES')}<span className="sr-only"> monedas</span>
             </span>
             <Link
               to="/recargar"
               state={{ returnTo: '/chat' }}
-              className="mcc-button mh-font-montserrat ml-auto grid h-7 w-[84px] shrink-0 place-items-center rounded-2xl border text-xs font-bold leading-none"
+              className="ml-auto grid h-7 w-[84px] shrink-0 place-items-center rounded-2xl border border-black/50 font-montserrat text-xs font-bold leading-none dark:border-white/50"
             >
               Recargar
             </Link>
           </section>
 
           {/* Cuota gratuita (contenedor propio) */}
-          <p className="mcc-panel mh-font-montserrat mt-2 flex h-9 items-center rounded-lg pl-[17px] text-xs leading-none">
+          <p className="mt-2 flex h-9 items-center rounded-lg bg-[#f0f0f0] pl-[17px] font-montserrat text-xs leading-none dark:bg-zinc-900">
             Te quedan&nbsp;<strong className="font-bold">{freeMessages}</strong>&nbsp;mensajes&nbsp;<span className="font-semibold">gratuitos</span>
           </p>
 
@@ -155,7 +153,7 @@ export const MobileCharacterHome = () => {
         </div>
       </main>
 
-      <MobileFooter />
+      <Footer className="-mt-6" />
     </div>
   );
 };

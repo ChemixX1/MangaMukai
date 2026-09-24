@@ -5,11 +5,10 @@ import { useNavigate } from 'react-router-dom';
 import { useSavedMangas } from '../../../hooks/useSavedMangas';
 import { useTheme } from '../../../hooks/useTheme';
 import type { MangaCapitulo } from '../../../types/manga';
+import { cleanTitle, formatViewsEs } from '../../../utils/mangaFormat';
 import { displayViews } from '../../../utils/seriesViews';
 import { preloadImages } from '../../../utils/preloadImages';
-import { CheckMark } from './CheckMark';
-import { BookmarkIcon, EyeIcon, OpenBookIcon } from './icons';
-import { ACCENT_HEX, cleanTitle, formatViewsEs, type MobileAccent } from './shared';
+import { ACCENT_HEX, BookmarkIcon, CheckMark, EyeIcon, OpenBookIcon, type Accent } from '../../ui';
 
 export interface HeroItem {
   id: number | string;
@@ -38,7 +37,7 @@ export const toHeroItems = (mangas: MangaCapitulo[], limit = 8): HeroItem[] =>
 
 interface MobileHeroProps {
   items: HeroItem[];
-  accent: MobileAccent;
+  accent: Accent;
   /** Texto accesible del carrusel (“Mangas destacados”, “Mangas juveniles destacados”). */
   label: string;
   /** Hueco superior: el primer hero deja sitio a la cabecera fija; el juvenil, al cartel blanco. */
@@ -180,15 +179,15 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
   };
 
   return (
-    <section ref={sectionRef} className={`mh-hero relative overflow-hidden mh-surface pb-14 ${topSpacingClass}`} aria-label={label}>
+    <section ref={sectionRef} className={`relative overflow-hidden bg-surface pb-14 ${topSpacingClass}`} aria-label={label}>
       {/* Fondo: portada activa bajo un velo negro. Capas absolutas de tamaño
           fijo (la imagen va como background), con fundido entre una y otra. */}
-      <div aria-hidden="true" className="absolute inset-0 z-0 overflow-hidden mh-surface">
+      <div aria-hidden="true" className="absolute inset-0 z-0 overflow-hidden bg-surface">
         <AnimatePresence initial={false}>
           {backdropSrc && (
             <motion.div
               key={backdropSrc}
-              className="mh-hero-backdrop absolute inset-0"
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
               style={{ backgroundImage: `url("${backdropSrc}")` }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -197,7 +196,7 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
             />
           )}
         </AnimatePresence>
-        <div className="mh-hero-scrim absolute inset-0" />
+        <div className="absolute inset-0 bg-surface/[.89] shadow-[0_4px_4px_rgba(157,157,157,0.25)]" />
       </div>
 
       {/* Portadas */}
@@ -223,7 +222,7 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
               aria-label={isSide ? `Mostrar ${item.title}` : undefined}
               disabled={!isSide}
               onClick={() => { if (isSide) { setIsPaused(true); goTo(index); } }}
-              className={`absolute left-1/2 top-1/2 block overflow-hidden rounded-lg mh-cover-base p-0 ${isCenter && covers.centerBorder ? 'border mh-hero-cover-border' : ''} ${isSide ? 'cursor-pointer' : 'cursor-default'}`}
+              className={`absolute left-1/2 top-1/2 block overflow-hidden rounded-lg bg-media p-0 ${isCenter && covers.centerBorder ? 'border border-[color:var(--mm-hero-cover-line)]' : ''} ${isSide ? 'cursor-pointer' : 'cursor-default'}`}
               style={{ width: covers.width, height: covers.height, zIndex: isCenter ? 3 : isSide ? 2 : 1, pointerEvents: isSide ? 'auto' : 'none', translate: '-50% -50%' }}
               initial={false}
               animate={{ x, scale: isCenter ? 1 : covers.sideScale, opacity: visible ? 1 : 0 }}
@@ -243,12 +242,12 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
 
       {/* Tipo y vistas */}
       <div className="relative z-10 mt-[46px] flex items-center justify-center gap-[9px]">
-        <span className={`mh-font-montserrat flex h-6 items-center rounded-[2px] px-3 text-xs font-black uppercase leading-none ${accentInkClass}`} style={{ backgroundColor: accentHex }}>
+        <span className={`flex h-6 items-center rounded-[2px] px-3 font-montserrat text-xs font-black uppercase leading-none ${accentInkClass}`} style={{ backgroundColor: accentHex }}>
           {activeItem.type}
         </span>
-        <span className="flex h-5 min-w-[56px] items-center justify-center gap-1 rounded-[2px] border mh-border px-1.5 mh-text" aria-label={`${formatViewsEs(activeItem.views)} vistas`}>
+        <span className="flex h-5 min-w-[56px] items-center justify-center gap-1 rounded-[2px] border border-line px-1.5 text-ink" aria-label={`${formatViewsEs(activeItem.views)} vistas`}>
           <EyeIcon size={16} />
-          <span className="mh-font-audiowide text-[10px] leading-none tracking-tight">{formatViewsEs(activeItem.views)}</span>
+          <span className="font-audiowide text-[10px] font-normal leading-none tracking-tight">{formatViewsEs(activeItem.views)}</span>
         </span>
       </div>
 
@@ -256,15 +255,15 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
           un título corto y uno largo dejan los mismos huecos arriba y abajo.
           Cuerpo al 70% del original (30px → 21px); la caja se mantiene para no mover el resto. */}
       <div className="relative z-10 mx-auto mt-3 flex h-16 w-full max-w-[384px] items-center justify-center overflow-hidden px-3">
-        <h2 className="mh-font-montserrat mh-line-clamp-2 w-full text-center text-[21px] font-black uppercase leading-[22px] mh-text">
+        <h2 className="line-clamp-2 w-full text-center font-montserrat text-[21px] font-black uppercase leading-[22px] text-ink">
           {activeItem.title}
         </h2>
       </div>
 
       {/* Sinopsis */}
       {/* Sinopsis: cinco líneas fijas de 18px, cortando con puntos suspensivos. */}
-      <div className="relative z-10 mx-auto mt-[13px] w-full max-w-[368px] rounded-[5px] border mh-border mh-synopsis px-4 py-3">
-        <p className="mh-font-inter mh-line-clamp-5 h-[90px] text-justify text-[13px] leading-[18px] mh-text">
+      <div className="relative z-10 mx-auto mt-[13px] w-full max-w-[368px] rounded-[5px] border border-line bg-ink/10 px-4 py-3">
+        <p className="line-clamp-5 h-[90px] text-justify font-inter text-[13px] leading-[18px] text-ink">
           {activeItem.description}
         </p>
       </div>
@@ -272,7 +271,7 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
       {/* Géneros */}
       <div className="relative z-10 mt-[27px] flex h-5 flex-nowrap items-center justify-center gap-2 overflow-hidden px-6">
         {activeItem.tags.map((tag, index) => (
-          <span key={`${tag}-${index}`} className="mh-font-anta flex h-5 items-center border mh-border mh-surface px-[7px] text-[10px] leading-5 mh-text">
+          <span key={`${tag}-${index}`} className="flex h-5 items-center border border-line bg-surface px-[7px] font-anta text-[10px] font-normal leading-5 text-ink">
             {tag}
           </span>
         ))}
@@ -283,7 +282,7 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
         <button
           type="button"
           onClick={openManga}
-          className={`mh-font-montserrat flex h-12 w-44 items-center justify-center gap-2 rounded-md text-sm font-extrabold uppercase transition-transform active:scale-95 ${accentInkClass}`}
+          className={`flex h-12 w-44 items-center justify-center gap-2 rounded-md font-montserrat text-sm font-extrabold uppercase transition-transform active:scale-95 ${accentInkClass}`}
           style={{ backgroundColor: accentHex }}
         >
           <OpenBookIcon size={19} /> Leer ahora
@@ -294,10 +293,8 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
           onClick={handleSave}
           aria-pressed={isBookmarked}
           whileTap={{ scale: 0.95 }}
-          className="mh-font-montserrat flex h-12 w-36 items-center justify-center rounded-md border text-sm font-extrabold uppercase transition-colors duration-300"
-          style={isFlashing
-            ? { backgroundColor: savedFill, borderColor: savedFill, color: savedInk }
-            : { backgroundColor: 'var(--mh-surface)', borderColor: 'var(--mh-border)', color: 'var(--mh-ink)' }}
+          className="flex h-12 w-36 items-center justify-center rounded-md border border-line bg-surface font-montserrat text-sm font-extrabold uppercase text-ink transition-colors duration-300"
+          style={isFlashing ? { backgroundColor: savedFill, borderColor: savedFill, color: savedInk } : undefined}
         >
           <AnimatePresence initial={false} mode="wait">
             {isFlashing ? (
@@ -332,7 +329,7 @@ export const MobileHero = ({ items, accent, label, topSpacingClass = 'pt-[90px]'
                 aria-selected={active}
                 aria-label={`Mostrar ${item.title}`}
                 onClick={() => { setIsPaused(true); goTo(index); }}
-                className={`block transition-[width,background-color] duration-300 ${active ? 'h-1.5 w-12' : 'h-[5px] w-5 mh-hero-dot'}`}
+                className={`block transition-[width,background-color] duration-300 ${active ? 'h-1.5 w-12' : 'h-[5px] w-5 bg-ink/80'}`}
                 style={active ? { backgroundColor: accentHex } : undefined}
               />
             );

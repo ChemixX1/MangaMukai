@@ -540,7 +540,7 @@ export const MangaDetail = () => {
             <div className="text-center xl:col-start-3 xl:row-start-1">
               <p className={`manga-detail-social-prompt text-[13px] ${isLightMode ? 'text-black/60' : 'text-white/60'}`}>¡No olvides seguirnos!</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5" aria-label="Redes sociales de MangaMukai">
-                {FOOTER_SOCIALS.map(({ name, href, icon: SocialIcon }) => (
+                {FOOTER_SOCIALS.map(({ name, href, Icon: SocialIcon }) => (
                   <a key={name} href={href} target="_blank" rel="noreferrer" aria-label={name} title={name} className="manga-detail-social-link flex h-9 w-8 items-center justify-center bg-transparent transition-all hover:-translate-y-0.5 hover:text-[#FF4D88]">
                     <SocialIcon size={21} />
                   </a>

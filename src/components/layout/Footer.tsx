@@ -1,219 +1,310 @@
-import { Facebook, Instagram, Youtube, Zap } from "lucide-react";
-import { Link } from "react-router-dom"; 
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 
-// Componentes SVG personalizados
-const WhatsAppIcon = ({ size = 20, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-  </svg>
-);
+import footerBackdrop from '../../assets/home/footer-backdrop.webp';
+import mascotPeek from '../../assets/home/mascot-peek.webp';
+import { DEVELOPER_URL, SOCIAL_LINKS } from '../../config/social';
+import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
+import { subscribeToNewsletter } from '../../services/newsletterService';
+import {
+  CheckMark,
+  CodeIcon,
+  DiscordMark,
+  FacebookIcon,
+  InstagramIcon,
+  MailIcon,
+  TelegramIcon,
+  WhatsAppIcon,
+  XIcon,
+  YoutubeIcon,
+} from '../ui';
 
-const TelegramIcon = ({ size = 20, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M22 2 9.7 14.3" />
-    <path d="m22 2-7.8 20-4.5-7.7L2 9.8 22 2Z" />
-  </svg>
-);
-
-const DiscordIcon = ({ size = 20, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
-  </svg>
-);
-
-const XIcon = ({ size = 20, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
-  </svg>
-);
-
+/** Redes oficiales. El pie móvil muestra solo las marcadas con `compact`. */
 export const FOOTER_SOCIALS = [
-  { name: "Facebook", icon: Facebook, href: "https://www.facebook.com/MangaAyanokouji/", color: "#1877F2", gradient: "from-[#1877F2] to-[#0d5dbf]" },
-  { name: "WhatsApp", icon: WhatsAppIcon, href: "https://wa.me/51926615198", color: "#25D366", gradient: "from-[#25D366] to-[#128C7E]" },
-  { name: "X", icon: XIcon, href: "https://x.com/MangaMukai", color: "#000000", gradient: "from-neutral-800 to-black" },
-  { name: "Telegram", icon: TelegramIcon, href: "https://t.me/+J6TE0l401vRhZTYx", color: "#0088cc", gradient: "from-[#0088cc] to-[#006699]" },
-  { name: "Instagram", icon: Instagram, href: "https://www.instagram.com/mangamukai/", color: "#d62976", gradient: "from-[#f09433] via-[#dc2743] to-[#bc1888]", isGradient: true },
-  { name: "Youtube", icon: Youtube, href: "https://www.youtube.com/@MangaMukai-b3g", color: "#FF0000", gradient: "from-[#FF0000] to-[#cc0000]" },
-  { name: "Discord", icon: DiscordIcon, href: "https://discord.gg/ZXt4SUxH", color: "#5865F2", gradient: "from-[#5865F2] to-[#4752C4]" },
+  { name: 'Facebook', href: SOCIAL_LINKS.facebook, Icon: FacebookIcon, size: 24, compact: true },
+  { name: 'WhatsApp', href: SOCIAL_LINKS.whatsapp, Icon: WhatsAppIcon, size: 23, compact: false },
+  { name: 'X', href: SOCIAL_LINKS.x, Icon: XIcon, size: 24, compact: true },
+  { name: 'Telegram', href: SOCIAL_LINKS.telegram, Icon: TelegramIcon, size: 24, compact: false },
+  { name: 'Instagram', href: SOCIAL_LINKS.instagram, Icon: InstagramIcon, size: 20, compact: true },
+  { name: 'YouTube', href: SOCIAL_LINKS.youtube, Icon: YoutubeIcon, size: 31, compact: true },
+  { name: 'Discord', href: SOCIAL_LINKS.discord, Icon: DiscordMark, size: 27, compact: false },
 ];
 
-export const Footer = () => {
-  // El footer conserva siempre su identidad oscura, independientemente del tema global.
-  const isLight = false;
+type FooterLink = { label: string; to?: string; href?: string };
 
-  // DEFINICIÓN DE LOS LINKS ACTUALIZADA
-  const LINKS = {
-    explorar: [
-      { label: "Tendencias", to: "/" }, // Cambiado a Home
-      { label: "Novedades", to: "/" },  // Cambiado a Home
-      { label: "Ranking", to: "/" },    // Cambiado a Home
-      { label: "Nosotros", to: "/nosotros" }, // Cambiado "Noticias" por "Nosotros" y link a /nosotros
-    ],
-    legal: [
-      { label: "DMCA", to: "/legal?tab=dmca" },
-      { label: "Privacidad", to: "/legal?tab=privacy" },
-      { label: "Términos", to: "/legal?tab=terms" },
-      { label: "Contacto", to: "/contacto" }
-    ]
+const NAVIGATION_LINKS: FooterLink[] = [
+  { label: 'Inicio', to: '/' },
+  { label: 'Biblioteca', to: '/biblioteca' },
+  { label: 'Sobre Nosotros', to: '/nosotros' },
+  { label: 'Recibe ayuda', href: SOCIAL_LINKS.discord },
+  { label: 'Contacto', to: '/contacto' },
+];
+
+const LEGAL_LINKS: FooterLink[] = [
+  { label: 'Política de Privacidad', to: '/privacidad' },
+  { label: 'Términos de Servicio', to: '/terminos' },
+  { label: 'Normas de la Comunidad', to: '/normas-comunidad' },
+  { label: 'Política de Cookies', to: '/cookies' },
+  // Lleva al apartado de la política que explica cómo gestionarlas desde el navegador.
+  { label: 'Cookie Settings', to: '/cookies#como-gestionarlas' },
+  { label: 'DMCA', to: '/legal?tab=dmca' },
+];
+
+const MOBILE_PAGES: (FooterLink & { font: string })[] = [
+  { label: 'Sobre Nosotros', to: '/nosotros', font: 'font-google' },
+  { label: 'Recibe ayuda', href: SOCIAL_LINKS.discord, font: 'font-montserrat' },
+  { label: 'Contacto', to: '/contacto', font: 'font-montserrat' },
+];
+
+/** Políticas del pie móvil: dos filas centradas; la primera cabe en una línea incluso a 360 px. */
+const MOBILE_LEGAL_ROWS = [LEGAL_LINKS.slice(0, 3), LEGAL_LINKS.slice(3, 5)];
+
+const DISCLAIMER = "All the comics on this website are only previews of the original comics. There may be many language errors, character names, and story lines. For the original version, please buy the comic if it's available in your city.";
+
+const FooterAnchor = ({ link, className }: { link: FooterLink; className: string }) => (
+  link.to
+    ? <Link to={link.to} className={className}>{link.label}</Link>
+    : <a href={link.href} target="_blank" rel="noopener noreferrer" className={className}>{link.label}</a>
+);
+
+const Wordmark = ({ className }: { className: string }) => (
+  <Link to="/" aria-label="Volver al inicio de MangaMukai" className="block w-fit">
+    <span className={`select-none whitespace-nowrap font-montserrat font-black uppercase italic leading-none tracking-tighter text-ink ${className}`}>
+      Manga<span className="text-mukai-pink">Mukai</span>
+    </span>
+  </Link>
+);
+
+const DeveloperCredit = ({ className }: { className: string }) => (
+  <a
+    href={DEVELOPER_URL}
+    target="_blank"
+    rel="noopener noreferrer"
+    className={`flex items-center gap-[3px] font-audiowide font-normal leading-none text-ink no-underline hover:no-underline ${className}`}
+  >
+    <CodeIcon size={9} />
+    7osemanuelmejia
+  </a>
+);
+
+type NewsletterStatus = 'idle' | 'sending' | 'done';
+const CHECK_VISIBLE_MS = 1300;
+
+/**
+ * Boletín: UNIRME envía el correo; al confirmarse muestra el check un instante y
+ * el botón vuelve a "UNIRME" con el campo vacío. Con un correo inválido o un
+ * fallo no se muestra nada: el campo se queda como está. El gato se asoma sobre
+ * el botón.
+ */
+const NewsletterForm = ({ inputId }: { inputId: string }) => {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<NewsletterStatus>('idle');
+  const resetTimer = useRef<number | null>(null);
+
+  useEffect(() => () => { if (resetTimer.current !== null) window.clearTimeout(resetTimer.current); }, []);
+
+  const handleSubscribe = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (status !== 'idle') return;
+    setStatus('sending');
+    const outcome = await subscribeToNewsletter(email);
+    if (outcome !== 'added' && outcome !== 'exists') {
+      setStatus('idle');
+      return;
+    }
+    setEmail('');
+    setStatus('done');
+    if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+    resetTimer.current = window.setTimeout(() => setStatus('idle'), CHECK_VISIBLE_MS);
   };
 
   return (
-    <footer className={`manga-footer relative w-full overflow-hidden font-sans transition-colors duration-500 ${isLight ? "bg-white text-black" : "bg-black text-neutral-400"}`}>
-      
-      {/* === BACKGROUND ESPACIAL === */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-          <div className="absolute bottom-0 left-0 right-0 h-[300px] bg-gradient-to-t from-[#FF4D88]/5 via-transparent to-transparent"></div>
-          <div className={`absolute inset-0 opacity-80 ${isLight ? "bg-[radial-gradient(circle_at_center,transparent_0%,#ffffff_100%)]" : "bg-[radial-gradient(circle_at_center,transparent_0%,#000000_100%)]"}`}></div>
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8">
-        
-        {/* === SECCIÓN SUPERIOR === */}
-        <div className="grid grid-cols-1 gap-8 py-10 md:gap-16 md:py-20 lg:grid-cols-12">
-          
-          {/* COLUMNA IZQUIERDA: Branding */}
-          <div className="flex flex-col gap-4 md:gap-6 lg:col-span-4">
-            <Link to="/" className="group flex items-center gap-3 w-fit">
-                <div className="relative">
-                    {/* Brillo Rosa Metálico */}
-                    <div className="absolute inset-0 bg-[#FF4D88]/20 rounded-xl"></div>
-                    <div className={`relative rounded-xl border p-3 shadow-[0_0_15px_rgba(255,77,136,0.1)] transition-colors duration-300 group-hover:border-[#FF4D88]/50 ${isLight ? "border-black/10 bg-white" : "border-white/10 bg-black"}`}>
-                        <Zap size={24} className="text-[#FF4D88]" fill="currentColor"/>
-                    </div>
-                </div>
-                <div className="flex flex-col leading-none">
-                    <span className={`text-3xl font-[900] uppercase italic tracking-tighter ${isLight ? "text-black" : "text-white"}`}>
-                        Manga<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4D88] to-[#BA2B5A]">Mukai</span>
-                    </span>
-                </div>
-            </Link>
-            <p className={`hidden max-w-sm text-sm font-medium leading-relaxed md:block ${isLight ? "text-black/65" : "text-neutral-400"}`}>
-              Tu plataforma de lectura digital optimizada. Disfruta de la mejor experiencia con calidad premium, velocidad warp y diseño de vanguardia.
-            </p>
-            
-            <div className="hidden flex-wrap gap-3 font-mono md:flex">
-              <div className={`rounded px-3 py-1 text-[10px] uppercase tracking-wider ${isLight ? "border border-black/10 bg-zinc-100 text-black/65" : "bg-[#1a1a1a]"}`}>
-                Disfruta
-              </div>
-              <div className={`rounded border border-[#FF4D88]/20 px-3 py-1 text-[10px] uppercase tracking-wider text-[#FF4D88]/70 ${isLight ? "bg-zinc-100" : "bg-[#1a1a1a]"}`}>
-                Imagina
-              </div>
-            </div>
-          </div>
-
-          {/* COLUMNA CENTRO: Links */}
-          <div className="grid grid-cols-2 gap-6 md:gap-8 lg:col-span-4">
-            
-            <div className="flex flex-col gap-4 md:gap-6">
-                <h4 className={`flex items-center gap-2 text-xs font-[900] uppercase tracking-[0.2em] ${isLight ? "text-black" : "text-white"}`}>
-                  <span className="w-1.5 h-1.5 bg-[#FF4D88] rounded-full shadow-[0_0_8px_#FF4D88]"></span>
-                  Navegación
-                </h4>
-                <ul className="flex flex-col gap-3">
-                    {LINKS.explorar.map(item => (
-                        <li key={item.label}>
-                            <Link to={item.to} className={`group inline-flex items-center gap-2 text-sm transition-all duration-300 hover:translate-x-2 ${isLight ? "text-black/60 hover:text-black" : "text-neutral-400 hover:text-white"}`}>
-                                <span className="w-0 group-hover:w-2 h-[1px] bg-[#FF4D88] transition-all duration-300"></span>
-                                {item.label}
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            <div className="flex flex-col gap-4 md:gap-6">
-                <h4 className={`flex items-center gap-2 text-xs font-[900] uppercase tracking-[0.2em] ${isLight ? "text-black" : "text-white"}`}>
-                  <span className="w-1.5 h-1.5 bg-[#FF4D88] rounded-full shadow-[0_0_8px_#FF4D88]"></span>
-                  Legal
-                </h4>
-                <ul className="flex flex-col gap-3">
-                    {LINKS.legal.map(item => (
-                        <li key={item.label}>
-                            <Link to={item.to} className={`group inline-flex items-center gap-2 text-sm transition-all duration-300 hover:translate-x-2 ${isLight ? "text-black/60 hover:text-black" : "text-neutral-400 hover:text-white"}`}>
-                                <span className="w-0 group-hover:w-2 h-[1px] bg-[#FF4D88] transition-all duration-300"></span>
-                                {item.label}
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-          </div>
-
-          {/* COLUMNA DERECHA: Newsletter */}
-          <div className="flex flex-col gap-4 md:gap-6 lg:col-span-4">
-            <h4 className={`text-xs font-[900] uppercase tracking-[0.2em] ${isLight ? "text-black" : "text-white"}`}>
-              Mantente al Dia
-            </h4>
-            <p className={`font-mono text-xs ${isLight ? "text-black/50" : "text-neutral-500"}`}>
-              RECIBE LAS ÚLTIMAS ACTUALIZACIONES Y CAPÍTULOS DIRECTAMENTE EN TU DISPOSITIVO.
-            </p>
-            <div className={`flex gap-2 rounded-xl border p-1 shadow-inner transition-all focus-within:border-[#FF4D88]/50 ${isLight ? "border-black/10 bg-zinc-50" : "border-white/10 bg-[#111]"}`}>
-              <input 
-                type="email" 
-                placeholder="usuario@red.com" 
-                className={`flex-1 border-none bg-transparent px-4 py-2 text-sm focus:outline-none focus:ring-0 ${isLight ? "text-black placeholder:text-black/35" : "text-white placeholder:text-neutral-600"}`}
-              />
-              <button className="bg-[#FF4D88] hover:bg-[#E03D76] text-white px-6 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(255,77,136,0.2)] active:scale-95">
-                Unirse
-              </button>
-            </div>
-          </div>
-
-        </div>
-
-        {/* === REDES SOCIALES === */}
-        <div className={`border-t py-6 md:py-10 ${isLight ? "border-black/[0.07]" : "border-white/5"}`}>
-          {/* Móvil: solo iconos, 4 por fila (dos filas). Escritorio: píldoras con nombre. */}
-          <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6">
-            {FOOTER_SOCIALS.map((social, idx) => (
-              <a 
-                key={idx}
-                href={social.href}
-                target="_blank" 
-                rel="noreferrer"
-                title={social.name}
-                aria-label={social.name}
-                className="group relative basis-[calc(25%-0.5625rem)] md:basis-auto"
+    <div className="relative">
+      <img
+        src={mascotPeek}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        className="pointer-events-none absolute -top-[68px] right-3 z-20 h-[75px] w-[189px] object-contain object-bottom"
+      />
+      <form onSubmit={handleSubscribe} noValidate className="relative z-10 flex h-12 items-center rounded-xl border border-ink/30 bg-surface/50 pl-[19px] pr-1">
+        <label htmlFor={inputId} className="sr-only">Correo para recibir novedades</label>
+        <input
+          id={inputId}
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="MatenteAlDia@mangamukai.com"
+          className="h-full min-w-0 flex-1 bg-transparent font-poppins text-xs font-medium text-ink outline-none placeholder:text-ink/55"
+        />
+        <motion.button
+          type="submit"
+          disabled={status === 'sending'}
+          aria-label={status === 'done' ? 'Suscripción confirmada' : 'Unirme al boletín'}
+          whileTap={{ scale: 0.95 }}
+          className="flex h-10 w-28 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-ink font-goldman text-xs font-bold text-surface disabled:opacity-80"
+        >
+          <AnimatePresence initial={false} mode="wait">
+            {status === 'done' ? (
+              <CheckMark key="check" background="rgb(var(--mm-surface))" ink="rgb(var(--mm-ink))" size={26} />
+            ) : (
+              <motion.span
+                key="label"
+                className="flex items-center gap-1.5"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18 }}
               >
-                <div 
-                  className={`relative flex items-center justify-center gap-3 rounded-2xl border px-3 py-3.5 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-[#FF4D88]/30 md:px-6 md:py-4 ${isLight ? "border-black/[0.08] bg-white group-hover:bg-zinc-50" : "border-white/5 bg-[#0F0F0F] group-hover:bg-[#151515]"}`}
-                >
-                  <social.icon 
-                    size={20} 
-                    className={`${isLight ? "text-black/55" : "text-neutral-400"} transition-colors duration-300 group-hover:text-[#FF4D88]`}
-                  />
-                  <span className={`hidden text-xs font-bold uppercase tracking-wider transition-colors md:inline ${isLight ? "text-black/60 group-hover:text-black" : "text-neutral-400 group-hover:text-white"}`}>
-                    {social.name}
-                  </span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
+                <MailIcon size={16} />
+                {status === 'sending' ? 'ENVIANDO' : 'UNIRME'}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.button>
+      </form>
+    </div>
+  );
+};
 
-        {/* === DISCLAIMER === */}
-        <div className={`border-t py-6 md:py-10 ${isLight ? "border-black/[0.07]" : "border-white/5"}`}>
-          <div className={`rounded-xl border p-5 md:p-8 ${isLight ? "border-black/[0.08] bg-zinc-50" : "border-white/5 bg-black"}`}>
-             <p className={`mx-auto max-w-4xl text-center text-xs font-medium leading-relaxed tracking-wide md:text-sm ${isLight ? "text-black/60" : "text-neutral-400"}`}>
-               All the comics on this website are only previews of the original comics. There may be many language errors, character names, and story lines. For the original version, please buy the comic if it's available in your city.
-             </p>
-          </div>
-        </div>
+/** Pie móvil (< lg): marca, redes, enlaces, boletín con el gato y políticas, sobre las montañas. */
+const MobileFooterContent = () => (
+  <div className="relative z-10 px-[25px] pb-7 pt-[235px]">
+    <Wordmark className="mx-auto block text-[28px]" />
 
-        {/* === BARRA INFERIOR === */}
-        <div className={`flex items-center justify-start border-t py-4 font-mono text-[10px] uppercase tracking-widest md:py-6 ${isLight ? "border-black/[0.07] text-black/45" : "border-white/5 text-neutral-600"}`}>
-          <a
-            href="https://chemixx7.vercel.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`group inline-flex items-center gap-1.5 no-underline transition-colors hover:no-underline ${isLight ? "hover:text-black" : "hover:text-white"}`}
-          >
-            <span>Developer:</span>
-            <span className={`font-bold transition-colors ${isLight ? "text-black" : "text-white"} group-hover:text-[#FF4D88]`}>7osemanuelmejia</span>
+    <ul className="mt-6 flex items-center justify-center gap-4">
+      {FOOTER_SOCIALS.filter((social) => social.compact).map(({ name, href, Icon, size }) => (
+        <li key={name} className="flex">
+          <a href={href} target="_blank" rel="noopener noreferrer" aria-label={name} title={name} className="flex h-8 w-8 items-center justify-center text-ink transition-opacity hover:opacity-70">
+            <Icon size={size} />
           </a>
-        </div>
+        </li>
+      ))}
+    </ul>
 
+    <ul className="mt-[35px] flex flex-col gap-[21px]">
+      {MOBILE_PAGES.map((page) => (
+        <li key={page.label}>
+          <FooterAnchor link={page} className={`${page.font} text-sm font-semibold leading-4 text-ink`} />
+        </li>
+      ))}
+    </ul>
+
+    <div className="mt-12">
+      <NewsletterForm inputId="footer-newsletter-email" />
+    </div>
+
+    <div className="-mx-3 mt-[22px] flex flex-col gap-2">
+      {MOBILE_LEGAL_ROWS.map((row, rowIndex) => (
+        <ul key={rowIndex} className="flex flex-wrap items-center justify-center gap-x-[14px] gap-y-2 whitespace-nowrap">
+          {row.map((item) => (
+            <li key={item.label}>
+              <FooterAnchor link={item} className="font-montserrat text-[8.5px] font-medium leading-none text-[color:var(--mm-legal-ink)] transition-colors hover:text-ink" />
+            </li>
+          ))}
+        </ul>
+      ))}
+    </div>
+
+    <DeveloperCredit className="mt-9 justify-center text-[7px]" />
+  </div>
+);
+
+const FooterHeading = ({ children }: { children: string }) => (
+  <h4 className="flex items-center gap-2 font-montserrat text-xs font-black uppercase tracking-[0.2em] text-ink">
+    <span aria-hidden="true" className="h-1.5 w-1.5 animate-blink rounded-full bg-mukai-pink motion-reduce:animate-none" />
+    {children}
+  </h4>
+);
+
+/** Pie de escritorio (lg+): la composición de PC (tres columnas, redes, aviso y crédito) con el estilo del móvil. */
+const DesktopFooterContent = () => (
+  <div className="relative z-10 mx-auto max-w-7xl px-8">
+    <div className="grid grid-cols-12 gap-16 pb-16 pt-24">
+      <div className="col-span-4 flex flex-col gap-6">
+        <Wordmark className="text-[32px]" />
+        <p className="max-w-sm font-montserrat text-sm font-medium leading-relaxed text-ink/80">
+          Tu plataforma de lectura digital optimizada. Disfruta de la mejor experiencia con calidad premium, velocidad warp y diseño de vanguardia.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {['Disfruta', 'Imagina'].map((tag) => (
+            <span key={tag} className="flex h-5 items-center border border-line bg-surface px-[7px] font-anta text-[10px] font-normal leading-5 text-ink">{tag}</span>
+          ))}
+        </div>
       </div>
+
+      <div className="col-span-4 grid grid-cols-2 gap-8">
+        {([['Navegación', NAVIGATION_LINKS], ['Legal', LEGAL_LINKS]] as const).map(([title, links]) => (
+          <div key={title} className="flex flex-col gap-6">
+            <FooterHeading>{title}</FooterHeading>
+            <ul className="flex flex-col gap-3">
+              {links.map((link) => (
+                <li key={link.label}>
+                  <FooterAnchor link={link} className="font-montserrat text-sm font-semibold leading-4 text-ink/80 transition-colors hover:text-mukai-pink" />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="col-span-4 flex flex-col gap-6">
+        <FooterHeading>Mantente al día</FooterHeading>
+        <p className="font-montserrat text-xs font-medium leading-relaxed text-muted">
+          Recibe las últimas actualizaciones y capítulos directamente en tu correo.
+        </p>
+        <div className="mt-14">
+          <NewsletterForm inputId="footer-newsletter-email" />
+        </div>
+      </div>
+    </div>
+
+    <ul className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 border-t border-line py-10">
+      {FOOTER_SOCIALS.map(({ name, href, Icon, size }) => (
+        <li key={name}>
+          <a href={href} target="_blank" rel="noopener noreferrer" aria-label={name} title={name} className="flex h-8 items-center gap-2.5 text-ink transition-opacity hover:opacity-70">
+            <span className="flex h-8 w-8 items-center justify-center"><Icon size={size} /></span>
+            <span className="font-montserrat text-xs font-bold uppercase tracking-wider">{name}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+
+    <div className="border-t border-line py-10">
+      <p className="mx-auto max-w-4xl rounded-[5px] border border-line bg-ink/10 px-8 py-5 text-center font-inter text-[13px] leading-[18px] text-ink/85">
+        {DISCLAIMER}
+      </p>
+    </div>
+
+    <div className="flex items-center justify-between border-t border-line py-6">
+      <DeveloperCredit className="text-[10px]" />
+      <span className="font-montserrat text-[10px] font-medium text-[color:var(--mm-legal-ink)]">© {new Date().getFullYear()} MangaMukai</span>
+    </div>
+  </div>
+);
+
+/**
+ * Pie de página de todo el sitio, con el diseño móvil (montañas rosas al fondo,
+ * marca, boletín con el gato) en ambas versiones: en móvil su composición
+ * propia y en escritorio la distribución clásica de PC.
+ */
+export const Footer = ({ className = '' }: { className?: string }) => {
+  const isMobile = useIsMobileViewport();
+  return (
+    <footer className={`relative overflow-hidden bg-surface text-ink ${className}`}>
+      <img
+        src={footerBackdrop}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover object-bottom lg:object-[center_42%]"
+      />
+      <div aria-hidden="true" className="absolute inset-0 bg-surface/[var(--mm-footer-scrim)]" />
+      {isMobile ? <MobileFooterContent /> : <DesktopFooterContent />}
     </footer>
   );
 };

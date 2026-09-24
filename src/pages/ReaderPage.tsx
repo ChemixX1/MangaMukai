@@ -344,7 +344,7 @@ export const ReaderPage = () => {
         {/* IZQUIERDA: REPRODUCTOR - ESTATICO (NO STICKY) */}
         <aside className="w-full max-w-[540px] px-4 lg:px-0 h-fit z-40 shrink-0 space-y-5">
              <nav className="flex flex-wrap items-center justify-center gap-0" aria-label="Redes sociales de MangaMukai">
-               {FOOTER_SOCIALS.map(({ name, href, icon: Icon }) => <a key={name} href={href} target="_blank" rel="noopener noreferrer" title={name} aria-label={name} className="grid h-8 w-6 sm:h-9 sm:w-7 place-items-center transition hover:text-[#FF4D88]"><Icon className="h-4 w-4 sm:h-5 sm:w-5" /></a>)}
+               {FOOTER_SOCIALS.map(({ name, href, Icon }) => <a key={name} href={href} target="_blank" rel="noopener noreferrer" title={name} aria-label={name} className="grid h-8 w-6 sm:h-9 sm:w-7 place-items-center transition hover:text-[#FF4D88]"><Icon className="h-4 w-4 sm:h-5 sm:w-5" /></a>)}
              </nav>
              <MangaMusicCard cover="" isLight={isLight} compactHeight singleLineDescription />
              <nav aria-label="Navegación del capítulo" className="mx-auto max-w-lg space-y-4">

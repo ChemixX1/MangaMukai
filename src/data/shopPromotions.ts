@@ -1,4 +1,4 @@
-import products from './shop-products.json';
+import { shopProducts as products } from './shopProducts';
 import type { ShopPromotionProps } from '../components/common/ShopPromotion';
 
 // Replace backgroundImage with the design INSIDE the panel and foregroundImage
@@ -8,7 +8,7 @@ export const shopPromotions: (Omit<ShopPromotionProps, 'onExplore'> & { id: stri
     id: 'new', category: 'Todo', tone: 'rose', foregroundType: 'character',
     eyebrow: 'RECIÉN LLEGADOS', title: 'Fuera de la viñeta', action: 'Ver novedades',
     backgroundImage: products[2].image,
-    foregroundImage: '/images/characters/gojo-full.png', foregroundAlt: 'Satoru Gojo sobresaliendo del panel',
+    foregroundImage: '/images/promotions/gojo-cutout.png', foregroundAlt: 'Satoru Gojo sobresaliendo del panel',
   },
   {
     id: 'art', category: 'Art prints', tone: 'lilac',

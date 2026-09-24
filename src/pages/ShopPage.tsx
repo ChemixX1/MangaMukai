@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ArrowDown, ArrowUpRight, Check, Flame, Minus, Plus, ShoppingBag, X } from 'lucide-react';
 import { Footer } from '../components/layout';
-import products from '../data/shop-products.json';
+import { shopProducts as products, type ShopProduct } from '../data/shopProducts';
 import { shopPromotions } from '../data/shopPromotions';
 import { ShopPromotion } from '../components/common/ShopPromotion';
 import shopBackdrop from '../assets/modals/auth-login.webp';
@@ -12,7 +12,7 @@ import { MobileShop } from '../components/shop/mobile/MobileShop';
 import '../styles/experiences.css';
 import '../styles/shop-redesign.css';
 
-type Product = typeof products[number];
+type Product = ShopProduct;
 type Review = { id: string; name: string; text: string; image: string; productId: string; demo?: boolean };
 const money = (value: number) => `$${value.toFixed(2)} USD`;
 const sampleReviews: Review[] = [

@@ -131,9 +131,6 @@ export const routeSeo = (pathname: string): RouteSeo => {
   return { section: null, description: DEFAULT_DESCRIPTION };
 };
 
-/** Compatibilidad: solo el título de la ruta. */
-export const routeTitle = (pathname: string): string | null => routeSeo(pathname).section;
-
 const upsertMeta = (attribute: 'name' | 'property', key: string, content: string) => {
   let tag = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
   if (!tag) {

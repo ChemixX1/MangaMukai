@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { BookOpenText, ChevronDown, ChevronLeft, Loader2 } from 'lucide-react';
 
-import { MobileFooter } from '../../home/mobile/MobileFooter';
+import { Footer } from '../../layout/Footer';
 import { MobileChapterList } from './MobileChapterList';
 import { MobileMangaComments } from './MobileMangaComments';
 import { MobileMukaiMusic } from './MobileMukaiMusic';
@@ -300,7 +300,7 @@ export const MobileMangaDetail = ({
       </div>
 
       <div className="mt-12">
-        <MobileFooter />
+        <Footer className="-mt-6" />
       </div>
     </div>
   );

@@ -273,15 +273,6 @@ export const recordMangaRead = async (mangaId: number | string, chapterId?: numb
   return Number(payload.mangas_read_count || 0);
 };
 
-export const searchUsers = async (query: string): Promise<FriendUser[]> => {
-  const response = await fetch(`${MANGAMUKAI_API}/social/users/search?q=${encodeURIComponent(query.trim())}`, {
-    credentials: 'include',
-    headers: authHeaders(),
-  });
-  const payload = await ensureResponse(response);
-  return payload.users || [];
-};
-
 export const getConversations = async (): Promise<{ conversations: Conversation[]; unread: number }> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/messages/conversations`, {
     credentials: 'include',

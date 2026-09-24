@@ -1,5 +1,5 @@
 import { Minus, Plus, ShoppingCart, X } from 'lucide-react';
-import products from '../../data/shop-products.json';
+import { shopProducts as products } from '../../data/shopProducts';
 import { SHOP_CART_MAX_UNITS, useShopCart } from '../../hooks/useShopCart';
 import { SlidePanel } from './SlidePanel';
 

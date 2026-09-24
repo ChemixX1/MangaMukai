@@ -194,47 +194,6 @@ export const ChapterCommentIcon = ({ size = 22, className }: IconProps) => (
   </svg>
 );
 
-/** Corazón (relleno) del capítulo. */
-export const ChapterHeartIcon = ({ size = 20, className }: IconProps) => (
-  <svg width={size} height={Math.round(size * 0.6061)} viewBox="91 0 33 20" fill="none" className={className} aria-hidden="true">
-    <path fillRule="evenodd" clipRule="evenodd" d="M107 4.31405C111.438 -0.247948 122.534 7.73505 107 18.0001C91.4658 7.73605 102.562 -0.247948 107 4.31405Z" fill="url(#paint7_linear_chapterhearticon)"/>
-    <defs>
-      <linearGradient id="paint0_linear_chapterhearticon" x1="6.98147" y1="14.5286" x2="8.84433" y2="19.0044" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FFA43D"/>
-      <stop offset="1" stopColor="#FB5937"/>
-      </linearGradient>
-      <linearGradient id="paint1_linear_chapterhearticon" x1="16.4472" y1="16.4264" x2="10.9029" y2="7.35571" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FF8A69"/>
-      <stop offset="1" stopColor="#FFCD0F"/>
-      </linearGradient>
-      <linearGradient id="paint2_linear_chapterhearticon" x1="4.83859" y1="10.6008" x2="6.70145" y2="15.0758" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FFA43D"/>
-      <stop offset="1" stopColor="#FB5937"/>
-      </linearGradient>
-      <linearGradient id="paint3_linear_chapterhearticon" x1="14.3043" y1="12.1408" x2="8.76002" y2="3.07007" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FF8A69"/>
-      <stop offset="1" stopColor="#FFCD0F"/>
-      </linearGradient>
-      <linearGradient id="paint4_linear_chapterhearticon" x1="7.69571" y1="5.60077" x2="9.55856" y2="10.0758" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FFA43D"/>
-      <stop offset="1" stopColor="#FB5937"/>
-      </linearGradient>
-      <linearGradient id="paint5_linear_chapterhearticon" x1="17.1614" y1="7.8543" x2="11.6171" y2="-1.2157" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FF8A69"/>
-      <stop offset="1" stopColor="#FFCD0F"/>
-      </linearGradient>
-      <linearGradient id="paint6_linear_chapterhearticon" x1="65.5" y1="105.375" x2="65.5" y2="118.042" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FF008C"/>
-      <stop offset="1" stopColor="#B000AD"/>
-      </linearGradient>
-      <linearGradient id="paint7_linear_chapterhearticon" x1="107" y1="3" x2="107" y2="18.0001" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#FF008C"/>
-      <stop offset="1" stopColor="#B000AD"/>
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
 /** Icono de "Mostrar Todos". */
 export const ShowAllIcon = ({ size = 21, className }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 21 21" fill="none" className={className} aria-hidden="true">

@@ -74,12 +74,6 @@ export const toggleBookmarkWithTotal = async (mangaId: string): Promise<ToggleIn
   return null;
 };
 
-/** Compatibilidad con las vistas que solo necesitan saber si se agregó o retiró. */
-export const toggleBookmark = async (mangaId: string): Promise<'added' | 'removed' | null> => {
-  const result = await toggleBookmarkWithTotal(mangaId);
-  return result?.action ?? null;
-};
-
 /** Alterna el like del usuario autenticado y devuelve el total actualizado. */
 export const toggleMangaLike = async (mangaId: string): Promise<ToggleInteractionResult | null> => {
   const token = getStoredToken();
@@ -104,19 +98,4 @@ export const toggleMangaLike = async (mangaId: string): Promise<ToggleInteractio
     }
   } catch { /* silent */ }
   return null;
-};
-
-/** Registra un compartido y devuelve el total actualizado. */
-export const trackMangaShare = async (mangaId: string): Promise<number | null> => {
-  try {
-    const res = await fetch(`${WP_AUTH}/share`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ manga_id: mangaId }).toString(),
-    });
-    const data = await res.json();
-    return data.success ? Number(data.total_shares ?? 0) : null;
-  } catch {
-    return null;
-  }
 };

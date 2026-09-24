@@ -1,8 +1,8 @@
 import { useId, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 
+import { ACCENT_HEX, type Accent } from './accent';
 import { ChevronIcon } from './icons';
-import { ACCENT_HEX, type MobileAccent } from './shared';
 
 const HEIGHT = 48;
 const TIP = 16;
@@ -62,7 +62,7 @@ const Segment = ({ children, shape, disabled = false, accentHex, gradientId, lab
   return (
     <motion.button
       type="button"
-      className="mh-pagination-segment"
+      className="tap-transparent relative grid h-12 flex-none cursor-pointer place-items-center border-0 bg-transparent p-0 text-ink disabled:cursor-default disabled:opacity-45 data-[center=true]:z-[2] data-[center=true]:disabled:opacity-70 [&+&]:-ml-[9px] [&>span]:relative [&>span]:z-[1] [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:left-0 [&>svg]:top-0 [&>svg]:overflow-visible"
       data-center={isCenter}
       disabled={disabled}
       onClick={onClick}
@@ -76,9 +76,9 @@ const Segment = ({ children, shape, disabled = false, accentHex, gradientId, lab
           a la vez que el ancho del botón, sin deformarse. */}
       <svg viewBox={`0 0 ${CENTER_OPEN_WIDTH} ${HEIGHT}`} width={CENTER_OPEN_WIDTH} height={HEIGHT} aria-hidden="true">
         <motion.path
-          className="mh-pagination-shape"
+          className="[transition:stroke_0.3s_ease,stroke-width_0.3s_ease]"
           fill={`url(#${gradientId})`}
-          stroke={active ? accentHex : 'var(--mh-pagination-edge)'}
+          stroke={active ? accentHex : 'var(--mm-pagination-edge)'}
           strokeWidth={active ? 2 : 1}
           strokeLinejoin="round"
           initial={false}
@@ -93,24 +93,25 @@ const Segment = ({ children, shape, disabled = false, accentHex, gradientId, lab
 
 const SLOT_SHAPES: Shape[] = ['arrowLeft', 'hexagon', 'arrowRight'];
 
-interface MobilePaginationProps {
+interface ArrowPaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  accent: MobileAccent;
+  accent: Accent;
   /** Bloque al que se vuelve al cambiar de página. */
   scrollTargetId: string;
+  className?: string;
 }
 
 /**
  * Paginación del diseño: siempre cinco tramos encadenados (atrás · 1 · 2 · 3 ·
  * siguiente) con los extremos redondeados. La página seleccionada lleva el
- * borde del color de la sección y el número en blanco negrita; el hexágono
- * central va pequeño y se abre cuando su página es la seleccionada.
- * Con una sola página se muestra igual, todo bloqueado.
+ * borde del color de la sección y el número en negrita; el hexágono central va
+ * pequeño y se abre cuando su página es la seleccionada. Con una sola página se
+ * muestra igual, todo bloqueado.
  */
-export const MobilePagination = ({ currentPage, totalPages, onPageChange, accent, scrollTargetId }: MobilePaginationProps) => {
-  const gradientId = `mh-pg-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent, scrollTargetId, className = '' }: ArrowPaginationProps) => {
+  const gradientId = `pagination-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const accentHex = ACCENT_HEX[accent];
   const pageCount = Math.max(1, totalPages);
 
@@ -128,13 +129,13 @@ export const MobilePagination = ({ currentPage, totalPages, onPageChange, accent
   };
 
   return (
-    <nav className="mh-pagination mx-auto flex h-24 w-80 max-w-full items-center justify-center" aria-label="Paginación">
+    <nav className={`mx-auto flex h-24 w-80 max-w-full items-center justify-center ${className}`} aria-label="Paginación">
       <svg width="0" height="0" aria-hidden="true" className="absolute">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="var(--mh-pagination-start)" />
-            <stop offset="0.48" stopColor="var(--mh-pagination-middle)" />
-            <stop offset="1" stopColor="var(--mh-pagination-start)" />
+            <stop stopColor="var(--mm-pagination-start)" />
+            <stop offset="0.48" stopColor="var(--mm-pagination-middle)" />
+            <stop offset="1" stopColor="var(--mm-pagination-start)" />
           </linearGradient>
         </defs>
       </svg>
@@ -160,7 +161,7 @@ export const MobilePagination = ({ currentPage, totalPages, onPageChange, accent
             {/* El número entra con un pequeño rebote al cambiar de página. */}
             <motion.span
               key={`${page}-${active}`}
-              className={`mh-font-montserrat block text-base leading-none mh-text ${active ? 'font-extrabold' : 'font-semibold'}`}
+              className={`block font-montserrat text-base leading-none text-ink ${active ? 'font-extrabold' : 'font-semibold'}`}
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 420, damping: 22 }}

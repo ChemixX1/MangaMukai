@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowRight, Check, Flame, Plus, ShoppingBag, Sparkles, X } from 'lucide-react';
 
-import products from '../../../data/shop-products.json';
+import { shopProducts as products, type ShopProduct } from '../../../data/shopProducts';
 import { SHOP_CART_MAX_UNITS, useShopCart } from '../../../hooks/useShopCart';
-import { MobileFooter } from '../../home/mobile/MobileFooter';
+import { Footer } from '../../layout/Footer';
 import '../../home/mobile/mobile-home.css';
 import './mobile-shop.css';
 
-type Product = (typeof products)[number];
+type Product = ShopProduct;
 type Category = 'Todo' | 'Manga' | 'Art prints' | 'Colecciones' | 'Sale';
 
 const categories: { id: Category; label: string }[] = [
@@ -179,7 +179,7 @@ export const MobileShop = () => {
         </aside>
       </main>
 
-      <MobileFooter />
+      <Footer className="-mt-6" />
 
       <dialog ref={productDialog} className="ms-product-dialog" onClick={(event) => { if (event.target === productDialog.current) productDialog.current?.close(); }}>
         {selected && (

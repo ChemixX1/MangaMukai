@@ -15,12 +15,12 @@ interface OutlinedNameProps {
  * doble de grosor y una máscara recorta la mitad que cae dentro del glifo.
  */
 export const OutlinedName = ({ id, text, color, opacity, fontSize = 24, className = '' }: OutlinedNameProps) => {
-  const maskId = `mcc-name-${id}`;
+  const maskId = `outlined-name-${id}`;
   const label = text.toUpperCase();
   const height = Math.round(fontSize * 1.2);
   const baseline = Math.round(fontSize * 0.96);
   return (
-    <svg aria-hidden="true" className={`mcc-font-russo w-full overflow-visible ${className}`} style={{ height, fontSize }}>
+    <svg aria-hidden="true" className={`w-full overflow-visible font-russo font-normal ${className}`} style={{ height, fontSize }}>
       <defs>
         <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
           <rect x="0" y="0" width="100%" height="100%" fill="#fff" />

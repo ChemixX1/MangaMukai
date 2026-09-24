@@ -621,7 +621,7 @@ export default function News({ variant = "default" }: NewsProps) {
 
       {/* MODAL DE AGRADECIMIENTO */}
       {showSuccessModal && createPortal(
-        <div className="fixed inset-0 z-[450] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/85 p-3 backdrop-blur-md animate-in fade-in duration-200 sm:p-6">
+        <div className="fixed inset-0 z-[450] flex items-center justify-center overflow-y-auto overscroll-contain bg-black/85 p-3 backdrop-blur-md animate-fade-in sm:p-6">
           <button
             type="button"
             tabIndex={-1}

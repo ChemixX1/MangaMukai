@@ -1,18 +1,56 @@
-/* 1. Las importaciones siempre van primero */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap');
-
-/* 2. Directivas de Tailwind */
+/* Directivas de Tailwind (tokens del sistema de diseño en tailwind.config.js). */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 3. Variables globales */
+/* Tema: superficies y tinta de las utilidades `bg-surface`, `text-ink`,
+   `bg-panel`, `bg-media`, `text-muted` y `border-line`. Claro por defecto;
+   oscuro con `dark` en <html> o `theme-dark` en una sección que siempre va en
+   oscuro (la ficha de manga móvil). */
 :root {
-  --font-sans: 'Inter', sans-serif;
-  --font-serif: 'Playfair Display', serif;
+  --mm-surface: 255 255 255;
+  --mm-ink: 0 0 0;
+  --mm-panel: 240 240 240;
+  --mm-media: 237 237 237;
+  --mm-muted-alpha: 0.6;
+  --mm-line-alpha: 0.4;
+  --mm-tab-line: rgba(41, 37, 36, 0.65);
+  --mm-rank-silver: #4b5563;
+  --mm-pagination-edge: rgba(0, 0, 0, 0.14);
+  --mm-pagination-start: #ebebeb;
+  --mm-pagination-middle: #f5f5f5;
+  --mm-inverse-card: #151515;
+  --mm-inverse-line: #333;
+  --mm-legal-ink: #52525b;
+  --mm-hero-cover-line: rgba(0, 0, 0, 0.3);
+  --mm-footer-scrim: 0.72;
+  --mm-telegram-plane: #000;
 }
 
-/* 4. Estilos del cuerpo y reseteos */
+.dark,
+.theme-dark {
+  --mm-surface: 0 0 0;
+  --mm-ink: 255 255 255;
+  --mm-panel: 38 38 38;
+  --mm-media: 26 26 26;
+  --mm-muted-alpha: 0.5;
+  --mm-line-alpha: 0.7;
+  --mm-tab-line: rgba(214, 211, 209, 0.75);
+  --mm-rank-silver: #d6d3d1;
+  --mm-pagination-edge: rgba(255, 255, 255, 0.12);
+  --mm-pagination-start: #242424;
+  --mm-pagination-middle: #262626;
+  --mm-inverse-card: #fcfcfc;
+  --mm-inverse-line: #e8e8e8;
+  --mm-legal-ink: rgba(161, 161, 170, 0.9);
+  --mm-hero-cover-line: #fff;
+  --mm-footer-scrim: 0.6;
+  --mm-telegram-plane: #fff;
+}
+
+.theme-dark { color-scheme: dark; }
+
+/* Estilos del cuerpo y reseteos */
 body {
   @apply bg-black text-white antialiased;
   margin: 0;
@@ -639,7 +677,7 @@ html {
    lector, la conversación con un personaje y su ficha previa no la muestran,
    así que no lo necesitan. */
 @media (max-width: 1023px) {
-  .mobile-tabbar-space:not(:has(.reader-page, .conversation-page, .mcc-intro)) {
+  .mobile-tabbar-space:not(:has(.reader-page, .conversation-page, .character-intro-page)) {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }

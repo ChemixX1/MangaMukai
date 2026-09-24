@@ -1,15 +1,14 @@
 import { useMemo } from 'react';
 
 import { useHomeData } from '../../../context/HomeDataContext';
+import { uniqueBySeries } from '../../../utils/mangaFormat';
 import { buildViewsIndex, withKnownViews } from '../../../utils/seriesViews';
 import { filterYouthMen } from '../../../utils/youthFilter';
-import { MobileFooter } from './MobileFooter';
+import { Footer } from '../../layout/Footer';
 import { MobileHero, toHeroItems } from './MobileHero';
 import { MobileLatest } from './MobileLatest';
 import { MobileRecruitBanner } from './MobileRecruitBanner';
 import { MobileTrending } from './MobileTrending';
-import { uniqueBySeries } from './shared';
-import './mobile-home.css';
 
 const HERO_SIZE = 8;
 
@@ -32,7 +31,7 @@ export const MobileHome = () => {
   }, [popularMenHistorical, popularMenWeekly, latestMen]);
 
   return (
-    <div className="mh-root" data-ready={isReady}>
+    <div className="focus-scope tap-transparent overflow-x-hidden bg-surface text-ink" data-ready={isReady}>
       <h1 className="sr-only">Leer manga online gratis en español</h1>
 
       <MobileHero items={womenHero} accent="pink" label="Mangas destacados" />
@@ -45,7 +44,7 @@ export const MobileHome = () => {
       <MobileTrending audience="men" accent="cyan" />
       <MobileLatest audience="men" accent="cyan" />
 
-      <MobileFooter />
+      <Footer className="-mt-6" />
     </div>
   );
 };
