@@ -11,10 +11,11 @@ const CLOSE_DURATION = 420;
  * dentro se navega a otra página, se cierra sola. El contenido solo se monta
  * mientras está abierta (o saliendo), para no dejarlo vivo.
  */
-export const SlidePanel = ({ open, from, size = 'full', isLight, label, onClose, children }: {
+export const SlidePanel = ({ open, from, size = 'full', scrollable = true, isLight, label, onClose, children }: {
   open: boolean;
   from: 'left' | 'right';
   size?: 'full' | 'half';
+  scrollable?: boolean;
   isLight: boolean;
   label: string;
   onClose: () => void;
@@ -62,7 +63,7 @@ export const SlidePanel = ({ open, from, size = 'full', isLight, label, onClose,
         aria-modal="true"
         aria-label={label}
         aria-hidden={!open}
-        className={`fixed ${frame} z-[120] flex flex-col overflow-y-auto overscroll-contain will-change-transform transition-transform duration-[400ms] ease-[cubic-bezier(.22,.9,.3,1)] ${shadow} ${isLight ? 'bg-white text-black' : 'bg-black text-white'} ${open ? 'translate-x-0' : `pointer-events-none ${hidden}`}`}
+        className={`fixed ${frame} z-[120] flex flex-col ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'} overscroll-contain will-change-transform transition-transform duration-[400ms] ease-[cubic-bezier(.22,.9,.3,1)] ${shadow} ${isLight ? 'bg-white text-black' : 'bg-black text-white'} ${open ? 'translate-x-0' : `pointer-events-none ${hidden}`}`}
       >
         {rendered && children}
       </div>

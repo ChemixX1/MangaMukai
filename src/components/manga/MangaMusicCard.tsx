@@ -4,7 +4,6 @@ import {
   Heart,
   ListMusic,
   Loader2,
-  Lock,
   MoreHorizontal,
   Music,
   Pause,
@@ -24,13 +23,13 @@ import {
   togglePlay,
   useMusicPlayer,
 } from '../../services/musicPlayer';
+import { MukaiMusicPromo } from './MukaiMusicPromo';
 import { openSubscriptionModal } from '../../utils/subscriptionModal';
 
 interface MangaMusicCardProps {
   cover: string;
   compactHeight?: boolean;
   isLight?: boolean;
-  singleLineDescription?: boolean;
 }
 
 const formatTime = (time: number) => {
@@ -40,7 +39,7 @@ const formatTime = (time: number) => {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
-export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false, singleLineDescription = false }: MangaMusicCardProps) => {
+export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }: MangaMusicCardProps) => {
   // Estado compartido: la misma lista y el mismo audio en la ficha y en el lector.
   const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, likedIds } = useMusicPlayer();
   const [showPlaylist, setShowPlaylist] = useState(false);
@@ -68,27 +67,25 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false, 
     setShowPlaylist(false);
   };
 
-  return (
-    <aside className={`manga-music-card group relative isolate flex w-full flex-col overflow-hidden rounded-[24px] border shadow-none ${isLocked ? 'is-locked' : ''} ${compactHeight ? 'h-[215px] lg:h-[235px]' : 'h-[220px] lg:h-[250px]'} ${isLight ? 'bg-white text-black' : 'bg-[#0a0a0d] text-white'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
-      {isLocked && (
-        <div className={`manga-music-lock-overlay absolute inset-0 z-50 flex flex-col items-center justify-center ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`}>
-          <div className="flex flex-col items-center p-6 text-center">
-            <div className="relative mb-3">
-              <div className="absolute inset-0 rounded-full bg-[#FF4D88] opacity-20 blur-xl" />
-              <div className={`relative z-10 rounded-full border p-3 ${isLight ? 'border-black/10 bg-zinc-100 text-zinc-600' : 'border-white/10 bg-zinc-900 text-zinc-400'}`}><Lock size={20} /></div>
-            </div>
-            <h3 className={`mb-1 text-lg font-black uppercase italic tracking-tighter ${isLight ? 'text-black' : 'text-white'}`}>Mukai <span className="text-[#FF4D88]">Music</span></h3>
-            <p className={`mb-4 font-medium leading-relaxed ${singleLineDescription ? 'whitespace-nowrap text-[9px] sm:text-[11px]' : 'max-w-[230px] text-[10px]'} ${isLight ? 'text-zinc-600' : 'text-zinc-400'}`}>Desbloquea los Soundtracks y escucha música mientras lees.</p>
-            <button type="button" onClick={openSubscriptionModal} className={`manga-detail-ui-label group relative flex items-center gap-2 rounded-full px-6 py-2 text-[10px] uppercase transition-all hover:bg-[#FF4D88] hover:text-white hover:shadow-[0_0_20px_rgba(255,77,136,0.4)] ${isLight ? 'bg-black text-white shadow-[0_0_15px_rgba(0,0,0,0.12)]' : 'bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.1)]'}`}>Desbloquear</button>
-          </div>
-        </div>
-      )}
+  const heightClass = compactHeight ? 'h-[215px] lg:h-[235px]' : 'h-[220px] lg:h-[250px]';
 
+  // Sin acceso a la música, solo el cartel de Mukai Music (como en móvil): el
+  // reproductor ni se monta, así no se ve ni se puede enfocar por detrás.
+  if (isLocked) {
+    return (
+      <aside aria-label="Mukai Music" className={`w-full shrink-0 overflow-hidden rounded-2xl border border-white/50 ${heightClass}`}>
+        <MukaiMusicPromo onUnlock={openSubscriptionModal} />
+      </aside>
+    );
+  }
+
+  return (
+    <aside className={`group relative isolate flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border shadow-none ${heightClass} ${isLight ? 'bg-white text-black' : 'bg-[#0a0a0d] text-white'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
       {loading && <div className={`absolute inset-0 z-50 flex items-center justify-center ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`}><Loader2 size={22} className={`animate-spin ${isLight ? 'text-black/50' : 'text-white/50'}`} /></div>}
 
       {/* Fondo sólido: el degradado con transparencia dejaba ver el fondo de la
           página durante el cambio de tema. */}
-      <div aria-hidden="true" className={`absolute -inset-px z-0 rounded-[24px] ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`} />
+      <div aria-hidden="true" className={`absolute -inset-px z-0 rounded-2xl ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`} />
 
       <div className="z-20 flex items-center justify-between px-5 pt-4">
         <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-black/45' : 'text-white/40'}`}>Now Playing</span>

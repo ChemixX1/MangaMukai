@@ -1,0 +1,57 @@
+/* theme: estilos compartidos entre tamaños de pantalla. */
+
+:root {
+  --mm-surface: 255 255 255;
+  --mm-ink: 0 0 0;
+  --mm-panel: 240 240 240;
+  --mm-media: 237 237 237;
+  --mm-muted-alpha: 0.6;
+  --mm-line-alpha: 0.4;
+  --mm-tab-line: rgba(41, 37, 36, 0.65);
+  --mm-rank-silver: #4b5563;
+  --mm-pagination-edge: rgba(0, 0, 0, 0.14);
+  --mm-pagination-start: #ebebeb;
+  --mm-pagination-middle: #f5f5f5;
+  --mm-inverse-card: #151515;
+  --mm-inverse-line: #333;
+  --mm-legal-ink: #52525b;
+  --mm-footer-scrim: 0.72;
+  --mm-telegram-plane: #000;
+  --mm-accent-pink: #db2777;
+  --mm-accent-cyan: #22d3ee;
+  --mm-type-manhwa: #7c3aed;
+  --mm-type-manhua: #a21caf;
+  --mm-type-novel: #2563eb;
+  --mm-free: #22e05a;
+  /* Diseño de PC: tarjetas de Telegram y Discord y línea de la cabecera. */
+  --mm-pc-card: #fcfcfc;
+  --mm-pc-card-line: #e8e8e8;
+  --mm-pc-nav-line: #beb7b7;
+}
+
+.dark,
+.theme-dark {
+  --mm-surface: 0 0 0;
+  --mm-ink: 255 255 255;
+  --mm-panel: 38 38 38;
+  --mm-media: 26 26 26;
+  --mm-muted-alpha: 0.5;
+  --mm-line-alpha: 0.7;
+  --mm-tab-line: rgba(214, 211, 209, 0.75);
+  --mm-rank-silver: #d6d3d1;
+  --mm-pagination-edge: rgba(255, 255, 255, 0.12);
+  --mm-pagination-start: #242424;
+  --mm-pagination-middle: #262626;
+  --mm-inverse-card: #fcfcfc;
+  --mm-inverse-line: #e8e8e8;
+  --mm-legal-ink: rgba(161, 161, 170, 0.9);
+  --mm-footer-scrim: 0.6;
+  --mm-telegram-plane: #fff;
+  --mm-pc-card: #151515;
+  --mm-pc-card-line: #333;
+  --mm-pc-nav-line: rgba(255, 255, 255, 0.1);
+}
+
+.theme-dark {
+  color-scheme: dark;
+}

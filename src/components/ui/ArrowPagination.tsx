@@ -1,15 +1,23 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 
-import { ACCENT_HEX, type Accent } from './accent';
+import { ACCENT_COLOR, type Accent } from './accent';
 import { ChevronIcon } from './icons';
 
-const HEIGHT = 48;
-const TIP = 16;
-const CAP_RADIUS = HEIGHT / 2;
-const SEGMENT_WIDTH = 64;
-/** El hexágono central se abre hasta este ancho cuando su página es la seleccionada. */
-const CENTER_OPEN_WIDTH = 96;
+/**
+ * Medidas de la cadena. `md` es la del diseño móvil (colecciones); `lg`, la de
+ * la portada de PC: tramos de 109 px a 64 px de alto con el central abierto a
+ * 160 px, las flechas corridas hacia fuera y los números un poco a la
+ * izquierda del centro de su tramo, como en el diseño.
+ */
+const GEOMETRY = {
+  md: { height: 48, tip: 16, segmentWidth: 64, centerOpenWidth: 96, overlap: 9, chevronSize: 22, chevronStroke: 3, chevronShift: 0, numberShift: 0, activeStroke: 2, navClass: 'h-24 w-80', numberClass: 'text-base' },
+  lg: { height: 64, tip: 26.5, segmentWidth: 109.35, centerOpenWidth: 160.08, overlap: 21.05, chevronSize: 38, chevronStroke: 1.6, chevronShift: 7.5, numberShift: -3.3, activeStroke: 1, navClass: 'h-[131px] w-[513px]', numberClass: 'text-base' },
+} as const;
+
+type PaginationSize = keyof typeof GEOMETRY;
+type Geometry = (typeof GEOMETRY)[PaginationSize];
+
 const OPEN_TRANSITION = { type: 'spring', stiffness: 260, damping: 26 } as const;
 
 /**
@@ -23,12 +31,12 @@ const OPEN_TRANSITION = { type: 'spring', stiffness: 260, damping: 26 } as const
  */
 type Shape = 'capLeft' | 'arrowLeft' | 'hexagon' | 'arrowRight' | 'capRight';
 
-const segmentPath = (width: number, shape: Shape) => {
+const segmentPath = (width: number, shape: Shape, geometry: Geometry) => {
   const w = width;
-  const h = HEIGHT;
+  const h = geometry.height;
   const m = h / 2;
-  const t = TIP;
-  const r = CAP_RADIUS;
+  const t = geometry.tip;
+  const r = h / 2;
   switch (shape) {
     case 'capLeft':
       return `M${r},0 H${w} L${w - t},${m} L${w},${h} H${r} A${r},${r} 0 0 1 ${r},0 Z`;
@@ -46,8 +54,9 @@ const segmentPath = (width: number, shape: Shape) => {
 interface SegmentProps {
   children: ReactNode;
   shape: Shape;
+  geometry: Geometry;
   disabled?: boolean;
-  accentHex: string;
+  accentColor: string;
   gradientId: string;
   label: string;
   /** Página seleccionada: borde del color de la sección (y el hexágono se abre). */
@@ -55,14 +64,15 @@ interface SegmentProps {
   onClick: () => void;
 }
 
-const Segment = ({ children, shape, disabled = false, accentHex, gradientId, label, active = false, onClick }: SegmentProps) => {
+const Segment = ({ children, shape, geometry, disabled = false, accentColor, gradientId, label, active = false, onClick }: SegmentProps) => {
   const isCenter = shape === 'hexagon';
-  const width = isCenter && active ? CENTER_OPEN_WIDTH : SEGMENT_WIDTH;
-  const d = segmentPath(width, shape);
+  const width = isCenter && active ? geometry.centerOpenWidth : geometry.segmentWidth;
+  const d = segmentPath(width, shape, geometry);
   return (
     <motion.button
       type="button"
-      className="tap-transparent relative grid h-12 flex-none cursor-pointer place-items-center border-0 bg-transparent p-0 text-ink disabled:cursor-default disabled:opacity-45 data-[center=true]:z-[2] data-[center=true]:disabled:opacity-70 [&+&]:-ml-[9px] [&>span]:relative [&>span]:z-[1] [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:left-0 [&>svg]:top-0 [&>svg]:overflow-visible"
+      className="tap-transparent relative grid flex-none cursor-pointer place-items-center border-0 bg-transparent p-0 text-ink disabled:cursor-default disabled:opacity-45 data-[center=true]:z-[2] data-[center=true]:disabled:opacity-70 [&>span]:relative [&>span]:z-[1] [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:left-0 [&>svg]:top-0 [&>svg]:overflow-visible"
+      style={{ height: geometry.height }}
       data-center={isCenter}
       disabled={disabled}
       onClick={onClick}
@@ -74,12 +84,12 @@ const Segment = ({ children, shape, disabled = false, accentHex, gradientId, lab
     >
       {/* Lienzo fijo del ancho máximo: la silueta se dibuja en píxeles y se anima
           a la vez que el ancho del botón, sin deformarse. */}
-      <svg viewBox={`0 0 ${CENTER_OPEN_WIDTH} ${HEIGHT}`} width={CENTER_OPEN_WIDTH} height={HEIGHT} aria-hidden="true">
+      <svg viewBox={`0 0 ${geometry.centerOpenWidth} ${geometry.height}`} width={geometry.centerOpenWidth} height={geometry.height} aria-hidden="true">
         <motion.path
           className="[transition:stroke_0.3s_ease,stroke-width_0.3s_ease]"
           fill={`url(#${gradientId})`}
-          stroke={active ? accentHex : 'var(--mm-pagination-edge)'}
-          strokeWidth={active ? 2 : 1}
+          stroke={active ? accentColor : 'var(--mm-pagination-edge)'}
+          strokeWidth={active ? geometry.activeStroke : 1}
           strokeLinejoin="round"
           initial={false}
           animate={{ d }}
@@ -100,6 +110,8 @@ interface ArrowPaginationProps {
   accent: Accent;
   /** Bloque al que se vuelve al cambiar de página. */
   scrollTargetId: string;
+  /** `md`: la del diseño móvil (por defecto); `lg`: la de la portada de PC. */
+  size?: PaginationSize;
   className?: string;
 }
 
@@ -110,9 +122,10 @@ interface ArrowPaginationProps {
  * pequeño y se abre cuando su página es la seleccionada. Con una sola página se
  * muestra igual, todo bloqueado.
  */
-export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent, scrollTargetId, className = '' }: ArrowPaginationProps) => {
+export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent, scrollTargetId, size = 'md', className = '' }: ArrowPaginationProps) => {
   const gradientId = `pagination-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  const accentHex = ACCENT_HEX[accent];
+  const accentColor = ACCENT_COLOR[accent];
+  const geometry = GEOMETRY[size];
   const pageCount = Math.max(1, totalPages);
 
   // Ventana fija de tres huecos alrededor de la actual (1-2-3, 4-5-6, …); los
@@ -129,7 +142,7 @@ export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent,
   };
 
   return (
-    <nav className={`mx-auto flex h-24 w-80 max-w-full items-center justify-center ${className}`} aria-label="Paginación">
+    <nav className={`mx-auto flex max-w-full items-center justify-center [&>button+button]:ml-[calc(var(--pagination-overlap)*-1)] ${geometry.navClass} ${className}`} style={{ '--pagination-overlap': `${geometry.overlap}px` } as CSSProperties} aria-label="Paginación">
       <svg width="0" height="0" aria-hidden="true" className="absolute">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -140,8 +153,8 @@ export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent,
         </defs>
       </svg>
 
-      <Segment shape="capLeft" accentHex={accentHex} gradientId={gradientId} label="Página anterior" disabled={currentPage <= 1} onClick={() => selectPage(currentPage - 1)}>
-        <ChevronIcon size={22} />
+      <Segment shape="capLeft" geometry={geometry} accentColor={accentColor} gradientId={gradientId} label="Página anterior" disabled={currentPage <= 1} onClick={() => selectPage(currentPage - 1)}>
+        <span className="block" style={{ translate: `${-geometry.chevronShift}px 0` }}><ChevronIcon size={geometry.chevronSize} strokeWidth={geometry.chevronStroke} className="block" /></span>
       </Segment>
 
       {slots.map((page, index) => {
@@ -151,7 +164,8 @@ export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent,
           <Segment
             key={page}
             shape={SLOT_SHAPES[index]}
-            accentHex={accentHex}
+            geometry={geometry}
+            accentColor={accentColor}
             gradientId={gradientId}
             label={exists ? `Página ${page}` : 'Sin más páginas'}
             disabled={!exists}
@@ -161,7 +175,8 @@ export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent,
             {/* El número entra con un pequeño rebote al cambiar de página. */}
             <motion.span
               key={`${page}-${active}`}
-              className={`block font-montserrat text-base leading-none text-ink ${active ? 'font-extrabold' : 'font-semibold'}`}
+              className={`block font-montserrat leading-none text-ink ${geometry.numberClass} ${active ? 'font-extrabold' : 'font-semibold'}`}
+              style={{ translate: `${geometry.numberShift}px 0` }}
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 420, damping: 22 }}
@@ -172,8 +187,8 @@ export const ArrowPagination = ({ currentPage, totalPages, onPageChange, accent,
         );
       })}
 
-      <Segment shape="capRight" accentHex={accentHex} gradientId={gradientId} label="Página siguiente" disabled={currentPage >= pageCount} onClick={() => selectPage(currentPage + 1)}>
-        <ChevronIcon size={22} className="rotate-180" />
+      <Segment shape="capRight" geometry={geometry} accentColor={accentColor} gradientId={gradientId} label="Página siguiente" disabled={currentPage >= pageCount} onClick={() => selectPage(currentPage + 1)}>
+        <span className="block" style={{ translate: `${geometry.chevronShift}px 0` }}><ChevronIcon size={geometry.chevronSize} strokeWidth={geometry.chevronStroke} className="block rotate-180" /></span>
       </Segment>
     </nav>
   );

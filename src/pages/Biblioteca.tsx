@@ -1,51 +1,21 @@
 import { useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Eye } from "lucide-react";
+import { SearchEyeIcon } from "../components/layout/SearchIcons";
+import { searchGenres } from "../config/searchAppearance";
+import "../styles/search.css";
 import { useTheme } from "../hooks/useTheme";
 import { setSearchTerm, useSearchFilter, useSearchTerm, type SearchFilter } from "../hooks/useSearchTerm";
-import { getPopularMenByViews, getPopularWomenByViews, getUltimosCapitulos } from "../services/mangaService";
-import { buildViewsIndex, displayViews, withKnownViews } from "../utils/seriesViews";
+import { getCachedSearchCatalog, loadSearchCatalog } from "../services/searchCatalog";
+import { displayViews } from "../utils/seriesViews";
 import { toTitleCase } from "../utils/titleCase";
 import { hasBlackWhiteTag, hasHotTag } from "../utils/womenBlackWhite";
 import type { MangaCapitulo } from "../types/manga";
 
 const RESULTS_PAGE_SIZE = 30;
-const TOP_SEARCHED_COUNT = 5;
+const TOP_SEARCHED_COUNT = 4;
 /* "Nuevos lanzamientos": uno grande y tres debajo. */
 const NEW_RELEASES_COUNT = 4;
 const DAY_MS = 86_400_000;
-
-/* Tintes de las tarjetas de género, en el orden en que se pintan (rosa, azul, índigo, naranja, rosa, lila). */
-const GENRE_TILE_COLORS = ["#f26f9d", "#5d9be6", "#7c8fe8", "#f0885e", "#f27fa6", "#a97fe0"];
-
-/* Etiquetas del catálogo que no son géneros: público, edad, formato o series concretas. */
-const NON_GENRE_TAGS = new Set(["Mujer", "Hombre", "HOT", "PRE", "Hentai", "Anime", "B/N", "Manga", "Manhwa", "Manhua", "Comic", "Manga para Adultos"]);
-const isGenreTag = (tag: string) => !NON_GENRE_TAGS.has(tag) && !/^\+\d+$/.test(tag) && !/^Manga\s/i.test(tag);
-
-interface GenreTile {
-  genre: string;
-  cover: string;
-  color: string;
-}
-
-/** Los géneros con más títulos, cada uno con la portada de un manga distinto que lo tenga. */
-const buildGenreTiles = (catalog: MangaCapitulo[], limit = 6): GenreTile[] => {
-  const counts = new Map<string, number>();
-  catalog.forEach((manga) => (manga.genres || []).forEach((genre) => {
-    if (isGenreTag(genre)) counts.set(genre, (counts.get(genre) || 0) + 1);
-  }));
-
-  const usedCovers = new Set<string>();
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
-    .slice(0, limit)
-    .map(([genre], index) => {
-      const withGenre = catalog.filter((manga) => manga.portada && (manga.genres || []).includes(genre));
-      const manga = withGenre.find((candidate) => !usedCovers.has(candidate.portada)) || withGenre[0];
-      if (manga) usedCovers.add(manga.portada);
-      return { genre, cover: manga?.portada || "", color: GENRE_TILE_COLORS[index % GENRE_TILE_COLORS.length] };
-    });
-};
 
 const normalizeSearchValue = (value: string) => value
   .normalize("NFD")
@@ -103,7 +73,7 @@ const releaseTime = (manga: MangaCapitulo) => {
 
 /**
  * Biblioteca (móvil primero): el campo de búsqueda vive en el navbar; aquí van
- * los cinco más buscados, las tarjetas por género, los últimos lanzamientos y,
+ * los cuatro más buscados, las tarjetas por género, los últimos lanzamientos y,
  * al escribir, los resultados sobre el catálogo. Con `embedded` se pinta dentro
  * de la ventana del buscador (SearchOverlay), que ya trae el campo y las pestañas.
  */
@@ -115,8 +85,8 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   const searchFilter = useSearchFilter();
   const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  const [allCatalog, setAllCatalog] = useState<MangaCapitulo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allCatalog, setAllCatalog] = useState<MangaCapitulo[]>(() => getCachedSearchCatalog() ?? []);
+  const [loading, setLoading] = useState(() => getCachedSearchCatalog() === null);
   const [visibleResults, setVisibleResults] = useState(RESULTS_PAGE_SIZE);
 
   // ?buscar= permite compartir una búsqueda (y es el destino del SearchAction del
@@ -134,10 +104,10 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   useEffect(() => {
     let cancelled = false;
     // El catálogo llega sin vistas: se completan con las de los rankings históricos.
-    Promise.all([getUltimosCapitulos(), getPopularWomenByViews("historical", false), getPopularMenByViews("historical", false)])
-      .then(([catalogData, popularWomen, popularMen]) => {
+    loadSearchCatalog()
+      .then((catalogData) => {
         if (cancelled) return;
-        setAllCatalog(withKnownViews(catalogData, buildViewsIndex(popularWomen, popularMen)));
+        setAllCatalog(catalogData);
       })
       .catch((error) => console.error("Biblioteca load error:", error))
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -147,13 +117,13 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   useEffect(() => { setVisibleResults(RESULTS_PAGE_SIZE); }, [deferredSearchTerm, searchFilter]);
 
   const catalog = useMemo(() => allCatalog.filter((manga) => matchesFilter(manga, searchFilter)), [allCatalog, searchFilter]);
-  // "+ Buscados": las cinco series con más vistas de la pestaña activa, de mayor a menor
+  // "+ Buscados": las cuatro series con más vistas de la pestaña activa, de mayor a menor
   // (con la cifra que se muestra, para que el orden coincida con lo que se lee).
   const topSearched = useMemo(() => [...catalog].sort((a, b) => displayViews(b) - displayViews(a)).slice(0, TOP_SEARCHED_COUNT), [catalog]);
   // "Nuevos lanzamientos": las series publicadas más recientemente, de la más nueva a la más antigua.
   const newReleases = useMemo(() => [...catalog].sort((a, b) => releaseTime(b) - releaseTime(a)).slice(0, NEW_RELEASES_COUNT), [catalog]);
 
-  const genreTiles = useMemo(() => buildGenreTiles(catalog), [catalog]);
+  const genreTiles = searchGenres;
   const results = useMemo(() => filterCatalog(catalog, deferredSearchTerm), [catalog, deferredSearchTerm]);
   const isSearching = deferredSearchTerm.trim().length > 0;
 
@@ -163,15 +133,15 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   const skeleton = isLight ? "bg-black/[0.06]" : "bg-white/[0.08]";
 
   return (
-    <div className={`biblioteca-page min-h-screen transition-colors duration-300 ${isLight ? "bg-white text-zinc-950" : "bg-black text-gray-100"}`}>
-      <div className={`mx-auto w-full max-w-lg px-4 pb-10 ${embedded ? "pt-5" : "pt-[140px]"}`}>
+    <div className={`biblioteca-page ${embedded ? "search-library" : ""} min-h-screen transition-colors duration-300 ${isLight ? "bg-white text-zinc-950" : "bg-black text-gray-100"}`}>
+      <div className={`search-library-inner mx-auto w-full max-w-lg px-4 pb-10 ${embedded ? "pt-5" : "pt-[140px]"}`}>
         {isSearching ? (
           <section aria-label="Resultados de búsqueda">
             {loading ? (
               <div className="grid grid-cols-2 gap-2.5">
                 {Array.from({ length: 6 }).map((_, index) => <div key={index} className={`aspect-[3/4] animate-pulse rounded-xl ${skeleton}`} />)}
               </div>
-            ) : results.length === 0 ? null : (
+            ) : results.length === 0 ? <p role="status" className="py-8 text-center text-sm">No encontramos títulos para esta búsqueda.</p> : (
               <>
                 <div className="grid grid-cols-2 gap-2.5">
                   {results.slice(0, visibleResults).map((manga) => <MangaCard key={manga.id} manga={manga} isLight={isLight} />)}
@@ -190,7 +160,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
           </section>
         ) : (
           <>
-            {/* "+ Buscados": cinco filas ordenadas por vistas, con portada pequeña,
+            {/* "+ Buscados": cuatro filas ordenadas por vistas, con portada pequeña,
                 título, etiqueta rosa con el tipo y contador negro con el ojo. */}
             <section aria-label="Más buscados">
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">+ Buscados</h2>
@@ -202,15 +172,15 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
                 <ol className="space-y-1">
                   {topSearched.map((manga) => (
                     <li key={manga.id}>
-                      <Link to={`/manga/${manga.id}`} className={`group flex items-center gap-3 rounded-xl p-1.5 transition-colors ${isLight ? "hover:bg-black/[0.04]" : "hover:bg-white/[0.06]"}`}>
+                      <Link to={`/manga/${manga.id}`} className={`search-top-row group flex items-center gap-3 rounded-xl p-1.5 transition-colors ${isLight ? "hover:bg-black/[0.04]" : "hover:bg-white/[0.06]"}`}>
                         <img src={manga.portada} alt={`Portada del manga ${manga.titulo}`} className="h-[72px] w-[68px] shrink-0 rounded-lg object-cover object-top bg-zinc-900" loading="lazy" decoding="async" />
                         <div className="min-w-0 flex-1">
                           <h3 className="line-clamp-2 font-[Montserrat] text-[13px] font-normal leading-snug">{toTitleCase(manga.titulo)}</h3>
                           <div className="mt-1.5 flex items-center gap-1.5">
-                            <span className="rounded-md bg-[#FF4D88] px-2 py-1 font-[Montserrat] text-[10px] font-bold uppercase leading-none tracking-wide text-white">{manga.tipo || "Manga"}</span>
+                            <span style={{ backgroundColor: hasHotTag(manga) ? "#FB5937" : hasBlackWhiteTag(manga) ? "#4C4C4C" : "#DB2777" }} className="search-type rounded-md bg-[#FF4D88] px-2 py-1 font-[Montserrat] text-[10px] font-bold uppercase leading-none tracking-wide text-white">{manga.tipo || "Manga"}</span>
                             {/* Vistas reales (suma de capítulos por serie) y, mientras no lleguen a 1K, la cifra provisional de displayViews. */}
-                            <span className={`flex items-center gap-1 rounded-md px-2 py-1 font-[Montserrat] text-[10px] font-bold leading-none text-white ${isLight ? "bg-black" : "border border-white/10 bg-[#1c1c21]"}`}>
-                              <Eye size={12} strokeWidth={2.5} aria-hidden="true" />
+                            <span className={`search-views flex items-center gap-1 rounded-md px-2 py-1 font-[Montserrat] text-[10px] font-bold leading-none text-white ${isLight ? "bg-black" : "border border-white/10 bg-[#1c1c21]"}`}>
+                              <SearchEyeIcon />
                               <span className="tabular-nums">{formatViews(displayViews(manga))}</span>
                               <span className="sr-only">vistas</span>
                             </span>
@@ -224,7 +194,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
             </section>
 
             {/* Tarjetas por género: portada de un manga del género con un tinte de color y la etiqueta abajo. */}
-            <section aria-label="Explorar por género" className="mt-7">
+            <section aria-label="Explorar por género" className="search-genres mt-7">
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Explorar por género</h2>
               <div className="grid grid-cols-2 gap-2.5">
                 {loading
@@ -234,7 +204,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
                       key={tile.genre}
                       type="button"
                       onClick={() => setSearchTerm(tile.genre)}
-                      className="group relative aspect-[2/1] overflow-hidden rounded-2xl text-left shadow-[0_6px_18px_rgba(0,0,0,0.12)] transition-transform duration-300 active:scale-[0.97]"
+                      className="search-genre group relative aspect-[2/1] overflow-hidden rounded-2xl text-left shadow-[0_6px_18px_rgba(0,0,0,0.12)] transition-transform duration-300 active:scale-[0.97]"
                       style={{ backgroundColor: tile.color }}
                     >
                       {tile.cover && <img src={tile.cover} alt="" className="absolute inset-0 h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />}
@@ -250,19 +220,19 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
             </section>
 
             {/* "Nuevos lanzamientos": el más reciente en grande y los tres siguientes debajo. */}
-            <section aria-label="Nuevos lanzamientos" className="mt-7">
+            <section aria-label="Nuevos lanzamientos" className="search-releases mt-7">
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Nuevos lanzamientos</h2>
               {loading || newReleases.length === 0 ? (
                 <>
                   <div className={`aspect-[4/5] animate-pulse rounded-2xl ${skeleton}`} />
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="search-release-grid mt-3 grid grid-cols-3 gap-2">
                     {Array.from({ length: 3 }).map((_, index) => <div key={index} className={`aspect-[3/4] animate-pulse rounded-xl ${skeleton}`} />)}
                   </div>
                 </>
               ) : (
                 <>
                   <Link to={`/manga/${newReleases[0].id}`} className="group block">
-                    <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_14px_34px_rgba(0,0,0,0.18)]">
+                    <div className="search-featured relative aspect-[4/5] overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_14px_34px_rgba(0,0,0,0.18)]">
                       <img src={newReleases[0].portada} alt={`Portada del manga ${newReleases[0].titulo}`} className="h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.04]" loading="lazy" decoding="async" />
                       <FreshnessBadge manga={newReleases[0]} className="absolute left-0 top-0 rounded-br-lg px-2.5 py-1.5 text-[11px]" />
                       <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
@@ -273,7 +243,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
                       </div>
                     </div>
                   </Link>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="search-release-grid mt-3 grid grid-cols-3 gap-2">
                     {newReleases.slice(1).map((manga) => <MangaCard key={manga.id} manga={manga} isLight={isLight} tall />)}
                   </div>
                 </>

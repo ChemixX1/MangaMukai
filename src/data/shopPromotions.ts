@@ -1,25 +1,19 @@
 import { shopProducts as products } from './shopProducts';
-import type { ShopPromotionProps } from '../components/common/ShopPromotion';
+import type { ShopFilter } from '../components/shop/ShopKit';
+import type { ShopPromotionProps } from '../components/shop/ShopPromotion';
 
-// Replace backgroundImage with the design INSIDE the panel and foregroundImage
-// with a transparent PNG/WebP to let a character or product extend beyond it.
-export const shopPromotions: (Omit<ShopPromotionProps, 'onExplore'> & { id: string; category: string })[] = [
+/** Dos accesos al catálogo, junto a la viñeta principal. */
+export const shopPromotions: (Omit<ShopPromotionProps, 'onExplore'> & { id: string; category: ShopFilter })[] = [
   {
-    id: 'new', category: 'Todo', tone: 'rose', foregroundType: 'character',
-    eyebrow: 'RECIÉN LLEGADOS', title: 'Fuera de la viñeta', action: 'Ver novedades',
-    backgroundImage: products[2].image,
-    foregroundImage: '/images/promotions/gojo-cutout.png', foregroundAlt: 'Satoru Gojo sobresaliendo del panel',
-  },
-  {
-    id: 'art', category: 'Art prints', tone: 'lilac',
-    eyebrow: 'MUKAI SELECT', title: 'Arte para tu mundo', action: 'Explorar colección',
-    backgroundImage: products[1].image,
+    id: 'art', category: 'Art prints', tone: 'sage',
+    eyebrow: '01 / ILUSTRACIONES', title: 'Arte para tu espacio.',
+    description: 'Tus viñetas favoritas, en otro formato.', action: 'Ver ilustraciones',
     foregroundImage: products[1].image, foregroundAlt: products[1].title,
   },
   {
-    id: 'sale', category: 'Sale', tone: 'peach',
-    eyebrow: 'FAVORITOS EN SALE', title: 'Una historia más', action: 'Descubrir ofertas',
-    backgroundImage: products[4].image,
-    foregroundImage: products[4].image, foregroundAlt: products[4].title,
+    id: 'collections', category: 'Colecciones', tone: 'ink',
+    eyebrow: '02 / COLECCIONES', title: 'Más de tu historia.',
+    description: 'Encuentra un lugar para cada volumen.', action: 'Ver colecciones',
+    foregroundImage: products[3].image, foregroundAlt: products[3].title,
   },
 ];

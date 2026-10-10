@@ -97,7 +97,7 @@ export const SavedMangas = () => {
          <div className={`absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] ${isLight ? 'opacity-[0.05]' : 'opacity-20'}`} />
       </div>
 
-      <div className="desktop-content-shell relative z-10 flex-grow max-w-[1400px] mx-auto w-full px-6 pt-32 pb-20">
+      <div className="lg:!max-w-[1366px] relative z-10 flex-grow max-w-[1400px] mx-auto w-full px-6 pt-32 pb-20">
 
         {/* HEADER */}
         <div className={`mb-12 flex flex-col items-center justify-between gap-4 border-b pb-6 text-center md:flex-row md:items-end md:text-left ${isLight ? 'border-black/10' : 'border-white/10'}`}>

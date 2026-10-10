@@ -54,7 +54,7 @@ export function BlackWhiteYouthAccordion() {
       <div className="relative z-20 h-[80px] w-full md:h-24">
         <div aria-hidden="true" className="home-men-ramp pointer-events-none absolute bottom-[-8px] left-0 h-10 w-full bg-gradient-to-r from-[#67E8F9] via-[#38BDF8] to-[#3B82F6]" />
         {/* En móvil el título va más a la izquierda y algo más pequeño para no pisar el escalón de la rampa (72 %). */}
-        <div className="desktop-content-shell relative z-10 mx-auto flex h-full w-full max-w-[1500px] items-end px-3 pb-1 sm:px-5 md:items-center md:pb-0 lg:px-16">
+        <div className="lg:!max-w-[1366px] relative z-10 mx-auto flex h-full w-full max-w-[1500px] items-end px-3 pb-1 sm:px-5 md:items-center md:pb-0 lg:px-16">
           <h2 id="bn-youth-title" className="flex -translate-y-1 items-center gap-2 text-[20px] font-black uppercase italic tracking-[-0.035em] sm:gap-3 sm:text-[23px] md:text-4xl">
             <Mars className="h-6 w-6 shrink-0 text-[#00C2FF] sm:h-8 sm:w-8" strokeWidth={3} />
             Mangas <span className="text-[#00C2FF]">juveniles</span>
@@ -62,7 +62,7 @@ export function BlackWhiteYouthAccordion() {
         </div>
       </div>
 
-      <div className="desktop-content-shell relative z-10 mx-auto max-w-[1500px] px-5 pb-14 pt-12 lg:px-16 lg:pt-14">
+      <div className="lg:!max-w-[1366px] relative z-10 mx-auto max-w-[1500px] px-5 pb-14 pt-12 lg:px-16 lg:pt-14">
 
         {!isReady || items.length === 0 ? (
           <div className="flex h-[640px] gap-2 overflow-hidden">

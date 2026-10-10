@@ -1,13 +1,13 @@
 /**
  * Acento de cada bloque del sitio: rosa para la parte femenina y celeste para
- * la juvenil. Los mismos valores que `mukai.pink` / `mukai.cyan` en
- * tailwind.config.js, para los estilos que se calculan en línea.
+ * la juvenil. Son variables CSS (definidas en index.css) para que una colección
+ * pueda sustituirlas: la de blanco y negro las pasa a gris.
  */
 export type Accent = 'pink' | 'cyan';
 
-export const ACCENT_HEX: Record<Accent, string> = {
-  pink: '#db2777',
-  cyan: '#22d3ee',
+export const ACCENT_COLOR: Record<Accent, string> = {
+  pink: 'var(--mm-accent-pink)',
+  cyan: 'var(--mm-accent-cyan)',
 };
 
 /**
@@ -16,8 +16,8 @@ export const ACCENT_HEX: Record<Accent, string> = {
  */
 export const typeBadgeColor = (type: string, accent: Accent) => {
   const normalized = (type || '').toLowerCase();
-  if (normalized.includes('manhwa')) return '#7c3aed';
-  if (normalized.includes('manhua')) return '#a21caf';
-  if (normalized.includes('novel')) return '#2563eb';
-  return ACCENT_HEX[accent];
+  if (normalized.includes('manhwa')) return 'var(--mm-type-manhwa)';
+  if (normalized.includes('manhua')) return 'var(--mm-type-manhua)';
+  if (normalized.includes('novel')) return 'var(--mm-type-novel)';
+  return ACCENT_COLOR[accent];
 };

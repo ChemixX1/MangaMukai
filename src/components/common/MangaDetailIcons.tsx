@@ -1,15 +1,14 @@
 import type { ImgHTMLAttributes } from 'react';
 
-type Raster3DIconProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'alt' | 'height' | 'src' | 'width'> & {
+type CoinIconProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'alt' | 'height' | 'src' | 'width'> & {
   size?: number | string;
 };
 
-// Moneda de 3Dicons (CC0-1.0): https://github.com/realvjy/3dicons
+// Moneda 3D de 3Dicons (CC0-1.0): https://github.com/realvjy/3dicons
 export const MANGAMUKAI_COIN_3D_ICON = 'https://3dicons.sgp1.cdn.digitaloceanspaces.com/v1/dynamic/color/3d-coin-dynamic-color.png';
-// Entrada de Microsoft Fluent Emoji (MIT): https://github.com/microsoft/fluentui-emoji
-const TICKET_3D_ICON = 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Admission%20tickets/3D/admission_tickets_3d.png';
 
-const Raster3DIcon = ({ size = 28, src, ...props }: Raster3DIconProps & { src: string }) => (
+/** Moneda de MangaMukai (precio de los capítulos, saldo del navbar, compras). */
+export const DetailCoin3DIcon = ({ size = 28, ...props }: CoinIconProps) => (
   <img
     {...props}
     alt=""
@@ -17,11 +16,7 @@ const Raster3DIcon = ({ size = 28, src, ...props }: Raster3DIconProps & { src: s
     decoding="async"
     draggable={false}
     height={size}
-    src={src}
+    src={MANGAMUKAI_COIN_3D_ICON}
     width={size}
   />
 );
-
-export const DetailCoin3DIcon = (props: Raster3DIconProps) => <Raster3DIcon {...props} src={MANGAMUKAI_COIN_3D_ICON} />;
-
-export const DetailTicket3DIcon = (props: Raster3DIconProps) => <Raster3DIcon {...props} src={TICKET_3D_ICON} />;

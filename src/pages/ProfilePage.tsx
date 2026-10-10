@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ProfilePostCard } from '../components/social/ProfilePostCard';
 import { ProfileStats } from '../components/social/ProfileStats';
-import { MangaRecommendationSidebar, type RecommendationManga } from '../components/manga/MangaRecommendationSidebar';
+import { MangaRecommendations, type RecommendationManga } from '../components/manga/MangaRecommendations';
 import { getUltimosCapitulos } from '../services/mangaService';
 import {
   Cake,
@@ -566,7 +566,7 @@ export const ProfilePage = () => {
 
           {/* Columna derecha: recomendaciones. En movil cierran el muro. */}
           <aside className="order-3 flex flex-col gap-4 lg:col-start-1 lg:row-start-2 xl:col-start-3 xl:row-start-1" aria-label="Mangas recomendados">
-            <MangaRecommendationSidebar items={recommendations} isLight={isLight} title="Mangas recomendados" compactDesktop />
+            <MangaRecommendations items={recommendations} title="Mangas recomendados" listClassName="h-[570px]" />
           </aside>
         </div>
         </div>

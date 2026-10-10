@@ -1,16 +1,35 @@
+import { useMemo } from 'react';
+
 import { EmergencyScreen } from '../components/common/EmergencyScreen';
-import { Hero, HomePageFrame } from '../components/home';
-import { MobileHome } from '../components/home/mobile/MobileHome';
 import { HomeDataProvider, useHomeData } from '../context/HomeDataContext';
 import { useIsMobileViewport } from '../hooks/useIsMobileViewport';
+import { uniqueBySeries } from '../utils/mangaFormat';
+import { buildViewsIndex, withKnownViews } from '../utils/seriesViews';
+import { filterYouthMen } from '../utils/youthFilter';
 
-/** Por debajo de lg la portada usa el diseño móvil propio; en escritorio, el clásico.
-    Si el servidor no responde (todas las secciones vacías), la pantalla de emergencia. */
+import { HERO_SIZE, toHeroItems } from '../components/home/homeModels';
+import HomeM from './home/HomeM';
+import HomeP from './home/HomeP';
+
 const HomeView = () => {
+  const { popularHistorical, popularMenHistorical, popularMenWeekly, latestMen, loaded, isReady, isOutage } = useHomeData();
+
+  const womenHero = useMemo(() => toHeroItems(popularHistorical), [popularHistorical]);
+
+  const menHero = useMemo(() => {
+    // Las últimas actualizaciones llegan sin vistas: se completan con las de los rankings.
+    const viewsIndex = buildViewsIndex(popularMenWeekly, popularMenHistorical);
+    const ranked = filterYouthMen(popularMenHistorical);
+    const latest = withKnownViews(filterYouthMen(latestMen), viewsIndex);
+    return toHeroItems(uniqueBySeries([ranked, latest], HERO_SIZE));
+  }, [popularMenHistorical, popularMenWeekly, latestMen]);
+
   const isMobile = useIsMobileViewport();
-  const { isReady, isOutage } = useHomeData();
   if (isReady && isOutage) return <EmergencyScreen />;
-  return isMobile ? <MobileHome /> : <HomePageFrame hero={<Hero />} />;
+
+  return isMobile
+    ? <HomeM womenHero={womenHero} menHero={menHero} isReady={loaded.popularHistorical} />
+    : <HomeP womenHero={womenHero} menHero={menHero} isReady={loaded.popularHistorical} />;
 };
 
 export default function Home() {

@@ -346,7 +346,7 @@ export const ReaderPage = () => {
              <nav className="flex flex-wrap items-center justify-center gap-0" aria-label="Redes sociales de MangaMukai">
                {FOOTER_SOCIALS.map(({ name, href, Icon }) => <a key={name} href={href} target="_blank" rel="noopener noreferrer" title={name} aria-label={name} className="grid h-8 w-6 sm:h-9 sm:w-7 place-items-center transition hover:text-[#FF4D88]"><Icon className="h-4 w-4 sm:h-5 sm:w-5" /></a>)}
              </nav>
-             <MangaMusicCard cover="" isLight={isLight} compactHeight singleLineDescription />
+             <MangaMusicCard cover="" isLight={isLight} compactHeight />
              <nav aria-label="Navegación del capítulo" className="mx-auto max-w-lg space-y-4">
                <div className="flex items-center justify-center gap-2 sm:gap-3">
                  <button type="button" onClick={() => navData?.prevId && navigate(`/read/${navData.prevId}`)} disabled={!navData?.prevId} className={`flex h-12 flex-1 items-center justify-center gap-1 rounded-2xl border px-3 text-sm disabled:opacity-30 ${navigationSurface}`}><ChevronLeft size={20} />Anterior</button>
@@ -419,8 +419,9 @@ export const ReaderPage = () => {
                 </button>
             </div>
           </div>
-          <div id="comentarios" className={`w-full scroll-mt-24 ${isLight ? 'bg-white' : 'bg-zinc-950'}`}>
-            <MangaComments key={chapterId} mangaId={navData?.mangaId || ''} chapterId={chapterId} initialComments={chapterComments} isLight={isLight} />
+          {/* El propio bloque lleva el ancla #comentarios. */}
+          <div className={`w-full px-4 pb-24 pt-12 md:px-8 ${isLight ? 'bg-white' : 'bg-zinc-950'}`}>
+            <MangaComments key={chapterId} mangaId={navData?.mangaId || ''} chapterId={chapterId} initialComments={chapterComments} />
           </div>
         </main>
 

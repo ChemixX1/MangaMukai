@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react';
 
-interface MangaDetailClockProps {
-  isLight: boolean;
-}
-
 const capitalize = (value: string) =>
   `${value.charAt(0).toLocaleUpperCase('es')}${value.slice(1)}`;
 
@@ -28,7 +24,8 @@ const timeUnitsOf = (date: Date) => [
   { label: 'SEG', value: String(date.getSeconds()).padStart(2, '0') },
 ];
 
-export const MangaDetailClock = ({ isLight }: MangaDetailClockProps) => {
+/** Reloj sobre la portada de la ficha de escritorio: fecha en Audiowide, cifras en Michroma y los dos puntos parpadeando. */
+export const MangaDetailClock = () => {
   const [now, setNow] = useState(() => new Date());
 
   /* El siguiente aviso se programa al filo del segundo siguiente, no cada 1000 ms
@@ -47,22 +44,20 @@ export const MangaDetailClock = ({ isLight }: MangaDetailClockProps) => {
   const units = timeUnitsOf(now);
 
   return (
-    <div
-      className={`manga-detail-clock ${isLight ? 'is-light' : 'is-dark'}`}
-      role="timer"
-      aria-label={`${formatLongDate(now)}, ${units.map((unit) => unit.value).join(':')}`}
-    >
-      <p className="manga-detail-clock-date">{formatLongDate(now)}</p>
+    <div className="w-full" role="timer" aria-label={`${formatLongDate(now)}, ${units.map((unit) => unit.value).join(':')}`}>
+      <p className="mb-[7px] text-center font-audiowide text-[clamp(0.66rem,1.4vw,0.79rem)] font-normal leading-[1.2] tracking-[0.02em] text-ink/90">{formatLongDate(now)}</p>
 
-      <div className="manga-detail-clock-shell" aria-hidden="true">
-        <div className="manga-detail-clock-display">
+      <div className="relative overflow-hidden rounded-[14px] border border-line bg-surface/70 px-3 py-[9px]" aria-hidden="true">
+        <div className="flex items-start justify-center gap-0.5">
           {units.map((unit, index) => (
-            <div key={unit.label} className="manga-detail-clock-group">
-              <span className="manga-detail-clock-unit">
-                <span className="manga-detail-clock-value tabular-nums">{unit.value}</span>
-                <span className="manga-detail-clock-label">{unit.label}</span>
+            <div key={unit.label} className="flex items-start gap-0.5">
+              <span className="flex min-w-10 flex-col items-center gap-0.5">
+                <span className="font-[Michroma] text-[clamp(1.2rem,3.4vw,1.5rem)] font-normal leading-none tracking-[-0.02em] text-ink tabular-nums">{unit.value}</span>
+                <span className="font-montserrat text-[8px] font-bold leading-none tracking-[0.22em] text-muted">{unit.label}</span>
               </span>
-              {index < units.length - 1 && <span className="manga-detail-clock-separator">:</span>}
+              {index < units.length - 1 && (
+                <span className="animate-dot-blink font-orbitron text-[clamp(1rem,2.9vw,1.25rem)] font-semibold leading-[1.12] text-mukai-magenta motion-reduce:animate-none">:</span>
+              )}
             </div>
           ))}
         </div>

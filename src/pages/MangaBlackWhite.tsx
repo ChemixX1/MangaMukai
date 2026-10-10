@@ -4,8 +4,9 @@ import {
   AdultLatestUpdates,
   BlackWhiteHero,
   BlackWhiteYouthAccordion,
+  HomePageFrame,
+  TrendingCarousel,
 } from '../components/collections';
-import { HomePageFrame, PopularCarousel, YouthCarousel } from '../components/home';
 import { HomeDataProvider, useHomeData } from '../context/HomeDataContext';
 import { useTheme } from '../hooks/useTheme';
 import { filterMenBlackWhite, filterWomenBlackWhite } from '../utils/womenBlackWhite';
@@ -27,7 +28,7 @@ function MangaBlackWhiteContent() {
   return (
     <HomePageFrame
       hero={<BlackWhiteHero />}
-      popularSection={<PopularCarousel filterMangas={filterWomenBlackWhite} />}
+      popularSection={<TrendingCarousel audience="women" filterMangas={filterWomenBlackWhite} />}
       latestSection={(
         <AdultLatestUpdates
           items={filterWomenBlackWhite(latestWomen)}
@@ -39,7 +40,7 @@ function MangaBlackWhiteContent() {
         />
       )}
       menSection={<BlackWhiteYouthAccordion />}
-      youthSection={<YouthCarousel filterMangas={filterMenBlackWhite} />}
+      youthSection={<TrendingCarousel audience="men" filterMangas={filterMenBlackWhite} />}
       youthLatestSection={(
         <AdultLatestUpdates
           items={filterMenBlackWhite(latestMen)}
@@ -50,8 +51,6 @@ function MangaBlackWhiteContent() {
           includeUpcoming
         />
       )}
-      hideFilterStrip
-      hideReleases
       pageClassName="manga-bn-page"
       pageHeading="Manga en blanco y negro: shounen, seinen y acción"
     />

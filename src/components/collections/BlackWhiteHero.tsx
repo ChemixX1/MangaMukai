@@ -115,7 +115,7 @@ export function BlackWhiteHero() {
         </AnimatePresence>
       </div>
 
-      <div className="desktop-content-shell relative z-10 mx-auto grid h-full w-full max-w-[1440px] grid-cols-1 gap-8 px-5 pb-20 pt-28 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(540px,.92fr)] lg:items-center lg:gap-12 lg:px-12 lg:pb-12 lg:pt-24 xl:gap-16 xl:px-16">
+      <div className="lg:!max-w-[1366px] relative z-10 mx-auto grid h-full w-full max-w-[1440px] grid-cols-1 gap-8 px-5 pb-20 pt-28 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(540px,.92fr)] lg:items-center lg:gap-12 lg:px-12 lg:pb-12 lg:pt-24 xl:gap-16 xl:px-16">
         <div className="order-2 flex min-w-0 flex-col items-center lg:order-1 lg:items-start">
           {!isReady || !active ? (
             <div className="flex w-full max-w-[650px] animate-pulse flex-col gap-6">

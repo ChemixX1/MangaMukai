@@ -1,3 +1,4 @@
+import { AuthPage } from './AuthPage';
 import { useEffect, useState, type ComponentType } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -161,6 +162,8 @@ export const MorePage = () => {
       {rows.map(renderRow)}
     </section>
   );
+
+  if (!user) return <AuthPage mode="login" />;
 
   return (
     <main className={`min-h-screen transition-colors ${isLight ? 'bg-[#f4f4f5] text-black' : 'bg-black text-white'}`}>

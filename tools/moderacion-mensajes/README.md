@@ -25,9 +25,9 @@ No envía mensajes, no borra ni modifica nada en el sitio.
 La app y el sitio comparten una clave larga y aleatoria:
 
 1. La primera vez que ejecutas la app, crea
-   `server/wp-content/mu-plugins/mangamukai-moderation-key.php` con la clave.
+   `backend/wp-content/mu-plugins/mangamukai-moderation-key.php` con la clave.
    Ese archivo está en `.gitignore`: nunca sube a GitHub.
-2. Como vive dentro de `server/`, el siguiente `npm run deploy` lo publica en el
+2. Como vive dentro de `backend/`, el siguiente `npm run deploy` lo publica en el
    servidor junto con el resto de PHP. Desde ese momento el sitio acepta las
    consultas de la app (cabecera `X-MM-Moderation-Key`) y rechaza cualquier
    otra.

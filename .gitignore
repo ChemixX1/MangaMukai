@@ -34,6 +34,9 @@ dist-ssr
 !server/
 !server/**/*.php
 !server/**/*.json
+!backend/
+!backend/**/*.php
+!backend/**/*.json
 !package.json
 !package-lock.json
 !tsconfig.json
@@ -43,3 +46,4 @@ dist-ssr
 
 # Clave compartida de la herramienta local de moderacion (se genera sola; se publica con el deploy, nunca a git)
 server/wp-content/mu-plugins/mangamukai-moderation-key.php
+backend/wp-content/mu-plugins/mangamukai-moderation-key.php

@@ -1,0 +1,205 @@
+/* collections: estilos compartidos entre tamaños de pantalla. */
+
+.manga-bn-page .manga-bn-interactive-cover,
+.manga-bn-page .home-main .home-block:not(.home-block-news):not(.home-block-youth-news) img[alt]:not([alt=""]) {
+  transition-property: transform, filter !important;
+  transition-duration: 480ms !important;
+  transition-timing-function: cubic-bezier(.22, 1, .36, 1) !important;
+}
+
+.manga-bn-page .manga-bn-interactive-cover:hover,
+.manga-bn-page .manga-bn-accordion-panel:hover .manga-bn-interactive-cover,
+.manga-bn-page .home-main .home-block:not(.home-block-news):not(.home-block-youth-news) a:hover img[alt]:not([alt=""]),
+.manga-bn-page .home-main .home-block:not(.home-block-news):not(.home-block-youth-news) button:hover img[alt]:not([alt=""]) {
+  filter: grayscale(1) saturate(0) contrast(1.04);
+}
+
+.bn-hero-status-dot {
+  animation: bn-hero-status-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes bn-hero-status-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.78);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bn-hero-status-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .manga-bn-page .home-block-popular {
+    margin-top: -2.5rem;
+  }
+  .manga-bn-page .home-block-latest {
+    margin-top: -3.5rem;
+  }
+  .manga-bn-page .home-block-youth,
+  .manga-bn-page .home-block-youth-latest {
+    margin-top: -2rem;
+  }
+}
+
+.manga-bn-page {
+  --bn-ink: #0f172a;
+  --bn-ink-bg: #0f172a;
+  --bn-on-ink: #ffffff;
+}
+
+.home-theme-dark .manga-bn-page {
+  --bn-ink: #d4d4d8;
+  --bn-ink-bg: #3f3f46;
+  --bn-on-ink: #f4f4f5;
+}
+
+.manga-bn-page [class^="text-[#FF4D88]"],
+.manga-bn-page [class*=" text-[#FF4D88]"],
+.manga-bn-page [class^="text-[#00C2FF]"],
+.manga-bn-page [class*=" text-[#00C2FF]"],
+.manga-bn-page [class^="text-[#38BDF8]"],
+.manga-bn-page [class*=" text-[#38BDF8]"],
+.manga-bn-page [class^="text-[#5865F2]"],
+.manga-bn-page [class*=" text-[#5865F2]"],
+.manga-bn-page [class^="text-[#229ED9]"],
+.manga-bn-page [class*=" text-[#229ED9]"],
+.manga-bn-page [class^="text-violet"],
+.manga-bn-page [class*=" text-violet"],
+.manga-bn-page [class^="text-yellow"],
+.manga-bn-page [class*=" text-yellow"] {
+  color: var(--bn-ink) !important;
+}
+
+.manga-bn-page [class^="bg-[#FF4D88]"],
+.manga-bn-page [class*=" bg-[#FF4D88]"],
+.manga-bn-page [class^="bg-[#00C2FF]"],
+.manga-bn-page [class*=" bg-[#00C2FF]"],
+.manga-bn-page [class^="bg-[#38BDF8]"],
+.manga-bn-page [class*=" bg-[#38BDF8]"],
+.manga-bn-page [class^="bg-[#5865F2]"],
+.manga-bn-page [class*=" bg-[#5865F2]"],
+.manga-bn-page [class^="bg-[#229ED9]"],
+.manga-bn-page [class*=" bg-[#229ED9]"],
+.manga-bn-page [class^="bg-violet"],
+.manga-bn-page [class*=" bg-violet"],
+.manga-bn-page [class^="bg-yellow"],
+.manga-bn-page [class*=" bg-yellow"] {
+  background-color: var(--bn-ink-bg) !important;
+}
+
+.manga-bn-page [class^="border-[#FF4D88]"],
+.manga-bn-page [class*=" border-[#FF4D88]"],
+.manga-bn-page [class^="border-[#00C2FF]"],
+.manga-bn-page [class*=" border-[#00C2FF]"],
+.manga-bn-page [class^="border-[#38BDF8]"],
+.manga-bn-page [class*=" border-[#38BDF8]"],
+.manga-bn-page [class^="border-yellow"],
+.manga-bn-page [class*=" border-yellow"] {
+  border-color: var(--bn-ink) !important;
+}
+
+.manga-bn-page .home-men-ramp,
+.manga-bn-page [class*="from-[#67E8F9]"] {
+  background-image: linear-gradient(90deg, #9ca3af, #4b5563, #1f2937) !important;
+}
+
+.home-theme-dark .manga-bn-page .home-men-ramp,
+.home-theme-dark .manga-bn-page [class*="from-[#67E8F9]"] {
+  background-image: linear-gradient(90deg, #e5e7eb, #9ca3af, #4b5563) !important;
+}
+
+.manga-bn-page img:not([alt^="Portada"]):not(.manga-bn-interactive-cover) {
+  filter: grayscale(1);
+}
+
+.manga-bn-page [class^="border-[#5865F2]"],
+.manga-bn-page [class*=" border-[#5865F2]"],
+.manga-bn-page [class^="border-[#229ED9]"],
+.manga-bn-page [class*=" border-[#229ED9]"],
+.manga-bn-page [class^="text-blue"],
+.manga-bn-page [class*=" text-blue"],
+.manga-bn-page [class^="text-orange"],
+.manga-bn-page [class*=" text-orange"],
+.manga-bn-page [class^="text-purple"],
+.manga-bn-page [class*=" text-purple"],
+.manga-bn-page [class^="text-green"],
+.manga-bn-page [class*=" text-green"] {
+  color: var(--bn-ink) !important;
+  border-color: var(--bn-ink) !important;
+}
+
+.manga-bn-page [class^="bg-blue"],
+.manga-bn-page [class*=" bg-blue"],
+.manga-bn-page [class^="bg-orange"],
+.manga-bn-page [class*=" bg-orange"],
+.manga-bn-page [class^="bg-purple"],
+.manga-bn-page [class*=" bg-purple"],
+.manga-bn-page [class^="bg-green"],
+.manga-bn-page [class*=" bg-green"] {
+  background-color: var(--bn-ink-bg) !important;
+}
+
+.manga-bn-page [class^="border-violet"],
+.manga-bn-page [class*=" border-violet"],
+.manga-bn-page [class^="border-purple"],
+.manga-bn-page [class*=" border-purple"],
+.manga-bn-page [class^="border-blue"],
+.manga-bn-page [class*=" border-blue"],
+.manga-bn-page [class^="border-green"],
+.manga-bn-page [class*=" border-green"],
+.manga-bn-page [class^="border-orange"],
+.manga-bn-page [class*=" border-orange"] {
+  border-color: var(--bn-ink) !important;
+}
+
+.manga-bn-page [class*="hover:bg-[#FF4D88]"]:hover,
+.manga-bn-page [class*="hover:bg-[#00C2FF]"]:hover {
+  background-color: var(--bn-ink-bg) !important;
+}
+
+.manga-bn-page [class*="hover:text-[#FF4D88]"]:hover,
+.manga-bn-page [class*="hover:text-[#00C2FF]"]:hover {
+  color: var(--bn-ink) !important;
+}
+
+.manga-bn-page [class*="hover:border-[#FF4D88]"]:hover,
+.manga-bn-page [class*="hover:border-[#00C2FF]"]:hover {
+  border-color: var(--bn-ink) !important;
+}
+
+.manga-bn-page [class*=" bg-[#5865F2]"],
+.manga-bn-page [class*=" bg-[#229ED9]"],
+.home-theme-dark .manga-bn-page [class*="bg-[#00C2FF]"][class*="text-black"],
+.home-theme-dark .manga-bn-page [class*="bg-[#FF4D88]"][class*="text-black"] {
+  color: var(--bn-on-ink) !important;
+}
+
+.manga-bn-page {
+  --mm-accent-pink: #737373;
+  --mm-accent-cyan: #737373;
+  --mm-type-manhwa: #737373;
+  --mm-type-manhua: #737373;
+  --mm-type-novel: #737373;
+  --mm-free: #737373;
+}
+
+.manga-bn-page .home-block-news a, .manga-bn-page .home-block-news button,
+.manga-bn-page .home-block-youth-news a, .manga-bn-page .home-block-youth-news button {
+  filter: grayscale(1);
+}
+
+.dark .manga-bn-page {
+  --bn-ink: #d4d4d8;
+  --bn-ink-bg: #3f3f46;
+  --bn-on-ink: #f4f4f5;
+}
+@media (min-width: 1024px) and (hover: hover) {
+  .collection-trending-track:hover { animation-play-state: paused; }
+}

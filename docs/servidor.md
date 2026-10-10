@@ -7,7 +7,7 @@ limpieza del 2026-09-06.
 ## Cómo llega el código al servidor
 
 `npm run deploy` compila (`npm run build`) y sube `dist/` por FTPS a la raíz de
-`public_html`. El build fusiona esta carpeta `server/` dentro de `dist/`, así que
+`public_html`. El build fusiona `server/` y `backend/` dentro de `dist/`, así que
 lo que hay aquí se publica tal cual:
 
 | En el repo                                   | En el servidor                                   |
@@ -16,10 +16,10 @@ lo que hay aquí se publica tal cual:
 | `public/favicon.svg`                         | `/favicon.svg`                                   |
 | `server/.htaccess`                           | `/.htaccess` (rutas React, OAuth, bloqueos)      |
 | `server/backend-patches/*.php`               | `/backend-patches/*.php` (SEO head, sitemaps, redirecciones) |
-| `server/wp-content/mu-plugins/*.php`         | `/wp-content/mu-plugins/*.php`                   |
-| `server/wp-content/plugins/manga-wordpress-storage-fix/` | `/wp-content/plugins/manga-wordpress-storage-fix/` |
-| `server/wp-content/plugins/manga-auth-legacy-fix/` | `/wp-content/plugins/manga-auth-legacy-fix/` (desde 2026-09-06; sobrescribe `/login`, `/register`, `/me`, `/coins`, `/chapters/*` con prioridad 99) |
-| `server/wp-content/plugins/manga-paypal-payments/` | `/wp-content/plugins/manga-paypal-payments/` (desde 2026-09-06; monedas y suscripción por PayPal, y **es quien responde `/me`** con prioridad 100) |
+| `backend/wp-content/mu-plugins/*.php` (excepto SEO en `server/`)         | `/wp-content/mu-plugins/*.php`                   |
+| `backend/wp-content/plugins/manga-wordpress-storage-fix/` | `/wp-content/plugins/manga-wordpress-storage-fix/` |
+| `backend/wp-content/plugins/manga-auth-legacy-fix/` | `/wp-content/plugins/manga-auth-legacy-fix/` (desde 2026-09-06; sobrescribe `/login`, `/register`, `/me`, `/coins`, `/chapters/*` con prioridad 99) |
+| `backend/wp-content/plugins/manga-paypal-payments/` | `/wp-content/plugins/manga-paypal-payments/` (desde 2026-09-06; monedas y suscripción por PayPal, y **es quien responde `/me`** con prioridad 100) |
 
 El deploy **sobrescribe y añade**; desde el 2026-09-15, tras subir, además
 **borra de `/assets/` todo bundle que no exista en el `dist/` recién subido**
@@ -36,7 +36,7 @@ No está versionado aquí. Antes de tocarlo, descargarlo por FTPS.
   `manga-views-tracker.php`, `manga-comments-api.php`, `manga-country-block.php`,
   `manga-rest-cover.php`.
 - ~~Plugins `manga-auth-legacy-fix` y `manga-paypal-payments`~~: desde el
-  2026-09-06 están en el repo (`server/wp-content/plugins/`). Cadena real de
+  2026-09-06 están en el repo (`backend/wp-content/plugins/`). Cadena real de
   `rest_api_init`: `manga-auth-api.php` (prioridad 10) → `manga-auth-legacy-fix`
   (99, `override`: `/login`, `/register`, `/me`, `/coins`, `/chapters/*`) →
   `manga-paypal-payments` (100, `override`: `/me`, `/buy-coins`, suscripción).
@@ -113,8 +113,8 @@ sesión puede escribir a otro.
 conversations/{a}/{b}, users) en **solo lectura**. Autoriza con la cabecera
 `X-MM-Moderation-Key`, que debe coincidir con la constante `MM_MODERATION_KEY`
 definida en `wp-content/mu-plugins/mangamukai-moderation-key.php`. Ese archivo
-**no está en git**: lo genera la herramienta local en `server/wp-content/mu-plugins/`
-y se publica con `npm run deploy` como cualquier otro PHP de `server/`. Si la
+**no está en git**: lo genera la herramienta local en `backend/wp-content/mu-plugins/`
+y se publica con `npm run deploy` como cualquier otro PHP de `backend/`. Si la
 clave se filtra, se borra el archivo, se vuelve a ejecutar la herramienta y se
 despliega. Lo consume `tools/moderacion-mensajes` (`npm run moderacion`), que
 corre en el equipo local y no se despliega. Detalles y avisos de privacidad en

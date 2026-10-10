@@ -9,6 +9,8 @@ interface MarqueeOptions {
   direction: 'right' | 'left';
   /** Inset inicial de la primera portada respecto al borde izquierdo. */
   leadingInset?: number;
+  /** Pausa el avance al pasar el ratón, sin cambiar la posición de la cinta. */
+  pauseOnHover?: boolean;
 }
 
 interface DragState {
@@ -33,7 +35,7 @@ const DRAG_THRESHOLD_PX = 6;
  * así el bucle no se nota. Al arrastrar, la cinta sigue al dedo; al soltar con
  * impulso frena poco a poco y retoma sola la velocidad de crucero.
  */
-export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset = 0 }: MarqueeOptions) => {
+export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset = 0, pauseOnHover = false }: MarqueeOptions) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const sequenceRef = useRef<HTMLDivElement>(null);
@@ -42,6 +44,7 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
   const [inView, setInView] = useState(true);
   const state = useRef<DragState>({ offset: 0, velocity: 0, dragging: false, pointerId: -1, lastX: 0, lastT: 0, startX: 0, moved: false });
   const initialized = useRef(false);
+  const hovered = useRef(false);
 
   const wrap = useCallback((offset: number) => {
     if (sequenceWidth <= 0) return offset;
@@ -104,7 +107,7 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
       const dt = Math.min(64, now - last);
       last = now;
       const s = state.current;
-      if (!s.dragging) {
+      if (!s.dragging && !(pauseOnHover && hovered.current)) {
         if (Math.abs(s.velocity) > Math.abs(cruise)) {
           s.velocity *= Math.exp(-dt / FLICK_DECAY_MS);
           if (Math.abs(s.velocity) <= Math.abs(cruise)) s.velocity = cruise;
@@ -118,7 +121,23 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     };
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
-  }, [sequenceWidth, itemCount, inView, speed, direction, wrap, paint]);
+  }, [sequenceWidth, itemCount, inView, speed, direction, wrap, paint, pauseOnHover]);
+
+  const onPointerEnter = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse') return;
+    hovered.current = true;
+    if (pauseOnHover) state.current.velocity = 0;
+  }, [pauseOnHover]);
+
+  const onPointerLeave = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'mouse') {
+      hovered.current = false;
+      if (state.current.dragging && !state.current.moved) {
+        state.current.dragging = false;
+        state.current.pointerId = -1;
+      }
+    }
+  }, []);
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -130,7 +149,6 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     s.startX = event.clientX;
     s.lastT = performance.now();
     s.moved = false;
-    event.currentTarget.setPointerCapture(event.pointerId);
   }, []);
 
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -139,7 +157,11 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     const now = performance.now();
     const dx = event.clientX - s.lastX;
     const dt = Math.max(1, now - s.lastT);
-    if (Math.abs(event.clientX - s.startX) > DRAG_THRESHOLD_PX) s.moved = true;
+    // Capturar antes del arrastre redirige el clic al contenedor y cancela el enlace de la portada.
+    if (!s.moved && Math.abs(event.clientX - s.startX) > DRAG_THRESHOLD_PX) {
+      s.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
     s.offset = wrap(s.offset - dx);
     // Velocidad suavizada para que el impulso al soltar sea el del último tramo.
     const instant = Math.max(-MAX_FLICK_VELOCITY, Math.min(MAX_FLICK_VELOCITY, -dx / dt));
@@ -172,6 +194,8 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     sequenceRef,
     copies,
     viewportProps: {
+      onPointerEnter,
+      onPointerLeave,
       onPointerDown,
       onPointerMove,
       onPointerUp: endDrag,

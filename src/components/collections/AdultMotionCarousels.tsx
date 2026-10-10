@@ -60,7 +60,7 @@ export function AdultHeroCoverflow({
   const isBookmarked = isSaved(active.id);
 
   return (
-    <div className="desktop-content-shell relative z-10 mx-auto flex min-h-[960px] w-full max-w-[1500px] flex-col px-5 pb-14 pt-28 sm:px-8 lg:min-h-[850px] lg:px-16 lg:pb-10 lg:pt-24">
+    <div className="lg:!max-w-[1366px] relative z-10 mx-auto flex min-h-[960px] w-full max-w-[1500px] flex-col px-5 pb-14 pt-28 sm:px-8 lg:min-h-[850px] lg:px-16 lg:pb-10 lg:pt-24">
       <div className="relative h-[320px] shrink-0 sm:h-[455px]" style={{ perspective: '1450px' }}>
         {items.map((manga, index) => {
           let relative = index - activeIndex;

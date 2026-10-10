@@ -198,10 +198,12 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     eroSeri:     item.id,
     status:      item.status || '',
     totalViews:  item.totalViews || 0,
+    chapterCount: typeof item.chapterCount === 'number' && Number.isInteger(item.chapterCount) && item.chapterCount >= 0 ? item.chapterCount : undefined,
     rawFecha:    item.fecha || '',
     tituloOriginal: item.titulo_original || '',
     fechaManga:  item.fecha_manga || '',
     studio:      item.studio || '',
+    author:      typeof item.author === 'string' ? item.author : typeof item.autor === 'string' ? item.autor : '',
     platform:    item.platform || '',
     publishedAt: item.published_at || item.fecha || '',
     capitulosRecientes: caps,
@@ -456,9 +458,29 @@ export const getChapterPreviewImage = async (
    de la misma página y el paso de página repiten muchas series, así que la
    respuesta se guarda y las peticiones simultáneas comparten la misma promesa. */
 const seriesChaptersCache = new Map<string, SeriesChapter[]>();
-const seriesChaptersRequests = new Map<string, Promise<SeriesChapter[]>>();
+const seriesChaptersRequests = new Map<string, Promise<SeriesChapter[] | null>>();
+const chapterCountCache = new Map<string, { count: number; expiresAt: number }>();
+const CHAPTER_COUNT_CACHE_KEY = 'mangamukai:chapter-counts:v1';
+let chapterCountsRestored = false;
 
-export const getChaptersBySeries = async (eroSeri: number | string): Promise<SeriesChapter[]> => {
+/** Solo totales pequeños, con caducidad: reutilizables incluso al recargar el home. */
+export const getCachedSeriesChapterCount = (id: number | string): number | null => {
+  if (!chapterCountsRestored) {
+    chapterCountsRestored = true;
+    try {
+      const entries = JSON.parse(sessionStorage.getItem(CHAPTER_COUNT_CACHE_KEY) || '[]');
+      for (const [key, value] of entries) {
+        if (Number.isInteger(value?.count) && value.count >= 0 && value.expiresAt > Date.now()) chapterCountCache.set(key, value);
+      }
+    } catch { /* La caché es opcional. */ }
+  }
+  const chapters = seriesChaptersCache.get(String(id));
+  if (chapters) return new Set(chapters.map(chapter => chapter.id)).size;
+  const cached = chapterCountCache.get(String(id));
+  return cached && cached.expiresAt > Date.now() ? cached.count : null;
+};
+
+const loadSeriesChapters = async (eroSeri: number | string): Promise<SeriesChapter[] | null> => {
   const key = String(eroSeri);
   const cached = seriesChaptersCache.get(key);
   if (cached) return cached;
@@ -468,15 +490,16 @@ export const getChaptersBySeries = async (eroSeri: number | string): Promise<Ser
 
   const request = fetch(`${MM_API}/series/${key}/chapters`)
     .then(async (res) => {
-      if (!res.ok) return [];
+      if (!res.ok) return null;
       const data = await res.json();
-      const chapters = data.success ? (data.chapters as SeriesChapter[]) : [];
-      if (chapters.length > 0) seriesChaptersCache.set(key, chapters);
+      if (!data.success || !Array.isArray(data.chapters)) return null;
+      const chapters = data.chapters as SeriesChapter[];
+      seriesChaptersCache.set(key, chapters);
       return chapters;
     })
     .catch((error) => {
       console.error('Error getChaptersBySeries:', error);
-      return [] as SeriesChapter[];
+      return null;
     })
     .finally(() => {
       seriesChaptersRequests.delete(key);
@@ -484,6 +507,21 @@ export const getChaptersBySeries = async (eroSeri: number | string): Promise<Ser
 
   seriesChaptersRequests.set(key, request);
   return request;
+};
+
+export const getChaptersBySeries = async (eroSeri: number | string): Promise<SeriesChapter[]> =>
+  (await loadSeriesChapters(eroSeri)) ?? [];
+
+/** Total publicado, incluidos extras; un error no equivale a una serie sin capítulos. */
+export const getSeriesChapterCount = async (eroSeri: number | string): Promise<number | null> => {
+  const cached = getCachedSeriesChapterCount(eroSeri);
+  if (cached !== null) return cached;
+  const chapters = await loadSeriesChapters(eroSeri);
+  if (chapters === null) return null;
+  const count = new Set(chapters.map((chapter) => chapter.id)).size;
+  chapterCountCache.set(String(eroSeri), { count, expiresAt: Date.now() + 5 * 60 * 1000 });
+  try { sessionStorage.setItem(CHAPTER_COUNT_CACHE_KEY, JSON.stringify([...chapterCountCache])); } catch { /* Caché opcional. */ }
+  return count;
 };
 
 // ---------------------------------------------------------------------------

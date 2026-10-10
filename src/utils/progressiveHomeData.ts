@@ -1,0 +1,64 @@
+import type { MangaCapitulo } from '../types/manga';
+
+export const HOME_LISTS = ['popularHistorical', 'popularWeekly', 'latestWomen', 'popularMenHistorical', 'popularMenWeekly', 'latestMen', 'newReleases'] as const;
+export type HomeList = typeof HOME_LISTS[number];
+export type HomeLists = Record<HomeList, MangaCapitulo[]>;
+export interface HomeSnapshot extends HomeLists {
+  loaded: Record<HomeList, boolean>;
+  isReady: boolean;
+  isOutage: boolean;
+}
+
+const emptySnapshot = (): HomeSnapshot => ({
+  popularHistorical: [], popularWeekly: [], latestWomen: [],
+  popularMenHistorical: [], popularMenWeekly: [], latestMen: [], newReleases: [],
+  loaded: Object.fromEntries(HOME_LISTS.map(key => [key, false])) as Record<HomeList, boolean>,
+  isReady: false, isOutage: false,
+});
+
+/** Deduplica montajes y publica cada lista sin esperar a sus vecinas ni a imágenes. */
+export const createHomeDataLoader = (fetchers: Record<HomeList, () => Promise<MangaCapitulo[]>>, priorityWindowMs = 1200) => {
+  let snapshot = emptySnapshot();
+  let pending: Promise<void> | null = null;
+  const listeners = new Set<(data: HomeSnapshot) => void>();
+  // Dar ventaja al bloque superior sin que una consulta lenta bloquee toda la página.
+  const waitForPriority = (requests: Promise<void>[]) => new Promise<void>(resolve => {
+    const timer = setTimeout(resolve, priorityWindowMs);
+    void Promise.all(requests).then(() => { clearTimeout(timer); resolve(); });
+  });
+  const publish = (next: HomeSnapshot) => {
+    snapshot = next;
+    listeners.forEach(listener => listener(snapshot));
+  };
+  const loadList = async (key: HomeList) => {
+    let items: MangaCapitulo[];
+    try { items = await fetchers[key](); } catch { items = []; }
+    const loaded = { ...snapshot.loaded, [key]: true };
+    const next = { ...snapshot, [key]: items, loaded };
+    next.isReady = HOME_LISTS.every(list => loaded[list]);
+    next.isOutage = next.isReady && HOME_LISTS.every(list => next[list].length === 0);
+    publish(next);
+  };
+  return {
+    getSnapshot: () => snapshot,
+    subscribe(listener: (data: HomeSnapshot) => void) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    load(): Promise<void> {
+      if (pending) return pending;
+      if (snapshot.isReady && !snapshot.isOutage) return Promise.resolve();
+      if (snapshot.isOutage) publish(emptySnapshot());
+      pending = (async () => {
+        const priority = [loadList('popularHistorical'), loadList('popularWeekly')];
+        await waitForPriority(priority);
+        const lower = [loadList('latestWomen'),
+          loadList('popularMenHistorical'), loadList('popularMenWeekly'),
+          loadList('latestMen'), loadList('newReleases'),
+        ];
+        await Promise.all([...priority, ...lower]);
+      })().finally(() => { pending = null; });
+      return pending;
+    },
+  };
+};

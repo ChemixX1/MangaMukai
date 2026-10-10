@@ -1,0 +1,233 @@
+/* navigation: estilos compartidos entre tamaños de pantalla. */
+
+@media (max-width: 1023px) {
+  .mobile-tabbar-space:not(:has(.reader-page, .conversation-page, .character-intro-page)) {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+}
+
+.navbar-primary-link {
+  font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.profile-user-popover,
+.profile-user-popover button,
+.profile-user-popover a,
+.profile-user-menu-option {
+  font-family: "Montserrat", sans-serif;
+  font-weight: 600;
+}
+
+.navbar-adult-link,
+.navbar-adult-option {
+  align-items: center;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+}
+
+.navbar-adult-label {
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+}
+
+.navbar-adult-number {
+  margin-left: 0.22em;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: "lnum" 1, "tnum" 1;
+}
+
+.navbar-adult-option .navbar-fire-stack {
+  align-self: center;
+  vertical-align: 0;
+}
+
+@keyframes navbar-fire-outer-flicker {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(-4deg) scaleX(0.94) scaleY(1.04);
+    filter: drop-shadow(0 0 2px rgba(255, 59, 0, 0.8)) drop-shadow(0 0 5px rgba(255, 122, 24, 0.48));
+  }
+  28% {
+    transform: translate3d(0.4px, -1.2px, 0) rotate(3deg) scaleX(1.04) scaleY(0.94);
+    filter: drop-shadow(0 0 3px rgba(255, 72, 0, 0.92)) drop-shadow(0 0 7px rgba(255, 174, 0, 0.58));
+  }
+  61% {
+    transform: translate3d(-0.5px, -0.5px, 0) rotate(-1deg) scaleX(0.9) scaleY(1.12);
+  }
+  82% {
+    transform: translate3d(0.5px, -1px, 0) rotate(4deg) scaleX(1.07) scaleY(0.98);
+  }
+}
+
+@keyframes navbar-fire-core-flicker {
+  0%, 100% {
+    transform: translateX(-50%) scale(0.92, 1.02) rotate(2deg);
+    opacity: 0.92;
+  }
+  38% {
+    transform: translateX(-50%) translateY(-0.8px) scale(1.06, 0.9) rotate(-4deg);
+    opacity: 1;
+  }
+  72% {
+    transform: translateX(-50%) translateY(-1.2px) scale(0.86, 1.12) rotate(3deg);
+    opacity: 0.86;
+  }
+}
+
+@keyframes navbar-fire-ember-rise {
+  0% {
+    transform: translate3d(0, 1px, 0) scale(0.65);
+    opacity: 0;
+  }
+  22% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(var(--ember-drift), -10px, 0) scale(0.1);
+    opacity: 0;
+  }
+}
+
+.navbar-fire-stack {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: visible;
+  vertical-align: -0.16em;
+}
+
+.navbar-fire-outer,
+.navbar-fire-core {
+  position: absolute;
+  bottom: 0;
+  transform-origin: 50% 100%;
+  will-change: transform, opacity, filter;
+}
+
+.navbar-fire-outer {
+  inset-inline: 0;
+  color: #ff8a1f;
+  fill: #ff3b00;
+  animation: navbar-fire-outer-flicker 1.14s cubic-bezier(.45, .05, .55, .95) infinite;
+}
+
+.navbar-fire-core {
+  left: 50%;
+  bottom: 1px;
+  color: #fff6a5;
+  fill: #ffd21a;
+  animation: navbar-fire-core-flicker 0.86s ease-in-out -0.22s infinite;
+}
+
+.navbar-fire-ember {
+  --ember-drift: 2px;
+  position: absolute;
+  bottom: 58%;
+  left: 58%;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: #ffd84a;
+  box-shadow: 0 0 4px rgba(255, 110, 0, 0.9);
+  animation: navbar-fire-ember-rise 1.35s ease-out infinite;
+}
+
+.navbar-fire-ember-two {
+  --ember-drift: -3px;
+  left: 38%;
+  width: 1.5px;
+  height: 1.5px;
+  animation-delay: -0.72s;
+  animation-duration: 1.64s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-fire-outer,
+  .navbar-fire-core,
+  .navbar-fire-ember {
+    animation: none;
+  }
+  .navbar-fire-ember {
+    display: none;
+  }
+}
+
+.site-navbar-surface {
+  isolation: isolate;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+html.dark .site-navbar-surface {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: #000;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
+}
+
+/* Cabecera móvil (diseño de la portada móvil): 56 px sin línea inferior, con la campana y la lupa
+   centradas en cajas de 44 px; en el tema oscuro, un halo blanco. */
+.site-navbar-surface.site-navbar-mobile {
+  border-bottom-width: 0;
+}
+
+html.dark .site-navbar-surface.site-navbar-mobile {
+  box-shadow: 0 1px 8px rgb(255 255 255 / 0.25);
+}
+
+/* Cabecera de escritorio (diseño de PC): fondo liso del tema y línea gris abajo, sin sombra ni desenfoque. */
+.site-navbar-surface.site-navbar-desktop,
+html.dark .site-navbar-surface.site-navbar-desktop {
+  border-bottom: 1px solid var(--mm-pc-nav-line);
+  background: rgb(var(--mm-surface));
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+@keyframes navbar-search-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.navbar-search-pill::before,
+.navbar-search-pill > input {
+  animation: navbar-search-fade-in 0.32s ease-out 0.08s both;
+}
+
+.navbar-search-close {
+  animation: navbar-search-fade-in 0.28s ease-out 0.16s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-search-pill::before,
+  .navbar-search-pill > input,
+  .navbar-search-close {
+    animation: none;
+  }
+}
+
+.bn-monochrome .site-navbar-surface,
+.bn-monochrome [role="dialog"][aria-label="Menú principal"] {
+  filter: grayscale(1);
+}
+
+/* La geometría de la portada es compartida por todas las rutas y temas. */
+@media (min-width: 1024px) {
+  .site-navbar-desktop nav a { font-size: 14px; }
+}
+@media (min-width: 1280px) {
+  .site-navbar-desktop > div { padding-left: 56px; }
+}
+@media (max-width: 1023px) {
+  .home-mobile-wordmark { font-family: Montserrat, sans-serif; font-size: 20px; font-weight: 900; font-style: italic; }
+}

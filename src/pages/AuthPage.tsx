@@ -2,16 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
-  Cake,
-  CalendarDays,
   ChevronDown,
-  Eye,
-  EyeOff,
   Loader2,
-  Lock,
-  Mail,
-  Phone,
-  User,
+
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MANGAMUKAI_API, SOCIAL_LOGIN_SESSION_URL, socialLoginUrl, wordpressUrl } from "../config/api";
@@ -25,6 +18,14 @@ import {
   setSharedAuthCovers,
   type SharedAuthCover,
 } from "../utils/authCoverCache";
+
+import discordIcon from '../assets/auth/discord.svg';
+import registerDiscordIcon from '../assets/auth/register-discord.svg';
+import registerGoogleIcon from '../assets/auth/register-google.svg';
+import { AuthUserIcon, AuthMailIcon, AuthBirthdayIcon, AuthCalendarIcon, AuthPeruIcon, AuthPhoneIcon, AuthLockIcon, AuthEyeOffIcon, AuthEyeIcon } from '../components/auth/AuthIcons';
+
+import googleIcon from '../assets/auth/google.svg';
+import { AuthPasswordIcon } from '../components/auth/AuthPasswordIcon';
 
 type CoverItem = SharedAuthCover;
 
@@ -83,13 +84,13 @@ const SOCIAL_AUTH = [
   {
     provider: "discord",
     label: "Continuar con Discord",
-    icon: "https://cdn.simpleicons.org/discord/white",
+    icon: discordIcon,
     className: "border-[#6975f5] bg-[#5865F2] text-white hover:bg-[#4f5ae0]",
   },
   {
     provider: "google",
     label: "Continuar con Google",
-    icon: "https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",
+    icon: googleIcon,
     className: "border-black/10 bg-white text-zinc-900 hover:bg-zinc-100",
   },
 ] as const;
@@ -177,15 +178,15 @@ const CountryCodeSelect = ({
         aria-expanded={open}
         aria-label={`Código de país: ${selected.country} ${selected.code}`}
         onClick={() => setOpen((visible) => !visible)}
-        className={`flex h-[50px] w-full items-center gap-1.5 rounded-xl border px-2.5 text-sm font-normal outline-none transition-all hover:border-[#FF4D88]/60 focus:border-[#FF4D88] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${surface}`}
+        className={`flex h-[50px] w-full items-center gap-1.5 rounded-xl border px-2.5 text-sm font-normal outline-none transition-all hover:border-[#FF4D88]/60 ${surface}`}
       >
-        <img
+        {selected.iso === "pe" ? <AuthPeruIcon className="shrink-0" /> : <img
           src={countryFlag(selected.iso)}
           alt={`Bandera de ${selected.country}`}
           width="24"
           height="18"
           className="h-[16px] w-[22px] shrink-0 rounded-[3px] object-cover shadow-sm"
-        />
+        />}
         <span>{selected.code}</span>
         <ChevronDown className={`ml-auto shrink-0 transition-transform ${open ? "rotate-180" : ""}`} size={15} />
       </button>
@@ -324,12 +325,12 @@ const AuthCoverCollage = ({ covers, isLight, impulseToken }: { covers: CoverItem
     >
       <div className="auth-collage-perspective">
         <div className="auth-collage-grid">
-          {directions.map((direction, index) => (
-            <CoverColumn
-              key={`${direction}-${index}`}
-              covers={makeColumn(covers, index)}
-              direction={direction}
-            />
+          {[0, 1].map((half) => (
+            <div className={'auth-collage-half auth-collage-half-' + half} key={half}>
+              {directions.slice(half * 3, half * 3 + 3).map((direction, index) => (
+                <CoverColumn key={index} covers={makeColumn(covers, half * 3 + index)} direction={direction} />
+              ))}
+            </div>
           ))}
         </div>
       </div>
@@ -338,12 +339,12 @@ const AuthCoverCollage = ({ covers, isLight, impulseToken }: { covers: CoverItem
   );
 };
 
-export const AuthPage = () => {
+export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isLight = theme === "light";
-  const isLogin = location.pathname.endsWith("/login");
+  const isLogin = mode ? mode === "login" : location.pathname.endsWith("/login");
   const [socialReturnTo] = useState(() => {
     const query = new URLSearchParams(location.search);
     return readSocialReturn(query.get("social") || query.get("return_provider"));
@@ -523,12 +524,13 @@ export const AuthPage = () => {
     ? "auth-form-card-light border-black/10 bg-white text-zinc-950"
     : "auth-form-card-dark border-white/10 bg-[#09090c] text-white";
   const inputClass = isLight
-    ? "border-black/15 bg-white text-black placeholder:text-black/40 focus:border-[#FF4D88] focus:bg-white"
-    : "border-white/10 bg-[#111111] text-white placeholder:text-white/40 focus:border-[#FF4D88] focus:bg-[#171717]";
+    ? "border-black/15 bg-white text-black placeholder:text-black/40"
+    : "border-white/10 bg-[#111111] text-white placeholder:text-white/40";
+  const PasswordIcon = isLogin ? AuthPasswordIcon : AuthLockIcon;
   const fieldIconClass = isLight ? "text-black" : "text-white";
 
   return (
-    <div className={`auth-page auth-google-sans min-h-screen ${isLight ? "auth-page-light" : "auth-page-dark"}`}>
+    <div className={`auth-page auth-reference min-h-screen ${isLight ? "auth-page-light" : "auth-page-dark"}`}>
       <main className="auth-visual-stage relative min-h-screen overflow-hidden">
         {remoteCovers.length > 0 && <AuthCoverCollage covers={remoteCovers} isLight={isLight} impulseToken={coverImpulseToken} />}
 
@@ -547,13 +549,13 @@ export const AuthPage = () => {
                 </svg>
               </div>
             ) : <>
-            <div className="mb-7 text-center sm:mb-8">
+            <div className="auth-heading mb-7 text-center sm:mb-8">
               <h1 className="auth-title-audiowide whitespace-nowrap text-[clamp(1.25rem,4.7vw,1.65rem)] leading-none tracking-normal">
                 {isLogin ? "Bienvenido de nuevo" : "Crea tu cuenta"}
               </h1>
             </div>
 
-            <div className="grid grid-cols-1 gap-2.5">
+            <div className="auth-social grid grid-cols-1 gap-2.5">
               {SOCIAL_AUTH.map((social) => (
                 <a
                   key={social.provider}
@@ -565,7 +567,7 @@ export const AuthPage = () => {
                   aria-disabled={loading || !!success}
                   className={`flex min-h-[54px] items-center justify-center gap-2 rounded-[24px] border px-3 py-3 text-center text-[13px] font-semibold tracking-normal transition-colors ${social.className}`}
                 >
-                  <img src={social.icon} alt="" className="h-[18px] w-[18px]" decoding="async" />
+                  <img src={isLogin ? social.icon : social.provider === 'discord' ? registerDiscordIcon : registerGoogleIcon} alt="" className="h-[18px] w-[18px]" decoding="async" />
                   {social.label}
                 </a>
               ))}
@@ -581,9 +583,9 @@ export const AuthPage = () => {
               <div className={`auth-fields-panel space-y-3 rounded-[20px] border p-3.5 sm:space-y-3.5 sm:p-4 ${isLight ? "border-black/10 bg-black/[0.02]" : "border-white/10 bg-black/20"}`}>
                 {!isLogin && (
                   <>
-                    <AuthField label="Nombre de usuario">
+                    <AuthField label="Usuario">
                       <span className="relative block">
-                        <User className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
+                        <AuthUserIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
                         <input
                           value={username}
                           onChange={(event) => setUsername(event.target.value)}
@@ -592,14 +594,35 @@ export const AuthPage = () => {
                           required
                           aria-label="Nombre de usuario"
                           placeholder="Ingresa tu nombre de usuario"
-                          className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
+                          className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
                         />
                       </span>
                     </AuthField>
 
+                  </>
+                )}
+
+                <AuthField label="Correo electrónico">
+                  <span className="relative block">
+                    <AuthMailIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
+                    <input
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      type="email"
+                      autoComplete="email"
+                      required
+                      aria-label="Correo electrónico"
+                      placeholder="username@gmail.com"
+                      className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
+                    />
+                  </span>
+                </AuthField>
+
+                {!isLogin && (
+                  <>
                     <AuthField label="Fecha de nacimiento">
                       <span className="relative block">
-                        <Cake className={`pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 ${fieldIconClass}`} size={18} />
+                        <AuthBirthdayIcon className={`pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 ${fieldIconClass}`} size={18} />
                         <input
                           value={formatBirthDate(birthDate)}
                           type="text"
@@ -609,7 +632,7 @@ export const AuthPage = () => {
                           readOnly
                           required
                           aria-label="Fecha de nacimiento"
-                          className={`min-h-[50px] w-full cursor-default rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
+                          className={`min-h-[50px] w-full cursor-default rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
                         />
                         <input
                           ref={birthDatePickerRef}
@@ -628,7 +651,7 @@ export const AuthPage = () => {
                           aria-label="Abrir calendario de fecha de nacimiento"
                           className={`absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg transition-colors ${isLight ? "text-black/55 hover:bg-black/5 hover:text-black" : "text-white/55 hover:bg-white/10 hover:text-white"}`}
                         >
-                          <CalendarDays size={18} />
+                          <AuthCalendarIcon size={18} />
                         </button>
                       </span>
                     </AuthField>
@@ -640,7 +663,7 @@ export const AuthPage = () => {
 
                       <AuthField label="Teléfono">
                         <span className="relative block">
-                          <Phone className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
+                          <AuthPhoneIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
                           <input
                             value={phone}
                             onChange={(event) => setPhone(event.target.value)}
@@ -650,7 +673,7 @@ export const AuthPage = () => {
                             required
                             aria-label="Teléfono"
                             placeholder={phoneExample}
-                            className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
+                            className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
                           />
                         </span>
                       </AuthField>
@@ -658,25 +681,9 @@ export const AuthPage = () => {
                   </>
                 )}
 
-                <AuthField label="Correo electrónico">
-                  <span className="relative block">
-                    <Mail className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
-                    <input
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      type="email"
-                      autoComplete="email"
-                      required
-                      aria-label="Correo electrónico"
-                      placeholder="username@domain.com"
-                      className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
-                    />
-                  </span>
-                </AuthField>
-
                 <AuthField label="Contraseña">
                   <span className="relative block">
-                    <Lock className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
+                    <PasswordIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} />
                     <input
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
@@ -686,21 +693,22 @@ export const AuthPage = () => {
                       required
                       aria-label="Contraseña"
                       placeholder="Ingresa tu contraseña"
-                      className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] focus:shadow-[0_0_0_4px_rgba(255,77,136,0.12)] ${inputClass}`}
+                      className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((visible) => !visible)}
                       aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                      className={`absolute right-4 top-1/2 -translate-y-1/2 transition-colors hover:text-[#FF4D88] ${fieldIconClass}`}
+                      aria-pressed={showPassword}
+                      className={`auth-password-toggle absolute right-2 top-1/2 -translate-y-1/2 transition-colors hover:text-[#FF4D88] ${fieldIconClass}`}
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      {showPassword ? <AuthEyeIcon /> : <AuthEyeOffIcon />}
                     </button>
                   </span>
                 </AuthField>
 
                 {isLogin && (
-                  <div className="flex items-center justify-between gap-3 px-1 pt-0.5 text-[10px] sm:text-[11px]">
+                  <div className="auth-remember flex items-center justify-between gap-3 px-1 pt-0.5 text-[10px] sm:text-[11px]">
                     <label className={`flex cursor-pointer items-center gap-2 font-normal ${isLight ? "text-black" : "text-white"}`}>
                       <input
                         type="checkbox"
@@ -708,7 +716,7 @@ export const AuthPage = () => {
                         onChange={(event) => setRememberSession(event.target.checked)}
                         className="auth-remember-checkbox h-3.5 w-3.5 shrink-0 accent-[#FF4D88]"
                       />
-                      Mantener
+                      Recordar
                     </label>
                     <a
                       href={wordpressUrl("wp-login.php?action=lostpassword")}
@@ -736,9 +744,9 @@ export const AuthPage = () => {
               </button>
             </form>
 
-            <div className={`my-4 h-px ${isLight ? "bg-black/10" : "bg-white/10"}`} />
+            <div className={`auth-bottom-divider my-4 h-px ${isLight ? "bg-black/10" : "bg-white/10"}`} />
 
-            <p className={`text-center text-[11px] font-normal tracking-normal sm:text-xs ${isLight ? "text-zinc-600" : "text-zinc-400"}`}>
+            <p className={`auth-switch text-center text-[11px] font-normal tracking-normal sm:text-xs ${isLight ? "text-zinc-600" : "text-zinc-400"}`}>
               {isLogin ? "¿Todavía no tienes cuenta?" : "¿Ya tienes una cuenta?"}{" "}
               <Link
                 to={isLogin ? "/auth/register" : "/auth/login"}

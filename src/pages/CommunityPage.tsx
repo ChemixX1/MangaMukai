@@ -1,23 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, Bell, BookMarked, BookOpen, Bookmark, Feather, Heart, House, ImagePlus, Loader2, Mail, MessageCircle, Search, User, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, BookMarked, BookOpen, Bookmark, Heart, ImagePlus, Loader2, MessageCircle, Search, ShieldCheck, User, Users, X } from 'lucide-react';
 import { readLocalImage, useExperienceUser, useLocalExperience } from '../hooks/useLocalExperience';
 import { getChaptersBySeries, searchMangas, type SeriesChapter } from '../services/mangaService';
 import type { MangaCapitulo } from '../types/manga';
 import { communityAds, communitySeeds, computeTrends, formatCount, handleOf, suggestedReaders, timeAgo, type CommunityMangaTag, type CommunityPost } from '../data/communityPosts';
+import '../styles/community.css';
 
-type Tab = 'foryou' | 'trending';
-type View = 'home' | 'saved';
+type Tab = 'recent' | 'trending' | 'saved';
 type ExperienceUser = ReturnType<typeof useExperienceUser>;
 
 /** Único acento de la sección: el rosa de la marca con un mínimo de rojo (nada de rojo puro). */
 const ROSE = '#ff4a7d';
 const MAX_LENGTH = 1000;
-/** Cada cuántas publicaciones se intercala un anuncio en móvil. */
-const AD_EVERY = 2;
 
 const divider = 'border-black/10 dark:border-white/10';
-const muted = 'text-[#536471] dark:text-[#71767b]';
+const muted = 'text-[#69636e] dark:text-[#b2aab9]';
 const strong = 'text-black/80 dark:text-white/85';
 const rowHover = 'hover:bg-black/[0.03] dark:hover:bg-white/[0.03]';
 const iconHover = 'hover:bg-black/[0.06] dark:hover:bg-white/10';
@@ -52,7 +50,7 @@ const BOOKMARK = 'm19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z';
 const HeartGlyph = (props: { size: number; active: boolean; trace: boolean }) => <FillGlyph d={HEART} {...props} />;
 const BookmarkGlyph = (props: { size: number; active: boolean; trace: boolean }) => <FillGlyph d={BOOKMARK} {...props} />;
 
-/** Comunidad: feed tipo X con publicaciones locales; el chat de mensajes se abre desde el botón flotante. */
+/** Comunidad: publicaciones y una columna de descubrimiento, compartidas por PC y móvil. */
 export default function CommunityPage() {
   const user = useExperienceUser();
   // El chat se precarga aquí para que el botón "Mensajes" abra al instante, sin loader.
@@ -67,8 +65,7 @@ function Community() {
   const author = params.get('autor') || '';
   const [posts, savePosts] = useLocalExperience<CommunityPost[]>(`mm-community-${user.id}`, communitySeeds);
   const [follows, saveFollows] = useLocalExperience<string[]>(`mm-community-follows-${user.id}`, []);
-  const [tab, setTab] = useState<Tab>('foryou');
-  const [view, setView] = useState<View>('home');
+  const [tab, setTab] = useState<Tab>('recent');
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -83,216 +80,161 @@ function Community() {
     catch (caught) { setError((caught as Error).message); }
   };
 
-  const trends = useMemo(() => computeTrends(posts), [posts]);
-  const needle = query.trim().toLowerCase();
-  const visible = posts
-    .filter((post) =>
-      (!author || post.userId === author)
-      && (view !== 'saved' || post.saved)
-      && (!needle || `${post.content} ${post.name} ${post.manga?.title || ''}`.toLowerCase().includes(needle)));
-  // "Tendencia" ordena por interacción; "Para ti" respeta el orden de publicación.
-  const feed = tab === 'trending' && view === 'home' && !author
-    ? [...visible].sort((a, b) => (b.likes + b.comments.length * 2) - (a.likes + a.comments.length * 2))
-    : visible;
+  const trends = useMemo(() => computeTrends(posts, 4), [posts]);
+  const needle = query.trim().toLocaleLowerCase('es');
+  const visible = posts.filter((post) =>
+    (!author || post.userId === author)
+    && (tab !== 'saved' || post.saved)
+    && (!needle || `${post.content} ${post.name} ${post.manga?.title || ''}`.toLocaleLowerCase('es').includes(needle)));
+  const feed = [...visible].sort((a, b) => tab === 'trending'
+    ? (b.likes + b.comments.length * 2) - (a.likes + a.comments.length * 2)
+    : (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0));
 
-  const search = (value: string) => {
-    setQuery(value);
-    setView('home');
-    setParams({});
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
   const goHome = () => {
-    setView('home');
+    setTab('recent');
     setQuery('');
     setParams({});
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const focusComposer = () => {
-    goHome();
-    window.requestAnimationFrame(() => {
-      composerRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      composerRef.current?.focus();
-    });
+  const search = (value: string) => {
+    setQuery(value);
+    setTab('recent');
+    setParams({});
   };
   const showAuthor = (post: CommunityPost) => {
     if (post.userId === user.id && user.signedIn) navigate('/perfil');
-    else { setView('home'); setParams({ autor: post.userId }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    else {
+      setTab('recent');
+      setQuery('');
+      setParams({ autor: post.userId });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
-
-  const authorName = author ? (posts.find((post) => post.userId === author)?.name || user.name) : '';
-  const profileTo = user.signedIn ? '/perfil' : '/auth/login';
-  const navItems: Array<{ key: string; label: string; Icon: typeof House; to?: string; onClick?: () => void; active?: boolean }> = [
-    { key: 'home', label: 'Inicio', Icon: House, onClick: goHome, active: view === 'home' && !author },
-    { key: 'explore', label: 'Explorar', Icon: Search, to: '/biblioteca' },
-    { key: 'notifications', label: 'Notificaciones', Icon: Bell, to: '/notificaciones' },
-    { key: 'messages', label: 'Mensajes', Icon: Mail, to: '/mensajes' },
-    { key: 'saved', label: 'Guardados', Icon: Bookmark, onClick: () => { setView('saved'); setParams({}); }, active: view === 'saved' },
-    { key: 'profile', label: 'Perfil', Icon: UserRound, to: profileTo },
+  const authorName = author ? (posts.find((post) => post.userId === author)?.name || 'este lector') : '';
+  const filtered = !!needle || !!author;
+  const savedCount = posts.filter((post) => post.saved).length;
+  const tabs: Array<{ id: Tab; label: string }> = [
+    { id: 'recent', label: 'Recientes' },
+    { id: 'trending', label: 'Populares' },
+    { id: 'saved', label: 'Guardados' },
   ];
-  const navClass = (active?: boolean) => `flex w-fit items-center gap-5 rounded-full p-3 text-xl transition-colors ${iconHover} ${active ? 'font-bold' : ''}`;
-
-  const suggestions = trends.map((trend) => trend.label);
 
   return (
-    <div className="community-page mx-auto flex w-full max-w-[1265px] justify-center px-0 pt-[60px] lg:px-4 lg:pt-16">
-      {/* ───────── Navegación (escritorio) ───────── */}
-      <aside className="hidden w-[88px] shrink-0 lg:block xl:w-[275px]">
-        <div className="sticky top-16 flex h-[calc(100dvh-4rem)] flex-col justify-between pb-4 pr-3">
-          <nav aria-label="Navegación de comunidad" className="mt-1 flex flex-col items-start gap-1">
-            {navItems.map(({ key, label, Icon, to, onClick, active }) => to
-              ? <Link key={key} to={to} className={navClass(active)}><Icon size={26} strokeWidth={active ? 2.5 : 2} /><span className="hidden pr-4 xl:inline">{label}</span></Link>
-              : <button key={key} type="button" onClick={onClick} aria-current={active ? 'page' : undefined} className={navClass(active)}><Icon size={26} strokeWidth={active ? 2.5 : 2} /><span className="hidden pr-4 xl:inline">{label}</span></button>)}
-            <button type="button" onClick={focusComposer} className={`mt-4 flex h-[52px] w-[52px] items-center justify-center rounded-[4px] text-[17px] font-semibold transition-colors xl:w-[90%] ${pill}`}>
-              <Feather size={24} className="xl:hidden" />
-              <span className="hidden xl:inline">Publicar</span>
-            </button>
-          </nav>
-          <Link to={profileTo} className={`flex items-center gap-3 rounded-full p-3 transition-colors ${iconHover}`}>
-            <Avatar src={user.avatar} />
-            <span className="hidden min-w-0 xl:block">
-              <strong className="block truncate text-[15px] font-bold">{user.name}</strong>
-              <span className={`block truncate text-[15px] ${muted}`}>{user.signedIn ? handleOf(user.name) : 'Iniciar sesión'}</span>
-            </span>
+    <main className="community-page">
+      <div className="community-shell">
+        <header className="community-masthead">
+          <div className="min-w-0">
+            <span className="community-kicker">Manga, manhwa y manhua</span>
+            <h1 className="community-title">Comunidad<span aria-hidden="true">!</span></h1>
+            <p className="community-intro">Recomienda lecturas, comenta capítulos y comparte tus teorías.</p>
+          </div>
+          <Link to="/mensajes" className="community-button community-messages">
+            <MessageCircle size={19} aria-hidden="true" />
+            Mensajes
+            <ArrowUpRight size={16} aria-hidden="true" />
           </Link>
-        </div>
-      </aside>
-
-      {/* ───────── Feed ───────── */}
-      <main className={`min-h-[calc(100dvh-60px)] w-full max-w-[600px] min-w-0 border-x ${divider} lg:min-h-[calc(100dvh-4rem)]`}>
-        <header className={`border-b ${divider}`}>
-          {view === 'saved' || author ? (
-            <div className="flex items-center gap-4 px-4 py-2">
-              <button type="button" onClick={goHome} aria-label="Volver al inicio" className={`-ml-2 rounded-full p-2 transition-colors ${iconHover}`}><ArrowLeft size={20} /></button>
-              <h1 className="truncate text-xl font-bold">{author ? `Publicaciones de ${authorName}` : 'Guardados'}</h1>
-            </div>
-          ) : (
-            <>
-              <div className="hidden items-center px-4 py-3 lg:flex"><h1 className="text-xl font-bold">Inicio</h1></div>
-              {/* Las dos pestañas van juntas en el centro. */}
-              <div className="flex items-stretch justify-center gap-4" role="tablist" aria-label="Publicaciones">
-                {([['foryou', 'Para ti'], ['trending', 'Tendencia']] as Array<[Tab, string]>).map(([id, label]) => (
-                  <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`relative px-3 py-4 text-[15px] transition-colors ${tab === id ? 'font-bold' : muted}`}>
-                    {label}
-                    {tab === id && <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-1 rounded-full" style={{ backgroundColor: ROSE }} />}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <span className="community-masthead-dots" aria-hidden="true" />
         </header>
 
-        {view === 'home' && !author && (
-          <>
-            <Composer user={user} textareaRef={composerRef} onPost={(post) => { if (write([post, ...posts])) { setTab('foryou'); setQuery(''); return true; } return false; }} onError={setError} />
-            {/* Respiro entre el compositor y el feed. */}
-            <div aria-hidden="true" className={`h-4 border-b ${divider}`} />
-          </>
-        )}
+        <div className="community-layout">
+          <div className="community-main">
+            {/* Una sola entrada para publicar; permanece montada al filtrar para conservar el borrador. */}
+            <div hidden={tab === 'saved' || !!author || !!needle}>
+              <Composer user={user} textareaRef={composerRef} onPost={(post) => {
+                if (!write([post, ...posts])) return false;
+                goHome();
+                return true;
+              }} onError={setError} />
+            </div>
 
-        {query && <div className={`flex items-center justify-between gap-3 border-b px-4 py-2.5 text-[14px] ${divider}`}><span className="truncate">Resultados para <strong>{query}</strong></span><button type="button" onClick={() => setQuery('')} className={`flex items-center gap-1 text-[13px] font-bold ${muted}`}>Limpiar <X size={14} /></button></div>}
+            <section className="community-board" aria-label="Publicaciones de la comunidad">
+              <div className="community-feed-tools">
+                <div className="community-tabs" role="group" aria-label="Filtrar publicaciones">
+                  {tabs.map(({ id, label }) => (
+                    <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setParams({}); }} className={tab === id ? 'is-active' : ''}>
+                      {id === 'saved' && <Bookmark size={14} aria-hidden="true" />}
+                      {label}
+                      {id === 'saved' && savedCount > 0 && <span className="community-tab-count">{savedCount}</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="community-search" role="search" aria-label="Búsqueda de publicaciones">
+                  <Search size={17} aria-hidden="true" />
+                  <input type="search" aria-label="Buscar en la comunidad" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar publicaciones…" />
+                  {query && <button type="button" onClick={() => setQuery('')} aria-label="Limpiar búsqueda"><X size={17} /></button>}
+                </div>
+              </div>
 
-        {error && <p role="alert" className="bg-[#ff4a7d]/10 px-4 py-2 text-[13px] text-[#ff4a7d]">{error}</p>}
+              {!author && tab !== 'saved' && (
+                <div className="community-topics" role="group" aria-label="Temas de conversación">
+                  <span>Temas populares</span>
+                  {trends.map((trend) => (
+                    <button key={trend.label} type="button" aria-pressed={query === trend.label} onClick={() => search(query === trend.label ? '' : trend.label)} title={trend.hint}>
+                      {trend.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-        {feed.map((post, index) => (
-          <FeedItem key={post.id} index={index} withAds={view === 'home'}>
-            <PostCard post={post} user={user} onUpdate={update} onAuthor={showAuthor} onTag={search} />
-          </FeedItem>
-        ))}
+              <div className="community-feed-caption">
+                <h2>{author ? `Publicaciones de ${authorName}` : needle ? (tab === 'saved' ? 'Resultados en guardados' : 'Resultados de búsqueda') : tab === 'saved' ? 'Publicaciones guardadas' : tab === 'trending' ? 'Publicaciones populares' : 'Publicaciones recientes'}</h2>
+                <span aria-live="polite">{feed.length} {feed.length === 1 ? 'publicación' : 'publicaciones'}</span>
+              </div>
+              {filtered && (
+                <div className="community-filter-summary">
+                  <span>{needle ? `Buscando «${query.trim()}»` : `Solo ${authorName}`}</span>
+                  <button type="button" onClick={goHome}><ArrowLeft size={14} /> Ver todas</button>
+                </div>
+              )}
+              {error && <p role="alert" className="community-error">{error}</p>}
 
-        {!feed.length && (
-          <div className="px-8 py-14 text-center">
-            <h2 className="text-[26px] font-extrabold leading-tight tracking-tight">{view === 'saved' ? 'Guarda publicaciones para después' : 'Nada por aquí'}</h2>
-            <p className={`mx-auto mt-2 max-w-xs text-[15px] ${muted}`}>{view === 'saved' ? 'Toca el marcador de una publicación y aparecerá aquí.' : 'Prueba otra búsqueda o comparte tu próxima lectura.'}</p>
+              <div className="community-feed">
+                {feed.map((post) => <PostCard key={post.id} post={post} user={user} onUpdate={update} onAuthor={showAuthor} onTag={search} />)}
+                {!feed.length && (
+                  <div className="community-card community-empty">
+                    {tab === 'saved' ? <Bookmark size={30} aria-hidden="true" /> : <Search size={30} aria-hidden="true" />}
+                    <h3>{needle ? 'No encontramos publicaciones' : tab === 'saved' ? 'Aún no tienes guardados' : 'Todavía no hay publicaciones'}</h3>
+                    <p>{needle ? 'Prueba con otro título, tema o nombre de lector.' : tab === 'saved' ? 'Guarda una publicación con el marcador y vuelve a ella cuando quieras.' : 'Comparte una recomendación o descubre lo que están leyendo los demás.'}</p>
+                    <button type="button" onClick={goHome} className="community-button">Explorar publicaciones <ArrowUpRight size={16} /></button>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
-        )}
-      </main>
 
-      {/* ───────── Columna derecha ───────── */}
-      <aside className="hidden w-[350px] shrink-0 pl-8 xl:block">
-        <div className="sticky top-16 space-y-4 pt-2">
-          <DesktopSearch query={query} suggestions={suggestions} onChange={setQuery} onPick={search} />
+          {/* Los mismos paneles pasan debajo del listado en pantallas pequeñas. */}
+          <aside className="community-sidebar" aria-label="Anuncios y lectores">
+            <section className="community-promotions" aria-labelledby="community-ads-title">
+              <div className="community-section-label"><h2 id="community-ads-title">Anuncios</h2><span>MangaMukai</span></div>
+              {communityAds.map((ad) => <CommunityAd key={ad.id} ad={ad} />)}
+            </section>
 
-          <section className={`overflow-hidden rounded-2xl ${panel}`}>
-            <h2 className="px-4 pb-1 pt-3 text-xl font-extrabold">Qué está pasando</h2>
-            {trends.map((trend) => (
-              <button key={trend.label} type="button" onClick={() => search(query === trend.label ? '' : trend.label)} className={`block w-full px-4 py-3 text-left transition-colors ${rowHover}`}>
-                <small className={`block text-[13px] ${muted}`}>{trend.category}</small>
-                <strong className="block truncate text-[15px] font-bold">{trend.label}</strong>
-                <small className={`block text-[13px] ${muted}`}>{trend.hint}</small>
-              </button>
-            ))}
-          </section>
+            <section className="community-card community-readers" aria-labelledby="community-readers-title">
+              <div className="community-readers-heading"><Users size={19} aria-hidden="true" /><h2 id="community-readers-title">Lectores sugeridos</h2></div>
+              {suggestedReaders.filter((reader) => reader.userId !== user.id).map((reader) => <FollowRow key={reader.userId} reader={reader} following={follows.includes(reader.userId)} onToggle={toggleFollow} onSelect={() => { setTab('recent'); setQuery(''); }} />)}
+            </section>
 
-          <section className={`overflow-hidden rounded-2xl ${panel}`}>
-            <h2 className="px-4 pb-1 pt-3 text-xl font-extrabold">A quién seguir</h2>
-            {suggestedReaders.map((reader) => <FollowRow key={reader.userId} reader={reader} following={follows.includes(reader.userId)} onToggle={toggleFollow} />)}
-          </section>
-
-          <section className={`rounded-2xl border p-4 ${divider}`}>
-            <h2 className="text-xl font-extrabold">Mukai Store</h2>
-            <p className={`mt-1 text-[15px] ${muted}`}>Tus historias, fuera de la pantalla. Explora la nueva colección.</p>
-            <Link to="/tienda" className={`mt-3 inline-flex h-9 items-center px-4 text-[15px] font-bold ${pill}`}>Ir a la tienda</Link>
-          </section>
-
-          <p className={`px-4 text-[13px] leading-relaxed ${muted}`}>Vista local con publicaciones de ejemplo · Respeta a otros lectores y avisa antes de compartir spoilers.</p>
+            <div className="community-guidelines">
+              <ShieldCheck size={18} aria-hidden="true" />
+              <div><p>Comparte con respeto. Avisa si hay spoilers.</p><Link to="/normas-comunidad">Normas de la comunidad <ArrowUpRight size={12} /></Link></div>
+            </div>
+          </aside>
         </div>
-      </aside>
-
-      {/* Botón flotante: abre el chat de mensajes a pantalla completa. */}
-      <button
-        type="button"
-        onClick={() => navigate('/mensajes')}
-        className="fixed bottom-[calc(64px+env(safe-area-inset-bottom)+16px)] right-4 z-[90] flex h-12 items-center gap-2 rounded-[3px] px-5 font-[Montserrat] text-[14px] font-bold text-white transition-transform hover:scale-[1.03] active:scale-95 lg:bottom-8 lg:right-8"
-        style={{ backgroundColor: ROSE }}
-      >
-        <MessageCircle size={20} strokeWidth={2.4} />
-        Mensajes
-      </button>
-    </div>
+      </div>
+    </main>
   );
 }
 
-/** Buscador de la columna derecha: al enfocarlo muestra los temas más relevantes, que filtran el feed al elegirlos. */
-function DesktopSearch({ query, suggestions, onChange, onPick }: { query: string; suggestions: string[]; onChange: (value: string) => void; onPick: (value: string) => void }) {
-  const [focused, setFocused] = useState(false);
+function CommunityAd({ ad }: { ad: typeof communityAds[number] }) {
   return (
-    <div className="relative">
-      <label className={`flex h-11 items-center gap-3 rounded-full bg-[#eff3f4] px-4 dark:bg-[#202327] ${muted}`}>
-        <Search size={18} />
-        <input aria-label="Buscar en la comunidad" value={query} onChange={(event) => onChange(event.target.value)} onFocus={() => setFocused(true)} onBlur={() => window.setTimeout(() => setFocused(false), 150)} placeholder="Buscar" className="min-w-0 flex-1 bg-transparent text-[15px] text-black outline-none placeholder:opacity-60 dark:text-white" />
-        {query && <button type="button" onClick={() => onChange('')} aria-label="Limpiar búsqueda"><X size={16} /></button>}
-      </label>
-      {focused && (
-        <div className={`absolute inset-x-0 top-12 z-20 overflow-hidden rounded-2xl border bg-white shadow-xl dark:bg-black ${divider}`}>
-          <p className={`px-4 pb-1 pt-3 text-[13px] font-semibold ${muted}`}>Temas relevantes</p>
-          {suggestions.map((label) => (
-            <button key={label} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { onPick(label); setFocused(false); }} className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] transition-colors ${rowHover}`}><Search size={16} className={muted} /><span className="truncate">{label}</span></button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Intercala un anuncio pequeño (solo móvil) cada AD_EVERY publicaciones. */
-function FeedItem({ index, withAds, children }: { index: number; withAds: boolean; children: ReactNode }) {
-  const ad = withAds && (index + 1) % AD_EVERY === 0 ? communityAds[(Math.floor(index / AD_EVERY)) % communityAds.length] : null;
-  return (
-    <>
-      {children}
-      {ad && (
-        <div className={`border-b px-4 py-7 lg:hidden ${divider}`}>
-          <Link to={ad.to} className={`flex items-center gap-5 rounded-2xl border p-6 transition-colors ${divider} ${panel} ${iconHover}`} aria-label={`Anuncio: ${ad.title}`}>
-            <img src={ad.image} alt="" className="h-32 w-24 shrink-0 rounded-lg object-cover object-top" />
-            <span className="min-w-0 flex-1">
-              <small className={`block text-[10px] font-bold tracking-[0.14em] ${muted}`}>{ad.eyebrow} · ANUNCIO</small>
-              <strong className="mt-1 block text-[16px] font-bold leading-tight">{ad.title}</strong>
-              <span className={`mt-1.5 flex items-center gap-1 text-[13px] ${muted}`}>{ad.text} <ArrowUpRight size={14} /></span>
-            </span>
-          </Link>
-        </div>
-      )}
-    </>
+    <Link to={ad.to} className={`community-ad community-ad--${ad.id}`} aria-label={`Anuncio de ${ad.eyebrow}: ${ad.title}`}>
+      <img src={ad.image} alt="" loading="lazy" className="community-ad-art" />
+      <span className="community-ad-copy">
+        <small>{ad.eyebrow}</small>
+        <strong>{ad.title}</strong>
+        <span className="community-ad-description">{ad.text}</span>
+        <span className="community-ad-cta">{ad.cta} <ArrowUpRight size={16} aria-hidden="true" /></span>
+      </span>
+    </Link>
   );
 }
 
@@ -324,18 +266,20 @@ function Composer({ user, textareaRef, onPost, onError }: {
   };
 
   return (
-    <form onSubmit={submit} className={`flex gap-3 border-b px-4 pb-3 pt-3 ${divider}`}>
+    <form onSubmit={submit} className="community-card community-composer">
       <Avatar src={user.avatar} />
       <div className="min-w-0 flex-1">
+        <label htmlFor="community-draft" className="community-composer-label">Crea una publicación</label>
         <textarea
+          id="community-draft"
           ref={textareaRef}
           aria-label="Nueva publicación"
           value={text}
           maxLength={MAX_LENGTH}
           rows={1}
-          placeholder="Comparte tu experiencia…"
+          placeholder="Recomienda un manga, comparte una teoría o inicia un debate…"
           onChange={(event) => { setText(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${event.target.scrollHeight}px`; }}
-          className="block min-h-[72px] w-full resize-none bg-transparent py-3 text-[17px] leading-6 outline-none placeholder:text-[#536471] dark:placeholder:text-[#71767b]"
+          className="block min-h-[64px] w-full resize-none bg-transparent py-2 text-[15px] leading-6 outline-none placeholder:text-[#697078] dark:placeholder:text-[#9b9ba3]"
         />
         {image && (
           <div className="relative mb-2 w-fit">
@@ -368,7 +312,7 @@ function Composer({ user, textareaRef, onPost, onError }: {
           </div>
           <div className="flex items-center gap-3">
             {text.length > 0 && <span className={`text-[13px] ${text.length >= MAX_LENGTH ? 'text-[#ff4a7d]' : muted}`}>{text.length}/{MAX_LENGTH}</span>}
-            <button type="submit" disabled={!canPost} className={`h-9 rounded-[4px] px-4 text-[15px] font-semibold transition-colors disabled:opacity-50 ${pill}`}>{reading ? 'Cargando…' : 'Publicar'}</button>
+            <button type="submit" disabled={!canPost} className="community-button community-button--accent">{reading ? 'Cargando…' : 'Publicar'}</button>
           </div>
         </div>
         <input
@@ -472,22 +416,22 @@ function MangaPicker({ onPick, onClose }: { onPick: (tag: CommunityMangaTag) => 
   );
 }
 
-function FollowRow({ reader, following, onToggle }: { reader: { userId: string; name: string; avatar: string }; following: boolean; onToggle: (id: string) => void }) {
+function FollowRow({ reader, following, onToggle, onSelect }: { reader: { userId: string; name: string; avatar: string }; following: boolean; onToggle: (id: string) => void; onSelect: () => void }) {
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 transition-colors ${rowHover}`}>
-      <Avatar src={reader.avatar} />
+    <div className={`flex items-center gap-2.5 px-4 py-3 transition-colors ${rowHover}`}>
+      <Link to={`/comunidad?autor=${reader.userId}`} onClick={onSelect} aria-label={`Publicaciones de ${reader.name}`}><Avatar src={reader.avatar} className="h-9 w-9" /></Link>
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-[15px] font-bold">{reader.name}</strong>
-        <span className={`block truncate text-[15px] ${muted}`}>{handleOf(reader.name)}</span>
+        <Link to={`/comunidad?autor=${reader.userId}`} onClick={onSelect} className="block truncate text-[13px] font-bold hover:underline">{reader.name}</Link>
+        <span className={`block truncate text-[11px] ${muted}`}>{handleOf(reader.name)}</span>
       </span>
-      <button type="button" onClick={() => onToggle(reader.userId)} aria-pressed={following} className={`h-8 px-4 text-[14px] font-bold transition-colors ${following ? `rounded-full border ${divider} hover:border-[#ff4a7d] hover:text-[#ff4a7d]` : pill}`}>{following ? 'Siguiendo' : 'Seguir'}</button>
+      <button type="button" onClick={() => onToggle(reader.userId)} aria-pressed={following} aria-label={`${following ? 'Dejar de seguir a' : 'Seguir a'} ${reader.name}`} className="community-follow">{following ? 'Siguiendo' : 'Seguir'}</button>
     </div>
   );
 }
 
 /** Texto de la publicación con los hashtags como enlaces de búsqueda. */
 const PostText = ({ content, onTag }: { content: string; onTag: (tag: string) => void }) => (
-  <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px] leading-5">
+  <p className="mt-2 whitespace-pre-wrap break-words text-[14px] leading-[1.75] sm:text-[15px]">
     {content.split(/(#[\p{L}\p{N}_]+)/u).map((part, index) => part.startsWith('#')
       ? <button key={index} type="button" onClick={() => onTag(part)} className="font-medium text-black hover:underline dark:text-white">{part}</button>
       : part)}
@@ -528,23 +472,24 @@ function PostCard({ post, user, onUpdate, onAuthor, onTag }: {
   });
 
   return (
-    <article className={`flex gap-3 border-b px-4 py-3 transition-colors ${divider} ${rowHover}`}>
+    <article className="community-card community-post">
       <button type="button" onClick={() => onAuthor(post)} aria-label={`Perfil de ${name}`} className="h-10 shrink-0"><Avatar src={avatar} /></button>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1 text-[15px]">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] sm:text-[14px]">
           <button type="button" onClick={() => onAuthor(post)} className="truncate font-bold hover:underline">{name}</button>
-          <span className={`truncate ${muted}`}>{handleOf(name)}</span>
+          <span className={`max-w-[130px] truncate ${muted}`}>{handleOf(name)}</span>
           {post.createdAt && <><span className={muted}>·</span><time dateTime={post.createdAt} className={`shrink-0 ${muted}`}>{timeAgo(post.createdAt)}</time></>}
+          {post.demo && <span className="community-example">Ejemplo</span>}
         </div>
         {post.content && <PostText content={post.content} onTag={onTag} />}
-        {post.image && <img src={post.image} alt="Imagen de la publicación" loading="lazy" className={`mt-3 max-h-[500px] w-full rounded-2xl border object-cover ${divider}`} />}
+        {post.image && <img src={post.image} alt="Imagen de la publicación" loading="lazy" className="community-post-image" />}
         {post.manga && (
           <Link to={post.manga.chapterId ? `/read/${post.manga.chapterId}` : `/manga/${post.manga.id}`} className={`mt-3 flex items-center gap-3 rounded-xl border p-2 transition-colors ${divider} ${iconHover}`}>
             {post.manga.showCover && post.manga.cover
               ? <img src={post.manga.cover} alt="" className="h-20 w-14 shrink-0 rounded-md object-cover" loading="lazy" />
               : <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${panel}`}><BookOpen size={18} /></span>}
             <span className="min-w-0 flex-1">
-              <small className={`block text-[11px] font-semibold ${muted}`}>Recomienda</small>
+              <small className={`block text-[11px] font-semibold ${muted}`}>Manga recomendado</small>
               <strong className="block truncate text-[14px] font-bold">{post.manga.title}</strong>
               {post.manga.chapterLabel && <span className={`block truncate text-[12px] ${muted}`}>{post.manga.chapterLabel}</span>}
             </span>
@@ -552,7 +497,7 @@ function PostCard({ post, user, onUpdate, onAuthor, onTag }: {
           </Link>
         )}
 
-        <div className="-ml-2 mt-2 flex items-center gap-3">
+        <div className={`-ml-2 mt-3 flex items-center gap-3 border-t pt-1 ${divider}`}>
           <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label="Comentar" className={`${actionClass(commented)} hover:text-[#ff4a7d]`} style={commented ? { color: ROSE } : undefined}>
             <span key={trace} className="p-1"><CommentGlyph size={23} trace={trace > 0} /></span>{post.comments.length > 0 && formatCount(post.comments.length)}
           </button>

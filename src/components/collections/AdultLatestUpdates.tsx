@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import type { MangaCapitulo } from '../../types/manga';
-import { PaginationControls } from '../common';
+import { ArrowPagination } from '../ui';
 import { useChapterAccess } from '../../hooks/useChapterAccess';
 import { getChaptersBySeries, type SeriesChapter } from '../../services/mangaService';
 import { getStoredToken, getUnlockedChapters } from '../../services/authService';
@@ -175,7 +175,7 @@ export function AdultLatestUpdates({
 
   return (
     <section className={`relative py-12 sm:py-16 ${isLight ? 'bg-[#f5f6f8]' : 'bg-black'}`}>
-      <div id={sectionId} className="desktop-content-shell mx-auto w-full max-w-[1600px] scroll-mt-24 px-4 sm:px-5 lg:px-8">
+      <div id={sectionId} className="lg:!max-w-[1366px] mx-auto w-full max-w-[1600px] scroll-mt-24 px-4 sm:px-5 lg:px-8">
         <div className="mb-7 flex items-end justify-between gap-4">
           <div className={`flex items-center gap-3 border-l-4 pl-4 ${accentClasses.border}`}>
             <Clock className={`h-7 w-7 sm:h-8 sm:w-8 ${accentClasses.text}`} strokeWidth={3} />
@@ -282,13 +282,13 @@ export function AdultLatestUpdates({
           })}
         </div>
         {chapterAccessModal}
-        <PaginationControls
+        <ArrowPagination
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
-          accent={accent}
+          accent={accent === 'blue' ? 'cyan' : 'pink'}
           scrollTargetId={sectionId}
-          theme={isLight ? 'light' : 'dark'}
+          className="mt-12"
         />
       </div>
     </section>

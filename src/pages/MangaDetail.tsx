@@ -1,26 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  ArrowDown,
-  ArrowUp,
-  Bookmark,
-  BookMarked,
-  BookOpen,
-  BookType,
-  Building2,
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  Heart,
-  List,
-  Loader2,
-  MessageSquareText,
-  MonitorPlay,
-  Palette,
-  Search,
-  Users,
-} from 'lucide-react';
+import { Bookmark, BookOpen, BookOpenText, ChevronDown, Loader2, Users } from 'lucide-react';
 
 import {
   getChaptersBySeries,
@@ -44,17 +25,34 @@ import {
   refreshUser,
 } from '../services/authService';
 import type { MangaCapitulo } from '../types/manga';
-import { ChapterList, MangaComments, MangaMusicCard, MangaRecommendationSidebar } from '../components/manga';
+import { ChapterList, MangaComments, MangaMusicCard, MangaRecommendations } from '../components/manga';
 import { MobileMangaDetail } from '../components/manga/mobile/MobileMangaDetail';
+import {
+  LikeHeartIcon,
+  PaletteIcon,
+  PlatformIcon,
+  PublishedIcon,
+  SaveBookmarkIcon,
+  SearchIcon,
+  SortDownIcon,
+  SortUpIcon,
+  StudioIcon,
+  TypeIcon,
+  ChaptersTabIcon,
+  SynopsisTabIcon,
+  CommentsTabIcon,
+} from '../components/manga/designIcons';
+import { MANGA_REACTIONS, ReactionButton, ReactionRingGradient, createReactionCounts, type MangaReactionId } from '../components/manga/reactions';
 import { useIsMobileViewport } from '../hooks/useIsMobileViewport';
 import { MangaDetailClock } from '../components/common';
-import { Footer } from '../components/layout';
-import { FOOTER_SOCIALS } from '../components/layout/Footer';
+import { Footer, FOOTER_SOCIALS } from '../components/layout/Footer';
 import { useTheme } from '../hooks/useTheme';
 import { toTitleCase } from '../utils/titleCase';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { collectionBadge } from '../utils/womenBlackWhite';
-import { preloadImages } from '../utils/preloadImages';
+import { whenIdle } from '../utils/whenIdle';
+import { MangaCommunityLinks } from '../components/manga/MangaCommunityLinks';
+import { DetailViewsIcon } from '../components/manga/referenceIcons';
 
 const formatCompactNumber = (value: number) => new Intl.NumberFormat('es-PE', {
   notation: value >= 1000 ? 'compact' : 'standard',
@@ -82,50 +80,52 @@ const cleanSynopsis = (title: string, synopsis?: string) => {
   return trimmed;
 };
 
-const MANGA_REACTIONS = [
-  { id: 'like', symbol: '👍', label: 'Me gusta' },
-  { id: 'love', symbol: '❤️', label: 'Me encanta' },
-  { id: 'haha', symbol: '😂', label: 'Me divierte' },
-  { id: 'wow', symbol: '😮', label: 'Me asombra' },
-  { id: 'sad', symbol: '😢', label: 'Me entristece' },
-  { id: 'angry', symbol: '😡', label: 'Me enoja' },
-] as const;
+/** El catálogo usa cuatro tipos: Manga, Manhwa, Manhua y Comic (mismos colores que en móvil). */
+const typeDotColor = (type = '') => {
+  const normalized = type.toLocaleLowerCase('es');
+  if (normalized.includes('manhua')) return '#22C55E';
+  if (normalized.includes('manhwa')) return '#B000AD';
+  if (normalized.includes('comic')) return '#38BDF8';
+  return '#FF008C';
+};
 
-type MangaReactionId = (typeof MANGA_REACTIONS)[number]['id'];
+/** Fila de la ficha técnica del diseño móvil: icono, etiqueta en negrita y valor a la derecha. */
+const MetaRow = ({ icon, label, value, dotColor }: { icon: ReactNode; label: string; value: string; dotColor?: string }) => (
+  <div className="flex min-h-[37px] items-start gap-2.5 text-ink">
+    <span className="flex w-[26px] shrink-0 justify-center">{icon}</span>
+    <span className="shrink-0 pt-1 font-montserrat text-base font-extrabold leading-4 tracking-tight">{label}</span>
+    <span className="ml-auto inline-flex min-w-0 items-center gap-2 pt-1 text-right font-montserrat text-base font-normal leading-4 tracking-tight">
+      {dotColor && <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 animate-dot-blink rounded-full motion-reduce:animate-none" style={{ backgroundColor: dotColor }} />}
+      <span className="truncate">{value || 'N/A'}</span>
+    </span>
+  </div>
+);
 
-const createReactionCounts = (): Record<MangaReactionId, number> => Object.fromEntries(
-  MANGA_REACTIONS.map(({ id }) => [id, 0]),
-) as Record<MangaReactionId, number>;
+const BADGE = 'flex h-6 min-w-16 items-center justify-center gap-1 rounded-lg px-2 font-montserrat text-xs font-bold leading-4';
 
-function SidebarMetaRow({ icon, label, value, isLight, valueDotColor }: { icon: ReactNode; label: string; value: string; isLight: boolean; valueDotColor?: string }) {
-  return (
-    <div className="google-sans-library flex min-h-[35px] min-w-0 items-center gap-1.5 sm:min-h-[40px] sm:gap-2 sm:py-0.5">
-      <span className={`shrink-0 [&>svg]:h-[23px] [&>svg]:w-[23px] sm:[&>svg]:h-6 sm:[&>svg]:w-6 ${isLight ? 'text-black' : 'text-white'}`}>{icon}</span>
-      <span className={`shrink-0 text-[15px] font-bold sm:text-[16px] ${isLight ? 'text-black' : 'text-white'}`}>{label}</span>
-      <span className={`ml-auto inline-flex max-w-[64%] items-center justify-end gap-1.5 overflow-visible text-right text-[15px] font-normal sm:text-[16px] ${isLight ? 'text-black/75' : 'text-white/75'}`}>
-        {valueDotColor && <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true"><span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-55" style={{ backgroundColor: valueDotColor }} /><span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: valueDotColor, boxShadow: `0 0 12px ${valueDotColor}` }} /></span>}
-        <span className="truncate">{value || 'N/A'}</span>
-      </span>
-    </div>
-  );
-}
+/** Pestañas Capítulos · Sinopsis · Comentarios: la activa sobre la píldora que se desliza. */
+const tabClass = (active = false) =>
+  `relative z-[1] flex h-full flex-1 basis-0 items-center justify-center gap-2 whitespace-nowrap rounded-full font-montserrat text-[13px] leading-5 transition-[color,font-weight] duration-[260ms] ${active ? 'font-bold text-surface' : 'font-normal text-ink hover:text-mukai-magenta'}`;
+
 
 export const MangaDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isLightMode = theme === 'light';
-  // Por debajo de lg la ficha usa su diseño móvil propio; en escritorio, el clásico.
   const isMobile = useIsMobileViewport();
-  const [isDesktopMusicPlacement, setIsDesktopMusicPlacement] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
-  ));
 
   const [manga, setManga] = useState<MangaCapitulo | null>(null);
   const [chapters, setChapters] = useState<SeriesChapter[]>([]);
   const [related, setRelated] = useState<RelatedManga[]>([]);
   const [initialComments, setInitialComments] = useState<MangaComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chaptersLoading, setChaptersLoading] = useState(true);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [relatedLoading, setRelatedLoading] = useState(true);
+  const [secondaryReady, setSecondaryReady] = useState(false);
+  const [commentsError, setCommentsError] = useState('');
+  const [chaptersError, setChaptersError] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   const [synopsisHasOverflow, setSynopsisHasOverflow] = useState(false);
@@ -137,6 +137,8 @@ export const MangaDetail = () => {
   // Solo la ultima peticion de reaccion puede reconciliar el estado optimista.
   const reactionSequence = useRef(0);
   const [reactionError, setReactionError] = useState('');
+  // Reacción recién pulsada: su aro se dibuja dando una vuelta, como en móvil.
+  const [tracingReaction, setTracingReaction] = useState<MangaReactionId | null>(null);
 
   useEffect(() => {
     if (!manga?.id) return;
@@ -154,16 +156,6 @@ export const MangaDetail = () => {
   const [userCoins, setUserCoins] = useState(0);
   const [userInfo, setUserInfo] = useState<{ id: string; username: string }>({ id: '', username: '' });
 
-  useEffect(() => {
-    const desktopMedia = window.matchMedia('(min-width: 1024px)');
-    const updateMusicPlacement = (event: MediaQueryListEvent | MediaQueryList) => {
-      setIsDesktopMusicPlacement(event.matches);
-    };
-
-    updateMusicPlacement(desktopMedia);
-    desktopMedia.addEventListener('change', updateMusicPlacement);
-    return () => desktopMedia.removeEventListener('change', updateMusicPlacement);
-  }, []);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [interactionBusy, setInteractionBusy] = useState<'bookmark' | 'like' | ''>('');
@@ -228,9 +220,9 @@ export const MangaDetail = () => {
     setPurchasedIds(unlocked);
   }, []);
 
-  const loadInteractions = useCallback(async (mangaId: string) => {
+  const loadInteractions = useCallback(async (mangaId: string, isActive: () => boolean = () => true) => {
     const interactions = await getInteractions(mangaId);
-    if (!interactions) return;
+    if (!interactions || !isActive()) return;
 
     setIsBookmarked(interactions.bookmarks?.some((item) => String(item) === mangaId) || false);
     // La lista completa ya viene en la respuesta: se comparte con los botones "Guardar" del resto de la web.
@@ -259,6 +251,13 @@ export const MangaDetail = () => {
     if (!id) return;
     let active = true;
     setLoading(true);
+    setChaptersLoading(true);
+    setCommentsLoading(true);
+    setRelatedLoading(true);
+    setCommentsError('');
+    setChaptersError('');
+    setSecondaryReady(false);
+    let cancelSecondary = () => {};
     setError(null);
     setManga(null);
     setChapters([]);
@@ -285,36 +284,30 @@ export const MangaDetail = () => {
         setManga(mangaData);
         const mangaPostId = mangaData.eroSeri || mangaData.id;
 
-        const [chapterData, relatedData, commentData] = await Promise.all([
-          getChaptersBySeries(mangaPostId),
-          getRelatedMangas(mangaPostId, 18),
-          getMangaComments(String(mangaData.id)),
-          loadInteractions(String(mangaData.id)),
-        ]);
-        if (!active) return;
-        await preloadImages([
-          mangaData.portada,
-          ...relatedData.slice(0, 10).map((item) => item.portada),
-        ]);
-        if (!active) return;
-        setChapters(chapterData);
-        setRelated(relatedData);
-        setInitialComments(commentData);
+        // La ficha se publica con sus metadatos; ninguna imagen ni lista la bloquea.
         setLoading(false);
-
-        void getUltimosCapitulos().then((catalog) => {
-          if (!active || catalog.length === 0) return;
-          const countByMangaId = new Map(catalog.map((catalogManga) => {
-            const chapterCount = catalogManga.capitulosRecientes.reduce((highest, chapter) => {
-              const chapterNumber = Number.parseFloat(String(chapter.numero).replace(',', '.'));
-              return Number.isFinite(chapterNumber) ? Math.max(highest, Math.ceil(chapterNumber)) : highest;
-            }, 0);
-            return [String(catalogManga.id), chapterCount] as const;
-          }));
-          setRelated((current) => current.map((relatedManga) => ({
-            ...relatedManga,
-            chapterCount: countByMangaId.get(String(relatedManga.id)) ?? 0,
-          })));
+        const commentsRequest = getMangaComments(String(mangaData.id)).then(data => {
+          if (active) setInitialComments(data);
+        }).catch(() => { if (active) setCommentsError('No se pudieron cargar los comentarios.'); })
+          .finally(() => { if (active) setCommentsLoading(false); });
+        const relatedRequest = getRelatedMangas(mangaPostId, 18).then(data => {
+          if (active) setRelated(data);
+        }).catch(() => {}).finally(() => { if (active) setRelatedLoading(false); });
+        const chaptersRequest = getChaptersBySeries(mangaPostId).then(data => {
+          if (active) setChapters(data);
+        }).catch(() => { if (active) setChaptersError('No se pudieron cargar los capítulos.'); })
+          .finally(() => { if (active) setChaptersLoading(false); });
+        void loadInteractions(String(mangaData.id), () => active).catch(() => {});
+        await Promise.allSettled([commentsRequest, relatedRequest, chaptersRequest]);
+        if (!active) return;
+        cancelSecondary = whenIdle(() => {
+          if (!active) return;
+          setSecondaryReady(true);
+          void getUltimosCapitulos().then(catalog => {
+            if (!active) return;
+            const counts = new Map(catalog.map(item => [String(item.eroSeri || item.id), item.chapterCount]));
+            setRelated(current => current.map(item => ({ ...item, chapterCount: counts.get(String(item.id)) ?? item.chapterCount })));
+          }).catch(() => {});
         });
       } catch (requestError) {
         console.error('Error MangaDetail:', requestError);
@@ -328,6 +321,7 @@ export const MangaDetail = () => {
     void fetchData();
     return () => {
       active = false;
+      cancelSecondary();
     };
   }, [id, loadInteractions]);
 
@@ -421,19 +415,25 @@ export const MangaDetail = () => {
       });
   };
 
+  const reactWithTrace = (reactionId: MangaReactionId) => {
+    setTracingReaction(reactionId);
+    window.setTimeout(() => setTracingReaction((current) => (current === reactionId ? null : current)), 700);
+    handleReaction(reactionId);
+  };
+
   if (loading) {
-    return <div className="min-h-screen bg-[#02040a]" />;
+    return <div role="status" aria-label="Cargando ficha del manga" className="manga-detail-loading min-h-screen bg-surface px-6 pt-28"><div className="mx-auto grid max-w-[1208px] gap-12 lg:grid-cols-[264px_1fr_264px]" aria-hidden="true"><div className="aspect-[264/374] rounded bg-ink/10 animate-pulse motion-reduce:animate-none" /><div className="space-y-6"><div className="h-14 rounded bg-ink/10" /><div className="h-6 rounded bg-ink/10" /><div className="h-96 rounded bg-ink/5" /></div><div className="h-96 rounded bg-ink/5" /></div></div>;
   }
 
   if (error || !manga) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#02040a] px-4 text-center text-white">
-        <BookOpen size={52} className="text-white/15" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-surface px-4 text-center text-ink">
+        <BookOpen size={52} className="text-ink/15" />
         <div>
-          <h1 className="text-2xl font-black uppercase italic">Historia no disponible</h1>
-          <p className="mt-2 text-sm text-white/45">{error || 'Manga no encontrado.'}</p>
+          <h1 className="font-dela text-2xl font-normal">Historia no disponible</h1>
+          <p className="mt-2 font-montserrat text-sm text-muted">{error || 'Manga no encontrado.'}</p>
         </div>
-        <button onClick={() => navigate(-1)} className="rounded-xl bg-[#FF4D88] px-6 py-3 text-xs font-black uppercase tracking-wider text-white">
+        <button onClick={() => navigate(-1)} className="rounded-md bg-mukai-magenta px-6 py-3 font-montserrat text-xs font-extrabold uppercase text-white">
           Volver
         </button>
       </div>
@@ -444,7 +444,7 @@ export const MangaDetail = () => {
   const synopsis = cleanSynopsis(manga.titulo, manga.descripcion);
   const publishedDate = manga.publishedAt || manga.rawFecha;
   const engagementStats = [
-    { label: 'Likes', value: engagement.likes, icon: Heart },
+    { label: 'Likes', value: engagement.likes, icon: LikeHeartIcon },
     { label: 'Guardados', value: engagement.bookmarks, icon: Bookmark },
     { label: 'Lectores conectados', value: engagement.online, icon: Users },
   ];
@@ -457,7 +457,6 @@ export const MangaDetail = () => {
   const engagementProgress = activeEngagementStat.label === 'Lectores conectados'
     ? onlineReaderProgress
     : ((activeEngagementIndex + 1) / engagementStats.length) * 100;
-  const typeIndicatorColor = /manhwa|manhua/i.test(manga.tipo || '') ? '#8b5cf6' : '#FF4D88';
   // Distintivo de la portada según la colección a la que pertenece la ficha.
   const coverBadge = collectionBadge(manga);
 
@@ -468,9 +467,16 @@ export const MangaDetail = () => {
         chapters={chapters}
         related={related}
         initialComments={initialComments}
+        commentsLoading={commentsLoading}
+        commentsError={commentsError}
+        chaptersLoading={chaptersLoading}
+        chaptersError={chaptersError}
+        relatedLoading={relatedLoading}
+        secondaryReady={secondaryReady}
         isBookmarked={isBookmarked}
         isLiked={isLiked}
         likes={engagement.likes}
+        online={engagement.online}
         interactionBusy={interactionBusy}
         onBookmark={() => void handleBookmark()}
         onLike={() => void handleLike()}
@@ -489,258 +495,244 @@ export const MangaDetail = () => {
     );
   }
 
+  const tabIndex = activeContent === 'chapters' ? 0 : 1;
+
   return (
-    <main className={`manga-detail-page relative min-h-screen overflow-x-clip transition-colors duration-500 ${isLightMode ? 'manga-detail-theme-light bg-white text-black' : 'manga-detail-theme-dark bg-black text-white'}`}>
-      {/* Fondo difuminado solo en escritorio: en móvil la portada va a sangre sobre fondo liso. */}
-      <div className="fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+    <main className="manga-detail-desktop relative min-h-screen overflow-x-clip bg-surface text-ink">
+      {/* Fondo: la portada difuminada bajo el velo del tema. */}
+      <div className="fixed inset-0 z-0" aria-hidden="true">
         <img src={manga.portada} alt="" className="h-full w-full origin-top scale-105 object-cover object-top blur-[2px]" />
-        <div className={`absolute inset-0 ${isLightMode ? 'bg-[linear-gradient(90deg,rgba(255,255,255,.97),rgba(255,255,255,.91)_52%,rgba(255,255,255,.96))]' : 'bg-[linear-gradient(90deg,rgba(0,0,0,.95),rgba(0,0,0,.84)_52%,rgba(0,0,0,.94))]'}`} />
-        <div className={`absolute inset-0 bg-gradient-to-b ${isLightMode ? 'from-white/45 via-transparent to-white' : 'from-black/45 via-transparent to-black'}`} />
+        <div className="absolute inset-0 bg-surface/[.95]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-surface/40 via-transparent to-surface" />
       </div>
+      <ReactionRingGradient />
 
-      {/* Móvil: la portada ocupa toda la parte superior, sin cabecera (el navbar
-          se oculta en esta ruta). El botón flotante devuelve a la página anterior. */}
-      <div className="manga-detail-mobile-hero relative z-10 lg:hidden" data-testid="manga-detail-mobile-hero">
-        {/* La portada se muestra entera (alto según su proporción), con la base curvada y una sombra suave debajo. */}
-        <div className={`relative w-full overflow-hidden rounded-b-[36px] ${isLightMode ? 'bg-white shadow-[0_18px_40px_rgba(0,0,0,0.18)]' : 'bg-black shadow-[0_18px_44px_rgba(0,0,0,0.6)]'}`}>
-          <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} className="block h-auto w-full" fetchPriority="high" />
-          <div className={`absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t ${isLightMode ? 'from-white/70' : 'from-black/70'} to-transparent`} aria-hidden="true" />
-        </div>
-
-        {/* Móvil: título, tipo y título original justo bajo la portada (el reloj y las redes solo van en escritorio). */}
-        <div className="px-5 pt-5 text-center">
-          <h1 className={`font-[Montserrat] text-[22px] font-bold uppercase leading-[1.15] tracking-[-0.02em] ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</h1>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            <span className="manga-detail-cover-tag inline-flex items-center rounded-md px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg" style={{ backgroundColor: typeIndicatorColor }}>{manga.tipo || 'Manga'}</span>
-            {coverBadge === 'bn' && <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-zinc-100 px-3 py-2 text-[11px] uppercase leading-none text-black shadow-lg">B&amp;N</span>}
-            {coverBadge === 'hot' && <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">Hot</span>}
-          </div>
-          {manga.tituloOriginal && (
-            <p className={`mx-auto mt-3 w-fit max-w-full rounded-md px-3 py-1 font-[Montserrat] text-[13px] font-medium ${isLightMode ? 'bg-black/[0.06] text-black/70' : 'bg-white/[0.08] text-white/75'}`}>{manga.tituloOriginal}</p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => { if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1); else navigate('/'); }}
-          aria-label="Volver"
-          title="Volver"
-          className="absolute left-3 top-[calc(env(safe-area-inset-top)+12px)] flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-md transition hover:bg-black/60"
-        >
-          <ChevronLeft size={24} strokeWidth={2.6} className="-ml-0.5" />
-        </button>
-      </div>
-
-      <section className="relative z-10 pb-20 pt-4 lg:pt-32">
-        <div className="desktop-content-shell mx-auto w-full max-w-[1780px] px-3 sm:px-5 lg:px-4 2xl:px-6">
-          <div className="mb-2 hidden items-center gap-4 lg:grid xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
+      <section className="manga-detail-stage relative z-10 pb-20 pt-32">
+        <div className="manga-detail-container mx-auto w-full max-w-[1780px] px-4 lg:!max-w-[1366px] 2xl:px-6">
+          <div className="manga-detail-topbar mb-2 grid items-center gap-4 xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
             {/* Va en la primera columna para quedar justo encima de la portada. */}
-            <div className="mx-auto w-full max-w-[300px] lg:max-w-none xl:col-start-1 xl:row-start-1">
-              <MangaDetailClock isLight={isLightMode} />
+            <div className="mx-auto w-full xl:col-start-1 xl:row-start-1">
+              <MangaDetailClock />
             </div>
             <div className="text-center xl:col-start-3 xl:row-start-1">
-              <p className={`manga-detail-social-prompt text-[13px] ${isLightMode ? 'text-black/60' : 'text-white/60'}`}>¡No olvides seguirnos!</p>
+              <p className="font-orbitron text-[13px] font-bold text-ink/70">¡No olvides seguirnos!</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5" aria-label="Redes sociales de MangaMukai">
                 {FOOTER_SOCIALS.map(({ name, href, Icon: SocialIcon }) => (
-                  <a key={name} href={href} target="_blank" rel="noreferrer" aria-label={name} title={name} className="manga-detail-social-link flex h-9 w-8 items-center justify-center bg-transparent transition-all hover:-translate-y-0.5 hover:text-[#FF4D88]">
-                    <SocialIcon size={21} />
+                  <a key={name} href={href} target="_blank" rel="noreferrer" aria-label={name} title={name} className="flex h-9 w-8 items-center justify-center text-ink transition-all hover:-translate-y-0.5 hover:text-mukai-magenta">
+                    <SocialIcon size={19} />
                   </a>
                 ))}
               </div>
             </div>
           </div>
-          <div data-testid="manga-detail-social-divider" className={`mb-5 hidden h-px w-full bg-gradient-to-r from-transparent via-current to-transparent lg:block ${isLightMode ? 'text-black/20' : 'text-white/20'}`} aria-hidden="true" />
+          <div className="mb-5 h-px w-full bg-gradient-to-r from-transparent via-ink/20 to-transparent" aria-hidden="true" />
 
-          <div className="grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
+          <div className="manga-detail-grid grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
             <motion.aside
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45 }}
-              data-testid="manga-detail-left-column"
-              className="manga-detail-sticky-column no-scrollbar order-1 mx-auto w-full max-w-[300px] lg:max-w-none xl:col-start-1 xl:row-start-1 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto xl:overscroll-contain"
+              className="manga-detail-cover-column xl:sticky xl:top-5 xl:self-start no-scrollbar w-full xl:col-start-1 xl:row-start-1 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto xl:overscroll-contain"
             >
-              <div className={`manga-detail-cover relative hidden aspect-[3/4.35] overflow-hidden rounded-[8px] border lg:block ${isLightMode ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
-                <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} className="h-full w-full object-cover" />
+              <div className="manga-detail-cover relative aspect-[3/4.35] overflow-hidden rounded-lg border border-line bg-media">
+                <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} fetchPriority="high" decoding="async" className="h-full w-full object-cover" />
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" onClick={handleReadFirst} disabled={!firstChapter} className="poppins-bold flex min-h-[48px] items-center justify-center rounded-md bg-[#FF4D88] px-3 py-3 text-[14px] text-white transition hover:-translate-y-0.5 hover:bg-[#ef2f73] disabled:cursor-not-allowed disabled:opacity-45">
-                  Leer capítulo 1
+              {/* "Leer Capítulo 1" ocupa el hueco que deja "Guardar" para no partirse en dos líneas. */}
+              <div className="mt-3 flex gap-[7px]">
+                <button type="button" onClick={handleReadFirst} disabled={!firstChapter} className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-mukai-magenta px-2 font-montserrat text-[13px] font-extrabold text-white transition-transform hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45">
+                  <BookOpenText size={20} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+                  Leer Capítulo 1
                 </button>
-                <button type="button" onClick={handleBookmark} className={`poppins-regular flex min-h-[48px] items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-[14px] transition ${isBookmarked ? 'border-[#FF4D88]/40 bg-[#FF4D88]/15 text-[#FF4D88]' : isLightMode ? 'border-black/10 bg-white/80 text-black hover:border-[#FF4D88]' : 'border-white/10 bg-white/10 text-white hover:border-[#FF4D88]'}`}>
-                  {interactionBusy === 'bookmark' ? <Loader2 size={14} className="animate-spin" /> : isBookmarked ? <BookMarked size={14} /> : <Bookmark size={14} />}{isBookmarked ? 'Guardado' : 'Guardar'}
+                <button
+                  type="button"
+                  onClick={handleBookmark}
+                  disabled={interactionBusy !== ''}
+                  aria-pressed={isBookmarked}
+                  className={`flex h-12 w-28 shrink-0 items-center justify-center gap-2 rounded-md border bg-surface font-montserrat text-[13px] font-extrabold uppercase transition-transform active:scale-95 ${isBookmarked ? 'border-mukai-magenta text-mukai-magenta' : 'border-line text-ink hover:border-ink'}`}
+                >
+                  {interactionBusy === 'bookmark' ? <Loader2 size={18} className="animate-spin" /> : <SaveBookmarkIcon size={18} />}
+                  {isBookmarked ? 'Guardado' : 'Guardar'}
                 </button>
               </div>
 
-              <div className="manga-detail-stat-carousel manga-cyber-stat-card relative mt-4" aria-label="Estadísticas del manga" aria-live="polite">
-                <div className="manga-cyber-stat-content">
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={activeEngagementStat.label}
-                      className="manga-cyber-stat-slide"
-                      initial={{ opacity: 0, x: 16 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -16 }}
-                      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                      aria-label={`${activeEngagementStat.label}: ${formatCompactNumber(activeEngagementStat.value)}`}
-                    >
-                      <div className="manga-cyber-stat-copy">
-                        <strong className="manga-cyber-stat-value tabular-nums">{formatCompactNumber(activeEngagementStat.value)}</strong>
-                        <span className={`manga-cyber-stat-label ${activeEngagementStat.label === 'Lectores conectados' ? 'is-long' : ''}`}>{activeEngagementStat.label}</span>
-                      </div>
-                      <span className={`manga-cyber-stat-icon ${activeEngagementStat.label === 'Likes' ? 'is-heart' : ''}`}>
-                        <ActiveEngagementIcon size={22} strokeWidth={2.15} />
-                      </span>
-                    </motion.div>
-                  </AnimatePresence>
-                  <div className="manga-cyber-progress-track">
-                    <span className="manga-cyber-progress-track-inner" />
-                    <motion.span
-                      key={`stat-progress-${activeEngagementIndex}`}
-                      aria-hidden="true"
-                      className="manga-cyber-progress-fill"
-                      initial={{ scaleX: 0 }}
-                      animate={{ scaleX: engagementProgress / 100 }}
-                      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                    <strong className="manga-cyber-progress-percentage tabular-nums">{Math.round(engagementProgress)}%</strong>
-                  </div>
+              {/* Estadísticas que rotan (me gusta, guardados, lectores conectados). */}
+              <div className="relative mt-4 min-h-[92px] overflow-hidden rounded-[18px] border border-line bg-surface/70 px-[15px] py-[11px]" aria-label="Estadísticas del manga" aria-live="polite">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={activeEngagementStat.label}
+                    className="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                    aria-label={`${activeEngagementStat.label}: ${formatCompactNumber(activeEngagementStat.value)}`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <strong className="font-anta text-[1.4rem] font-normal leading-none tabular-nums">{formatCompactNumber(activeEngagementStat.value)}</strong>
+                      <span className={`truncate font-orbitron font-bold uppercase leading-none ${activeEngagementStat.label === 'Lectores conectados' ? 'text-[0.6rem] tracking-[0.05em]' : 'text-[0.68rem] tracking-[0.16em]'}`}>{activeEngagementStat.label}</span>
+                    </div>
+                    <span className={activeEngagementStat.label === 'Likes' ? 'text-mukai-magenta' : 'text-ink'}>
+                      <ActiveEngagementIcon size={22} />
+                    </span>
+                  </motion.div>
+                </AnimatePresence>
+                {/* Barra en pico del diseño: rosa a morado. */}
+                <div className="relative mt-[7px] h-[18px] overflow-hidden bg-gradient-to-r from-mukai-magenta to-mukai-purple [clip-path:polygon(5%_0,95%_0,100%_50%,95%_100%,5%_100%,0_50%)]">
+                  <span className="absolute inset-[2px] z-[1] bg-surface [clip-path:inherit]" />
+                  <motion.span
+                    key={`stat-progress-${activeEngagementIndex}`}
+                    aria-hidden="true"
+                    className="absolute inset-1 z-[2] origin-left rounded-[1px] bg-gradient-to-r from-mukai-magenta to-mukai-purple [clip-path:inherit]"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: engagementProgress / 100 }}
+                    transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                  <strong className="absolute inset-0 z-[3] flex items-center justify-center font-orbitron text-[0.58rem] font-semibold leading-none text-white mix-blend-difference tabular-nums">{Math.round(engagementProgress)}%</strong>
                 </div>
               </div>
 
-              {/* Etiquetas de la ficha y "Me gusta", antes encima de la portada:
-                  ahora en una sola fila bajo el contador de likes y lectores. */}
-              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 xl:flex xl:flex-wrap">
-                {/* En móvil las etiquetas van centradas y el corazón a la derecha; en escritorio, en fila. */}
-                <div className="col-start-2 flex flex-wrap items-center justify-center gap-2 xl:justify-start">
-                <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-[#FF4D88] px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">
-                  Estreno
-                </span>
+              {/* Etiquetas de la colección y "Me gusta" en una sola fila. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className={`${BADGE} bg-mukai-magenta text-white`}>Estreno</span>
                 {coverBadge === 'bn' ? (
-                  <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-zinc-100 px-3 py-2 text-[11px] uppercase leading-none text-black shadow-lg">B&amp;N</span>
+                  <span className={`${BADGE} bg-zinc-100 text-black`}>B&amp;N</span>
                 ) : coverBadge === 'hot' ? (
-                  <span className="manga-detail-cover-tag inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">Hot</span>
+                  <span className={`${BADGE} bg-red-600 text-white`}>Hot</span>
                 ) : (
-                  <span className="manga-detail-cover-tag inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-[11px] uppercase leading-none text-white shadow-lg">
-                    Color
-                    <Palette size={14} strokeWidth={2.3} aria-hidden="true" />
-                  </span>
+                  <span className={`${BADGE} bg-mukai-purple text-white`}>Color <PaletteIcon size={13} /></span>
                 )}
-                </div>
                 <button
                   type="button"
                   onClick={handleLike}
                   disabled={interactionBusy !== ''}
+                  aria-pressed={isLiked}
                   aria-label={isLiked ? 'Quitar Me gusta' : 'Me gusta'}
-                  className={`col-start-3 flex shrink-0 items-center justify-center justify-self-end bg-transparent xl:ml-auto transition-all hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60 ${isLiked ? 'text-[#FF4D88]' : isLightMode ? 'text-black/70 hover:text-[#FF4D88]' : 'text-white/80 hover:text-[#FF4D88]'}`}
+                  className="ml-auto flex shrink-0 items-center gap-1.5 transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {interactionBusy === 'like' ? <Loader2 size={24} className="animate-spin" /> : <Heart size={24} fill={isLiked ? 'currentColor' : 'none'} />}
+                  {interactionBusy === 'like'
+                    ? <Loader2 size={24} className="animate-spin" />
+                    : <LikeHeartIcon size={26} className={isLiked ? 'text-mukai-magenta' : 'text-ink'} />}
+                  <span className="font-anta text-sm font-normal tabular-nums">{engagement.likes}</span>
                 </button>
               </div>
 
-              <div className="mt-2 px-1">
-                <SidebarMetaRow icon={<BookType />} label="Tipo" value={manga.tipo || 'Manga'} isLight={isLightMode} valueDotColor={typeIndicatorColor} />
-                <SidebarMetaRow icon={<Building2 />} label="Estudio" value={manga.studio || 'N/A'} isLight={isLightMode} />
-                <SidebarMetaRow icon={<MonitorPlay />} label="Plataforma" value={manga.platform || 'N/A'} isLight={isLightMode} />
-                <SidebarMetaRow icon={<CalendarDays />} label="Publicación" value={formatDate(publishedDate)} isLight={isLightMode} />
+              <div className="manga-detail-metadata mt-4 px-1">
+                <MetaRow icon={<TypeIcon size={26} />} label="Tipo" value={manga.tipo || 'Manga'} dotColor={typeDotColor(manga.tipo)} />
+                <MetaRow icon={<DetailViewsIcon size={25} />} label="Vistas" value={formatCompactNumber(manga.totalViews ?? 0)} />
+                {manga.author && <MetaRow icon={<StudioIcon size={25} />} label="Autor" value={manga.author} />}
+                <MetaRow icon={<StudioIcon size={25} />} label="Estudio" value={manga.studio || 'N/A'} />
+                <MetaRow icon={<PlatformIcon size={26} />} label="Plataforma" value={manga.platform || 'N/A'} />
+                <MetaRow icon={<PublishedIcon size={27} />} label="Publicación" value={formatDate(publishedDate)} />
               </div>
             </motion.aside>
 
-            <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.5 }} className="order-2 min-w-0 xl:col-start-2 xl:row-start-1 xl:px-1">
-              {!isDesktopMusicPlacement && (
-                <div className="mx-auto mb-6 w-full max-w-[340px]">
-                  <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />
-                </div>
-              )}
-              <header className={`border-b pb-5 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                <p className={`hidden text-center font-[Montserrat] text-[clamp(1.2rem,1.6vw,1.72rem)] font-bold uppercase leading-[1.16] tracking-[-0.025em] lg:block ${isLightMode ? 'text-black' : 'text-white'}`}>{manga.titulo.toLocaleUpperCase('es')}</p>
+            <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.5 }} className="manga-detail-content min-w-0 xl:col-start-2 xl:row-start-1 xl:px-1">
+              <header className="border-b border-line pb-5">
+                <h1 className="text-center font-montserrat text-[clamp(1.3rem,1.7vw,1.8rem)] font-black leading-[1.15] text-ink">{toTitleCase(manga.titulo)}</h1>
                 {manga.tituloOriginal && (
-                  <p className={`mx-auto mt-2 hidden w-fit max-w-full rounded-md px-3 py-1 text-center font-[Montserrat] text-[clamp(0.8rem,1vw,0.95rem)] font-medium backdrop-blur-md lg:block ${isLightMode ? 'bg-black/[0.06] text-black/70' : 'bg-white/[0.08] text-white/75'}`}>
+                  <p className="mx-auto mt-3 w-fit max-w-full rounded-md border border-ink/[.12] bg-ink/[.08] px-3 py-1 text-center font-anta text-[13px] font-normal leading-tight backdrop-blur-[6px]">
                     {manga.tituloOriginal}
                   </p>
                 )}
                 {genres.length > 0 && (
-                  <div className="no-scrollbar mt-4 flex flex-nowrap items-center justify-start gap-2 overflow-x-auto whitespace-nowrap px-1 pb-1 sm:mx-auto sm:w-fit sm:max-w-full sm:justify-center sm:overflow-hidden">
-                    <span className="shrink-0 text-lg font-black text-[#FF4D88]">#</span>
-                    {genres.map((genre, index) => (
-                      <Link key={genre} to={`/biblioteca?genre=${encodeURIComponent(genre)}`} className={`shrink-0 rounded-md border px-3 py-1.5 text-[11px] font-bold transition hover:border-[#FF4D88] hover:text-[#FF4D88] ${index >= 4 ? 'sm:hidden' : ''} ${isLightMode ? 'border-black/10 bg-white/60 text-black/60' : 'border-white/10 bg-black/35 text-white/60'}`}>{genre}</Link>
+                  <nav aria-label="Géneros" className="mt-4 flex flex-wrap items-center justify-center gap-[7px]">
+                    {genres.slice(0, 6).map((genre) => (
+                      <Link key={genre} to={`/biblioteca?genre=${encodeURIComponent(genre)}`} className="flex h-6 items-center border border-line bg-surface px-2.5 font-anta text-[11px] font-normal leading-6 text-ink transition-colors hover:border-mukai-magenta hover:text-mukai-magenta">
+                        {genre}
+                      </Link>
                     ))}
-                  </div>
+                  </nav>
                 )}
               </header>
 
-              <nav className={`mt-4 grid grid-cols-[1.12fr_.88fr_1fr] rounded-full border p-1 backdrop-blur-xl ${isLightMode ? 'border-black/10 bg-white/70' : 'border-white/10 bg-black/60'}`} aria-label="Secciones del manga">
-                <button type="button" onClick={() => setActiveContent('chapters')} className={`manga-detail-section-tab flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-1 py-2 text-[12px] transition sm:gap-2 sm:px-3 sm:text-[13px] xl:text-[14px] ${activeContent === 'chapters' ? 'bg-[#FF4D88] text-white' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white/70 hover:text-white'}`}><List className="h-[18px] w-[18px] sm:h-[18px] sm:w-[18px]" />Capítulos ({chapters.length})</button>
-                <button type="button" onClick={() => setActiveContent('synopsis')} className={`manga-detail-section-tab flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-1 py-2 text-[12px] transition sm:gap-2 sm:px-3 sm:text-[13px] xl:text-[14px] ${activeContent === 'synopsis' ? 'bg-[#FF4D88] text-white' : isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white/70 hover:text-white'}`}><BookOpen className="h-[18px] w-[18px] sm:h-[18px] sm:w-[18px]" />Sinopsis</button>
-                <a href="#comentarios" className={`manga-detail-section-tab flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-1 py-2 text-[12px] transition sm:gap-2 sm:px-3 sm:text-[13px] xl:text-[14px] ${isLightMode ? 'text-black hover:text-[#FF4D88]' : 'text-white/70 hover:text-white'}`}><MessageSquareText className="h-[18px] w-[18px] sm:h-[18px] sm:w-[18px]" />Comentarios</a>
+              {/* Pestañas: una sola píldora que viaja entre ellas. */}
+              <nav aria-label="Secciones del manga" className="mt-4">
+                <div className="relative flex h-11 items-center rounded-3xl border border-[color:var(--mm-tab-line)] bg-surface">
+                  <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-ink transition-transform duration-[360ms] ease-[cubic-bezier(0.22,0.9,0.3,1)] will-change-transform motion-reduce:transition-none" style={{ transform: `translateX(${tabIndex * 100}%)` }} />
+                  <button type="button" onClick={() => setActiveContent('chapters')} aria-current={activeContent === 'chapters'} className={tabClass(activeContent === 'chapters')}>
+                    <ChaptersTabIcon size={13} /> Capítulos ({chapters.length})
+                  </button>
+                  <button type="button" onClick={() => setActiveContent('synopsis')} aria-current={activeContent === 'synopsis'} className={tabClass(activeContent === 'synopsis')}>
+                    <SynopsisTabIcon size={14} /> Sinopsis
+                  </button>
+                  <a href="#comentarios" className={tabClass()}>
+                    <CommentsTabIcon size={16} /> Comentarios
+                  </a>
+                </div>
               </nav>
 
               {activeContent === 'chapters' ? (
-                <section id="capitulos" className="mt-5 scroll-mt-28">
-                  <div className="mb-6 flex items-center gap-2">
-                    <label className={`relative flex h-11 min-w-0 flex-1 items-center overflow-hidden rounded-xl border ${isLightMode ? 'border-black/10 bg-white/[0.34]' : 'border-white/10 bg-black/25'}`}>
-                      <Search size={16} className={`ml-4 shrink-0 ${isLightMode ? 'text-black/35' : 'text-white/35'}`} />
-                      <input type="search" aria-label="Buscar por número de capítulo o título" value={chapterSearch} onChange={(event) => setChapterSearch(event.target.value)} placeholder="Buscar por número de capítulo o título" className={`h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none ${isLightMode ? 'text-black placeholder:text-black/30' : 'text-white placeholder:text-white/30'}`} />
+                <section id="capitulos" aria-label="Capítulos" className="mt-5 scroll-mt-28">
+                  <div className="mb-6 flex items-center gap-1.5">
+                    <label className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border-[0.5px] border-line bg-ink/[.06] px-3.5">
+                      <SearchIcon size={22} className="shrink-0 text-ink/60" />
+                      <input
+                        type="search"
+                        aria-label="Buscar por número de capítulo o título"
+                        value={chapterSearch}
+                        onChange={(event) => setChapterSearch(event.target.value)}
+                        placeholder="Busca por número de capítulo o título"
+                        className="h-full min-w-0 flex-1 bg-transparent font-montserrat text-[13px] leading-5 text-ink caret-mukai-magenta outline-none placeholder:text-ink/40 [&::-webkit-search-cancel-button]:hidden"
+                      />
                     </label>
                     <button
                       type="button"
                       onClick={() => setChapterSortOrder((current) => current === 'desc' ? 'asc' : 'desc')}
                       aria-label={chapterSortOrder === 'desc' ? 'Ordenar capítulos del menor al mayor' : 'Ordenar capítulos del mayor al menor'}
                       title={chapterSortOrder === 'desc' ? 'Actualmente: mayor a menor' : 'Actualmente: menor a mayor'}
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center gap-0 rounded-xl border transition hover:border-[#FF4D88] hover:text-[#FF4D88] ${isLightMode ? 'border-black/10 bg-white/[0.34] text-black' : 'border-white/10 bg-black/25 text-white'}`}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-[0.5px] border-line bg-ink/[.06] text-ink transition-colors hover:border-mukai-magenta"
                     >
-                      <ArrowUp strokeWidth={2.2} className={`manga-chapter-sort-arrow ${chapterSortOrder === 'asc' ? 'opacity-100' : 'opacity-30'}`} />
-                      <ArrowDown strokeWidth={2.2} className={`manga-chapter-sort-arrow ${chapterSortOrder === 'desc' ? 'opacity-100' : 'opacity-30'}`} />
+                      <SortDownIcon size={22} className={chapterSortOrder === 'desc' ? 'opacity-100' : 'opacity-50'} />
+                      <SortUpIcon size={22} className={chapterSortOrder === 'asc' ? 'opacity-100' : 'opacity-50'} />
                     </button>
                   </div>
                   {chapterSearch.trim() && filteredChapters.length === 0 ? (
-                    <div className={`rounded-2xl border px-5 py-16 text-center text-sm ${isLightMode ? 'border-black/10 bg-white/70 text-black/45' : 'border-white/10 bg-black/50 text-white/40'}`}>No encontramos capítulos con esa búsqueda.</div>
+                    <p className="rounded-lg border border-line py-14 text-center font-montserrat text-xs text-muted">No encontramos capítulos con esa búsqueda.</p>
                   ) : (
-                    <ChapterList chapters={filteredChapters} purchasedChapterIds={purchasedIds} userCoins={userCoins} userInfo={userInfo} onPurchaseSuccess={handlePurchaseSuccess} isLight={isLightMode} sortOrder={chapterSortOrder} />
+                    <ChapterList loading={chaptersLoading} loadError={chaptersError} chapters={filteredChapters} purchasedChapterIds={purchasedIds} userCoins={userCoins} userInfo={userInfo} onPurchaseSuccess={handlePurchaseSuccess} sortOrder={chapterSortOrder} />
                   )}
                 </section>
               ) : (
-                <section id="sinopsis" className={`relative mt-5 scroll-mt-28 overflow-hidden rounded-2xl border p-5 backdrop-blur-xl ${isLightMode ? 'border-black/10 bg-white/[0.72]' : 'border-white/10 bg-black/[0.52]'}`}>
-                  <h2 className={`manga-detail-synopsis-heading text-sm font-semibold ${isLightMode ? 'text-black' : 'text-white'}`}>Sinopsis</h2>
-                  <p ref={synopsisRef} className={`manga-detail-synopsis-copy mt-3 text-justify text-sm leading-7 ${synopsisExpanded ? '' : 'is-collapsed'} ${isLightMode ? 'text-black/60' : 'text-white/55'}`}>{synopsis || 'La sinopsis de este manga todavía no está disponible.'}</p>
-                  {synopsisHasOverflow && <button type="button" onClick={() => setSynopsisExpanded((current) => !current)} className="mx-auto mt-4 flex items-center gap-1 text-[10px] font-bold text-[#FF4D88]">{synopsisExpanded ? 'Ver menos' : 'Ver más'}<ChevronDown size={13} className={synopsisExpanded ? 'rotate-180' : ''} /></button>}
+                <section id="sinopsis" aria-label="Sinopsis" className="mt-5 scroll-mt-28 rounded-2xl border-[0.5px] border-line bg-surface/60 p-5">
+                  <p ref={synopsisRef} className={`text-justify font-montserrat text-[13px] font-normal leading-6 text-ink/90 ${synopsisExpanded ? '' : 'line-clamp-[9]'}`}>{synopsis || 'La sinopsis de este manga todavía no está disponible.'}</p>
+                  {synopsisHasOverflow && (
+                    <button type="button" onClick={() => setSynopsisExpanded((current) => !current)} className="mx-auto mt-3 flex items-center gap-1 font-montserrat text-[11px] font-semibold text-mukai-magenta">
+                      {synopsisExpanded ? 'Ver menos' : 'Ver más'}<ChevronDown size={14} className={synopsisExpanded ? 'rotate-180' : ''} />
+                    </button>
+                  )}
                 </section>
               )}
 
-              <div className={`mt-7 rounded-2xl border px-4 py-4 ${isLightMode ? 'border-black/10 bg-white/[0.28]' : 'border-white/10 bg-black/20'}`} aria-label="Reacciones del manga">
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  {reactionError && <p role="alert" className="text-xs text-red-500">{reactionError}</p>}
+              <MangaCommunityLinks />
+              <div className="mt-7 rounded-[20px] border-[0.5px] border-line bg-surface/60 px-5 py-5" aria-label="Reacciones del manga">
+                {reactionError && <p role="alert" className="mb-3 text-center font-montserrat text-xs text-red-500">{reactionError}</p>}
+                <div className="grid grid-cols-6 items-start gap-2.5">
                   {MANGA_REACTIONS.map((reaction) => (
-                    <div key={reaction.id} className="flex flex-col items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => void handleReaction(reaction.id)}
-                        aria-label={reaction.label}
-                        aria-pressed={selectedReaction === reaction.id}
-                        title={reaction.label}
-                        className={`group flex h-[76px] w-[76px] items-center justify-center rounded-full transition-colors ${selectedReaction === reaction.id ? 'border-2 border-[#FF4D88] bg-transparent shadow-[0_0_13px_rgba(255,77,136,0.42)]' : isLightMode ? 'border border-transparent bg-white/80 shadow-[0_0_7px_rgba(0,0,0,0.24)]' : 'border border-transparent bg-white/[0.05] shadow-[0_0_7px_rgba(255,255,255,0.22)]'}`}
-                      >
-                        <span className="text-[36px] leading-none transition-transform duration-200 ease-out group-hover:scale-110" aria-hidden="true">
-                          {reaction.symbol}
-                        </span>
-                      </button>
-                      <span className={`manga-reaction-count tabular-nums ${selectedReaction === reaction.id ? 'is-selected' : ''}`}>{formatCompactNumber(reactionCounts[reaction.id])}</span>
+                    <div key={reaction.id} className="flex flex-col items-center gap-[7px]">
+                      <ReactionButton
+                        reaction={reaction}
+                        count={reactionCounts[reaction.id]}
+                        selected={selectedReaction === reaction.id}
+                        tracing={tracingReaction === reaction.id}
+                        onReact={() => reactWithTrace(reaction.id)}
+                        className="aspect-square w-full max-w-[76px]"
+                      />
                     </div>
                   ))}
                 </div>
               </div>
+              <div className="manga-detail-comments mt-12"><MangaComments key={manga.id} mangaId={String(manga.id)} initialComments={initialComments} loading={commentsLoading} loadError={commentsError} /></div>
             </motion.section>
 
-            <motion.div data-testid="manga-detail-right-column" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="manga-detail-sticky-column order-3 flex flex-col gap-5 lg:col-[1/3] xl:col-start-3 xl:row-start-1 xl:h-[calc(100vh-2.5rem)] xl:min-h-0">
-              {isDesktopMusicPlacement && <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} />}
-              <MangaRecommendationSidebar items={related} currentId={manga.id} isLight={isLightMode} />
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="manga-detail-sidebar xl:sticky xl:top-5 xl:self-start flex flex-col gap-5 lg:col-[1/3] xl:col-start-3 xl:row-start-1 xl:h-[calc(100vh-2.5rem)] xl:min-h-0">
+              {secondaryReady ? <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} /> : <div className="h-40 rounded-2xl bg-ink/5" aria-label="Cargando música" />}
+              <MangaRecommendations loading={relatedLoading} items={related} currentId={manga.id} className="xl:min-h-0 xl:flex-1 xl:px-4" listClassName="h-[600px] xl:h-auto xl:min-h-0 xl:flex-1" />
             </motion.div>
           </div>
         </div>
       </section>
 
-      <div id="comentarios" className="relative z-10 scroll-mt-28">
-        <MangaComments mangaId={String(manga.id)} initialComments={initialComments} isLight={isLightMode} />
-      </div>
       <Footer />
     </main>
   );

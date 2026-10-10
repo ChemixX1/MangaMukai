@@ -9,7 +9,7 @@ interface ChapterMetaProps {
   /** Capítulo de la última semana: la fecha se cambia por la llama de "NUEVO". */
   isNew?: boolean;
   /** Color de la llama y de "NUEVO" (el acento de la sección). */
-  accentHex?: string;
+  accentColor?: string;
   /**
    * `row`: filas de capítulo de "Lo Más Reciente" (con el libro y en
    * mayúsculas); `bar`: pie de las tarjetas del ranking.
@@ -24,7 +24,7 @@ const Divider = () => <span aria-hidden="true" className="h-3.5 w-px min-w-px fl
  * los separadores entre ellas. Ocupa todo el ancho de su contenedor; si el
  * contenido pide más, la fila entera se encoge en bloque (useFitScale).
  */
-export const ChapterMeta = ({ chapter, isFree, date, isNew = false, accentHex, variant = 'row' }: ChapterMetaProps) => {
+export const ChapterMeta = ({ chapter, isFree, date, isNew = false, accentColor, variant = 'row' }: ChapterMetaProps) => {
   const { outerRef, innerRef } = useFitScale<HTMLSpanElement, HTMLSpanElement>();
   const isRow = variant === 'row';
   return (
@@ -42,7 +42,7 @@ export const ChapterMeta = ({ chapter, isFree, date, isNew = false, accentHex, v
           {isFree ? 'GRATIS' : 'PAGO'}
         </span>
         <Divider />
-        <span className="flex shrink-0 items-center gap-[3px]" style={isNew ? { color: accentHex } : undefined}>
+        <span className="flex shrink-0 items-center gap-[3px]" style={isNew ? { color: accentColor } : undefined}>
           {isNew && <FlameIcon size={15} className="origin-bottom animate-flame motion-reduce:animate-none" />}
           <span className={`whitespace-nowrap font-anta font-normal ${isRow ? 'text-[10px] uppercase' : 'text-xs'}`}>{isNew ? 'Nuevo' : date}</span>
         </span>

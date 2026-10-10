@@ -1,9 +1,8 @@
 /**
  * Catálogo local de la Tienda (demostración, sin pagos). Las imágenes son
  * portadas del catálogo de MangaMukai guardadas en `public/images/collection/`
- * con el id de su serie. El orden importa: la tienda destaca los productos 0
- * (novedad), 2 (fondo de "Recién llegados") y 4 (Mukai Select / Sale), y la
- * promoción de arte usa el 1.
+ * con el id de su serie. El escaparate destaca los productos 13 y 14; los
+ * paneles de ilustraciones y colecciones usan los productos 1 y 3.
  */
 export type ShopCategory = 'Manga' | 'Art prints' | 'Colecciones';
 

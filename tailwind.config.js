@@ -31,6 +31,10 @@ export default {
         russo: ['"Russo One"', 'Montserrat', 'sans-serif'],
         koho: ['KoHo', 'Montserrat', 'sans-serif'],
         raleway: ['Raleway', 'sans-serif'],
+        // Cartel de reclutamiento de la portada.
+        rammetto: ['"Rammetto One"', 'Montserrat', 'sans-serif'],
+        // Etiqueta de tipo del hero de la portada (fuente del sistema en Windows).
+        segoe: ['"Segoe UI"', 'Montserrat', 'sans-serif'],
       },
       colors: {
         // Superficies y tinta del tema.
@@ -48,7 +52,12 @@ export default {
           purple: '#b000ad',
           gold: '#ffcd0f',
           orange: '#fb923c',
-          free: '#22e05a', // punto de "GRATIS"
+          free: 'var(--mm-free)', // punto de "GRATIS" (variable: B&N lo pasa a gris)
+          // Tienda: la revista de colección.
+          rose: '#ff4d88',
+          sky: '#38d9f5',
+          lemon: '#ffe45c',
+          ink: '#090909',
         },
       },
       keyframes: {
@@ -101,6 +110,20 @@ export default {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        // Cintas infinitas: la secuencia va duplicada y la pista se desplaza media longitud.
+        'marquee-x': {
+          from: { transform: 'translate3d(0, 0, 0)' },
+          to: { transform: 'translate3d(-50%, 0, 0)' },
+        },
+        'marquee-y': {
+          from: { transform: 'translate3d(0, 0, 0)' },
+          to: { transform: 'translate3d(0, -50%, 0)' },
+        },
+        // Láser que recorre los bordes de la tira de categorías.
+        scan: {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(100%)' },
+        },
       },
       animation: {
         blink: 'blink 1.3s ease-in-out infinite',
@@ -111,6 +134,9 @@ export default {
         'ring-trace': 'ring-trace 0.65s cubic-bezier(0.33, 1, 0.68, 1)',
         paint: 'paint 0.5s cubic-bezier(0.33, 1, 0.68, 1) forwards',
         'fade-in': 'fade-in 200ms ease-out both',
+        'marquee-x': 'marquee-x 52s linear infinite',
+        'marquee-y': 'marquee-y 112s linear infinite',
+        scan: 'scan 2.7s cubic-bezier(0.4, 0, 0.2, 1) infinite',
       },
     },
   },
@@ -124,9 +150,14 @@ export default {
           '&::-webkit-scrollbar': { display: 'none' },
         },
         '.tap-transparent': { '-webkit-tap-highlight-color': 'transparent' },
-        // Anillo de foco visible con el color del texto para todo lo pulsable de una sección.
+        // Anillo de foco visible para todo lo pulsable de una sección: del color del
+        // texto salvo que la sección fije `--focus-color`. Con especificidad mínima
+        // (`:where`) para que cualquier utilidad del propio elemento lo sustituya.
         '.focus-scope': {
-          '& :is(button, a, input):focus-visible': { outline: '2px solid currentColor', 'outline-offset': '3px' },
+          ':where(&) :where(button, a, input):focus-visible': {
+            outline: '2px solid var(--focus-color, currentColor)',
+            'outline-offset': 'var(--focus-offset, 3px)',
+          },
         },
       });
     }),

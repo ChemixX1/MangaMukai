@@ -40,12 +40,12 @@ export const communitySeeds: CommunityPost[] = [
   { id: 'sample-3', userId: 'sample-yuki', name: 'Yuki', avatar: '/images/collection/57821.webp', content: 'El arte de La rebelión de la tirana Nero merece su propio post. Cada viñeta parece una ilustración de colección. ✨\n\n#FanArt #Recomendaciones', likes: 43, comments: [], demo: true, createdAt: hoursAgo(26) },
 ];
 
-/** Lectores de ejemplo para "A quién seguir" (los autores de las publicaciones de muestra). */
+/** Lectores sugeridos de ejemplo (autores de las publicaciones de muestra). */
 export const suggestedReaders = communitySeeds.map(({ userId, name, avatar }) => ({ userId, name, avatar }));
 
 export type CommunityTrend = { category: string; label: string; hint: string };
 
-/** Relleno de "Qué está pasando" mientras la comunidad no etiqueta mangas ni usa hashtags. */
+/** Temas sugeridos mientras la comunidad no etiqueta mangas ni usa hashtags. */
 export const fallbackTrends: CommunityTrend[] = [
   { category: 'Tendencia · Manga', label: '#MangaDelDía', hint: 'Entre lectores' },
   { category: 'Lecturas', label: '#LeyendoAhora', hint: 'Tu próxima historia' },
@@ -75,11 +75,10 @@ export const computeTrends = (posts: CommunityPost[], limit = 5): CommunityTrend
   return trends.slice(0, limit);
 };
 
-/** Anuncios pequeños intercalados en el feed móvil. */
+/** Anuncios de Comunidad, compartidos por PC y móvil. */
 export const communityAds = [
-  { id: 'store', to: '/tienda', eyebrow: 'MUKAI STORE', title: 'Tus historias, fuera de la pantalla', text: 'Explora la nueva colección', image: '/images/collection/57821.webp' },
-  { id: 'chat', to: '/chat', eyebrow: 'MUKAI CHAT', title: 'Tu próxima conversación', text: 'Habla con personajes de tus mangas', image: '/images/collection/57266.webp' },
-  { id: 'coins', to: '/recargar', eyebrow: 'MONEDAS', title: 'Desbloquea capítulos al instante', text: 'Recarga y sigue leyendo', image: '/images/collection/57841.webp' },
+  { id: 'store', to: '/tienda', eyebrow: 'TIENDA MUKAI', title: 'Mangas para tu colección', text: 'Volúmenes, ilustraciones y colecciones.', cta: 'Ver tienda', image: '/images/collection/57821.webp' },
+  { id: 'chat', to: '/chat', eyebrow: 'CHARACTER', title: 'Chatea con personajes', text: 'Conversa con tus personajes favoritos.', cta: 'Explorar personajes', image: '/images/collection/57266.webp' },
 ];
 
 export const handleOf = (name: string) => `@${name.toLowerCase().replace(/\s+/g, '')}`;

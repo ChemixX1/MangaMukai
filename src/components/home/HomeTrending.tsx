@@ -1,0 +1,179 @@
+import { useReducedMotion } from 'framer-motion';
+import { useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
+
+import { HomeChaptersIcon, HomeCrownIcon, HomeTrendingIcon, HomeViewsIcon } from '../../components/home/HomeIcons';
+import { ACCENT_COLOR, TypeBadge, type Accent } from '../../components/ui';
+import { useInfiniteMarquee } from '../../hooks/useInfiniteMarquee';
+import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
+import { RANKING_PERIODS, useTrendingRanking, type RankedManga, type RankingPeriod } from '../../hooks/useTrendingRanking';
+import { formatHomeViews } from '../../utils/mangaFormat';
+import { toTitleCase } from '../../utils/titleCase';
+import { formatChapterCount } from '../../utils/trendingRanking';
+
+import { type Audience } from './homeModels';
+
+/** Nueve portadas: el puesto siempre es de una cifra, como el número grande de las tarjetas. */
+const TRENDING_SIZE = 9;
+/** Medidas de las tarjetas del ranking en las referencias de PC y móvil. */
+const TRENDING_CARD = {
+  desktop: { width: 230, gap: 17, inset: 38 },
+  mobile: { width: 198, gap: 13, inset: 17 },
+} as const;
+/** Velocidad de crucero de la cinta en px/s. */
+const TRENDING_SPEED = 52;
+
+/** Ancho de cada pestaña del periodo (la elegida se rellena de tinta). */
+const PERIOD_WIDTHS: Record<RankingPeriod, number> = { Semanal: 124, Mensual: 117, Histórico: 110 };
+
+interface TrendingCardProps {
+  manga: RankedManga;
+  rank: number;
+  accent: Accent;
+  /** Copia de relleno del bucle: fuera del orden de tabulación. */
+  isCopy: boolean;
+  isMobile: boolean;
+}
+
+/** La posición queda dentro de la portada; ambos rankings comparten el diseño. */
+const TrendingCard = ({ manga, rank, accent, isCopy, isMobile }: TrendingCardProps) => {
+  const accentColor = ACCENT_COLOR[accent];
+  const title = toTitleCase(manga.title);
+  const card = TRENDING_CARD[isMobile ? 'mobile' : 'desktop'];
+  const rankColor = ({ 1: '#fb923c', 2: '#a21caf', 3: '#ef4444' } as Record<number, string>)[rank] ?? '#000';
+  const views = formatHomeViews(manga.views);
+  const chapters = formatChapterCount(manga.chapterCount);
+  return (
+    <Link to={`/manga/${manga.id}`} draggable={false} tabIndex={isCopy ? -1 : undefined}
+      aria-label={`${rank}. ${title}: ${chapters}, ${views} vistas`}
+      className="home-ranking-card" style={{ width: card.width, marginRight: card.gap }}>
+      <div className="home-ranking-surface">
+        <div className="home-ranking-cover">
+          <img src={manga.coverImage} alt={`Portada del manga ${title}`} loading={!isCopy && rank <= 5 ? "eager" : "lazy"} decoding="async" draggable={false} />
+          {rank === 1 && <span aria-hidden="true" className="home-ranking-crown"><HomeCrownIcon /></span>}
+          <span aria-hidden="true" className="home-ranking-number" style={{ color: rankColor }}>{rank}</span>
+        </div>
+        <div className="home-ranking-caption">
+          <h3 title={title}>{title}</h3>
+          <div className="home-ranking-meta">
+            <span className="home-ranking-chapter"><HomeChaptersIcon style={{ color: accentColor }} /><span>{chapters}</span></span>
+            <span className="home-ranking-views" title={`${manga.views} vistas`}><HomeViewsIcon />{views}</span>
+            <TypeBadge type={manga.type} accent={accent} className="home-ranking-type" />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+};
+
+/**
+ * Pestañas del periodo: píldora de borde gris (en el tema oscuro, fondo negro
+ * puro y la línea clara del tema) con la opción elegida rellena de tinta. En móvil mide 44 px, sin
+ * sombra, con tres pestañas iguales y la elegida dentro del borde; en PC, 48 px
+ * con sombra.
+ */
+const PeriodTabs = ({ value, onChange, className }: { value: RankingPeriod; onChange: (period: RankingPeriod) => void; className: string }) => (
+  <div role="tablist" aria-label="Periodo del ranking" className={`flex h-11 shrink-0 rounded-3xl border border-[#878383] dark:border-[color:var(--mm-tab-line)] dark:bg-black lg:h-12 lg:shadow-[0_4px_4px_rgba(0,0,0,1)] ${className}`}>
+    {RANKING_PERIODS.map((option) => {
+      const active = option === value;
+      return (
+        <button
+          key={option}
+          type="button"
+          role="tab"
+          aria-selected={active}
+          onClick={() => onChange(option)}
+          className={`h-full flex-1 rounded-3xl font-montserrat text-xs uppercase leading-3 transition-colors lg:-my-px lg:h-12 lg:w-[var(--tab-width)] lg:flex-none lg:first:-ml-px lg:last:-mr-px ${active ? 'bg-ink font-black text-surface' : 'font-bold text-ink'}`}
+          style={{ '--tab-width': `${PERIOD_WIDTHS[option]}px` } as CSSProperties}
+        >
+          {option}
+        </button>
+      );
+    })}
+  </div>
+);
+
+/**
+ * "Tendencia Ahora": titular con la llama, pestañas del periodo y una cinta
+ * infinita de nueve tarjetas que avanza sola, se puede arrastrar (ratón o dedo)
+ * y se funde con el fondo en los dos bordes.
+ */
+export const TrendingSection = ({ audience, className }: { audience: Audience; className: string }) => {
+  const accent: Accent = audience === 'men' ? 'cyan' : 'pink';
+  const accentColor = ACCENT_COLOR[accent];
+  const prefersReducedMotion = useReducedMotion();
+  const isMobile = useIsMobileViewport();
+  const [period, setPeriod] = useState<RankingPeriod>('Semanal');
+  const { items, loading } = useTrendingRanking({ audience, period, size: TRENDING_SIZE, youthOnly: audience === 'men', preloadCount: 5 });
+  const { viewportRef, trackRef, sequenceRef, copies, viewportProps } = useInfiniteMarquee({
+    itemCount: items.length,
+    speed: prefersReducedMotion ? 0 : TRENDING_SPEED,
+    direction: 'left',
+    leadingInset: TRENDING_CARD[isMobile ? 'mobile' : 'desktop'].inset,
+    pauseOnHover: !isMobile,
+  });
+
+  return (
+    <section className={`relative w-full ${className}`} aria-busy={loading}>
+      <div className="relative mx-auto w-full max-w-[1440px]">
+        {/* Móvil: la llama y el titular arriba y las pestañas debajo, a 43 px de cada borde. PC: las pestañas a la derecha. */}
+        <div className="home-trending-heading relative h-[111px] lg:h-[103px]">
+          <div className="absolute left-[43px] top-0 flex items-start lg:left-[62px]">
+            <span aria-hidden="true" className="flex shrink-0" style={{ color: accentColor }}>
+              <HomeTrendingIcon className="home-trending-icon h-[69px] w-[71px]" />
+            </span>
+            <h2 className="mt-[14px] whitespace-pre font-dela text-xl font-normal leading-8 text-ink lg:mt-[22px] lg:text-[30px] lg:leading-8">
+              {'Tendencia  '}<span style={{ color: accentColor }}>Ahora</span>
+            </h2>
+          </div>
+          <PeriodTabs value={period} onChange={setPeriod} className="absolute left-[43px] right-[43px] top-[67px] lg:left-auto lg:right-[95px] lg:top-[14px]" />
+        </div>
+
+        <div className="home-trending-cards relative mt-[29px] min-h-[328px] lg:mt-0 lg:min-h-[339px]">
+          {items.length > 0 ? (
+            <div
+              ref={viewportRef}
+              {...viewportProps}
+              className="home-trending-viewport cursor-grab touch-pan-y select-none overflow-hidden active:cursor-grabbing"
+              aria-label="Ranking en movimiento continuo; arrastra para recorrerlo"
+            >
+              <div ref={trackRef} className="flex w-max will-change-transform">
+                {Array.from({ length: copies }, (_, copy) => (
+                  <div key={copy} ref={copy === 0 ? sequenceRef : undefined} className="flex flex-none" aria-hidden={copy > 0 ? true : undefined}>
+                    {items.map((manga, index) => (
+                      <TrendingCard key={`${copy}-${manga.id}`} manga={manga} rank={index + 1} accent={accent} isCopy={copy > 0} isMobile={isMobile} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : loading ? (
+            <div role="status" aria-label="Cargando tendencias" className="home-trending-skeleton overflow-hidden">
+              <span className="sr-only">Cargando tendencias…</span>
+              <div className="flex w-max" aria-hidden="true">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <div key={index} className="home-ranking-card" style={{ width: TRENDING_CARD[isMobile ? "mobile" : "desktop"].width, marginRight: TRENDING_CARD[isMobile ? "mobile" : "desktop"].gap }}>
+                    <div className="home-ranking-cover animate-pulse motion-reduce:animate-none" />
+                    <div className="home-ranking-caption"><span className="mx-auto mt-1 h-3 w-4/5 rounded bg-ink/10" /><span className="h-3 w-2/3 rounded bg-ink/10" /></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            !loading && (
+              <p className="flex h-[328px] items-center justify-center font-montserrat text-xs font-bold uppercase tracking-wider text-muted lg:h-[339px]">
+                No hay resultados en este periodo
+              </p>
+            )
+          )}
+
+          {/* Fundido con el fondo en los dos bordes. */}
+          <div aria-hidden="true" className="home-trending-edge home-trending-edge-left" />
+          <div aria-hidden="true" className="home-trending-edge home-trending-edge-right" />
+        </div>
+      </div>
+    </section>
+  );
+};
+
+/* -------------------------------------------------------- Lo Más Reciente */

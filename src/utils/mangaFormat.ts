@@ -7,10 +7,19 @@ export const cleanTitle = (text: string) => {
 };
 
 /** "7,7K" / "1,2M" (coma decimal, sin decimales por debajo de mil). */
-export const formatViewsEs = (views: number) => {
-  if (views >= 1_000_000) return `${(views / 1_000_000).toFixed(1).replace('.', ',')}M`;
-  if (views >= 1_000) return `${(views / 1_000).toFixed(1).replace('.', ',')}K`;
+export const formatViewsEs = (views: number, alwaysCompact = false) => {
+  // Evita mostrar 1000K cuando el redondeo ya alcanza un millón.
+  if (views >= 999_950) return `${(views / 1_000_000).toFixed(1).replace('.', ',')}M`;
+  if (views >= 1_000 || alwaysCompact) return `${(views / 1_000).toFixed(1).replace('.', ',')}K`;
   return String(views);
+};
+
+/** Portada: 999, 1K, 2K…; miles y millones completos, sin decimales. */
+export const formatHomeViews = (views: number) => {
+  const count = Number.isFinite(views) ? Math.max(0, Math.floor(views)) : 0;
+  if (count >= 1_000_000) return `${Math.floor(count / 1_000_000)}M`;
+  if (count >= 1_000) return `${Math.floor(count / 1_000)}K`;
+  return String(count);
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -41,6 +50,19 @@ export const timeAgoEs = (dateString: string) => {
   if (months < 12) return months === 1 ? '1 Mes' : `${months} Meses`;
   const years = Math.floor(months / 12);
   return years === 1 ? '1 Año' : `${years} Años`;
+};
+
+/** Antigüedad de las portadas: días hasta 364; luego años completos. */
+export const timeAgoDaysEs = (dateString: string) => {
+  const days = daysSince(dateString);
+  if (Number.isNaN(days)) return '—';
+  if (days === 0) return 'Hoy';
+  if (days === 1) return '1 Día';
+  if (days >= 365) {
+    const years = Math.floor(days / 365);
+    return years === 1 ? '1 Año' : `${years} Años`;
+  }
+  return `${days} Días`;
 };
 
 /**

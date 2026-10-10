@@ -1,58 +1,38 @@
-import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
-import { BadgeCheck, ChevronDown, ChevronUp, Flame, Heart, LockKeyhole, MessageCircle } from "lucide-react";
-import { PurchaseModal } from "../modals";
-import { DetailCoin3DIcon } from "../common";
-import { buyChapter, getStoredToken } from "../../services/authService";
-import { getChapterPreviewImage } from "../../services/mangaService";
-import { getChapterEngagement, setEntityReaction } from "../../services/communityService";
+import { useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
-export interface Chapter {
-  id: number | string;
-  chapter_number: number;
-  title: string;
-  created_at: string;
-  is_paid: boolean;
-  price_coins: number;
-  free_at: string | null;
-  /** Portada subida en WordPress. Vacío = se usa la primera página del capítulo. */
-  cover_url?: string | null;
-}
+import { PurchaseModal } from '../modals';
+import { getChapterPreviewImage, type SeriesChapter } from '../../services/mangaService';
+import { getChapterEngagement, setEntityReaction } from '../../services/communityService';
+import { buyChapter, getStoredToken } from '../../services/authService';
+import {
+  ChapterCommentIcon,
+  ChapterLikeHeartIcon,
+  CoinStackIcon,
+  LikeHeartIcon,
+  PurchasedIcon,
+  ShowAllIcon,
+} from './designIcons';
 
-interface ChapterListProps {
-  chapters: Chapter[];
-  purchasedChapterIds: Set<string>;
-  userCoins: number;
-  userInfo: { id: string; username: string };
-  onPurchaseSuccess: () => void;
-  isLight?: boolean;
-  sortOrder?: 'asc' | 'desc';
-}
+const VISIBLE_CHAPTERS = 6;
 
+/** "Hoy", "3 días", "3 meses"… */
 const formatChapterAge = (createdAt: string): string => {
   const published = new Date(createdAt).getTime();
   if (!Number.isFinite(published)) return '';
-
   const elapsedDays = Math.max(0, Math.floor((Date.now() - published) / 86_400_000));
   if (elapsedDays === 0) return 'Hoy';
   if (elapsedDays === 1) return '1 día';
   if (elapsedDays >= 365) {
-    const elapsedYears = Math.floor(elapsedDays / 365);
-    return `${elapsedYears} ${elapsedYears === 1 ? 'año' : 'años'}`;
+    const years = Math.floor(elapsedDays / 365);
+    return `${years} ${years === 1 ? 'año' : 'años'}`;
   }
   if (elapsedDays > 30) {
-    const elapsedMonths = Math.floor(elapsedDays / 30);
-    return `${elapsedMonths} ${elapsedMonths === 1 ? 'mes' : 'meses'}`;
+    const months = Math.floor(elapsedDays / 30);
+    return `${months} ${months === 1 ? 'mes' : 'meses'}`;
   }
   return `${elapsedDays} días`;
-};
-
-const isRecentChapter = (createdAt: string): boolean => {
-  const published = new Date(createdAt).getTime();
-  if (!Number.isFinite(published)) return false;
-  const elapsedDays = Math.max(0, Math.floor((Date.now() - published) / 86_400_000));
-  return elapsedDays <= 14;
 };
 
 const formatUnlockTime = (remainingMilliseconds: number): string => {
@@ -61,129 +41,107 @@ const formatUnlockTime = (remainingMilliseconds: number): string => {
   const hours = Math.floor((totalSeconds % 86_400) / 3_600);
   const minutes = Math.floor((totalSeconds % 3_600) / 60);
   const seconds = totalSeconds % 60;
+  const pad = (value: number) => value.toString().padStart(2, '0');
 
-  if (days > 0) return `${days}d ${hours.toString().padStart(2, '0')}h`;
-  if (hours > 0) return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m`;
-  return `${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+  if (days > 0) return `${days}d ${pad(hours)}h`;
+  if (hours > 0) return `${pad(hours)}h ${pad(minutes)}m`;
+  return `${pad(minutes)}m ${pad(seconds)}s`;
 };
 
-function PremiumUnlockTimer({
-  chapterId,
-  targetDate,
-  isLight,
-  onExpire,
-  priceNode,
-}: {
-  chapterId: number | string;
+/**
+ * Cuenta atrás de los capítulos de pago que se liberan solos: "¡Gratis En!" y el
+ * tiempo que falta se turnan junto al precio. Solo se ve en escritorio, donde la
+ * fila tiene sitio; en móvil sigue contando para desbloquear el capítulo a tiempo.
+ */
+function FreeCountdown({ chapterId, targetDate, onExpire }: {
+  chapterId: number;
   targetDate: string;
-  isLight: boolean;
-  onExpire: (chapterId: number | string) => void;
-  /** En móvil no hay sitio para las dos cosas: el aviso alterna con el precio. */
-  priceNode?: ReactNode;
+  onExpire: (chapterId: number) => void;
 }) {
   const reduceMotion = useReducedMotion();
   const [now, setNow] = useState(() => Date.now());
-  // En móvil el hueco es uno solo, así que rotan tres avisos de uno en uno:
-  // precio, "¡Gratis En!" y la cuenta atrás. En escritorio solo los dos últimos.
-  const frames: Array<'price' | 'label' | 'countdown'> = priceNode
-    ? ['price', 'label', 'countdown']
-    : ['label', 'countdown'];
-  const [frameIndex, setFrameIndex] = useState(0);
+  const [showLabel, setShowLabel] = useState(true);
   const targetTime = new Date(targetDate).getTime();
-  const remainingMilliseconds = Math.max(0, targetTime - now);
   const hasExpired = Number.isFinite(targetTime) && targetTime <= now;
-  const countdownCopy = formatUnlockTime(remainingMilliseconds);
+  const countdown = formatUnlockTime(Math.max(0, targetTime - now));
 
+  // Cada aviso se programa al filo del segundo siguiente para no desfasarse del reloj.
   useEffect(() => {
     let timer = 0;
     const tick = () => {
       setNow(Date.now());
       timer = window.setTimeout(tick, 1000 - (Date.now() % 1000));
     };
-
     tick();
     return () => window.clearTimeout(timer);
   }, [targetDate]);
 
-  const frameCount = frames.length;
   useEffect(() => {
-    setFrameIndex(0);
+    setShowLabel(true);
     if (reduceMotion) return;
-
-    const timer = window.setInterval(() => setFrameIndex((current) => (current + 1) % frameCount), 2200);
+    const timer = window.setInterval(() => setShowLabel((current) => !current), 2200);
     return () => window.clearInterval(timer);
-  }, [reduceMotion, targetDate, frameCount]);
+  }, [reduceMotion, targetDate]);
 
   useEffect(() => {
     if (hasExpired) onExpire(chapterId);
   }, [chapterId, hasExpired, onExpire]);
 
-  const freeLabel = <span className="manga-free-holo">¡Gratis En!</span>;
-  const frame = frames[frameIndex] ?? frames[0];
-  const visibleCopy = reduceMotion
-    ? <>{freeLabel} {countdownCopy}</>
-    : frame === 'price'
-      ? priceNode
-      : frame === 'label'
-        ? freeLabel
-        : countdownCopy;
+  const label = <span className="manga-free-holo">¡Gratis En!</span>;
 
-  /* El hueco mide siempre 104px para que quepa el aviso más largo. En móvil su
-     contenido se pega a la derecha, así el precio, el "¡Gratis En!" y la cuenta
-     atrás caen justo donde está el precio de las filas sin contador; en
-     escritorio el contenido sigue centrado dentro de ese hueco. */
   return (
     <span
-      className={`inline-flex h-8 w-[104px] shrink-0 items-center justify-end overflow-hidden whitespace-nowrap font-[Montserrat] text-[12px] font-semibold leading-none tracking-[-0.01em] md:justify-center ${isLight ? 'text-black' : 'text-white'}`}
       role="timer"
-      aria-label={`¡Gratis en! ${countdownCopy}`}
-      title={`¡Gratis en! ${countdownCopy}`}
+      aria-label={`¡Gratis en! ${countdown}`}
+      title={`¡Gratis en! ${countdown}`}
+      className="hidden h-8 min-w-[104px] shrink-0 items-center justify-center overflow-hidden whitespace-nowrap font-montserrat text-xs font-semibold text-ink tabular-nums lg:inline-flex"
     >
-      <span className={`relative inline-grid h-5 w-full items-center overflow-hidden ${reduceMotion ? 'min-w-0' : ''}`} aria-hidden="true">
-        <AnimatePresence initial={false} mode="wait">
-          <motion.span
-            key={reduceMotion ? 'reduced' : frame}
-            initial={reduceMotion ? false : { opacity: 0, y: 7 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduceMotion ? undefined : { opacity: 0, y: -7 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-            className={`${reduceMotion ? 'relative' : 'absolute inset-0'} flex items-center justify-end whitespace-nowrap tabular-nums md:justify-center`}
-          >
-            {visibleCopy}
-          </motion.span>
-        </AnimatePresence>
-      </span>
+      {reduceMotion ? (
+        <span aria-hidden="true" className="flex items-center gap-1">{label} {countdown}</span>
+      ) : (
+        <span aria-hidden="true" className="relative inline-grid h-5 w-full items-center overflow-hidden">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.span
+              key={showLabel ? 'label' : 'countdown'}
+              initial={{ opacity: 0, y: 7 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -7 }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              {showLabel ? label : countdown}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      )}
     </span>
   );
 }
 
-const CHAPTER_FACE_FOCUS_POINTS = [
+type FocusPoint = { x: number; y: number };
+
+/** Zonas donde suele haber una cara en una página suelta del capítulo. */
+const FOCUS_POINTS: readonly FocusPoint[] = [
   { x: 32, y: 28 },
   { x: 68, y: 28 },
   { x: 50, y: 36 },
   { x: 28, y: 50 },
   { x: 72, y: 50 },
   { x: 50, y: 60 },
-] as const;
+];
 
-const getChapterFocusPoint = (chapter: Chapter, imageUrl: string) => {
-  const seedSource = `${chapter.id}:${chapter.chapter_number}:${imageUrl}`;
-  const seed = Array.from(seedSource).reduce(
-    (total, character) => ((total * 31) + character.charCodeAt(0)) >>> 0,
-    0,
-  );
-  return CHAPTER_FACE_FOCUS_POINTS[seed % CHAPTER_FACE_FOCUS_POINTS.length];
+const seededFocus = (chapter: SeriesChapter, imageUrl: string) => {
+  const seed = Array.from(`${chapter.id}:${chapter.chapter_number}:${imageUrl}`)
+    .reduce((total, character) => ((total * 31) + character.charCodeAt(0)) >>> 0, 0);
+  return FOCUS_POINTS[seed % FOCUS_POINTS.length];
 };
 
-const findDetailedColorFocus = (
-  image: HTMLImageElement,
-  fallback: (typeof CHAPTER_FACE_FOCUS_POINTS)[number],
-) => {
+/** Elige la zona con más color y detalle de la página para encuadrar la miniatura. */
+const detectFocus = (image: HTMLImageElement, fallback: FocusPoint): FocusPoint => {
   try {
     const canvas = document.createElement('canvas');
-    const aspect = image.naturalHeight / Math.max(1, image.naturalWidth);
     canvas.width = 96;
-    canvas.height = Math.max(96, Math.min(160, Math.round(96 * aspect)));
+    canvas.height = Math.max(96, Math.min(160, Math.round(96 * (image.naturalHeight / Math.max(1, image.naturalWidth)))));
     const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) return fallback;
 
@@ -194,10 +152,9 @@ const findDetailedColorFocus = (
       return (pixels[offset] * 0.299) + (pixels[offset + 1] * 0.587) + (pixels[offset + 2] * 0.114);
     };
 
-    let bestPoint = fallback;
+    let best = fallback;
     let bestScore = Number.NEGATIVE_INFINITY;
-
-    CHAPTER_FACE_FOCUS_POINTS.forEach((point) => {
+    FOCUS_POINTS.forEach((point) => {
       const centerX = Math.round((point.x / 100) * (canvas.width - 1));
       const centerY = Math.round((point.y / 100) * (canvas.height - 1));
       const radiusX = Math.max(8, Math.round(canvas.width * 0.14));
@@ -208,47 +165,38 @@ const findDetailedColorFocus = (
       for (let y = Math.max(1, centerY - radiusY); y < Math.min(canvas.height - 1, centerY + radiusY); y += 2) {
         for (let x = Math.max(1, centerX - radiusX); x < Math.min(canvas.width - 1, centerX + radiusX); x += 2) {
           const offset = ((y * canvas.width) + x) * 4;
-          const red = pixels[offset];
-          const green = pixels[offset + 1];
-          const blue = pixels[offset + 2];
+          const [red, green, blue] = [pixels[offset], pixels[offset + 1], pixels[offset + 2]];
           const saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
-          const edge = Math.abs(luminanceAt(x, y) - luminanceAt(x + 1, y))
-            + Math.abs(luminanceAt(x, y) - luminanceAt(x, y + 1));
-          const skinLike = red > 90 && green > 35 && blue > 20 && red > green && red > blue
-            ? 18
-            : 0;
+          const edge = Math.abs(luminanceAt(x, y) - luminanceAt(x + 1, y)) + Math.abs(luminanceAt(x, y) - luminanceAt(x, y + 1));
+          const skinLike = red > 90 && green > 35 && blue > 20 && red > green && red > blue ? 18 : 0;
           score += (saturation * 1.25) + (edge * 0.72) + skinLike;
           samples += 1;
         }
       }
 
-      const averageScore = samples > 0 ? score / samples : 0;
-      if (averageScore > bestScore) {
-        bestScore = averageScore;
-        bestPoint = point;
+      const average = samples > 0 ? score / samples : 0;
+      if (average > bestScore) {
+        bestScore = average;
+        best = point;
       }
     });
-
-    return bestPoint;
+    return best;
   } catch {
-    // En desarrollo las imágenes remotas pueden bloquear la lectura del canvas.
-    // El encuadre determinista sigue funcionando como alternativa ligera.
+    // Las imágenes de otro dominio pueden bloquear la lectura del canvas: queda el encuadre fijo.
     return fallback;
   }
 };
 
-function ChapterThumbnail({ chapter }: { chapter: Chapter }) {
-  // Portada subida en WordPress; si no hay, se mantiene la provisional (primera
-  // página del capítulo) para que la fila nunca se quede vacía.
+/** Miniatura: la portada subida del capítulo y, si no hay o falla, su primera página encuadrada. */
+function ChapterThumbnail({ chapter }: { chapter: SeriesChapter }) {
   const uploadedCover = chapter.cover_url?.trim() || '';
   const [coverFailed, setCoverFailed] = useState(false);
   const useUploadedCover = Boolean(uploadedCover) && !coverFailed;
   const [imageUrl, setImageUrl] = useState(useUploadedCover ? uploadedCover : '');
-  const [detectedFocus, setDetectedFocus] = useState<(typeof CHAPTER_FACE_FOCUS_POINTS)[number] | null>(null);
-  const fallbackFocus = getChapterFocusPoint(chapter, imageUrl);
-  // La portada subida ya viene encuadrada; el recorte inteligente solo se aplica
-  // a la imagen provisional (una página suelta del capítulo).
-  const focusPoint = useUploadedCover ? { x: 50, y: 50 } : detectedFocus ?? fallbackFocus;
+  const [detectedFocus, setDetectedFocus] = useState<FocusPoint | null>(null);
+  const fallbackFocus = seededFocus(chapter, imageUrl);
+  // La portada subida ya viene encuadrada; el recorte solo se calcula para la página provisional.
+  const focus = useUploadedCover ? { x: 50, y: 50 } : detectedFocus ?? fallbackFocus;
 
   useEffect(() => {
     setCoverFailed(false);
@@ -256,395 +204,241 @@ function ChapterThumbnail({ chapter }: { chapter: Chapter }) {
 
   useEffect(() => {
     setDetectedFocus(null);
-
     if (useUploadedCover) {
       setImageUrl(uploadedCover);
       return;
     }
-
     setImageUrl('');
     let active = true;
     void getChapterPreviewImage(chapter.id, chapter.chapter_number, getStoredToken()).then((preview) => {
       if (active && preview) setImageUrl(preview);
     });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [chapter.chapter_number, chapter.id, uploadedCover, useUploadedCover]);
 
   return (
-    <div className="relative flex h-[52px] w-[68px] items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/[0.04] shadow-[0_7px_16px_rgba(0,0,0,.18)] md:h-[58px] md:w-[74px]">
-      {imageUrl ? (
+    <span className="h-[76px] w-[87px] shrink-0 overflow-hidden rounded-lg border border-ink bg-ink/10 max-[400px]:w-16">
+      {imageUrl && (
         <img
           src={imageUrl}
           alt=""
+          aria-hidden="true"
           loading="lazy"
           decoding="async"
-          fetchPriority="low"
-          onLoad={(event) => {
-            if (useUploadedCover) return;
-            setDetectedFocus(findDetailedColorFocus(event.currentTarget, fallbackFocus));
-          }}
+          onLoad={(event) => { if (!useUploadedCover) setDetectedFocus(detectFocus(event.currentTarget, fallbackFocus)); }}
           onError={() => {
             setDetectedFocus(null);
             setImageUrl('');
-            // Si la portada subida falla, se cae a la provisional.
             if (useUploadedCover) setCoverFailed(true);
           }}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.04]"
-          style={{ objectPosition: `${focusPoint.x}% ${focusPoint.y}%` }}
+          className="h-full w-full object-cover"
+          style={{ objectPosition: `${focus.x}% ${focus.y}%` }}
         />
-      ) : (
-        <span className="h-full w-full animate-pulse bg-gradient-to-br from-[#FF4D88]/15 via-white/[0.04] to-violet-500/15" aria-hidden="true" />
       )}
-      <span className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/[0.04]" aria-hidden="true" />
-    </div>
-  );
-}
-
-function ChapterEngagement({
-  commentActive,
-  commentCount,
-  liked,
-  onToggleComment,
-  onToggleLike,
-  likeCount,
-}: {
-  commentActive: boolean;
-  commentCount: number;
-  liked: boolean;
-  onToggleComment: () => void;
-  onToggleLike: () => void;
-  likeCount: number;
-}) {
-  const handleAction = (event: MouseEvent<HTMLButtonElement>, action: () => void) => {
-    event.stopPropagation();
-    action();
-  };
-
-  return (
-    <span className="manga-chapter-engagement" aria-label={`${commentCount} comentarios y ${likeCount} me gusta`}>
-      <button
-        type="button"
-        className={`manga-chapter-engagement-item ${commentActive ? 'is-active' : ''}`}
-        title="Comentarios"
-        aria-label="Comentarios del capítulo"
-        aria-pressed={commentActive}
-        onClick={(event) => handleAction(event, onToggleComment)}
-      >
-        <MessageCircle className="manga-chapter-engagement-icon" strokeWidth={2.5} aria-hidden="true" />
-        <span className="tabular-nums">{commentCount}</span>
-      </button>
-      <button
-        type="button"
-        className={`manga-chapter-engagement-item manga-chapter-like-action ${liked ? 'is-active' : ''}`}
-        title="Me gusta"
-        aria-label="Me gusta este capítulo"
-        aria-pressed={liked}
-        onClick={(event) => handleAction(event, onToggleLike)}
-      >
-        <Heart className="manga-chapter-engagement-icon manga-chapter-like-icon" strokeWidth={2.5} fill={liked ? 'currentColor' : 'none'} aria-hidden="true" />
-        <span className="tabular-nums">{likeCount}</span>
-      </button>
     </span>
   );
 }
 
-export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, isLight = false, sortOrder = 'desc' }: ChapterListProps) => {
+/**
+ * Lista de capítulos de la ficha (móvil y escritorio): cinco filas y el botón
+ * "Mostrar Todos". Cada fila lleva la miniatura, el número, la antigüedad y, a
+ * la derecha, el precio en monedas (o el sello verde si ya es suyo), los
+ * comentarios y los me gusta.
+ */
+export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, sortOrder = 'desc', loading = false, loadError = '' }: {
+  loading?: boolean;
+  loadError?: string;
+  chapters: SeriesChapter[];
+  purchasedChapterIds: Set<string>;
+  userCoins: number;
+  userInfo: { id: string; username: string };
+  onPurchaseSuccess: () => void;
+  sortOrder?: 'asc' | 'desc';
+}) => {
   const navigate = useNavigate();
-
-  const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
-
-  // Modales
+  const [showAll, setShowAll] = useState(false);
+  const [selectedChapter, setSelectedChapter] = useState<SeriesChapter | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   const [isProcessing, setIsProcessing] = useState(false);
-
   const [localUnlocked, setLocalUnlocked] = useState<Set<string>>(new Set());
   const [timedUnlocked, setTimedUnlocked] = useState<Set<string>>(new Set());
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(new Set());
   const [chapterLikes, setChapterLikes] = useState<Record<string, number>>({});
+  const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(new Set());
   const [likeBusy, setLikeBusy] = useState(false);
-  const [showAll, setShowAll] = useState(false);
-  const chapterIds = chapters.map(chapter => String(chapter.id)).join(',');
+
+  const chapterIds = chapters.map((chapter) => String(chapter.id)).join(',');
   useEffect(() => {
     let active = true;
-    const load = () => { if (chapterIds) void getChapterEngagement(chapterIds.split(',')).then(({ counts, engagement }) => {
-      if (!active) return;
-      setCommentCounts(counts);
-      setChapterLikes(Object.fromEntries(Object.entries(engagement).map(([id, state]) => [id, state.reactions.like || 0])));
-      setLikedChapterIds(new Set(Object.entries(engagement).filter(([, state]) => state.my_reaction === 'like').map(([id]) => id)));
-    }).catch(() => undefined); };
+    const load = () => {
+      if (!chapterIds) return;
+      void getChapterEngagement(chapterIds.split(',')).then(({ counts, engagement }) => {
+        if (!active) return;
+        setCommentCounts(counts);
+        setChapterLikes(Object.fromEntries(Object.entries(engagement).map(([id, state]) => [id, state.reactions.like || 0])));
+        setLikedChapterIds(new Set(Object.entries(engagement).filter(([, state]) => state.my_reaction === 'like').map(([id]) => id)));
+      }).catch(() => undefined);
+    };
     load();
     window.addEventListener('focus', load);
     window.addEventListener('mm_chapter_comments_changed', load);
     return () => { active = false; window.removeEventListener('focus', load); window.removeEventListener('mm_chapter_comments_changed', load); };
   }, [chapterIds]);
 
-  const toggleChapterAction = async (chapterId: number | string) => {
-    if (likeBusy) return;
-    if (!getStoredToken()) { navigate('/auth/login', { state: { returnTo: window.location.pathname } }); return; }
-    const id = String(chapterId);
-    setLikeBusy(true);
-    try {
-      const result = await setEntityReaction('chapter', id, likedChapterIds.has(id) ? '' : 'like');
-      setChapterLikes(current => ({ ...current, [id]: result.reactions.like || 0 }));
-      setLikedChapterIds(current => { const next = new Set(current); if (result.my_reaction === 'like') next.add(id); else next.delete(id); return next; });
-    } catch { window.alert('No se pudo guardar el me gusta. Inténtalo de nuevo.'); }
-    finally { setLikeBusy(false); }
-  };
+  const returnTo = () => `${window.location.pathname}${window.location.search}`;
+  const goToLogin = () => navigate('/auth/login', { state: { returnTo: returnTo() } });
 
-  const isChapterPurchased = (chapter: Chapter) => {
-    const idStr = String(chapter.id);
-    return purchasedChapterIds.has(idStr) || localUnlocked.has(idStr);
-  };
-
-  const handleTimedUnlock = useCallback((chapterId: number | string) => {
+  const handleTimedUnlock = useCallback((chapterId: number) => {
     const id = String(chapterId);
-    setTimedUnlocked((current) => {
-      if (current.has(id)) return current;
-      const next = new Set(current);
-      next.add(id);
-      return next;
-    });
+    setTimedUnlocked((current) => (current.has(id) ? current : new Set(current).add(id)));
   }, []);
 
-  const totalChapters = chapters.length;
-
-  const orderedChapters = [...chapters].sort((a, b) => {
-    const chapterDifference = sortOrder === 'asc'
-      ? Number(a.chapter_number) - Number(b.chapter_number)
-      : Number(b.chapter_number) - Number(a.chapter_number);
-    if (chapterDifference !== 0) return chapterDifference;
-    return sortOrder === 'asc'
-      ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-  const visibleChapters = showAll ? orderedChapters : orderedChapters.slice(0, 5);
-
-  const isChapterLocked = (chapter: Chapter) => {
+  const isPurchased = (chapter: SeriesChapter) => purchasedChapterIds.has(String(chapter.id)) || localUnlocked.has(String(chapter.id));
+  const isLocked = (chapter: SeriesChapter) => {
     if (!chapter.is_paid) return false;
     if (timedUnlocked.has(String(chapter.id))) return false;
     if (chapter.free_at && new Date(chapter.free_at) <= new Date()) return false;
-
-    if (isChapterPurchased(chapter)) {
-      return false;
-    }
-    return true;
+    return !isPurchased(chapter);
   };
 
-  // --- LÓGICA DE CLIC ---
-  const handleChapterClick = (chapter: Chapter) => {
-    const locked = isChapterLocked(chapter);
-
-    // Si el capítulo es GRATUITO → entrar directamente, sin login
-    if (!locked) {
-      navigate(`/read/${chapter.id}`);
-      return;
-    }
-
-    // El capítulo es de PAGO → necesita sesión
-    if (!userInfo.id) {
-      // Sin sesión → llevar a la página de acceso y regresar después al manga.
-      navigate('/auth/login', {
-        state: { returnTo: `${window.location.pathname}${window.location.search}` },
-      });
-      return;
-    }
-
-    // Con sesión y capítulo bloqueado → mostrar modal de compra
+  const openChapter = (chapter: SeriesChapter) => {
+    if (!isLocked(chapter)) { navigate(`/read/${chapter.id}`); return; }
+    if (!userInfo.id) { goToLogin(); return; }
     setSelectedChapter(chapter);
     setIsModalOpen(true);
   };
 
+  const toggleLike = async (chapterId: number) => {
+    if (likeBusy) return;
+    if (!getStoredToken()) { goToLogin(); return; }
+    const id = String(chapterId);
+    setLikeBusy(true);
+    try {
+      const result = await setEntityReaction('chapter', id, likedChapterIds.has(id) ? '' : 'like');
+      setChapterLikes((current) => ({ ...current, [id]: result.reactions.like || 0 }));
+      setLikedChapterIds((current) => {
+        const next = new Set(current);
+        if (result.my_reaction === 'like') next.add(id); else next.delete(id);
+        return next;
+      });
+    } catch { /* Un me gusta perdido no interrumpe la lectura. */ }
+    finally { setLikeBusy(false); }
+  };
 
-  const handleConfirmPurchase = async () => {
+  const confirmPurchase = async () => {
     if (!selectedChapter) return;
     setIsProcessing(true);
     try {
       const result = await buyChapter(selectedChapter.id);
       if (result.success) {
-        setLocalUnlocked(prev => new Set(prev).add(String(selectedChapter.id)));
+        setLocalUnlocked((current) => new Set(current).add(String(selectedChapter.id)));
         onPurchaseSuccess();
         setIsModalOpen(false);
         navigate(`/read/${selectedChapter.id}`);
-      } else if (result.message.includes("saldo") || result.message.includes("insuficiente")) {
-        alert("Saldo insuficiente. Recarga tus monedas en mangamukai.com");
-        setIsModalOpen(false);
       } else {
-        alert("Error: " + (result.message || "No se pudo comprar"));
+        window.alert(result.message || 'No se pudo comprar el capítulo.');
+        setIsModalOpen(false);
       }
-    } catch (err: unknown) {
-      console.error("Error comprando:", err);
-      alert("Error técnico al procesar la compra.");
+    } catch {
+      window.alert('Error técnico al procesar la compra.');
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const ordered = [...chapters].sort((a, b) => {
+    const byNumber = sortOrder === 'asc' ? a.chapter_number - b.chapter_number : b.chapter_number - a.chapter_number;
+    if (byNumber !== 0) return byNumber;
+    const byDate = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    return sortOrder === 'asc' ? byDate : -byDate;
+  });
+  const visible = showAll ? ordered : ordered.slice(0, VISIBLE_CHAPTERS);
+
+  if (loading) return <div role="status" aria-label="Cargando capítulos" className="space-y-2"><span className="sr-only">Cargando capítulos…</span>{Array.from({ length: VISIBLE_CHAPTERS }, (_, i) => <div key={i} aria-hidden="true" className="h-20 rounded-lg bg-ink/5 animate-pulse motion-reduce:animate-none" />)}</div>;
+  if (loadError) return <p role="alert" className="py-14 text-center text-sm text-red-500">{loadError}</p>;
+  if (chapters.length === 0) {
+    return <p className="rounded-lg border border-zinc-400/25 py-14 text-center font-montserrat text-[15px] font-bold italic text-ink/60">Próximamente</p>;
+  }
+
   return (
     <>
-      <div className={`manga-chapter-list relative z-20 w-full ${isLight ? 'is-light' : 'is-dark'}`}>
+      <ul className="flex flex-col gap-1.5">
+        {visible.map((chapter) => {
+          const id = String(chapter.id);
+          const locked = isLocked(chapter);
+          const liked = likedChapterIds.has(id);
+          const comments = commentCounts[id] || 0;
+          const freesLater = locked && Boolean(chapter.free_at) && new Date(chapter.free_at as string) > new Date();
+          return (
+            <li key={id}>
+              <div className="flex h-24 items-center gap-2 rounded-lg border border-zinc-400/25 pl-[5px] pr-2.5 transition-colors max-[400px]:gap-[5px] max-[400px]:pr-[5px] lg:gap-3 lg:pr-4 lg:hover:border-mukai-magenta/60">
+                <button type="button" onClick={() => openChapter(chapter)} className="flex min-w-0 flex-1 items-center gap-2 text-left max-[400px]:gap-1.5 lg:gap-3" aria-label={`Leer capítulo ${chapter.chapter_number}`}>
+                  <ChapterThumbnail chapter={chapter} />
+                  <span className="flex min-w-0 flex-col gap-2">
+                    <span className="truncate font-montserrat text-xs font-semibold leading-3 text-ink lg:text-sm lg:leading-4">Capítulo {chapter.chapter_number}</span>
+                    <span className="truncate font-montserrat text-xs font-light leading-3 text-ink/80 lg:leading-4">{formatChapterAge(chapter.created_at)}</span>
+                  </span>
+                </button>
 
-        {/* LISTA */}
-        <div className="manga-chapter-surface">
-          <div className="flex flex-col gap-2">
-            {totalChapters === 0 ? (
-              <div className="manga-chapter-empty flex items-center justify-center rounded-xl border border-white/[0.07] bg-black/30 px-5 py-16 text-center">
-                <p className="font-[Montserrat] text-base font-bold italic">Próximamente</p>
-              </div>
-            ) : visibleChapters.map((chapter) => {
-              const locked = isChapterLocked(chapter);
-              const isPurchased = isChapterPurchased(chapter);
-              const isFutureFree = !!chapter.free_at && new Date(chapter.free_at) > new Date();
-              const isNewChapter = isRecentChapter(chapter.created_at);
-              const chapterId = String(chapter.id);
-              const commentActive = (commentCounts[chapterId] || 0) > 0;
-              const liked = likedChapterIds.has(chapterId);
+                <span className="flex shrink-0 items-center gap-2 max-[400px]:gap-[5px] max-[400px]:[&_:is(button,span)]:gap-0.5 max-[400px]:[&_:is(button,span)]:text-xs max-[400px]:[&_svg]:w-4 lg:gap-3">
+                  {freesLater && <FreeCountdown chapterId={chapter.id} targetDate={chapter.free_at as string} onExpire={handleTimedUnlock} />}
 
-              return (
-                <div
-                  key={chapter.id}
-                  className={`manga-chapter-row group relative grid w-full grid-cols-[68px_minmax(0,1fr)] items-center gap-x-3 overflow-hidden rounded-xl border border-white/[0.07] bg-black/30 px-4 py-3 text-left text-sm transition-all duration-200 md:grid-cols-[84px_minmax(0,1fr)_minmax(300px,auto)] md:gap-x-4 md:px-5 ${locked ? 'opacity-90 hover:opacity-100' : ''}`}
-                >
+                  {/* Precio mientras esté bloqueado; si lo compró, el sello verde. */}
+                  {locked ? (
+                    <span title={`${chapter.price_coins} monedas`} className="flex items-center gap-1 font-anta text-sm font-normal text-mukai-orange">
+                      <CoinStackIcon size={20} />
+                      {chapter.price_coins}
+                    </span>
+                  ) : isPurchased(chapter) ? (
+                    <span role="img" aria-label="Comprado" title="Comprado" className="flex text-green-500">
+                      <PurchasedIcon size={30} />
+                    </span>
+                  ) : null}
+
                   <button
                     type="button"
-                    onClick={() => handleChapterClick(chapter)}
-                    className="manga-chapter-row-action absolute inset-0 z-0 h-full w-full"
-                    aria-label={`Abrir capítulo ${chapter.chapter_number}`}
-                  />
+                    onClick={() => navigate(`/read/${chapter.id}#comentarios`)}
+                    aria-label={`${comments} comentarios del capítulo ${chapter.chapter_number}`}
+                    title="Comentarios"
+                    className="flex items-center gap-1 font-anta text-base font-normal text-ink"
+                  >
+                    <ChapterCommentIcon size={20} className={comments ? 'text-mukai-magenta' : 'text-ink'} />
+                    <span className={comments ? 'text-mukai-magenta' : ''}>{comments}</span>
+                  </button>
 
-                  <div className="pointer-events-none relative z-[1]">
-                    <ChapterThumbnail chapter={chapter} />
-                  </div>
+                  <button type="button" onClick={() => void toggleLike(chapter.id)} disabled={likeBusy} aria-label={liked ? 'Quitar me gusta' : 'Me gusta'} aria-pressed={liked} className="flex items-center gap-1 font-anta text-base font-normal text-ink disabled:opacity-60">
+                    {liked ? <ChapterLikeHeartIcon size={16} /> : <LikeHeartIcon size={18} className="text-ink" />}
+                    <span className={liked ? 'text-mukai-magenta' : ''}>{chapterLikes[id] || 0}</span>
+                  </button>
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
 
-                  <div className="manga-chapter-row-title pointer-events-none relative z-[1] min-h-[40px] min-w-0 text-left transition-colors group-hover:text-white md:min-h-0 md:pr-4">
-                    <strong className="manga-chapter-title-copy absolute inset-x-0 top-0 block truncate text-[13px] font-semibold leading-tight md:static md:text-[14px]">
-                      Capítulo {chapter.chapter_number}
-                    </strong>
-                    <span className="manga-chapter-date absolute inset-x-0 bottom-0 flex min-h-[16px] items-center text-[13px] font-normal md:static md:mt-1.5">
-                      {isNewChapter ? (
-                        <span className="manga-chapter-new inline-flex items-center gap-1 text-[11px] font-medium uppercase text-[#FF4D88]">
-                          <Flame className="manga-chapter-new-flame" size={15} fill="currentColor" strokeWidth={1.8} aria-hidden="true" /> New
-                        </span>
-                      ) : (
-                        <span>{formatChapterAge(chapter.created_at)}</span>
-                      )}
-                    </span>
-                    <div className="absolute inset-y-0 right-0 flex min-w-0 items-center justify-end gap-3 md:hidden">
-                      {locked ? (
-                        isFutureFree ? (
-                          <PremiumUnlockTimer
-                            chapterId={chapter.id}
-                            targetDate={chapter.free_at!}
-                            isLight={isLight}
-                            onExpire={handleTimedUnlock}
-                            priceNode={(
-                              <span className="manga-chapter-coin-value flex items-center gap-1 text-yellow-500">
-                                <DetailCoin3DIcon size={17} className="h-[17px] w-[17px] object-contain" /> {chapter.price_coins}
-                              </span>
-                            )}
-                          />
-                        ) : (
-                          <span className="manga-chapter-coin-value flex shrink-0 items-center gap-1 text-yellow-500">
-                            <DetailCoin3DIcon size={17} className="h-[17px] w-[17px] object-contain" /> {chapter.price_coins}
-                          </span>
-                        )
-                      ) : isPurchased ? (
-                        <span className="manga-chapter-purchased-status inline-flex shrink-0 items-center justify-center" aria-label="Comprado" title="Comprado">
-                          <BadgeCheck className="manga-chapter-purchased-icon" strokeWidth={2.3} />
-                        </span>
-                      ) : (
-                        <span className="manga-chapter-free-access shrink-0">Gratis</span>
-                      )}
-                      <ChapterEngagement
-                        commentActive={commentActive}
-                        commentCount={commentCounts[chapterId] || 0}
-                        liked={liked}
-                        onToggleComment={() => navigate(`/read/${chapter.id}#comentarios`)}
-                        likeCount={chapterLikes[chapterId] || 0}
-                        onToggleLike={() => void toggleChapterAction(chapter.id)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pointer-events-none relative z-[1] hidden flex-nowrap items-center justify-end gap-4 whitespace-nowrap text-right md:flex">
-                    {locked ? (
-                      <span className="flex shrink-0 flex-nowrap items-center justify-end gap-3 whitespace-nowrap">
-                        {/* Hueco reservado siempre: así las filas con cuenta atrás
-                            y las que solo tienen PREMIUM quedan alineadas. */}
-                        <span className="flex w-[104px] shrink-0 items-center justify-end">
-                          {isFutureFree && (
-                            <PremiumUnlockTimer
-                              chapterId={chapter.id}
-                              targetDate={chapter.free_at!}
-                              isLight={isLight}
-                              onExpire={handleTimedUnlock}
-                            />
-                          )}
-                        </span>
-                        <span className="rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-yellow-400">
-                          Premium
-                        </span>
-                        <span className="manga-chapter-coin-value flex items-center gap-1.5 text-yellow-400">
-                          <DetailCoin3DIcon size={18} className="h-[18px] w-[18px] object-contain" /> {chapter.price_coins}
-                        </span>
-                        <LockKeyhole size={17} strokeWidth={1.8} className="manga-chapter-access-icon shrink-0" />
-                      </span>
-                    ) : (
-                      <span className="shrink-0">
-                        {isPurchased ? (
-                          <span className="manga-chapter-purchased-status inline-flex items-center justify-center gap-1.5" aria-label="Comprado" title="Comprado">
-                            <BadgeCheck className="manga-chapter-purchased-icon" strokeWidth={2.3} />
-                            <span className="font-[Montserrat] text-[11px] font-semibold">Comprado</span>
-                          </span>
-                        ) : (
-                          <span className="manga-chapter-free-access">Gratis</span>
-                        )}
-                      </span>
-                    )}
-                    <ChapterEngagement
-                      commentActive={commentActive}
-                      commentCount={commentCounts[chapterId] || 0}
-                      liked={liked}
-                      onToggleComment={() => navigate(`/read/${chapter.id}#comentarios`)}
-                      likeCount={chapterLikes[chapterId] || 0}
-                      onToggleLike={() => void toggleChapterAction(chapter.id)}
-                    />
-                  </div>
-
-                </div>
-              );
-            })}
-          </div>
-
-          {totalChapters > 5 && (
-            <button
-              onClick={() => setShowAll(!showAll)}
-              className="manga-chapter-toggle mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.07] bg-black/35 py-4 text-xs font-semibold text-white/40 transition-colors duration-300 hover:bg-black/50 hover:text-white/65"
-            >
-              {showAll ? (<> <ChevronUp size={14} /> Mostrar menos </>) : (<> <ChevronDown size={14} /> Mostrar todos </>)}
-            </button>
-          )}
-        </div>
-      </div>
+      {ordered.length > VISIBLE_CHAPTERS && (
+        <button
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+          className="mx-auto mt-2.5 flex h-12 w-48 items-center justify-center gap-2 rounded-[20px] border-[0.5px] border-zinc-400/25 font-montserrat text-sm text-ink/75 transition-colors lg:hover:border-mukai-magenta/60 lg:hover:text-ink"
+        >
+          {showAll ? 'Mostrar Menos' : 'Mostrar Todos'}
+          <ShowAllIcon size={20} className={showAll ? 'rotate-180' : ''} />
+        </button>
+      )}
 
       <PurchaseModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onConfirm={handleConfirmPurchase}
-        onRecharge={() => {
-          setIsModalOpen(false);
-          navigate('/recargar', { state: { returnTo: `${window.location.pathname}${window.location.search}` } });
-        }}
+        onConfirm={confirmPurchase}
+        onRecharge={() => { setIsModalOpen(false); navigate('/recargar', { state: { returnTo: returnTo() } }); }}
         chapterNumber={selectedChapter?.chapter_number ?? ''}
         price={selectedChapter?.price_coins || 0}
         userBalance={userCoins}
         loading={isProcessing}
         freeAt={selectedChapter?.free_at || null}
       />
-
     </>
   );
 };

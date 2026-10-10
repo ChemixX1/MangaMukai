@@ -1,20 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import type { EmojiClickData, EmojiStyle, Theme } from 'emoji-picker-react';
 import { getFluentEmojiCDN } from '@lobehub/fluent-emoji';
+import { Bold, Italic, Loader2, Send, Smile, Sticker, Underline, User as UserIcon, X } from 'lucide-react';
+
 import {
-  ChevronDown,
-  ChevronUp,
-  Loader2,
-  MessageSquareText,
-  Reply,
-  Send,
-  SmilePlus,
-  Sticker,
-  X,
-} from 'lucide-react';
-import {
+  getMangaComments,
   notifyCommentReaction,
   postMangaComment,
   setEntityReaction,
@@ -22,148 +13,171 @@ import {
 } from '../../services/communityService';
 import { getStoredToken, getStoredUser } from '../../services/authService';
 import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from '../../services/wordpressService';
-
-interface MangaCommentsProps {
-  mangaId: string;
-  initialComments: MangaComment[];
-  isLight?: boolean;
-  chapterId?: string;
-}
+import { useTheme } from '../../hooks/useTheme';
+import {
+  CommentFireActiveIcon,
+  CommentFireIcon,
+  CommentLaughActiveIcon,
+  CommentLaughIcon,
+  CommentLikeActiveIcon,
+  CommentLikeIcon,
+  CommentLoveActiveIcon,
+  CommentLoveIcon,
+  CommentReplyIcon,
+  CommentsHeadingIcon,
+  ComposerPromptIcon,
+  PublishIcon,
+  ShowAllIcon,
+} from './designIcons';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
-const getFluentStickerUrl = (emoji: string) => getFluentEmojiCDN(emoji, { cdn: 'unpkg', type: '3d' });
-
+/** Reacciones de cada comentario, en el orden y los colores del diseño. */
 const COMMENT_REACTIONS = [
-  { id: 'fire', symbol: '🔥', label: 'Fuego', imgUrl: getFluentStickerUrl('🔥') },
-  { id: 'love', symbol: '❤️', label: 'Me encanta', imgUrl: getFluentStickerUrl('❤️') },
-  { id: 'like', symbol: '👍', label: 'Me gusta', imgUrl: getFluentStickerUrl('👍') },
-  { id: 'haha', symbol: '😂', label: 'Me divierte', imgUrl: getFluentStickerUrl('😂') },
-  { id: 'sad', symbol: '😢', label: 'Me entristece', imgUrl: getFluentStickerUrl('😢') },
+  { id: 'like', Icon: CommentLikeIcon, ActiveIcon: CommentLikeActiveIcon, label: 'Me gusta', color: '#00C9F1' },
+  { id: 'love', Icon: CommentLoveIcon, ActiveIcon: CommentLoveActiveIcon, label: 'Me encanta', color: '#FF008C' },
+  { id: 'fire', Icon: CommentFireIcon, ActiveIcon: CommentFireActiveIcon, label: 'Candente', color: '#FB5937' },
+  { id: 'haha', Icon: CommentLaughIcon, ActiveIcon: CommentLaughActiveIcon, label: 'Me divierte', color: '#FFCD0F' },
 ] as const;
 
 type CommentReactionId = (typeof COMMENT_REACTIONS)[number]['id'];
-type CommentReactionCounts = Record<CommentReactionId, number>;
 
-const createCommentReactionCounts = (): CommentReactionCounts => ({
-  fire: 0,
-  love: 0,
-  like: 0,
-  haha: 0,
-  sad: 0,
-});
+const VISIBLE_COMMENTS = 4;
 
-const createFluentSticker = (id: string, emoji: string, names: string[]) => ({
-  id,
-  emoji,
-  names,
-  imgUrl: getFluentStickerUrl(emoji),
-});
+/** Stickers 3D de Fluent: el comentario los guarda como `[sticker:url]`. */
+const COMMENT_STICKERS = ([
+  ['🫶', 'Corazón con manos'], ['🫠', 'Derretido'], ['💀', 'Calavera'], ['💅', 'Icónico'],
+  ['💯', 'Cien'], ['🤯', 'Impactado'], ['🥹', 'Emocionado'], ['😭', 'Llorando'],
+  ['🔥', 'Fuego'], ['💜', 'Corazón morado'], ['💘', 'Flechazo'], ['😍', 'Me encanta'],
+  ['🥳', 'Fiesta'], ['🎉', 'Confeti'], ['✨', 'Brillos'], ['🚀', 'Cohete'],
+  ['👑', 'Corona'], ['😎', 'Genial'], ['🥶', 'Congelado'], ['🤡', 'Payaso'],
+  ['🙄', 'Mirada'], ['🤝', 'Trato'], ['🤗', 'Abrazo'], ['🧋', 'Bubble tea'],
+] as const).map(([emoji, name]) => ({ name, url: getFluentEmojiCDN(emoji, { cdn: 'unpkg', type: '3d' }) }));
 
-const COMMENT_STICKERS = [
-  createFluentSticker('mm-heart-hands', '🫶', ['corazón con manos', 'amor', 'apoyo']),
-  createFluentSticker('mm-melting', '🫠', ['derretido', 'mood', 'calor']),
-  createFluentSticker('mm-skull', '💀', ['calavera', 'morir de risa', 'meme']),
-  createFluentSticker('mm-nails', '💅', ['uñas', 'slay', 'icónico']),
-  createFluentSticker('mm-hundred', '💯', ['cien', 'real', 'perfecto']),
-  createFluentSticker('mm-mind-blown', '🤯', ['impactado', 'mente', 'increíble']),
-  createFluentSticker('mm-pleading', '🥹', ['emocionado', 'ternura', 'por favor']),
-  createFluentSticker('mm-crying', '😭', ['llorando', 'emoción', 'mood']),
-  createFluentSticker('mm-fire', '🔥', ['fuego', 'épico', 'tendencia']),
-  createFluentSticker('mm-purple-heart', '💜', ['corazón morado', 'amor', 'aesthetic']),
-  createFluentSticker('mm-heart-arrow', '💘', ['flechazo', 'amor', 'crush']),
-  createFluentSticker('mm-heart-eyes', '😍', ['amor', 'encanta', 'crush']),
-  createFluentSticker('mm-party', '🥳', ['fiesta', 'celebrar', 'party']),
-  createFluentSticker('mm-confetti', '🎉', ['confeti', 'fiesta', 'celebrar']),
-  createFluentSticker('mm-sparkles', '✨', ['brillos', 'magia', 'aesthetic']),
-  createFluentSticker('mm-rocket', '🚀', ['cohete', 'increíble', 'subiendo']),
-  createFluentSticker('mm-crown', '👑', ['corona', 'rey', 'reina']),
-  createFluentSticker('mm-cool', '😎', ['lentes', 'cool', 'genial']),
-  createFluentSticker('mm-cold', '🥶', ['frío', 'congelado', 'cool']),
-  createFluentSticker('mm-clown', '🤡', ['payaso', 'meme', 'broma']),
-  createFluentSticker('mm-side-eye', '🙄', ['mirada', 'drama', 'side eye']),
-  createFluentSticker('mm-handshake', '🤝', ['trato', 'acuerdo', 'equipo']),
-  createFluentSticker('mm-hug', '🤗', ['abrazo', 'cariño', 'apoyo']),
-  createFluentSticker('mm-bubble-tea', '🧋', ['bubble tea', 'bebida', 'aesthetic']),
-];
+type CommentSticker = (typeof COMMENT_STICKERS)[number];
 
-const COMMENT_SUCCESS_MESSAGE = 'Tu comentario ya forma parte de la conversación.';
+const STICKER_TOKEN = /(\[sticker:https:\/\/[^\]]+\])/g;
+/** Stickers de Twemoji de la versión anterior, que siguen en comentarios guardados. */
+const LEGACY_STICKER_PREFIX = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@';
 
-const formatCommentDate = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Ahora';
-  return new Intl.DateTimeFormat('es-PE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
+/** Solo se pintan como imagen los stickers conocidos; cualquier otra URL se queda como texto. */
+const stickerFromToken = (token: string) => {
+  const url = token.slice('[sticker:'.length, -1);
+  const known = COMMENT_STICKERS.find((sticker) => sticker.url === url);
+  if (known) return known;
+  return url.startsWith(LEGACY_STICKER_PREFIX) ? { url, name: 'Sticker' } : null;
 };
 
-const renderCommentContent = (value: string) => value
-  .split(/(\[sticker:https:\/\/[^\]]+\])/g)
-  .filter(Boolean)
-  .map((part, index) => {
-    const match = part.match(/^\[sticker:(https:\/\/[^\]]+)\]$/);
-    const stickerUrl = match?.[1];
-    const sticker = stickerUrl ? COMMENT_STICKERS.find(({ imgUrl }) => imgUrl === stickerUrl) : null;
-    const isLegacySticker = Boolean(stickerUrl?.startsWith('https://cdn.jsdelivr.net/gh/twitter/twemoji@'));
-    return sticker || isLegacySticker
-      ? <img key={`${sticker?.id || 'legacy-sticker'}-${index}`} src={sticker?.imgUrl || stickerUrl} alt={sticker?.names[0] || 'Sticker'} className="manga-comment-sticker" loading="lazy" />
-      : <span key={`comment-text-${index}`}>{part}</span>;
-  });
+/** Variables del selector de emojis con los colores de la web. */
+const EMOJI_PICKER_STYLE = {
+  '--epr-emoji-size': '30px',
+  '--epr-picker-border-color': 'rgba(255, 0, 140, 0.25)',
+  '--epr-picker-border-radius': '14px',
+  fontFamily: 'Montserrat, sans-serif',
+} as CSSProperties;
 
-export const MangaComments = ({ mangaId, initialComments, isLight = false, chapterId }: MangaCommentsProps) => {
+/** "14/06": día y mes, como en el diseño. */
+const formatCommentDate = (value: string) => {
+  const date = new Date(value.includes(' ') ? value.replace(' ', 'T') : value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`;
+};
+
+/**
+ * El editor escribe HTML (negrita, cursiva y subrayado, como en un procesador
+ * de textos). Al guardar y al pintar solo se dejan pasar esas marcas: el resto
+ * se escapa, así nada de lo que escriba un lector llega al DOM como etiqueta.
+ */
+const RICH_TAGS = ['b', 'strong', 'i', 'em', 'u', 'br'];
+const sanitizeRichText = (html: string) => {
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const walk = (node: Node): string => Array.from(node.childNodes).map((child) => {
+    if (child.nodeType === Node.TEXT_NODE) return (child.textContent || '').replace(/[<>&]/g, (character) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[character] as string));
+    if (child.nodeType !== Node.ELEMENT_NODE) return '';
+    const element = child as HTMLElement;
+    const tag = element.tagName.toLowerCase();
+    if (tag === 'br') return '<br>';
+    if (tag === 'div' || tag === 'p') return `${walk(element)}<br>`;
+    const inner = walk(element);
+    return RICH_TAGS.includes(tag) ? `<${tag}>${inner}</${tag}>` : inner;
+  }).join('');
+  return walk(holder).replace(/(<br>)+$/, '').trim();
+};
+
+/** Texto plano del editor, para saber si hay algo que publicar. */
+const richTextToPlain = (html: string) => html.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+
+const readActiveFormats = () => new Set(['bold', 'italic', 'underline'].filter((command) => document.queryCommandState(command)));
+
+const handleOf = (username: string) => `@${username.toLocaleLowerCase('es').replace(/\s+/g, '_')}`;
+
+/** Cuerpo del nombre y de la arroba: bajan con los nombres largos y en las respuestas para caber en una línea. */
+const headSizes = (isReply: boolean, isLongName: boolean) => {
+  if (isReply) return isLongName ? ['text-[10px] lg:text-sm', 'text-[8px] lg:text-xs'] : ['text-[11px] lg:text-sm', 'text-[9px] lg:text-xs'];
+  return isLongName ? ['text-[11px] lg:text-base', 'text-[9px] lg:text-sm'] : ['text-[13px] lg:text-base', 'text-[11px] lg:text-sm'];
+};
+
+/** Texto del comentario con sus stickers intercalados. */
+const CommentBody = ({ content, className }: { content: string; className: string }) => (
+  <p className={className}>
+    {content.split(STICKER_TOKEN).filter(Boolean).map((part, index) => {
+      const sticker = part.startsWith('[sticker:') ? stickerFromToken(part) : null;
+      return sticker
+        ? <img key={index} src={sticker.url} alt={sticker.name} title={sticker.name} loading="lazy" className="my-1 mr-2 inline-block h-12 w-12 object-contain align-middle lg:h-[72px] lg:w-[72px]" />
+        : <span key={index} dangerouslySetInnerHTML={{ __html: sanitizeRichText(part) }} />;
+    })}
+  </p>
+);
+
+/**
+ * Comentarios de la ficha y del lector (móvil y escritorio): el cuadro para
+ * escribir con su barra de formato, emojis y stickers y, debajo, los hilos con
+ * el rail rosa que baja del avatar hasta las respuestas, sangradas en una
+ * tarjeta más estrecha. Con `chapterId` son los comentarios de ese capítulo.
+ */
+export const MangaComments = ({ mangaId, initialComments, chapterId, loading = false, loadError = '', forceDark = false }: {
+  loading?: boolean;
+  loadError?: string;
+  mangaId: string;
+  initialComments: MangaComment[];
+  chapterId?: string;
+  /** La ficha móvil va siempre en oscuro: el selector de emojis también. */
+  forceDark?: boolean;
+}) => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [comments, setComments] = useState<MangaComment[]>(initialComments);
-  const [posting, setPosting] = useState(false);
   const [content, setContent] = useState('');
-  const [visibleCount, setVisibleCount] = useState(3);
+  const [sticker, setSticker] = useState<CommentSticker | null>(null);
+  const [tool, setTool] = useState<'emojis' | 'stickers' | null>(null);
+  const [posting, setPosting] = useState(false);
   const [replyTo, setReplyTo] = useState<MangaComment | null>(null);
   const [replyContent, setReplyContent] = useState('');
-  const [replyPosting, setReplyPosting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [composerTool, setComposerTool] = useState<'emojis' | 'stickers' | null>(null);
-  const [selectedSticker, setSelectedSticker] = useState<(typeof COMMENT_STICKERS)[number] | null>(null);
-  const [commentReactionSelections, setCommentReactionSelections] = useState<Record<number, CommentReactionId | null>>({});
-  const [commentReactionCounts, setCommentReactionCounts] = useState<Record<number, CommentReactionCounts>>({});
-  const [reactionBursts, setReactionBursts] = useState<Record<number, { id: CommentReactionId; key: number }>>({});
-  const composerToolsRef = useRef<HTMLDivElement>(null);
-  // Cada comentario lleva su propio contador de peticiones: solo la ultima respuesta reconcilia el estado.
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [showAll, setShowAll] = useState(false);
+  const [error, setError] = useState('');
+  const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set());
+  // Reacción que se está pintando ahora mismo (comentario:reaccion).
+  const [painted, setPainted] = useState<string | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
+  // Última posición del cursor en el editor: los emojis se insertan ahí aunque el foco pase al selector.
+  const savedRange = useRef<Range | null>(null);
+  // Solo la última petición de cada comentario puede reconciliar su reacción.
   const reactionSequences = useRef(new Map<number, number>());
+  const currentUser = getStoredUser();
+  const isEmpty = !richTextToPlain(content);
 
-  const token = getStoredToken();
-  const user = getStoredUser();
+  useEffect(() => { setComments(initialComments); }, [initialComments]);
 
-  // Una entrada en null significa "quite mi reaccion"; solo si no hay entrada volvemos al dato del servidor.
-  const resolveSelection = (comment: MangaComment): CommentReactionId | null => (
-    comment.id in commentReactionSelections
-      ? commentReactionSelections[comment.id]
-      : ((comment.my_reaction || (comment.is_liked_by_user ? 'like' : null)) as CommentReactionId | null)
-  );
-
-  useEffect(() => {
-    if (!composerTool) return;
-    const closeComposerTool = (event: PointerEvent) => {
-      if (!composerToolsRef.current?.contains(event.target as Node)) setComposerTool(null);
-    };
-    document.addEventListener('pointerdown', closeComposerTool);
-    return () => document.removeEventListener('pointerdown', closeComposerTool);
-  }, [composerTool]);
-
-  useEffect(() => {
-    setComments(initialComments);
-    setVisibleCount(3);
-    setCommentReactionSelections(Object.fromEntries(
-      initialComments.map((comment) => [comment.id, (comment.my_reaction || (comment.is_liked_by_user ? 'like' : null)) as CommentReactionId | null]),
-    ));
-    setCommentReactionCounts(Object.fromEntries(initialComments.map(comment => [comment.id, { ...createCommentReactionCounts(), ...comment.reactions, like: comment.reactions?.like ?? comment.likes ?? 0 }])));
-  }, [initialComments, mangaId]);
-
+  // Nombre y foto al día si el lector edita su perfil con la ficha abierta.
   useEffect(() => {
     const updateProfile = (event: Event) => {
       const detail = (event as CustomEvent<ProfileUpdatedDetail>).detail;
       if (!detail?.userId) return;
-      setComments((current) => current.map((comment) => String(comment.user_id) === detail.userId
+      setComments((current) => current.map((comment) => (String(comment.user_id) === detail.userId
         ? {
             ...comment,
             profiles: {
@@ -172,439 +186,403 @@ export const MangaComments = ({ mangaId, initialComments, isLight = false, chapt
               ...(detail.avatarUrl ? { avatar_url: detail.avatarUrl } : {}),
             },
           }
-        : comment));
+        : comment)));
     };
     window.addEventListener(PROFILE_UPDATED_EVENT, updateProfile);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, updateProfile);
   }, []);
 
+  // Formato activo donde está el cursor, para resaltar sus botones, y la posición del cursor.
+  useEffect(() => {
+    const sync = () => {
+      const editor = editorRef.current;
+      const selection = document.getSelection();
+      if (!editor || !selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
+      savedRange.current = selection.getRangeAt(0).cloneRange();
+      setActiveFormats(readActiveFormats());
+    };
+    document.addEventListener('selectionchange', sync);
+    return () => document.removeEventListener('selectionchange', sync);
+  }, []);
+
+  // Los selectores de emojis y stickers se cierran al pulsar fuera de ellos.
+  useEffect(() => {
+    if (!tool) return;
+    const close = (event: PointerEvent) => {
+      if (!toolsRef.current?.contains(event.target as Node)) setTool(null);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [tool]);
+
+  const applyFormat = (command: 'bold' | 'italic' | 'underline') => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    document.execCommand(command);
+    setContent(editor.innerHTML);
+    setActiveFormats(readActiveFormats());
+  };
+
+  /** Escribe en el cursor guardado o, si aún no se ha tocado el editor, al final. */
+  const insertAtCaret = (text: string) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const selection = window.getSelection();
+    if (selection) {
+      const saved = savedRange.current && editor.contains(savedRange.current.startContainer) ? savedRange.current : null;
+      const range = saved ?? document.createRange();
+      if (!saved) {
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    document.execCommand('insertText', false, text);
+    setContent(editor.innerHTML);
+  };
+
   const repliesByParent = useMemo(() => {
-    const replies = new Map<number, MangaComment[]>();
+    const map = new Map<number, MangaComment[]>();
     comments.forEach((comment) => {
       if (!comment.parent_id) return;
-      const current = replies.get(comment.parent_id) || [];
-      current.push(comment);
-      replies.set(comment.parent_id, current);
+      map.set(comment.parent_id, [...(map.get(comment.parent_id) || []), comment]);
     });
-    return replies;
+    return map;
   }, [comments]);
 
-  const topLevelComments = useMemo(() => {
-    const topLevel = comments.filter((comment) => !comment.parent_id);
-    return [...topLevel].sort((a, b) => {
-      const aScore = a.likes + (repliesByParent.get(a.id)?.length || 0);
-      const bScore = b.likes + (repliesByParent.get(b.id)?.length || 0);
-      if (bScore !== aScore) return bScore - aScore;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-  }, [comments, repliesByParent]);
+  const topLevel = useMemo(() => comments.filter((comment) => !comment.parent_id), [comments]);
+  const visible = showAll ? topLevel : topLevel.slice(0, VISIBLE_COMMENTS);
 
-  const goToLogin = () => {
-    navigate('/auth/login', {
-      state: { returnTo: `${window.location.pathname}${window.location.search}` },
-    });
+  const requireSession = () => {
+    if (getStoredToken()) return true;
+    navigate('/auth/login', { state: { returnTo: `${window.location.pathname}${window.location.search}` } });
+    return false;
   };
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!token) {
-      goToLogin();
-      return;
-    }
-    const trimmed = content.trim();
-    if ((!trimmed && !selectedSticker) || posting) return;
-    const publishedContent = [
-      trimmed,
-      selectedSticker ? `[sticker:${selectedSticker.imgUrl}]` : '',
-    ].filter(Boolean).join('\n');
+  const reload = async () => setComments(await getMangaComments(mangaId, chapterId));
 
+  const publish = async (body: string, parentId: number | null) => {
+    const trimmed = body.trim();
+    if (!richTextToPlain(trimmed) || posting) return false;
+    if (!requireSession()) return false;
     setPosting(true);
-    setMessage('');
-    const posted = await postMangaComment(mangaId, publishedContent, null, chapterId);
-    if (posted) {
-      setComments((current) => [posted, ...current]);
-      setContent('');
-      setSelectedSticker(null);
-      setComposerTool(null);
-      setMessage(COMMENT_SUCCESS_MESSAGE);
-    } else {
-      setMessage('No pudimos publicar el comentario. Inténtalo otra vez.');
-    }
+    setError('');
+    const created = await postMangaComment(mangaId, trimmed, parentId, chapterId);
     setPosting(false);
+    if (!created) { setError('No se pudo publicar tu comentario. Inténtalo otra vez.'); return false; }
+    await reload();
+    return true;
   };
 
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
-    setContent((current) => `${current}${emojiData.emoji}`.slice(0, 500));
-    setComposerTool(null);
-  };
-
-  const handleStickerClick = (sticker: (typeof COMMENT_STICKERS)[number]) => {
-    setSelectedSticker(sticker);
-    setComposerTool(null);
-  };
-
-  const handleReplySubmit = async (event: FormEvent, comment: MangaComment) => {
-    event.preventDefault();
-    if (!token) {
-      goToLogin();
-      return;
+  // Optimista: el contador cambia en el mismo toque y la red solo confirma.
+  const react = async (comment: MangaComment, reactionId: CommentReactionId) => {
+    if (!requireSession()) return;
+    const next = comment.my_reaction === reactionId ? '' : reactionId;
+    if (next) {
+      const key = `${comment.id}:${reactionId}`;
+      setPainted(key);
+      window.setTimeout(() => setPainted((current) => (current === key ? null : current)), 520);
     }
-    const trimmed = replyContent.trim();
-    if (!trimmed || replyPosting) return;
-
-    setReplyPosting(true);
-    const posted = await postMangaComment(mangaId, trimmed, comment.id, chapterId);
-    if (posted) {
-      setComments((current) => [...current, posted]);
-      setReplyContent('');
-      setReplyTo(null);
-    } else {
-      setMessage('No pudimos publicar la respuesta. Inténtalo otra vez.');
-    }
-    setReplyPosting(false);
-  };
-
-  // La reaccion se pinta en el mismo clic; la red solo confirma o revierte despues.
-  const handleCommentReaction = (comment: MangaComment, reactionId: CommentReactionId) => {
-    if (!token) {
-      goToLogin();
-      return;
-    }
-
-    const previousSelection = resolveSelection(comment);
-    const nextSelection = previousSelection === reactionId ? null : reactionId;
-    const previousCounts = commentReactionCounts[comment.id] || createCommentReactionCounts();
     const sequence = (reactionSequences.current.get(comment.id) || 0) + 1;
     reactionSequences.current.set(comment.id, sequence);
-
-    const optimisticCounts = { ...previousCounts };
-    if (previousSelection) optimisticCounts[previousSelection] = Math.max(0, optimisticCounts[previousSelection] - 1);
-    if (nextSelection) optimisticCounts[nextSelection] += 1;
-
-    setCommentReactionSelections(current => ({ ...current, [comment.id]: nextSelection }));
-    setCommentReactionCounts(current => ({ ...current, [comment.id]: optimisticCounts }));
-    setReactionBursts(current => ({ ...current, [comment.id]: { id: reactionId, key: Date.now() } }));
-    setComments(current => current.map(item => item.id === comment.id
-      ? { ...item, likes: optimisticCounts.like, my_reaction: nextSelection || '', is_liked_by_user: nextSelection === 'like' }
-      : item));
-
-    void (async () => {
-      try {
-        const result = await setEntityReaction('comment', comment.id, nextSelection || '');
-        if (reactionSequences.current.get(comment.id) !== sequence) return;
-        const confirmed = { ...createCommentReactionCounts(), ...result.reactions };
-        setCommentReactionSelections(current => ({ ...current, [comment.id]: (result.my_reaction || null) as CommentReactionId | null }));
-        setCommentReactionCounts(current => ({ ...current, [comment.id]: confirmed }));
-        setComments(current => current.map(item => item.id === comment.id
-          ? { ...item, likes: confirmed.like, my_reaction: result.my_reaction || '', is_liked_by_user: result.my_reaction === 'like' }
-          : item));
-        void notifyCommentReaction(comment.id, nextSelection && nextSelection !== 'like' ? nextSelection : null);
-      } catch (caught) {
-        if (reactionSequences.current.get(comment.id) !== sequence) return;
-        setCommentReactionSelections(current => ({ ...current, [comment.id]: previousSelection }));
-        setCommentReactionCounts(current => ({ ...current, [comment.id]: previousCounts }));
-        setComments(current => current.map(item => item.id === comment.id
-          ? { ...item, likes: previousCounts.like, my_reaction: previousSelection || '', is_liked_by_user: previousSelection === 'like' }
-          : item));
-        setMessage(caught instanceof Error ? caught.message : 'No se pudo guardar la reacción.');
-      }
-    })();
-  };
-
-  const selectReply = (comment: MangaComment) => {
-    if (!token) {
-      goToLogin();
-      return;
+    setComments((current) => current.map((item) => {
+      if (item.id !== comment.id) return item;
+      const reactions = { ...(item.reactions || {}) };
+      if (item.my_reaction) reactions[item.my_reaction] = Math.max(0, (reactions[item.my_reaction] || 0) - 1);
+      if (next) reactions[next] = (reactions[next] || 0) + 1;
+      return { ...item, reactions, my_reaction: next };
+    }));
+    try {
+      const result = await setEntityReaction('comment', comment.id, next);
+      if (reactionSequences.current.get(comment.id) !== sequence) return;
+      setComments((current) => current.map((item) => (item.id === comment.id
+        ? { ...item, reactions: result.reactions, my_reaction: result.my_reaction }
+        : item)));
+      // El autor recibe el aviso de la reacción (el "me gusta" lo avisa el propio servidor).
+      void notifyCommentReaction(comment.id, next && next !== 'like' ? next : null);
+    } catch {
+      if (reactionSequences.current.get(comment.id) === sequence) await reload();
     }
-    setReplyTo(comment);
-    setReplyContent('');
-    window.setTimeout(() => document.getElementById(`manga-inline-reply-${comment.id}`)?.focus(), 0);
   };
 
   const renderComment = (comment: MangaComment, isReply = false) => {
-    const selectedReaction = resolveSelection(comment);
-    const localCounts = commentReactionCounts[comment.id] || createCommentReactionCounts();
-    const burst = reactionBursts[comment.id];
-    const burstReaction = burst ? COMMENT_REACTIONS.find(({ id }) => id === burst.id) : null;
+    const replies = repliesByParent.get(comment.id) || [];
+    const username = comment.profiles?.username || 'Lector';
+    const isLong = richTextToPlain(comment.content.replace(STICKER_TOKEN, '')).length > (isReply ? 90 : 150);
+    const isExpanded = expanded.has(comment.id);
+    const [authorSize, handleSize] = headSizes(isReply, username.length > 12);
+    const avatarSize = isReply ? 40 : 48;
 
     return (
-      <article key={comment.id} className={`manga-comment-entry ${isReply ? 'is-reply' : ''}`}>
-        <Link
-          to={`/usuarios/${comment.user_id}`}
-          aria-label={`Ver perfil de ${comment.profiles?.username || 'usuario'}`}
-          className={`manga-comment-avatar flex shrink-0 items-center justify-center overflow-hidden border bg-gradient-to-br from-[#FF4D88]/30 text-sm font-black transition-transform hover:scale-105 ${isLight ? 'border-black/10 to-black/[0.03] text-black' : 'border-white/10 to-white/[0.03] text-white'}`}
-        >
-          {comment.profiles?.avatar_url ? (
-            <img src={comment.profiles.avatar_url} alt="" className="h-full w-full object-cover" loading="lazy" />
-          ) : (
-            (comment.profiles?.username || 'M').charAt(0).toUpperCase()
-          )}
-        </Link>
+      <li key={comment.id} className="relative">
+        <div className="flex items-stretch gap-3">
+          {/* Columna del avatar: se estira hasta el final de la tarjeta para que
+              el rail rosa arranque justo debajo de la foto y llegue a las respuestas. */}
+          <div className="relative flex shrink-0 flex-col items-center self-stretch">
+            <Link
+              to={`/usuarios/${comment.user_id}`}
+              aria-label={`Ver perfil de ${username}`}
+              className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-300 text-black/40 transition-transform hover:scale-105"
+              style={{ height: avatarSize, width: avatarSize }}
+            >
+              {comment.profiles?.avatar_url
+                ? <img src={comment.profiles.avatar_url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                : <UserIcon size={avatarSize / 2} />}
+            </Link>
+            {replies.length > 0 && <span aria-hidden="true" className="absolute bottom-0 left-1/2 w-px -translate-x-1/2 bg-mukai-magenta" style={{ top: avatarSize }} />}
+          </div>
 
-        <div className={`manga-comment-card relative min-w-0 overflow-hidden border p-4 transition-colors sm:p-5 ${isLight ? 'border-black/[0.09] bg-white/90' : 'border-white/[0.08] bg-[#080808]/90'}`}>
-          <AnimatePresence>
-            {burst && burstReaction && (
-              <motion.div key={burst.key} className="manga-comment-reaction-burst" aria-hidden="true">
-                {Array.from({ length: 14 }, (_, index) => (
-                  <motion.span
-                    key={`${burst.key}-${index}`}
-                    className="manga-comment-reaction-particle"
-                    style={{ left: `${2 + index * 7.25}%` }}
-                    initial={{ opacity: 0, scale: 0.2, x: 0, y: 70, rotate: 0 }}
-                    animate={{
-                      opacity: [0, 0.08, 0.52, 0.5, 0],
-                      scale: [0.2, 0.5, 0.9, 1.05, 0.86],
-                      x: [0, (index % 2 === 0 ? -1 : 1) * 12, (index - 6.5) * 10],
-                      y: [90, 38, -24 - (index % 3) * 14, -155 - (index % 4) * 22, -325 - (index % 2) * 35],
-                      rotate: [0, (index % 2 === 0 ? -1 : 1) * 10, (index - 6.5) * 8],
-                    }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 3.35, delay: index * 0.025, times: [0, 0.16, 0.38, 0.74, 1], ease: [0.22, 1, 0.36, 1] }}
-                  >
-                    {burstReaction.symbol}
-                  </motion.span>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <article className={`flex min-w-0 flex-1 flex-col rounded-2xl border-[0.5px] border-zinc-300/60 bg-surface px-3.5 py-2 max-[400px]:px-2.5 lg:px-5 lg:py-3 ${isReply ? 'min-h-28' : 'min-h-[119px]'}`}>
+            <header className="flex min-w-0 items-baseline gap-x-1.5">
+              <h3 className={`min-w-0 max-w-[58%] flex-[0_1_auto] truncate pr-0.5 font-montserrat font-black italic leading-[30px] text-ink ${authorSize}`}>
+                <Link to={`/usuarios/${comment.user_id}`} className="transition-colors hover:text-mukai-magenta">{username}</Link>
+              </h3>
+              {comment.profiles?.is_pro && (
+                <span className="shrink-0 self-center rounded-full bg-mukai-magenta/15 px-1.5 font-montserrat text-[7px] font-black uppercase leading-4 text-mukai-magenta lg:text-[9px]">Pro</span>
+              )}
+              <span className={`min-w-0 flex-[0_1_auto] truncate pr-0.5 text-center font-montserrat font-extralight italic leading-[30px] text-ink/[.64] ${handleSize}`}>{handleOf(username)}</span>
+              <span className="ml-auto shrink-0 text-justify font-montserrat text-[8px] font-normal not-italic leading-3 text-ink lg:text-[11px]">{formatCommentDate(comment.created_at)}</span>
+            </header>
 
-          <div className="relative z-10">
-            <div className="mb-2 flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Link to={`/usuarios/${comment.user_id}`} className={`poppins-bold truncate text-[14px] transition-colors hover:text-[#FF4D88] sm:text-[15px] ${isLight ? 'text-black' : 'text-white'}`}>
-                  {comment.profiles?.username || 'Usuario MangaMukai'}
-                </Link>
-                {comment.profiles?.is_pro && (
-                  <span className="rounded-full bg-[#FF4D88]/15 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-[#FF4D88]">
-                    Pro
-                  </span>
-                )}
-              </div>
-              <span className={`google-sans-library ml-auto shrink-0 text-right text-[12px] font-medium sm:text-[13px] ${isLight ? 'text-black' : 'text-white'}`}>
-                {formatCommentDate(comment.created_at)}
-              </span>
-            </div>
-
-            <div className={`whitespace-pre-wrap text-sm leading-relaxed ${isLight ? 'text-black/72' : 'text-white/70'}`}>{renderCommentContent(comment.content)}</div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <div className="manga-comment-reaction-list flex flex-nowrap items-center gap-0.5" aria-label="Reacciones al comentario">
-                {COMMENT_REACTIONS.map((reaction) => {
-                  const isSelected = selectedReaction === reaction.id;
-                  const count = localCounts[reaction.id];
-                  return (
-                    <motion.button
-                      key={reaction.id}
-                      type="button"
-                      onClick={() => handleCommentReaction(comment, reaction.id)}
-                      whileHover={{ y: -2, scale: 1.08 }}
-                      whileTap={{ scale: 0.88 }}
-                      aria-label={`${reaction.label}: ${count}`}
-                      aria-pressed={isSelected}
-                      title={reaction.label}
-                      className={`manga-comment-reaction-button ${isSelected ? 'is-selected' : ''} ${isLight ? 'is-light' : 'is-dark'}`}
-                    >
-                      <img src={reaction.imgUrl} alt="" className="manga-comment-reaction-emoji" aria-hidden="true" />
-                      <span className="manga-comment-reaction-count tabular-nums">{count}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              {!isReply && (
+            <div className="relative mt-1">
+              <CommentBody
+                content={comment.content}
+                className={`whitespace-pre-wrap text-justify font-montserrat font-normal leading-3 text-ink [overflow-wrap:anywhere] lg:leading-5 ${isReply ? 'text-[8px] lg:text-xs' : 'text-[9px] lg:text-[13px]'} ${isLong && !isExpanded ? (isReply ? 'line-clamp-2' : 'line-clamp-3') : ''}`}
+              />
+              {isLong && (
                 <button
                   type="button"
-                  onClick={() => selectReply(comment)}
-                  className={`manga-comment-reply-button ml-auto inline-flex items-center gap-1.5 font-[Montserrat] text-[12px] font-semibold transition-colors sm:text-[13px] ${isLight ? 'is-light text-black/60 hover:text-black' : 'is-dark text-white/55 hover:text-white'}`}
+                  onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(comment.id)) next.delete(comment.id); else next.add(comment.id); return next; })}
+                  className="absolute bottom-0 right-0 bg-surface pl-2.5 font-montserrat text-[7px] font-normal leading-3 text-mukai-magenta underline lg:text-[11px] lg:leading-5"
                 >
-                  <Reply size={15} /> Responder
+                  {isExpanded ? 'Ver menos' : 'Ver Todo'}
                 </button>
               )}
             </div>
 
-            <AnimatePresence initial={false}>
-              {!isReply && replyTo?.id === comment.id && (
-                <motion.form
-                  key={`inline-reply-${comment.id}`}
-                  onSubmit={(event) => handleReplySubmit(event, comment)}
-                  className={`manga-inline-reply mt-4 border-t pt-4 ${isLight ? 'border-black/[0.08]' : 'border-white/[0.08]'}`}
-                  initial={{ opacity: 0, height: 0, y: -6 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -4 }}
-                  transition={{ duration: 0.22 }}
+            <footer className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-0 lg:gap-x-4">
+              {COMMENT_REACTIONS.map((reaction) => {
+                const count = comment.reactions?.[reaction.id] || 0;
+                const mine = comment.my_reaction === reaction.id;
+                const painting = painted === `${comment.id}:${reaction.id}`;
+                return (
+                  <button
+                    key={reaction.id}
+                    type="button"
+                    onClick={() => void react(comment, reaction.id)}
+                    aria-label={`${reaction.label}: ${count}`}
+                    aria-pressed={mine}
+                    title={reaction.label}
+                    className="flex items-center gap-1 font-anta text-sm font-normal leading-4 text-ink"
+                    style={mine ? { color: reaction.color } : undefined}
+                  >
+                    <span className="relative inline-flex h-[15px] w-[15px]">
+                      <reaction.Icon size={15} className="absolute inset-0 text-ink" />
+                      {/* La versión a color se pinta de abajo arriba al elegirla. */}
+                      <span className={`absolute inset-0 block ${painting ? 'animate-paint opacity-100 motion-reduce:animate-none motion-reduce:[clip-path:inset(0)]' : mine ? 'opacity-100 [clip-path:inset(0)]' : 'opacity-0 [clip-path:inset(100%_0_0_0)]'}`}>
+                        <reaction.ActiveIcon size={15} />
+                      </span>
+                    </span>
+                    {count}
+                  </button>
+                );
+              })}
+              {!isReply && (
+                <button
+                  type="button"
+                  onClick={() => { if (requireSession()) { setReplyTo(replyTo?.id === comment.id ? null : comment); setReplyContent(''); } }}
+                  className="ml-auto flex shrink-0 items-center gap-1.5 font-montserrat text-xs font-semibold leading-8 text-ink transition-colors hover:text-mukai-magenta lg:text-[13px]"
                 >
-                  <textarea
-                    id={`manga-inline-reply-${comment.id}`}
-                    value={replyContent}
-                    onChange={(event) => setReplyContent(event.target.value.slice(0, 500))}
-                    placeholder={`Responder a ${comment.profiles?.username || 'este lector'}...`}
-                    className={`min-h-24 w-full resize-y rounded-xl border px-3 py-3 font-[Montserrat] text-sm outline-none transition-colors focus:border-[#FF4D88]/55 ${isLight ? 'border-black/10 bg-black/[0.035] text-black placeholder:text-black/35' : 'border-white/10 bg-white/[0.045] text-white placeholder:text-white/30'}`}
-                  />
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className={`font-[Montserrat] text-[10px] font-semibold ${isLight ? 'text-black/35' : 'text-white/30'}`}>{replyContent.length}/500</span>
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => setReplyTo(null)} className={`rounded-lg px-3 py-2 font-[Montserrat] text-[10px] font-semibold ${isLight ? 'text-black/50 hover:bg-black/5' : 'text-white/45 hover:bg-white/5'}`}>Cancelar</button>
-                      <button type="submit" disabled={!replyContent.trim() || replyPosting} className="inline-flex items-center gap-1.5 rounded-lg bg-[#FF4D88] px-3 py-2 font-[Montserrat] text-[10px] font-semibold text-white disabled:opacity-35">
-                        {replyPosting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                        Responder
-                      </button>
-                    </div>
-                  </div>
-                </motion.form>
+                  <CommentReplyIcon size={20} />
+                  Responder
+                </button>
               )}
-            </AnimatePresence>
-          </div>
+            </footer>
+
+            {replyTo?.id === comment.id && (
+              <form
+                className="mt-2 border-t border-ink/10 pt-2"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (await publish(replyContent, comment.id)) { setReplyContent(''); setReplyTo(null); }
+                }}
+              >
+                <textarea
+                  value={replyContent}
+                  onChange={(event) => setReplyContent(event.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  autoFocus
+                  placeholder={`Responder a ${username}`}
+                  className="w-full resize-none rounded-lg bg-ink/[0.06] p-2 font-montserrat text-[11px] text-ink caret-mukai-magenta outline-none placeholder:text-ink/30 lg:text-sm"
+                />
+                <div className="mt-1.5 flex justify-end gap-2">
+                  <button type="button" onClick={() => setReplyTo(null)} className="rounded-full px-3 py-1 font-montserrat text-[10px] text-ink/60 lg:text-xs">Cancelar</button>
+                  <button type="submit" disabled={!replyContent.trim() || posting} className="inline-flex items-center gap-1.5 rounded-lg bg-mukai-magenta px-3 py-1.5 font-montserrat text-[10px] font-bold text-white disabled:opacity-40 lg:text-xs">
+                    {posting ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}Responder
+                  </button>
+                </div>
+              </form>
+            )}
+          </article>
         </div>
-      </article>
+
+        {/* Respuestas: sangradas, con el codo que sale del rail del comentario. */}
+        {replies.length > 0 && (
+          <ul className="mt-[31px] flex flex-col gap-5 pl-[60px] max-[400px]:pl-[30px]">
+            {replies.map((reply) => (
+              // El codo: continúa el rail del comentario y dobla hacia el avatar de la respuesta.
+              <div key={reply.id} className="relative before:absolute before:-left-[38px] before:-top-5 before:h-10 before:w-px before:bg-mukai-magenta before:content-[''] first:before:-top-[31px] first:before:h-[51px] after:absolute after:-left-[38px] after:top-5 after:h-px after:w-[38px] after:bg-mukai-magenta after:content-['']">
+                {renderComment(reply, true)}
+              </div>
+            ))}
+          </ul>
+        )}
+      </li>
     );
   };
 
   return (
-    <section className={`manga-comments desktop-content-shell relative mx-auto mb-28 mt-4 w-full max-w-[1400px] px-4 transition-colors md:px-8 ${isLight ? 'text-black' : 'text-white'}`} aria-labelledby="comments-title">
-      <div className={`mb-7 flex items-center justify-center border-b pb-5 ${isLight ? 'border-black/[0.08]' : 'border-white/[0.07]'}`}>
-        <div className="flex items-center justify-center gap-3 text-center">
-          <MessageSquareText size={28} className="text-[#FF4D88] md:h-8 md:w-8" />
-          <h2 id="comments-title" className={`text-2xl font-black uppercase italic tracking-tight md:text-[28px] ${isLight ? 'text-black' : 'text-white'}`}>
-          {chapterId ? 'Comentarios del capítulo' : 'Comentarios'}
-          </h2>
+    <section id="comentarios" aria-label="Comentarios" className="scroll-mt-4 text-ink lg:scroll-mt-28">
+      <h2 className="flex items-center justify-center gap-2.5 font-montserrat text-xl font-black leading-5 lg:text-2xl">
+        <CommentsHeadingIcon size={44} className="text-ink" />
+        {chapterId ? 'COMENTARIOS DEL CAPÍTULO' : 'COMENTARIOS'} <span className="text-mukai-magenta">({loading ? '…' : comments.length})</span>
+      </h2>
+
+      {/* Caja para escribir */}
+      <form
+        className="ml-[7.0455%] mt-[41px] min-h-[164px] w-[87.2727%] rounded-2xl border-[0.5px] border-zinc-400/60 bg-surface py-[15px] pl-[22px] pr-4 lg:ml-0 lg:mt-8 lg:w-full lg:px-6 lg:py-5"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const html = sanitizeRichText(content);
+          const body = sticker ? `${html}${html ? '<br>' : ''}[sticker:${sticker.url}]` : html;
+          if (await publish(body, null)) {
+            setContent('');
+            setSticker(null);
+            setTool(null);
+            if (editorRef.current) editorRef.current.innerHTML = '';
+          }
+        }}
+      >
+        {/* Editor con formato: negrita, cursiva y subrayado se aplican sobre el
+            texto seleccionado, como en un procesador de textos. */}
+        <div className="relative">
+          {/* Marcador de posición: reaparece en cuanto la caja vuelve a quedar vacía. */}
+          {isEmpty && (
+            <span aria-hidden="true" className="pointer-events-none absolute left-0 top-0 flex items-start gap-2 pl-6 font-montserrat text-xs font-medium leading-5 text-ink/50 lg:text-sm lg:leading-6">
+              <ComposerPromptIcon size={16} className="absolute left-0 top-0.5 mt-0.5 shrink-0 lg:top-1" />
+              ¿Qué te pareció{currentUser?.username ? `, ${currentUser.username}` : ''}?
+            </span>
+          )}
+          <div
+            ref={editorRef}
+            role="textbox"
+            aria-multiline="true"
+            aria-label="Escribe tu comentario"
+            contentEditable
+            suppressContentEditableWarning
+            onInput={(event) => setContent((event.target as HTMLDivElement).innerHTML)}
+            className="min-h-20 w-full bg-transparent pl-6 font-montserrat text-xs font-medium leading-5 text-ink caret-mukai-magenta outline-none lg:min-h-24 lg:text-sm lg:leading-6"
+          />
         </div>
-      </div>
 
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-7">
-        <form onSubmit={handleSubmit} className={`manga-comment-form rounded-3xl border p-4 transition-colors sm:p-5 ${isLight ? 'border-black/10 bg-white/88' : 'border-white/10 bg-[#080808]/88'}`}>
-          <div className={`manga-comment-composer-box relative overflow-hidden rounded-2xl border transition-colors focus-within:border-[#FF4D88]/50 ${isLight ? 'border-black/10 bg-zinc-50' : 'border-white/10 bg-black/30'}`}>
-            <textarea
-              id="manga-comment-input"
-              value={content}
-              onChange={(event) => setContent(event.target.value.slice(0, 500))}
-              onClick={() => {
-                if (!token) goToLogin();
-              }}
-              readOnly={!token}
-              placeholder={token ? `¿Qué te pareció, ${user?.username || 'lector'}?` : 'Inicia sesión para comentar...'}
-              className={`min-h-28 w-full resize-y border-0 bg-transparent p-4 text-sm leading-relaxed outline-none sm:min-h-32 ${selectedSticker ? 'pb-[66px]' : ''} ${isLight ? 'text-black placeholder:text-black/30' : 'text-white placeholder:text-white/20'}`}
-            />
-
-            {selectedSticker && (
-              <div className={`manga-comment-composer-sticker-row absolute bottom-2.5 left-3 inline-flex items-center gap-1 rounded-lg border px-1.5 py-1 ${isLight ? 'border-black/[0.08] bg-white/92' : 'border-white/[0.08] bg-black/85'}`}>
-                <img
-                  src={selectedSticker.imgUrl}
-                  alt={selectedSticker.names[0]}
-                  className="manga-comment-composer-sticker"
-                />
-                <button
-                  type="button"
-                  onClick={() => setSelectedSticker(null)}
-                  aria-label="Quitar sticker"
-                  className={`flex h-[22px] w-[22px] items-center justify-center rounded-full transition-colors ${isLight ? 'text-black/45 hover:bg-black/[0.06] hover:text-black' : 'text-white/45 hover:bg-white/[0.07] hover:text-white'}`}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div ref={composerToolsRef} className="relative flex min-w-0 flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setComposerTool((current) => current === 'emojis' ? null : 'emojis')}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-[Montserrat] text-[11px] font-semibold transition-colors ${composerTool === 'emojis' ? 'border-[#FF4D88]/55 text-[#FF4D88]' : isLight ? 'border-black/10 text-black/55 hover:text-black' : 'border-white/10 text-white/50 hover:text-white'}`}
-                aria-expanded={composerTool === 'emojis'}
-                aria-label="Abrir emojis"
-              >
-                <SmilePlus size={15} />
-                Emojis
-              </button>
-              <button
-                type="button"
-                onClick={() => setComposerTool((current) => current === 'stickers' ? null : 'stickers')}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-[Montserrat] text-[11px] font-semibold transition-colors ${composerTool === 'stickers' ? 'border-[#FF4D88]/55 text-[#FF4D88]' : isLight ? 'border-black/10 text-black/55 hover:text-black' : 'border-white/10 text-white/50 hover:text-white'}`}
-                aria-expanded={composerTool === 'stickers'}
-                aria-label="Abrir stickers"
-              >
-                <Sticker size={15} />
-                Stickers
-              </button>
-              {composerTool === 'emojis' && (
-                <div className="manga-comment-emoji-picker absolute bottom-full left-0 z-30 mb-2">
-                  <Suspense fallback={null}>
-                    <EmojiPicker
-                      onEmojiClick={handleEmojiClick}
-                      theme={(isLight ? 'light' : 'dark') as Theme}
-                      emojiStyle={'native' as EmojiStyle}
-                      lazyLoadEmojis
-                      searchPlaceHolder="Buscar emoji"
-                      previewConfig={{ showPreview: false }}
-                      width="100%"
-                      height={420}
-                    />
-                  </Suspense>
-                </div>
-              )}
-              {composerTool === 'stickers' && (
-                <div className={`manga-comment-sticker-picker absolute bottom-full left-0 z-30 mb-2 max-h-[360px] overflow-y-auto rounded-2xl border p-3 ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-[#101010]'}`}>
-                  <div className="grid grid-cols-4 gap-2">
-                    {COMMENT_STICKERS.map((sticker) => (
-                      <button key={sticker.id} type="button" onClick={() => handleStickerClick(sticker)} title={sticker.names[0]} className={`flex aspect-square items-center justify-center rounded-xl border p-2 transition-colors hover:border-[#FF4D88]/55 ${isLight ? 'border-black/[0.07] bg-black/[0.025]' : 'border-white/[0.07] bg-white/[0.035]'}`}>
-                        <img src={sticker.imgUrl} alt={sticker.names[0]} className="h-full w-full object-contain" loading="eager" decoding="async" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={posting || (Boolean(token) && !content.trim() && !selectedSticker)}
-              className="google-sans-library ml-auto flex items-center justify-center gap-2.5 rounded-xl bg-[#FF4D88] px-6 py-3 text-[13px] font-bold tracking-normal text-white transition-colors hover:bg-[#ff2f78] disabled:cursor-not-allowed disabled:opacity-35 sm:px-7 sm:text-[14px]"
-            >
-              {posting ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
-              {token ? 'Publicar' : 'Iniciar sesión'}
+        {sticker && (
+          <div className="mt-2 inline-flex items-center gap-1 rounded-lg border border-zinc-400/40 px-1.5 py-1">
+            <img src={sticker.url} alt={sticker.name} className="h-[46px] w-[46px] object-contain" />
+            <button type="button" onClick={() => setSticker(null)} aria-label="Quitar sticker" className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-ink/50 transition-colors hover:bg-ink/10 hover:text-ink">
+              <X size={14} />
             </button>
           </div>
+        )}
 
-          {message && <p className={`mt-3 text-center text-[10px] leading-relaxed ${message === COMMENT_SUCCESS_MESSAGE ? 'lg:hidden' : ''} ${isLight ? 'text-black/55' : 'text-white/45'}`}>{message}</p>}
-        </form>
+        {/* La línea separadora solo cubre los botones de formato, no todo el ancho. */}
+        <div ref={toolsRef} className="relative mt-[19px] flex items-center gap-2 before:absolute before:left-0 before:top-0 before:w-36 before:border-t-[0.5px] before:border-neutral-400/30 before:content-[''] max-[400px]:flex-wrap">
+          {([['Negrita', Bold, 'bold'], ['Cursiva', Italic, 'italic'], ['Subrayado', Underline, 'underline']] as const).map(([label, Icon, command]) => (
+            <button
+              key={label}
+              type="button"
+              aria-label={label}
+              aria-pressed={activeFormats.has(command)}
+              // En mousedown, para que el editor no pierda la selección al pulsar.
+              onMouseDown={(event) => { event.preventDefault(); applyFormat(command); }}
+              className={`inline-flex h-[26px] w-[26px] items-center justify-center rounded-md text-ink transition-colors duration-[180ms] ${activeFormats.has(command) ? 'bg-ink/[.16]' : 'bg-transparent'}`}
+            >
+              <Icon size={18} strokeWidth={2.4} />
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-label="Emojis"
+            aria-expanded={tool === 'emojis'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setTool((current) => (current === 'emojis' ? null : 'emojis'))}
+            className={`transition-colors ${tool === 'emojis' ? 'text-mukai-magenta' : 'text-ink'}`}
+          >
+            <Smile size={18} />
+          </button>
+          <button
+            type="button"
+            aria-label="Stickers"
+            aria-expanded={tool === 'stickers'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setTool((current) => (current === 'stickers' ? null : 'stickers'))}
+            className={`transition-colors ${tool === 'stickers' ? 'text-mukai-magenta' : 'text-ink'}`}
+          >
+            <Sticker size={18} />
+          </button>
+          <button type="submit" disabled={(isEmpty && !sticker) || posting} className="ml-auto inline-flex h-8 items-center gap-2 rounded-lg bg-ink px-3 font-montserrat text-sm font-bold text-surface shadow-[1px_2px_1px_0_rgba(127,127,127,0.55)] disabled:opacity-40">
+            {posting ? <Loader2 size={16} className="animate-spin" /> : <PublishIcon size={18} />}
+            Publicar
+          </button>
 
-        <div className="min-h-72">
-          {topLevelComments.length === 0 ? (
-            <div className={`flex min-h-72 flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center ${isLight ? 'border-black/10 bg-zinc-50' : 'border-white/10 bg-[#080808]'}`}>
-              <span className={`mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border ${isLight ? 'border-black/10 bg-white' : 'border-white/10 bg-black'}`}>
-                <MessageSquareText size={30} className={isLight ? 'text-black/25' : 'text-white/20'} />
-              </span>
-              <h3 className={`text-lg font-black ${isLight ? 'text-black' : 'text-white'}`}>Sé el primero en comentar</h3>
-              <p className={`mt-2 max-w-sm text-sm leading-relaxed ${isLight ? 'text-black/45' : 'text-white/35'}`}>
-                Comparte tu teoría, tu escena favorita o una recomendación para otros lectores.
-              </p>
+          {tool === 'emojis' && (
+            <div className="absolute bottom-full left-0 z-30 mb-2 w-[min(360px,calc(100vw-32px))] drop-shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
+              <Suspense fallback={null}>
+                <EmojiPicker
+                  onEmojiClick={(data: EmojiClickData) => { insertAtCaret(data.emoji); setTool(null); }}
+                  theme={(forceDark || theme === 'dark' ? 'dark' : 'light') as Theme}
+                  emojiStyle={'native' as EmojiStyle}
+                  lazyLoadEmojis
+                  searchPlaceHolder="Buscar emoji"
+                  previewConfig={{ showPreview: false }}
+                  width="100%"
+                  height={420}
+                  style={EMOJI_PICKER_STYLE}
+                />
+              </Suspense>
             </div>
-          ) : (
-            <div className="manga-comments-thread-list space-y-4">
-              {topLevelComments.slice(0, visibleCount).map((comment) => (
-                <div key={comment.id} className={`manga-comment-thread space-y-3 ${(repliesByParent.get(comment.id)?.length || 0) > 0 ? 'has-replies' : ''}`}>
-                  {renderComment(comment)}
-                  {(repliesByParent.get(comment.id)?.length || 0) > 0 && (
-                    <div className="manga-comment-replies space-y-3">
-                      {(repliesByParent.get(comment.id) || []).map((reply) => renderComment(reply, true))}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {topLevelComments.length > 3 && (
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((current) => current >= topLevelComments.length ? 3 : topLevelComments.length)}
-                  className={`flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-[10px] font-black uppercase tracking-[0.16em] transition-colors hover:border-[#FF4D88]/30 ${isLight ? 'border-black/10 bg-black/[0.03] text-black/45 hover:text-black' : 'border-white/10 bg-white/[0.03] text-white/40 hover:text-white'}`}
-                >
-                  {visibleCount >= topLevelComments.length ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  {visibleCount >= topLevelComments.length ? 'Mostrar menos' : 'Ver todos los comentarios'}
-                </button>
-              )}
+          )}
+          {tool === 'stickers' && (
+            <div className="absolute bottom-full left-0 z-30 mb-2 max-h-[360px] w-[min(360px,calc(100vw-32px))] overflow-y-auto rounded-2xl border border-zinc-400/40 bg-surface p-3 shadow-xl">
+              <div className="grid grid-cols-4 gap-2">
+                {COMMENT_STICKERS.map((item) => (
+                  <button key={item.url} type="button" onClick={() => { setSticker(item); setTool(null); }} title={item.name} aria-label={item.name} className="flex aspect-square items-center justify-center rounded-xl border border-zinc-400/25 p-2 transition-colors hover:border-mukai-magenta/60">
+                    <img src={item.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
-      </div>
+        {error && <p role="alert" className="mt-2 font-montserrat text-[10px] text-red-400 lg:text-xs">{error}</p>}
+      </form>
+
+      {loading ? <p role="status" className="py-12 text-center text-sm text-ink/50">Cargando comentarios…</p> : loadError ? <p role="alert" className="py-12 text-center text-sm text-red-500">{loadError}</p> : topLevel.length === 0 ? (
+        <p className="mt-6 text-center font-montserrat text-xs text-ink/50 lg:text-sm">Aún no hay comentarios. ¡Sé el primero en compartir tu opinión!</p>
+      ) : (
+        <>
+          <ul className="ml-[6.8182%] mt-[31px] flex w-[87.2727%] flex-col gap-[41px] max-[400px]:[&>li>div]:gap-2 lg:ml-0 lg:mt-10 lg:w-full lg:gap-10">{visible.map((comment) => renderComment(comment))}</ul>
+          {topLevel.length > VISIBLE_COMMENTS && (
+            <button type="button" onClick={() => setShowAll((current) => !current)} className="mx-auto mt-6 flex h-12 w-48 items-center justify-center gap-2 rounded-[20px] border-[0.5px] border-zinc-400/25 font-montserrat text-xs text-ink/75 lg:text-sm">
+              {showAll ? 'Mostrar Menos' : 'Mostrar Todos'}
+              <ShowAllIcon size={20} className={showAll ? 'rotate-180' : ''} />
+            </button>
+          )}
+        </>
+      )}
     </section>
   );
 };

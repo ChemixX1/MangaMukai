@@ -125,7 +125,7 @@ export function AdultYouthMotionCarousel({ items, isLight }: AdultYouthMotionCar
         <div className="absolute -right-20 bottom-0 h-80 w-80 rounded-full bg-[#FF4D88]/10 blur-3xl" />
       </div>
 
-      <div className="desktop-content-shell relative z-10 mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
+      <div className="lg:!max-w-[1366px] relative z-10 mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-10">
         <div className="mb-7 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 border-l-4 border-[#00C2FF] pl-4">
             <Mars className="h-7 w-7 text-[#00C2FF] sm:h-8 sm:w-8" strokeWidth={3} />

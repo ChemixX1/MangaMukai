@@ -3,9 +3,9 @@
  * Supervision local de mensajes privados de MangaMukai (solo lectura).
  *
  * Conexion integrada, sin inicio de sesion: la app y el sitio comparten una clave
- * larga guardada en server/wp-content/mu-plugins/mangamukai-moderation-key.php.
+ * larga guardada en backend/wp-content/mu-plugins/mangamukai-moderation-key.php.
  * Ese archivo esta fuera de git, lo genera esta herramienta la primera vez y se
- * publica en el servidor con el resto de server/ al hacer `npm run deploy`.
+ * publica en el servidor con el resto de backend/ al hacer `npm run deploy`.
  *
  * El servidor local sirve la interfaz (index.html) en http://127.0.0.1:4317 y
  * reenvia las consultas a /wp-json/mangamukai/v1/moderation/* del sitio
@@ -41,7 +41,7 @@ const HOST = '127.0.0.1';
 const API_BASE = '/wp-json/mangamukai/v1';
 const INDEX_FILE = path.join(here, 'index.html');
 const KEY_FILE = path.resolve(process.env.MM_MODERATION_KEY_FILE || flags['key-file']
-  || path.join(repoRoot, 'server', 'wp-content', 'mu-plugins', 'mangamukai-moderation-key.php'));
+  || path.join(repoRoot, 'backend', 'wp-content', 'mu-plugins', 'mangamukai-moderation-key.php'));
 
 if (SITE.protocol !== 'https:') {
   console.error('MM_SITE debe usar https.');
@@ -169,10 +169,10 @@ const relativeKeyFile = path.relative(repoRoot, KEY_FILE).replace(/\\/g, '/');
 
 function explain(status) {
   if (status === 401 || status === 403) {
-    return `El sitio no reconoce la clave de supervision. Publica server/ con "npm run deploy" (la clave esta en ${relativeKeyFile}) y pulsa Reintentar.`;
+    return `El sitio no reconoce la clave de supervision. Publica backend/ con "npm run deploy" (la clave esta en ${relativeKeyFile}) y pulsa Reintentar.`;
   }
   if (status === 404) {
-    return 'El sitio todavia no tiene la API de moderacion. Publica server/ con "npm run deploy" y pulsa Reintentar.';
+    return 'El sitio todavia no tiene la API de moderacion. Publica backend/ con "npm run deploy" y pulsa Reintentar.';
   }
   return `Respuesta no valida del sitio (HTTP ${status}).`;
 }
@@ -231,7 +231,7 @@ server.listen(PORT, HOST, () => {
   console.log(`Sitio: ${SITE.origin}${SITE_IP ? ` (respaldo IP ${SITE_IP})` : ''}. Ctrl+C para salir.`);
   if (keyCreated) {
     console.log(`Clave de supervision creada en ${relativeKeyFile}.`);
-    console.log('Publica server/ con "npm run deploy" para que el sitio la reconozca.');
+    console.log('Publica backend/ con "npm run deploy" para que el sitio la reconozca.');
   } else {
     console.log(`Clave de supervision: ${process.env.MM_MODERATION_KEY ? 'variable MM_MODERATION_KEY' : relativeKeyFile}.`);
   }

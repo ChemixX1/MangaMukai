@@ -64,10 +64,12 @@ export interface MangaCapitulo {
   eroSeri?: number | null;
   status?: string;
   totalViews?: number;
+  chapterCount?: number;
   rawFecha?: string;
   tituloOriginal?: string;
   fechaManga?: string;
   studio?: string;
+  author?: string;
   platform?: string;
   publishedAt?: string;
   capitulosRecientes: Array<{
