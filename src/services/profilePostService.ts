@@ -21,6 +21,7 @@ export interface ProfilePost {
   my_reaction?: string;
   comment_count?: number;
   share_count?: number;
+  views?: number;
   shared_post_id?: number | null;
   shared_post?: ProfilePost | null;
 }

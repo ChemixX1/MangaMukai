@@ -18,6 +18,7 @@ const AboutPage = lazy(() => import('./pages/AboutPage').then(({ AboutPage: Page
 const ContactPage = lazy(() => import('./pages/ContactPage').then(({ ContactPage: Page }) => ({ default: Page })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(({ ProfilePage: Page }) => ({ default: Page })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(({ PublicProfilePage: Page }) => ({ default: Page })));
+const ProfilePostPage = lazy(() => import('./pages/ProfilePostPage').then(({ ProfilePostPage: Page }) => ({ default: Page })));
 const TermsAndPrivacy = lazy(() => import('./pages/TermsAndPrivacy').then(({ TermsAndPrivacy: Page }) => ({ default: Page })));
 const SavedMangas = lazy(() => import('./pages/SavedMangas').then(({ SavedMangas: Page }) => ({ default: Page })));
 const ReaderPage = lazy(() => import('./pages/ReaderPage').then(({ ReaderPage: Page }) => ({ default: Page })));
@@ -29,7 +30,6 @@ const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const CharacterChatPage = lazy(() => import('./pages/CharacterChatPage'));
 const ShopPage = lazy(() => import('./pages/ShopPage'));
-const MorePage = lazy(() => import('./pages/MorePage'));
 const LegalDocumentPage = lazy(() => import('./pages/LegalDocumentPage').then(({ LegalDocumentPage: Page }) => ({ default: Page })));
 
 const ScrollToTop = () => {
@@ -78,9 +78,11 @@ function AppInner() {
             <Route path="/" element={<Home />} />
             <Route path="/nosotros" element={<AboutPage />} />
             <Route path="/contacto" element={<ContactPage />} />
-            <Route path="/perfil" element={<ProfilePage />} />
+            <Route path="/perfil" element={<Navigate to="/mas" replace />} />
             <Route path="/usuarios/:id" element={<PublicProfilePage />} />
+              <Route path="/usuarios/:id/publicacion/:postId" element={<ProfilePostPage />} />
             <Route path="/comunidad" element={<CommunityPage />} />
+            <Route path="/comunidad/publicacion/:postId" element={<CommunityPage />} />
             <Route path="/mensajes" element={<MessagesPage />} />
             <Route path="/mensajes/:userId" element={<MessagesPage />} />
             <Route path="/notificaciones" element={<NotificationsPage />} />
@@ -88,7 +90,7 @@ function AppInner() {
             <Route path="/chat/:characterId" element={<CharacterChatPage />} />
             <Route path="/chat/:characterId/conversacion" element={<CharacterChatPage />} />
             <Route path="/tienda" element={<ShopPage />} />
-            <Route path="/mas" element={<MorePage />} />
+            <Route path="/mas" element={<ProfilePage />} />
             <Route path="/perfil/editar" element={<EditProfilePage />} />
             <Route path="/saved" element={<SavedMangas />} />
             <Route path="/legal" element={<TermsAndPrivacy />} />

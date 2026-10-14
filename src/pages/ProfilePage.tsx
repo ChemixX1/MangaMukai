@@ -1,576 +1,222 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { AlarmClock, ChevronLeft, ChevronRight, Info, KeyRound, LogOut, Shield, Trash2, UserRound, X } from 'lucide-react';
 import { ProfilePostCard } from '../components/social/ProfilePostCard';
-import { ProfileStats } from '../components/social/ProfileStats';
-import { MangaRecommendations, type RecommendationManga } from '../components/manga/MangaRecommendations';
-import { getUltimosCapitulos } from '../services/mangaService';
-import {
-  Cake,
-  CalendarDays,
-  Camera,
-  Check,
-  Edit3,
-  Eye,
-  EyeOff,
-  ExternalLink,
-  Image as ImageIcon,
-  Loader2,
-  MapPin,
-  MessageCircle,
-  Phone,
-  Save,
-  Send,
-  User,
-  UserCheck,
-  UserPlus,
-  Users,
-  Video,
-  X,
-} from 'lucide-react';
+import { SlidePanel } from '../components/layout/SlidePanel';
+import { OPEN_TIMER_EVENT } from '../components/layout/useNavbarState';
+import { MoonIcon, SunIcon } from '../components/ui';
+import { SOCIAL_LINKS } from '../config/social';
+import { wordpressUrl } from '../config/api';
 import { useTheme } from '../hooks/useTheme';
-import { getStoredToken, getStoredUser, updateStoredUser } from '../services/authService';
-import {
-  followUser,
-  getFollows,
-  getPublicProfile,
-  openChat,
-  unfollowUser,
-  type FollowEntry,
-  type FollowLists,
-} from '../services/socialService';
-import {
-  createProfilePost,
-  getProfilePosts,
-  uploadProfilePostMedia,
-  type ProfilePost,
-} from '../services/profilePostService';
-import {
-  emptySocialLinks,
-  getWordPressProfile,
-  saveWordPressProfile,
-  uploadWordPressProfileImage,
-  type ProfileSocialLinks,
-  type WordPressProfile,
-} from '../services/wordpressService';
+import { AUTH_CHANGED_EVENT, clearAuth, getStoredToken, getStoredUser, type MMUser } from '../services/authService';
+import { getInteractions } from '../services/interactionsService';
+import { getUltimosCapitulos } from '../services/mangaService';
+import { getProfilePosts, type ProfilePost } from '../services/profilePostService';
+import { useSavedMangasState } from '../services/savedMangas';
+import { getPublicProfile, getSocialLibrary, type PublicProfile, type SocialLibrary, type LibraryChapter } from '../services/socialService';
+import { isPlaceholderAvatar } from '../services/wordpressService';
+import type { MangaCapitulo } from '../types/manga';
+import { readerRankName } from '../utils/readerRank';
+import { displayViews } from '../utils/seriesViews';
+import { openSubscriptionModal } from '../utils/subscriptionModal';
+import profileBanner from '../assets/banners/illustration-anime-character-rain.jpg';
+import editIcon from '../assets/profile-icons/edit.svg';
+import menuIcon from '../assets/profile-icons/menu.svg';
+import crownIcon from '../assets/profile-icons/crown.svg';
+import postIcon from '../assets/profile-icons/post.svg';
+import collectionIcon from '../assets/profile-icons/collection.svg';
+import collectionActiveIcon from '../assets/profile-icons/collection-active.svg';
+import savedIcon from '../assets/profile-icons/saved.svg';
+import savedActiveIcon from '../assets/profile-icons/saved-active.svg';
+import likeIcon from '../assets/profile-icons/like.svg';
+import likeActiveIcon from '../assets/profile-icons/like-active.svg';
+import historyIcon from '../assets/profile-icons/history.svg';
+import historyActiveIcon from '../assets/profile-icons/history-active.svg';
+import eyeIcon from '../assets/profile-icons/eye.svg';
+import rechargeCoinIcon from '../assets/profile-icons/recharge-coin.svg';
+import mukaiProLogo from '../assets/profile-icons/mukai-pro.svg';
+import rechargeArtwork from '../../Recarga.png';
+import proArtwork from '../../HaztePro.png';
+import '../styles/profile-page.css';
 
-const BANNER_COLORS = ['bg-[#FF4D88]', 'bg-black', 'bg-zinc-800', 'bg-[#5865F2]', 'bg-[#7C3AED]', 'bg-[#0EA5E9]', 'bg-[#16A34A]'];
-const SOCIAL_FIELDS: Array<{ key: keyof ProfileSocialLinks; label: string; placeholder: string }> = [
-  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/...' },
-  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/...' },
-  { key: 'twitter', label: 'X / Twitter', placeholder: 'https://x.com/...' },
-  { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@...' },
-  { key: 'telegram', label: 'Telegram', placeholder: 'https://t.me/...' },
-  { key: 'whatsapp', label: 'WhatsApp', placeholder: 'https://wa.me/...' },
-  { key: 'github', label: 'GitHub', placeholder: 'https://github.com/...' },
-  { key: 'discord', label: 'Discord', placeholder: 'Usuario o enlace de Discord' },
-];
+type Tab = 'collection' | 'posts' | 'saved' | 'likes' | 'history';
+type LibraryFilter = 'objects' | 'covers' | 'series' | 'chapters';
+type MenuSection = 'main' | 'security' | 'information' | 'account';
+const footerInfoLinks = [
+  { label: 'Sobre Nosotros', to: '/nosotros' },
+  { label: 'Recibe ayuda', href: SOCIAL_LINKS.discord },
+  { label: 'Política de Privacidad', to: '/privacidad' },
+  { label: 'Términos de Servicio', to: '/terminos' },
+  { label: 'Normas de la Comunidad', to: '/normas-comunidad' },
+  { label: 'Política de Cookies', to: '/cookies' },
+  { label: 'Cookie Settings', to: '/cookies#como-gestionarlas' },
+] as const;
+const emptyLibrary = (): SocialLibrary => ({ reading: [], liked_chapters: [], liked_mangas: [] });
+const compact = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : String(n);
+const chapterLabel = (n: number) => n > 0 ? `Capítulo ${n}` : 'Capítulo';
 
-const fallbackProfile = (username = '', avatar = ''): WordPressProfile => ({
-  username,
-  bio: '',
-  location: '',
-  birth_date: '',
-  country_code: '+51',
-  phone: '',
-  show_birth_date: false,
-  show_phone: false,
-  avatar_url: avatar,
-  banner_url: '',
-  banner_color: 'bg-[#FF4D88]',
-  is_pro: false,
-  created_at: new Date().toISOString(),
-  social_links: emptySocialLinks(),
-});
+const tabs = [
+  { id: 'collection', label: 'Colección', icon: postIcon, activeIcon: postIcon },
+  { id: 'posts', label: 'Post', icon: collectionActiveIcon, activeIcon: collectionIcon },
+  { id: 'saved', label: 'Guardado', icon: savedIcon, activeIcon: savedActiveIcon },
+  { id: 'likes', label: 'Me gusta', icon: likeIcon, activeIcon: likeActiveIcon },
+  { id: 'history', label: 'Historial', icon: historyIcon, activeIcon: historyActiveIcon },
+] as const;
 
-const formatProfileDate = (value = '') => {
-  if (!value) return 'Sin configurar';
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
-};
-
-const emptyFollows = (): FollowLists => ({ followers: [], following: [] });
-
-const UserAvatar = ({ entry, size = 'h-10 w-10' }: { entry: FollowEntry; size?: string }) => entry.user.avatar_url
-  ? <img src={entry.user.avatar_url} alt="" className={`${size} shrink-0 rounded-full object-cover ring-2 ring-[#FF4D88]/25`} />
-  : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#FF4D88] text-sm font-black text-white`}>{entry.user.username.charAt(0).toUpperCase()}</span>;
-
-type ProfileSection = 'summary' | 'information' | 'followers' | 'following';
-type PostMedia = { url: string; kind: 'image' | 'video'; name: string; file: File };
+const Cover = ({ id, title, cover, views, tag }: { id: number | string; title: string; cover: string; views: number; tag?: string }) => (
+  <Link to={`/manga/${id}`} className="mobile-profile-cover">
+    <img src={cover} alt="" loading="lazy" decoding="async" />
+    <span className="mobile-profile-cover-shade" aria-hidden="true" />
+    {tag && <span className="mobile-profile-cover-type">{tag}</span>}
+    <span className="mobile-profile-cover-views"><img src={eyeIcon} alt="" />{compact(views)}</span>
+    <span className="mobile-profile-cover-title">{title}</span>
+  </Link>
+);
+const Chapter = ({ item, history = false }: { item: LibraryChapter; history?: boolean }) => (
+  <Link to={`/read/${item.chapter_id}`} className={history ? 'mobile-profile-history-card' : 'mobile-profile-chapter'}>
+    <img src={item.image || item.cover} alt="" loading="lazy" decoding="async" />
+    <span className="mobile-profile-chapter-info">
+      <strong>{chapterLabel(item.chapter_number)}</strong>
+      <span>{item.title}</span>
+      {history && <em>Continuar</em>}
+    </span>
+  </Link>
+);
 
 export const ProfilePage = () => {
-  const navigate = useNavigate();
-  const { theme } = useTheme();
-  const isLight = theme === 'light';
-  const [profile, setProfile] = useState<WordPressProfile>(() => fallbackProfile());
-  const [follows, setFollows] = useState<FollowLists>(() => emptyFollows());
-  const [mangasRead, setMangasRead] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveConfirmed, setSaveConfirmed] = useState(false);
-  const [imageType, setImageType] = useState<'avatar' | 'banner' | null>(null);
-  const [avatarConfirmed, setAvatarConfirmed] = useState(false);
-  const [recommendations, setRecommendations] = useState<RecommendationManga[]>([]);
-  const avatarConfirmationRef = useRef<number | null>(null);
-  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [actionId, setActionId] = useState<number | null>(null);
-  const [activeSection, setActiveSection] = useState<ProfileSection>('summary');
-  const [postText, setPostText] = useState('');
-  const [postMedia, setPostMedia] = useState<PostMedia | null>(null);
+  const { theme, toggleTheme } = useTheme();
+  const [user, setUser] = useState<MMUser | null>(() => getStoredToken() ? getStoredUser() : null);
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [tab, setTab] = useState<Tab>('collection');
+  const [collectionFilter, setCollectionFilter] = useState<LibraryFilter>('covers');
+  const [likesFilter, setLikesFilter] = useState<LibraryFilter>('series');
+  const [catalog, setCatalog] = useState<MangaCapitulo[]>([]);
+  const [library, setLibrary] = useState<SocialLibrary>(emptyLibrary);
+  const [likedIds, setLikedIds] = useState<string[]>([]);
   const [posts, setPosts] = useState<ProfilePost[]>([]);
-  const [publishing, setPublishing] = useState(false);
-  const avatarRef = useRef<HTMLInputElement>(null);
-  const bannerRef = useRef<HTMLInputElement>(null);
-  const postImageRef = useRef<HTMLInputElement>(null);
-  const postVideoRef = useRef<HTMLInputElement>(null);
-  const postMediaUrlsRef = useRef(new Set<string>());
-  const saveConfirmationRef = useRef<number | null>(null);
-  const user = useMemo(() => getStoredUser(), []);
+  const [loaded, setLoaded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuSection, setMenuSection] = useState<MenuSection>('main');
+  const saved = useSavedMangasState();
+  const userId = user?.id;
 
   useEffect(() => {
-    let active = true;
-    void getUltimosCapitulos().then(items => {
-      if (active) setRecommendations(items.slice(0, 8).map(item => ({ id: item.id, titulo: item.titulo, portada: item.portada })));
-    }).catch(() => undefined);
-    return () => { active = false; };
+    const sync = () => setUser(getStoredToken() ? getStoredUser() : null);
+    window.addEventListener(AUTH_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, sync);
   }, []);
-
   useEffect(() => {
-    if (!user || !getStoredToken()) {
-      navigate('/auth/login', { replace: true, state: { returnTo: '/perfil' } });
-      return;
-    }
+    if (!userId) return;
     let active = true;
-    Promise.all([
-      getWordPressProfile(user),
-      getFollows().catch(() => emptyFollows()),
-      getProfilePosts(user.id).catch(() => []),
-      getPublicProfile(user.id).then((social) => social.mangas_read_count).catch(() => 0),
-    ]).then(([loadedProfile, loadedFollows, loadedPosts, loadedReads]) => {
-      if (!active) return;
-      setProfile(loadedProfile);
-      updateStoredUser({
-        username: loadedProfile.username,
-        display_name: loadedProfile.username,
-        avatar: loadedProfile.avatar_url,
+    void Promise.allSettled([getPublicProfile(userId), getUltimosCapitulos(), getSocialLibrary(), getInteractions(), getProfilePosts(userId)])
+      .then(([p, c, l, i, post]) => {
+        if (!active) return;
+        setProfile(p.status === 'fulfilled' ? p.value : null);
+        setCatalog(c.status === 'fulfilled' ? c.value : []);
+        setLibrary(l.status === 'fulfilled' ? l.value : emptyLibrary());
+        setLikedIds(i.status === 'fulfilled' ? i.value?.likes.map(String) ?? [] : []);
+        setPosts(post.status === 'fulfilled' ? post.value : []);
+        setLoaded(true);
       });
-      setFollows(loadedFollows);
-      setMangasRead(loadedReads);
-      setPosts(loadedPosts);
-    }).catch(() => {
-      if (!active) return;
-      setProfile(fallbackProfile(user.username, user.avatar || ''));
-      setFollows(emptyFollows());
-      setNotice({ type: 'error', text: 'No se pudo sincronizar el perfil.' });
-    }).finally(() => {
-      if (!active) return;
-      setLoading(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, [navigate, user]);
+    return () => { active = false; };
+  }, [userId]);
+  const catalogById = useMemo(() => new Map(catalog.map((manga) => [String(manga.id), manga])), [catalog]);
+  const savedMangas = useMemo(() => saved.ids.map((id) => catalogById.get(id)).filter((manga): manga is MangaCapitulo => Boolean(manga)), [saved.ids, catalogById]);
+  const likedMangas = useMemo(() => library.liked_mangas.length
+    ? library.liked_mangas.map((item) => ({ id: item.manga_id, title: item.title, cover: item.cover }))
+    : likedIds.map((id) => catalogById.get(id)).filter((manga): manga is MangaCapitulo => Boolean(manga)).map((manga) => ({ id: manga.id, title: manga.titulo, cover: manga.portada })),
+  [library.liked_mangas, likedIds, catalogById]);
 
-  useEffect(() => () => {
-    postMediaUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    postMediaUrlsRef.current.clear();
-    if (saveConfirmationRef.current) window.clearTimeout(saveConfirmationRef.current);
-    if (avatarConfirmationRef.current) window.clearTimeout(avatarConfirmationRef.current);
-  }, []);
+  if (!user) return <Navigate to="/auth/login" replace state={{ returnTo: '/mas' }} />;
+  const isLight = theme === 'light';
+  const chaptersRead = profile?.chapters_read_count ?? profile?.mangas_read_count ?? 0;
+  const avatar = profile?.avatar_url || user.avatar || '';
+  const premium = Boolean(profile?.is_pro || user.isPremium || user.is_premium);
+  const empty = (label: string) => loaded ? <p className="mobile-profile-empty">{label}</p> : null;
+  const viewsFor = (id: number | string) => displayViews(catalogById.get(String(id)) || { id, totalViews: 0 });
+  const closeMenu = () => { setMenuOpen(false); setMenuSection('main'); };
+  const openAlarm = () => { closeMenu(); window.dispatchEvent(new Event(OPEN_TIMER_EVENT)); };
 
-  const reloadFollows = async () => setFollows(await getFollows());
-
-  const handleImage = async (event: ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    const field = type === 'avatar' ? 'avatar_url' : 'banner_url';
-    const previous = profile[field];
-    const preview = URL.createObjectURL(file);
-    setProfile((current) => ({ ...current, [field]: preview }));
-    setImageType(type);
-    if (type === 'avatar') {
-      setAvatarConfirmed(false);
-      if (avatarConfirmationRef.current) window.clearTimeout(avatarConfirmationRef.current);
-    }
-    setNotice(null);
-    try {
-      const result = await uploadWordPressProfileImage(file, type);
-      if (!result.success) throw new Error(result.message);
-      setProfile((current) => ({ ...current, [field]: result.url }));
-      if (type === 'avatar') {
-        setAvatarConfirmed(true);
-        avatarConfirmationRef.current = window.setTimeout(() => setAvatarConfirmed(false), 1400);
-      } else setNotice({ type: 'success', text: 'Portada actualizada.' });
-    } catch (caught) {
-      setProfile((current) => ({ ...current, [field]: previous }));
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo subir la imagen.' });
-    } finally {
-      URL.revokeObjectURL(preview);
-      setImageType(null);
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setNotice(null);
-    try {
-      const result = await saveWordPressProfile(profile);
-      if (!result.success) throw new Error(result.message);
-      setEditing(false);
-      setSaveConfirmed(true);
-      if (saveConfirmationRef.current) window.clearTimeout(saveConfirmationRef.current);
-      saveConfirmationRef.current = window.setTimeout(() => {
-        setSaveConfirmed(false);
-        saveConfirmationRef.current = null;
-      }, 1250);
-    } catch (caught) {
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo guardar el perfil.' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleUnfollow = async (entry: FollowEntry) => {
-    if (!window.confirm(`¿Dejar de seguir a ${entry.user.username}?`)) return;
-    setActionId(entry.user.id);
-    setNotice(null);
-    try {
-      await unfollowUser(entry.user.id);
-      await reloadFollows();
-    } catch (caught) {
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo dejar de seguir.' });
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const handleFollowBack = async (entry: FollowEntry) => {
-    setActionId(entry.user.id);
-    setNotice(null);
-    try {
-      await followUser(entry.user.id);
-      await reloadFollows();
-    } catch (caught) {
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo seguir.' });
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const handlePostMedia = (event: ChangeEvent<HTMLInputElement>, kind: PostMedia['kind']) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
-    if (postMedia) {
-      URL.revokeObjectURL(postMedia.url);
-      postMediaUrlsRef.current.delete(postMedia.url);
-    }
-
-    const url = URL.createObjectURL(file);
-    postMediaUrlsRef.current.add(url);
-    setPostMedia({ url, kind, name: file.name, file });
-  };
-
-  const clearPostMedia = () => {
-    if (!postMedia) return;
-    URL.revokeObjectURL(postMedia.url);
-    postMediaUrlsRef.current.delete(postMedia.url);
-    setPostMedia(null);
-  };
-
-  const publishPost = async () => {
-    const text = postText.trim();
-    if ((!text && !postMedia) || publishing) return;
-    setPublishing(true);
-    setNotice(null);
-    try {
-      const uploaded = postMedia ? await uploadProfilePostMedia(postMedia.file) : null;
-      const created = await createProfilePost(text, uploaded?.id);
-      setPosts((current) => [created, ...current]);
-      setPostText('');
-      clearPostMedia();
-    } catch (caught) {
-      setNotice({ type: 'error', text: caught instanceof Error ? caught.message : 'No se pudo publicar.' });
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  if (loading) return <main className={`min-h-screen ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#18191a]'}`} />;
-
-  const muted = isLight ? 'text-black/50' : 'text-white/45';
-  const input = isLight ? 'border-black/10 bg-[#f0f2f5] text-black placeholder:text-black/30' : 'border-white/10 bg-white/[0.05] text-white placeholder:text-white/25';
-  const card = isLight
-    ? 'border-black/[0.08] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
-    : 'border-white/[0.08] bg-[#242526] shadow-[0_1px_2px_rgba(0,0,0,0.45)]';
-  const joined = new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(new Date(profile.created_at));
-  const configuredSocials = SOCIAL_FIELDS.filter((field) => profile.social_links[field.key]);
-
-  // Mosaico 3x2: foto del seguidor con su nombre sobre una sombra interior que lo mantiene legible.
-  const renderFollowTile = (entry: FollowEntry) => (
-    <Link key={entry.user.id} to={`/usuarios/${entry.user.id}`} title={entry.user.username} className="group relative block aspect-square overflow-hidden rounded-lg">
-      {entry.user.avatar_url
-        ? <img src={entry.user.avatar_url} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-        : <span className="flex h-full w-full items-center justify-center bg-[#FF4D88] text-2xl font-black text-white">{entry.user.username.charAt(0).toUpperCase()}</span>}
-      <span className={`pointer-events-none absolute inset-0 flex items-end p-1.5 ${isLight ? 'shadow-[inset_0_-34px_26px_-14px_rgba(255,255,255,0.96)]' : 'shadow-[inset_0_-34px_26px_-14px_rgba(0,0,0,0.94)]'}`}>
-        <span className={`w-full truncate text-[11px] font-bold leading-tight ${isLight ? 'text-black' : 'text-white'}`}>{entry.user.username}</span>
-      </span>
-    </Link>
-  );
-
-  return (
-    <main className={`min-h-screen pb-24 transition-colors ${isLight ? 'bg-[#f0f2f5] text-[#1c1e21]' : 'bg-[#18191a] text-white'}`}>
-      <section className={`border-b ${isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-[#242526]'}`}>
-        <div className="mx-auto w-full max-w-6xl">
-          <div className={`relative h-56 overflow-hidden rounded-b-2xl sm:h-72 md:h-[360px] ${profile.banner_color}`}>
-            {profile.banner_url && <img src={profile.banner_url} alt="Portada de tu perfil" className="absolute inset-0 h-full w-full object-cover" />}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/5" />
-
-            {editing && (
-              <div className="absolute bottom-4 right-4 flex max-w-[calc(100%-2rem)] flex-col items-end gap-2">
-                <div className={`flex flex-wrap justify-end gap-2 rounded-xl border p-2 shadow-xl backdrop-blur-md ${isLight ? 'border-black/10 bg-white/85' : 'border-white/10 bg-black/75'}`} aria-label="Colores de portada">
-                  {BANNER_COLORS.map((color) => (
-                    <button key={color} type="button" aria-label="Elegir color de portada" onClick={() => setProfile((current) => ({ ...current, banner_color: color }))} className={`h-7 w-7 rounded-full border-2 transition-transform ${color} ${profile.banner_color === color ? 'scale-110 border-[#FF4D88]' : isLight ? 'border-black/10' : 'border-white/20'}`} />
-                  ))}
-                </div>
-                <button type="button" onClick={() => bannerRef.current?.click()} disabled={imageType === 'banner'} className="flex h-10 items-center gap-2 rounded-lg bg-white px-4 text-[11px] font-black text-black shadow-lg transition hover:bg-zinc-100 disabled:opacity-60">
-                  {imageType === 'banner' ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-                  Cambiar portada
-                </button>
-                <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(event) => void handleImage(event, 'banner')} />
-              </div>
-            )}
+  return <main className={`profile-page mobile-profile mobile-profile-more ${isLight ? 'mobile-profile-light' : 'mobile-profile-dark'}`}>
+    <div className="mobile-profile-shell">
+      <div className="mobile-profile-hero">
+        <img src={profile?.banner_url || profileBanner} alt="" aria-hidden="true" />
+        <span className="mobile-profile-hero-fade" />
+        <Link to="/perfil/editar" className="mobile-profile-edit" aria-label="Editar perfil"><img src={editIcon} alt="" /></Link>
+        <button type="button" className="mobile-profile-menu" aria-label="Abrir menú" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><img src={menuIcon} alt="" /></button>
+      </div>
+      <section className="mobile-profile-identity" aria-label="Información del perfil">
+        <span className="mobile-profile-avatar">{avatar && !isPlaceholderAvatar(avatar) ? <img src={avatar} alt="" /> : <UserRound size={45} />}</span>
+        <div className="mobile-profile-identity-info">
+          <div className="mobile-profile-name-row">
+            <div className="mobile-profile-name"><h1>{user.display_name || user.username}</h1><span>@{user.username}</span></div>
+            <button type="button" className="mobile-profile-pro-badge" onClick={openSubscriptionModal}><img src={crownIcon} alt="" />{premium ? 'Mukai Pro' : 'Hazte Pro'}</button>
           </div>
-
-          <div className="px-4 sm:px-6">
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-5">
-              <div className="group relative -mt-16 shrink-0 sm:-mt-10">
-                <div className={`h-32 w-32 overflow-hidden rounded-full border-[5px] shadow-lg sm:h-40 sm:w-40 ${isLight ? 'border-white bg-zinc-100' : 'border-[#242526] bg-zinc-900'}`}>
-                  {profile.avatar_url ? <img src={profile.avatar_url} alt="Tu avatar" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center"><User size={52} className={isLight ? 'text-black/20' : 'text-white/20'} /></span>}
-                </div>
-                <button type="button" onClick={() => avatarRef.current?.click()} disabled={imageType === 'avatar'} aria-label={avatarConfirmed ? 'Foto actualizada' : 'Cambiar foto de perfil'} className={`absolute bottom-1 right-1 flex h-10 w-10 items-center justify-center rounded-full border shadow-md transition hover:bg-[#FF4D88] hover:text-white ${isLight ? 'border-white bg-[#e4e6eb] text-black' : 'border-[#242526] bg-[#3a3b3c] text-white'}`}>{imageType === 'avatar' ? <Loader2 size={18} className="animate-spin" /> : avatarConfirmed ? <Check size={21} strokeWidth={3} className="text-[#FF4D88]" /> : <Camera size={18} />}</button>
-                <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={(event) => void handleImage(event, 'avatar')} />
-              </div>
-
-              <div className="flex min-w-0 flex-1 flex-col items-center gap-4 pb-1 text-center sm:-translate-y-3 sm:flex-row sm:items-center sm:justify-between sm:text-left">
-                <div className="min-w-0">
-                  {editing ? <input value={profile.username} maxLength={60} onChange={(event) => setProfile((current) => ({ ...current, username: event.target.value }))} className={`w-full max-w-xl rounded-lg border px-4 py-3 text-2xl font-black outline-none focus:border-[#FF4D88]/60 ${input}`} /> : <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start"><h1 className="break-words text-3xl font-black tracking-[-0.035em] md:text-4xl">{profile.username}</h1>{profile.is_pro && <span className="rounded bg-yellow-400 px-2 py-1 text-[9px] font-black text-black">MUKAI PRO</span>}</div>}
-                  {/* En móvil solo van los contadores; la fecha de registro se muestra en escritorio y en el chat. */}
-                  <div className={`mt-2 hidden flex-wrap items-center justify-center gap-3 text-xs font-semibold sm:flex sm:justify-start ${muted}`}>
-                    <span className="flex items-center gap-1.5"><CalendarDays size={14} className="text-[#FF4D88]" />Miembro desde {joined}</span>
-                    <span className="flex items-center gap-1.5"><MapPin size={14} />{profile.location || 'Ubicación sin configurar'}</span>
-                  </div>
-                  <ProfileStats
-                    isLight={isLight}
-                    className="mt-3"
-                    onSelect={(key) => { if (key === 'followers' || key === 'following') setActiveSection(key); }}
-                    stats={[
-                      { key: 'followers', label: 'Seguidores', value: follows.followers.length },
-                      { key: 'following', label: 'Siguiendo', value: follows.following.length },
-                      { key: 'reads', label: 'Mangas leídos', value: mangasRead },
-                    ]}
-                  />
-                </div>
-                <div className="flex w-full shrink-0 justify-center gap-2 sm:w-auto">
-                  {editing && <button type="button" onClick={() => { setEditing(false); if (user) void getWordPressProfile(user).then(setProfile); }} className={`flex h-10 items-center gap-2 rounded-lg border px-4 text-xs font-bold ${isLight ? 'border-black/10 bg-[#e4e6eb] hover:bg-[#d8dadf]' : 'border-white/10 bg-[#3a3b3c] hover:bg-[#4e4f50]'}`}><X size={16} />Cancelar</button>}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editing) void handleSave();
-                      else {
-                        setSaveConfirmed(false);
-                        setEditing(true);
-                        setActiveSection('information');
-                      }
-                    }}
-                    disabled={saving || saveConfirmed}
-                    aria-label={saveConfirmed ? 'Perfil guardado' : editing ? 'Guardar perfil' : 'Editar perfil'}
-                    className={`flex h-10 min-w-36 items-center justify-center gap-2 rounded-lg border px-5 text-xs font-black transition-all disabled:opacity-100 ${saveConfirmed ? 'border-[#FF4D88]/25 bg-[#FF4D88]/10 text-[#FF4D88]' : 'border-[#FF4D88] bg-[#FF4D88] text-white hover:border-[#e93b78] hover:bg-[#e93b78]'}`}
-                  >
-                    {saving ? <Loader2 size={16} className="animate-spin" /> : saveConfirmed ? <Check size={21} strokeWidth={3} /> : editing ? <><Save size={16} />Guardar</> : <><Edit3 size={16} />Editar perfil</>}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* "safe center": centradas si caben y, si desbordan en móvil, alineadas al inicio para poder desplazarlas. */}
-            <div className={`mt-5 flex min-h-14 items-stretch gap-1 overflow-x-auto border-t [justify-content:safe_center] sm:justify-start ${isLight ? 'border-black/10' : 'border-white/10'}`} aria-label="Secciones del perfil">
-              <button type="button" onClick={() => setActiveSection('summary')} aria-current={activeSection === 'summary' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'summary' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Resumen</button>
-              <button type="button" onClick={() => setActiveSection('information')} aria-current={activeSection === 'information' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'information' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Información</button>
-              <button type="button" onClick={() => setActiveSection('followers')} aria-current={activeSection === 'followers' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'followers' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Seguidores <span className="ml-2 rounded-full bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] text-[#FF4D88]">{follows.followers.length}</span></button>
-              <button type="button" onClick={() => setActiveSection('following')} aria-current={activeSection === 'following' ? 'page' : undefined} className={`flex shrink-0 items-center border-b-[3px] px-4 text-sm font-bold transition-colors ${activeSection === 'following' ? 'border-[#FF4D88] text-[#FF4D88]' : `border-transparent ${muted} hover:text-[#FF4D88]`}`}>Siguiendo <span className="ml-2 rounded-full bg-[#FF4D88]/10 px-2 py-0.5 text-[10px] text-[#FF4D88]">{follows.following.length}</span></button>
-            </div>
+          <div className="mobile-profile-stats">
+            <div><strong>{compact(profile?.followers_count ?? 0)}</strong><span>Seguidores</span></div>
+            <div><strong>{readerRankName(chaptersRead)}</strong><span>Rango Mukai</span></div>
+            <div><strong>{compact(chaptersRead)}</strong><span>Leídos</span></div>
           </div>
+          <p className="mobile-profile-bio">{profile?.bio?.trim() || 'No bio yet'}</p>
         </div>
       </section>
-
-      <div className="relative isolate min-h-[680px] overflow-hidden">
-        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 xl:max-w-[1360px]">
-        {notice && <p className={`mb-5 rounded-lg border px-4 py-3 text-xs font-semibold ${notice.type === 'success' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500' : 'border-red-500/20 bg-red-500/10 text-red-400'}`}>{notice.text}</p>}
-
-        <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start xl:grid-cols-[320px_minmax(0,1fr)_320px]">
-          {/* Columna izquierda: quién eres y tu círculo. En móvil va primero, como en Facebook. */}
-          <aside className="order-1 flex flex-col gap-4 lg:col-start-1 lg:row-start-1" aria-label="Presentación y seguidores">
-            <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-intro-title">
-              <h2 id="profile-intro-title" className="text-lg font-bold">Presentación</h2>
-              <p className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 ${muted}`}>{profile.bio || 'Cuéntale a la comunidad un poco sobre ti.'}</p>
-              {profile.location && <p className="mt-3 flex items-center gap-2 text-sm"><MapPin size={16} />{profile.location}</p>}
-              {configuredSocials.length > 0 && (
-                <div className={`mt-4 flex flex-wrap gap-2 border-t pt-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
-                  {configuredSocials.map((field) => field.key === 'discord' && !profile.social_links[field.key].startsWith('http')
-                    ? <span key={field.key} className={`rounded-lg px-3 py-2 text-xs font-bold ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}: {profile.social_links[field.key]}</span>
-                    : <a key={field.key} href={profile.social_links[field.key]} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors hover:text-[#FF4D88] ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}</a>)}
-                </div>
-              )}
-            </section>
-
-
-            <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-followers-preview">
-              <div className="flex items-center justify-between">
-                <h2 id="profile-followers-preview" className="text-lg font-bold">Seguidores</h2>
-                <button type="button" onClick={() => setActiveSection('followers')} className="text-xs font-semibold text-[#FF4D88]">Ver todos</button>
-              </div>
-              <p className={`mb-3 text-xs ${muted}`}>{follows.followers.length} {follows.followers.length === 1 ? 'seguidor' : 'seguidores'}</p>
-              {follows.followers.length === 0
-                ? <p className={`text-xs ${muted}`}>Todavía nadie te sigue. Comparte tu perfil con otros lectores.</p>
-                : <div className="grid grid-cols-3 gap-2">{follows.followers.slice(0, 6).map(renderFollowTile)}</div>}
-            </section>
-          </aside>
-
-          <div className="order-2 min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2 xl:row-span-1">
-        {activeSection === 'summary' && (
-          <div className="mx-auto max-w-3xl">
-            <div className="space-y-4">
-            <section className={`rounded-xl border p-4 ${card}`} aria-labelledby="profile-composer-title">
-              <h2 id="profile-composer-title" className="sr-only">Crear publicación</h2>
-              <div className="flex items-start gap-3">
-                <div className={`h-11 w-11 shrink-0 overflow-hidden rounded-full ${isLight ? 'bg-[#e4e6eb]' : 'bg-[#3a3b3c]'}`}>
-                  {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center"><User size={19} className={muted} /></span>}
-                </div>
-                <textarea value={postText} maxLength={1500} onChange={(event) => setPostText(event.target.value)} placeholder={`¿Qué estás pensando, ${profile.username || 'lector'}?`} className={`min-h-11 w-full resize-none rounded-[22px] border-0 px-4 py-3 text-sm leading-5 outline-none ring-[#FF4D88]/40 transition focus:ring-2 ${isLight ? 'bg-[#f0f2f5] text-black placeholder:text-black/45' : 'bg-[#3a3b3c] text-white placeholder:text-white/50'}`} />
-              </div>
-
-              {postMedia && (
-                <div className={`relative mt-4 overflow-hidden rounded-xl border ${isLight ? 'border-black/10 bg-black/[0.03]' : 'border-white/10 bg-black/20'}`}>
-                  {postMedia.kind === 'image'
-                    ? <img src={postMedia.url} alt="Vista previa de la publicación" className="max-h-[420px] w-full object-contain" />
-                    : <video src={postMedia.url} controls preload="metadata" className="max-h-[420px] w-full bg-black object-contain" />}
-                  <button type="button" onClick={clearPostMedia} aria-label="Quitar archivo" className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white backdrop-blur-sm hover:bg-black"><X size={17} /></button>
-                  <span className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-black/65 px-3 py-1 text-[9px] font-bold text-white backdrop-blur-sm">{postMedia.name}</span>
-                </div>
-              )}
-
-              <input ref={postImageRef} type="file" accept="image/*" className="hidden" onChange={(event) => handlePostMedia(event, 'image')} />
-              <input ref={postVideoRef} type="file" accept="video/*" className="hidden" onChange={(event) => handlePostMedia(event, 'video')} />
-
-              <div className={`mt-4 grid grid-cols-[1fr_1fr_auto] items-center gap-1 border-t pt-3 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
-                <button type="button" onClick={() => postImageRef.current?.click()} className={`flex h-11 items-center justify-center gap-2 rounded-lg text-xs font-bold transition ${isLight ? 'hover:bg-[#f0f2f5]' : 'hover:bg-[#3a3b3c]'}`}><ImageIcon size={19} className="text-emerald-500" /> Foto</button>
-                <button type="button" onClick={() => postVideoRef.current?.click()} className={`flex h-11 items-center justify-center gap-2 rounded-lg text-xs font-bold transition ${isLight ? 'hover:bg-[#f0f2f5]' : 'hover:bg-[#3a3b3c]'}`}><Video size={19} className="text-[#FF4D88]" /> Video</button>
-                <button type="button" onClick={() => void publishPost()} disabled={publishing || (!postText.trim() && !postMedia)} className="flex h-10 items-center gap-2 rounded-lg bg-[#FF4D88] px-4 text-xs font-black text-white transition hover:bg-[#e93b78] disabled:cursor-not-allowed disabled:opacity-35">{publishing ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} <span className="hidden sm:inline">{publishing ? 'Publicando' : 'Publicar'}</span></button>
-              </div>
-            </section>
-
-            {posts.map((post) => (
-              <ProfilePostCard key={post.id} initialPost={post} isLight={isLight} onShared={shared => setPosts(current => [shared, ...current.filter(item => item.id !== shared.id)])} />
-            ))}
-
-            {posts.length === 0 && <div className={`rounded-xl border border-dashed py-12 text-center ${isLight ? 'border-black/15 bg-white/45' : 'border-white/15 bg-white/[0.025]'}`}><ImageIcon size={30} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} /><p className="text-sm font-bold">Comparte tu primera actualización</p><p className={`mt-1 text-xs ${muted}`}>Publica una idea, una imagen o un video para tu comunidad.</p></div>}
-            </div>
-
-          </div>
-        )}
-
-        {activeSection === 'information' && (
-          <div className="grid items-start gap-4">
-            <article className={`rounded-xl border p-5 ${card}`}>
-              <h2 className="text-xl font-black tracking-tight">Presentación</h2>
-              {editing ? <><input value={profile.location} maxLength={80} onChange={(event) => setProfile((current) => ({ ...current, location: event.target.value }))} placeholder="Ciudad o país" className={`mt-4 w-full rounded-lg border px-4 py-3 text-sm outline-none focus:border-[#FF4D88]/60 ${input}`} /><textarea value={profile.bio} maxLength={800} onChange={(event) => setProfile((current) => ({ ...current, bio: event.target.value }))} placeholder="Cuéntale a la comunidad qué mangas te gustan..." className={`mt-3 min-h-36 w-full resize-none rounded-lg border px-4 py-3 text-sm leading-6 outline-none focus:border-[#FF4D88]/60 ${input}`} /></> : <p className={`mt-3 whitespace-pre-wrap text-sm leading-6 ${isLight ? 'text-black/70' : 'text-white/70'}`}>{profile.bio || 'Añade una descripción para que otros lectores te conozcan.'}</p>}
-              {!editing && profile.location && <p className={`mt-4 flex items-center gap-2 text-sm ${muted}`}><MapPin size={17} /> Vive en <strong className={isLight ? 'text-black' : 'text-white'}>{profile.location}</strong></p>}
-            </article>
-
-            <article className={`rounded-xl border p-5 ${card}`}>
-              <div className="flex items-center justify-between"><h2 className="text-xl font-black tracking-tight">Redes sociales</h2><ExternalLink size={18} className="text-[#FF4D88]" /></div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {SOCIAL_FIELDS.map((field) => editing ? (
-                  <label key={field.key} className="block"><span className={`mb-1.5 block text-[10px] font-bold ${muted}`}>{field.label}</span><input value={profile.social_links[field.key]} onChange={(event) => setProfile((current) => ({ ...current, social_links: { ...current.social_links, [field.key]: event.target.value } }))} placeholder={field.placeholder} className={`w-full rounded-lg border px-3 py-2.5 text-xs outline-none focus:border-[#FF4D88]/60 ${input}`} /></label>
-                ) : profile.social_links[field.key] ? (
-                  field.key === 'discord' && !profile.social_links[field.key].startsWith('http')
-                    ? <span key={field.key} className={`rounded-lg px-3 py-2.5 text-xs font-bold ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}: {profile.social_links[field.key]}</span>
-                    : <a key={field.key} href={profile.social_links[field.key]} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2.5 text-xs font-bold transition-colors hover:text-[#FF4D88] ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>{field.label}</a>
-                ) : null)}
-                {!editing && !Object.values(profile.social_links).some(Boolean) && <p className={`text-xs ${muted}`}>Todavía no agregaste redes sociales.</p>}
-              </div>
-            </article>
-
-            <article className={`rounded-xl border p-5 lg:col-span-2 ${card}`}>
-              <h2 className="text-xl font-black tracking-tight">Datos de registro</h2>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className={`rounded-xl border p-4 ${isLight ? 'border-black/10 bg-[#f7f8fa]' : 'border-white/10 bg-black/20'}`}>
-                  <div className="flex items-center gap-2"><Cake size={18} className="text-[#FF4D88]" /><h3 className="text-sm font-black">Fecha de nacimiento</h3></div>
-                  {editing ? <input type="date" min="1900-01-01" max={new Date().toISOString().slice(0, 10)} value={profile.birth_date} onChange={(event) => setProfile((current) => ({ ...current, birth_date: event.target.value }))} className={`mt-3 h-11 w-full rounded-lg border px-3 text-sm outline-none focus:border-[#FF4D88]/60 ${input}`} /> : <div className="mt-3 flex items-center gap-2"><p className={`text-sm font-semibold ${profile.birth_date ? '' : muted}`}>{formatProfileDate(profile.birth_date)}</p>{profile.show_birth_date ? <Eye size={15} aria-label="Visible en el perfil" className="text-emerald-500" /> : <EyeOff size={15} aria-label="Oculto en el perfil" className={muted} />}</div>}
-                  {editing && <button type="button" onClick={() => setProfile((current) => ({ ...current, show_birth_date: !current.show_birth_date }))} className={`mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ${profile.show_birth_date ? 'bg-[#FF4D88] text-white' : isLight ? 'bg-[#e4e6eb] text-black hover:bg-[#d8dadf]' : 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]'}`}>{profile.show_birth_date ? <EyeOff size={14} /> : <Eye size={14} />}{profile.show_birth_date ? 'Ocultar del perfil' : 'Mostrar en perfil'}</button>}
-                </div>
-
-                <div className={`rounded-xl border p-4 ${isLight ? 'border-black/10 bg-[#f7f8fa]' : 'border-white/10 bg-black/20'}`}>
-                  <div className="flex items-center gap-2"><Phone size={18} className="text-[#FF4D88]" /><h3 className="text-sm font-black">Teléfono</h3></div>
-                  {editing ? <div className="mt-3 grid grid-cols-[82px_minmax(0,1fr)] gap-2"><input value={profile.country_code} maxLength={5} onChange={(event) => setProfile((current) => ({ ...current, country_code: event.target.value }))} aria-label="Código de país" className={`h-11 rounded-lg border px-3 text-sm outline-none focus:border-[#FF4D88]/60 ${input}`} /><input type="tel" inputMode="tel" value={profile.phone} maxLength={15} onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value.replace(/\D/g, '') }))} aria-label="Teléfono" className={`h-11 min-w-0 rounded-lg border px-3 text-sm outline-none focus:border-[#FF4D88]/60 ${input}`} /></div> : <div className="mt-3 flex items-center gap-2"><p className={`text-sm font-semibold ${profile.phone ? '' : muted}`}>{profile.phone ? `${profile.country_code} ${profile.phone}` : 'Sin configurar'}</p>{profile.show_phone ? <Eye size={15} aria-label="Visible en el perfil" className="text-emerald-500" /> : <EyeOff size={15} aria-label="Oculto en el perfil" className={muted} />}</div>}
-                  {editing && <button type="button" onClick={() => setProfile((current) => ({ ...current, show_phone: !current.show_phone }))} className={`mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ${profile.show_phone ? 'bg-[#FF4D88] text-white' : isLight ? 'bg-[#e4e6eb] text-black hover:bg-[#d8dadf]' : 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]'}`}>{profile.show_phone ? <EyeOff size={14} /> : <Eye size={14} />}{profile.show_phone ? 'Ocultar del perfil' : 'Mostrar en perfil'}</button>}
-                </div>
-              </div>
-            </article>
-          </div>
-        )}
-
-        {(activeSection === 'followers' || activeSection === 'following') && (() => {
-          const showingFollowers = activeSection === 'followers';
-          const entries = showingFollowers ? follows.followers : follows.following;
-          return (
-            <section className={`mx-auto max-w-5xl rounded-xl border p-5 ${card}`} aria-labelledby="profile-follow-title">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h2 id="profile-follow-title" className="flex items-center gap-2 text-xl font-black tracking-tight">{showingFollowers ? <Users size={20} className="text-[#FF4D88]" /> : <UserCheck size={20} className="text-[#FF4D88]" />}{showingFollowers ? 'Seguidores' : 'Siguiendo'}</h2>
-                  <p className={`mt-0.5 text-xs ${muted}`}>{showingFollowers ? 'Lectores que siguen tu perfil.' : 'Perfiles que sigues.'}</p>
-                </div>
-                <span className="grid h-10 min-w-10 place-items-center rounded-full bg-[#FF4D88]/10 px-3 text-xs font-black text-[#FF4D88]">{entries.length}</span>
-              </div>
-
-              {entries.length === 0 ? (
-                <div className={`mt-5 rounded-xl border border-dashed py-16 text-center ${isLight ? 'border-black/15 bg-[#f7f8fa]' : 'border-white/15 bg-white/[0.025]'}`}>
-                  <UserPlus size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/15' : 'text-white/15'}`} />
-                  <p className="text-sm font-bold">{showingFollowers ? 'Todavía nadie te sigue' : 'Aún no sigues a nadie'}</p>
-                  <p className={`mx-auto mt-1 max-w-sm text-xs leading-relaxed ${muted}`}>{showingFollowers ? 'Cuando alguien te siga aparecerá aquí.' : 'Sigue a otros lectores desde su perfil público.'}</p>
-                </div>
-              ) : (
-                <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {entries.map((entry) => (
-                    <div key={entry.user.id} className={`flex items-center gap-3 rounded-lg p-3 ${isLight ? 'bg-[#f0f2f5]' : 'bg-[#3a3b3c]'}`}>
-                      <Link to={`/usuarios/${entry.user.id}`}><UserAvatar entry={entry} size="h-12 w-12" /></Link>
-                      <Link to={`/usuarios/${entry.user.id}`} className="min-w-0 flex-1 truncate text-sm font-bold hover:text-[#FF4D88]">{entry.user.username}</Link>
-                      <button type="button" onClick={() => openChat(entry.user)} aria-label={`Chatear con ${entry.user.username}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FF4D88] hover:bg-[#FF4D88]/10"><MessageCircle size={16} /></button>
-                      {showingFollowers && !entry.viewer_follows ? (
-                        <button type="button" onClick={() => void handleFollowBack(entry)} disabled={actionId === entry.user.id} className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-[#FF4D88] px-3 text-[10px] font-black text-white disabled:opacity-50">{actionId === entry.user.id ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}Seguir</button>
-                      ) : (
-                        <button type="button" onClick={() => void handleUnfollow(entry)} disabled={actionId === entry.user.id} title="Dejar de seguir" className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[10px] font-black disabled:opacity-50 ${isLight ? 'bg-[#e4e6eb] text-black hover:bg-[#d8dadf]' : 'bg-[#4e4f50] text-white hover:bg-[#5a5b5c]'}`}>{actionId === entry.user.id ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />}Siguiendo</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })()}
-          </div>
-
-          {/* Columna derecha: recomendaciones. En movil cierran el muro. */}
-          <aside className="order-3 flex flex-col gap-4 lg:col-start-1 lg:row-start-2 xl:col-start-3 xl:row-start-1" aria-label="Mangas recomendados">
-            <MangaRecommendations items={recommendations} title="Mangas recomendados" listClassName="h-[570px]" />
-          </aside>
+      <section className="mobile-profile-promos" aria-label="Monedas y suscripción">
+        <Link to="/recargar" className="mobile-profile-promo mobile-profile-recharge">
+          <img className="mobile-profile-promo-artwork" src={rechargeArtwork} alt="" />
+          <span className="mobile-profile-balance"><img className="mobile-profile-coin" src={rechargeCoinIcon} alt="" />{compact(user.coins || 0)}</span>
+          <span className="mobile-profile-recharge-action">Recargar</span>
+        </Link>
+        <button type="button" onClick={openSubscriptionModal} className="mobile-profile-promo mobile-profile-pro-promo">
+          <img className="mobile-profile-promo-artwork" src={proArtwork} alt="" />
+          <img className="mobile-profile-pro-logo" src={mukaiProLogo} alt="" />
+          <span className="mobile-profile-pro-promo-action">Hazte Pro</span>
+        </button>
+      </section>
+      <section className="mobile-profile-content" aria-label="Biblioteca del perfil">
+        <div className="mobile-profile-tabs" role="tablist" aria-label="Apartados del perfil">
+          {tabs.map(({ id, label, icon, activeIcon }) => <button key={id} type="button" role="tab" aria-selected={tab === id} aria-label={label} onClick={() => setTab(id)} className={tab === id ? 'active' : ''}><img src={tab === id ? activeIcon : icon} alt="" /><span>{label}</span></button>)}
         </div>
-        </div>
+        {tab === 'collection' && <div role="tabpanel" className="mobile-profile-panel">
+          <div className="mobile-profile-filters"><button type="button" className={collectionFilter === 'objects' ? 'active' : ''} onClick={() => setCollectionFilter('objects')}>Objetos</button><button type="button" className={collectionFilter === 'covers' ? 'active' : ''} onClick={() => setCollectionFilter('covers')}>Portadas</button></div>
+          {empty('Aún no tienes una colección')}
+        </div>}
+        {tab === 'posts' && <div role="tabpanel" className="mobile-profile-panel">
+          {posts.length ? <div className="mobile-profile-posts">{posts.map((post) => <ProfilePostCard key={post.id} initialPost={post} isLight={isLight} variant="community" onShared={(shared) => setPosts((current) => [shared, ...current.filter((item) => item.id !== shared.id)])} />)}</div> : empty('Aún no has publicado nada')}
+        </div>}
+        {tab === 'saved' && <div role="tabpanel" className="mobile-profile-panel">{savedMangas.length ? <div className="mobile-profile-cover-grid">{savedMangas.map((manga) => <Cover key={manga.id} id={manga.id} title={manga.titulo} cover={manga.portada} views={displayViews(manga)} />)}</div> : saved.loaded && empty('Aún no has guardado mangas')}</div>}
+        {tab === 'likes' && <div role="tabpanel" className="mobile-profile-panel">
+          <div className="mobile-profile-filters"><button type="button" className={likesFilter === 'series' ? 'active' : ''} onClick={() => setLikesFilter('series')}>Series</button><button type="button" className={likesFilter === 'chapters' ? 'active' : ''} onClick={() => setLikesFilter('chapters')}>Capítulos</button></div>
+          {likesFilter === 'series' ? likedMangas.length ? <div className="mobile-profile-cover-grid">{likedMangas.map((manga) => <Cover key={manga.id} {...manga} views={viewsFor(manga.id)} tag="Manga" />)}</div> : empty('Aún no has dado me gusta a ninguna serie') : library.liked_chapters.length ? <div className="mobile-profile-chapters">{library.liked_chapters.map((item) => <Chapter key={item.chapter_id} item={item} />)}</div> : empty('Aún no has reaccionado a ningún capítulo')}
+        </div>}
+        {tab === 'history' && <div role="tabpanel" className="mobile-profile-panel">{library.reading.length ? <div className="mobile-profile-history">{library.reading.map((item) => <Chapter key={item.chapter_id} item={item} history />)}</div> : empty('Aún no has empezado ninguna lectura')}</div>}
+      </section>
+    </div>
+    <SlidePanel open={menuOpen} from="right" size="wide" blurBackdrop isLight={isLight} label="Opciones del perfil" onClose={closeMenu}>
+      <div className="profile-settings-panel">
+        <header className="profile-settings-header">
+          {menuSection !== 'main' ? <button type="button" onClick={() => setMenuSection('main')} aria-label="Volver a opciones"><ChevronLeft size={20} /></button> : <span />}
+          <h2>{menuSection === 'main' ? 'Opciones' : menuSection === 'security' ? 'Seguridad' : menuSection === 'information' ? 'Información' : 'Cuenta'}</h2>
+          <button type="button" onClick={closeMenu} aria-label="Cerrar opciones"><X size={20} /></button>
+        </header>
+        {menuSection === 'security' ? <nav className="profile-settings-list" aria-label="Seguridad de la cuenta">
+          <a href={wordpressUrl('wp-login.php?action=lostpassword')}><KeyRound size={19} /><span>Restablecer contraseña</span><ChevronRight size={16} /></a>
+        </nav> : menuSection === 'information' ? <nav className="profile-settings-list" aria-label="Información y ayuda">
+          {footerInfoLinks.map(link => 'to' in link ? <Link key={link.label} to={link.to} onClick={closeMenu}><span>{link.label}</span><ChevronRight size={16} /></Link> : <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer"><span>{link.label}</span><ChevronRight size={16} /></a>)}
+        </nav> : menuSection === 'account' ? <nav className="profile-settings-list" aria-label="Cuenta">
+          <Link to="/contacto?motivo=eliminar-cuenta" onClick={closeMenu} className="profile-settings-danger"><Trash2 size={19} /><span>Eliminar cuenta</span><ChevronRight size={16} /></Link>
+          <p className="profile-settings-note">Solicita la eliminación de tu cuenta al equipo de MangaMukai.</p>
+        </nav> : <>
+          <nav className="profile-settings-list" aria-label="Opciones de cuenta">
+            <button type="button" className="profile-settings-theme" onClick={toggleTheme}>{isLight ? <MoonIcon size={20} /> : <SunIcon size={20} />}<span>Tema</span><small>{isLight ? 'Claro' : 'Oscuro'}</small></button>
+            <button type="button" onClick={openAlarm}><AlarmClock size={19} /><span>Alarma</span><ChevronRight size={16} /></button>
+            <div className="profile-settings-divider" />
+            <button type="button" onClick={() => setMenuSection('security')}><Shield size={19} /><span>Seguridad</span><ChevronRight size={16} /></button>
+            <button type="button" onClick={() => setMenuSection('information')}><Info size={19} /><span>Información</span><ChevronRight size={16} /></button>
+            <button type="button" onClick={() => setMenuSection('account')}><UserRound size={19} /><span>Cuenta</span><ChevronRight size={16} /></button>
+          </nav>
+          <button type="button" className="profile-settings-logout" onClick={() => { closeMenu(); void clearAuth(); }}><LogOut size={19} />Cerrar sesión</button>
+        </>}
       </div>
-    </main>
-  );
+    </SlidePanel>
+  </main>;
 };

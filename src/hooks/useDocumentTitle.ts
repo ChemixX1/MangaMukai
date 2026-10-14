@@ -118,6 +118,9 @@ export const routeSeo = (pathname: string): RouteSeo => {
   if (path.startsWith('/mensajes/')) {
     return { section: 'Mensajes', description: 'Área privada de MangaMukai.', noindex: true };
   }
+  if (path.startsWith('/comunidad/publicacion/')) {
+    return { section: 'Publicación · Comunidad', description: 'Lee la publicación y participa en la conversación de MangaMukai.', noindex: true };
+  }
   if (path.startsWith('/chat/')) {
     return { section: 'Mukai Chat', description: 'Conversa con personajes de manga en MangaMukai.' };
   }

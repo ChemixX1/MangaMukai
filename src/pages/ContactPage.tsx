@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
 import { Mail, MapPin, Send, Github, Instagram, CheckCircle, AlertCircle, Loader2, Facebook, Youtube } from "lucide-react";
 import { getStoredUser } from "../services/authService";
 import { sendWordPressContactMessage } from "../services/wordpressService";
@@ -26,6 +27,7 @@ const DiscordIcon = ({ size = 20, className = "" }) => (
 );
 
 export const ContactPage = () => {
+  const location = useLocation();
   const [formState, setFormState] = useState({
     name: "",
     email: "",
@@ -48,6 +50,11 @@ export const ContactPage = () => {
     }));
   }, []);
 
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('motivo') !== 'eliminar-cuenta') return;
+    setFormState(prev => ({ ...prev, subject: 'eliminacion_cuenta', message: prev.message || 'Solicito la eliminación de mi cuenta y de los datos asociados.' }));
+  }, [location.search]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -60,7 +67,7 @@ export const ContactPage = () => {
     }
 
     try {
-      const result = await sendWordPressContactMessage(formState);
+      const result = await sendWordPressContactMessage({ ...formState, subject: formState.subject === 'eliminacion_cuenta' ? 'soporte' : formState.subject });
 
       if (!result.success) throw new Error(result.message);
 
@@ -215,6 +222,7 @@ export const ContactPage = () => {
                        <option value="colaboracion">Colaboración / Partners</option>
                        <option value="feedback">Feedback General</option>
                        <option value="otro">Otro</option>
+                       <option value="eliminacion_cuenta">Eliminar cuenta</option>
                      </select>
                   </div>
 

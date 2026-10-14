@@ -1,9 +1,15 @@
-import angryImage from '../../assets/manga/reactions/angry.png';
-import hahaImage from '../../assets/manga/reactions/haha.png';
-import likeImage from '../../assets/manga/reactions/like.png';
-import loveImage from '../../assets/manga/reactions/love.png';
-import sadImage from '../../assets/manga/reactions/sad.png';
-import wowImage from '../../assets/manga/reactions/wow.png';
+import angryImage from '../../assets/manga/reactions/angry.svg';
+import hahaImage from '../../assets/manga/reactions/haha.svg';
+import likeImage from '../../assets/manga/reactions/like.svg';
+import loveImage from '../../assets/manga/reactions/love.svg';
+import sadImage from '../../assets/manga/reactions/sad.svg';
+import wowImage from '../../assets/manga/reactions/wow.svg';
+import detailHahaImage from '../../assets/manga/reactions/detail/haha.png';
+import detailLikeImage from '../../assets/manga/reactions/detail/like.png';
+import detailSadImage from '../../assets/manga/reactions/detail/sad.png';
+import detailWowImage from '../../assets/manga/reactions/detail/wow.png';
+import detailAngryImage from '../../assets/manga/reactions/detail/angry.png';
+import detailLoveImage from '../../assets/manga/reactions/detail/love.png';
 
 /** Reacciones a la serie, en el orden del diseño (móvil y escritorio). */
 export const MANGA_REACTIONS = [
@@ -16,6 +22,34 @@ export const MANGA_REACTIONS = [
 ] as const;
 
 export type MangaReactionId = (typeof MANGA_REACTIONS)[number]['id'];
+
+// Los recursos de iCONOSdereaccion.md son exclusivos de la ficha del manga.
+// «Me enoja» y «Me encanta» usan los últimos recursos adjuntos.
+const DETAIL_REACTION_IMAGES: Partial<Record<MangaReactionId, string>> = {
+  like: detailLikeImage,
+  haha: detailHahaImage,
+  wow: detailWowImage,
+  sad: detailSadImage,
+  angry: detailAngryImage,
+  love: detailLoveImage,
+};
+
+/** Los SVG se cargan como imágenes para aislar sus degradados entre instancias. */
+export const ReactionIcon = ({ id, className = 'h-[23px] w-[23px]' }: {
+  id: MangaReactionId;
+  className?: string;
+}) => (
+  <img
+    src={MANGA_REACTIONS.find((reaction) => reaction.id === id)?.image}
+    alt=""
+    aria-hidden="true"
+    width="23"
+    height="23"
+    loading="lazy"
+    decoding="async"
+    className={`shrink-0 object-contain ${className}`}
+  />
+);
 
 export const createReactionCounts = (): Record<MangaReactionId, number> =>
   Object.fromEntries(MANGA_REACTIONS.map(({ id }) => [id, 0])) as Record<MangaReactionId, number>;
@@ -57,10 +91,10 @@ export const ReactionButton = ({ reaction, count, selected, tracing, onReact, cl
       aria-label={reaction.label}
       aria-pressed={selected}
       title={reaction.label}
-      className={`relative flex items-center justify-center rounded-full bg-panel transition-transform hover:scale-105 active:scale-95 ${className}`}
+      className={`manga-reaction-button relative flex items-center justify-center rounded-full bg-panel transition-transform hover:scale-105 active:scale-95 ${className}`}
     >
       <svg viewBox="0 0 80 80" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
-        <circle cx="40" cy="40" r="38" fill="none" stroke="rgb(116,116,116)" strokeWidth="2" />
+        <circle cx="40" cy="40" r="38" fill="none" stroke="rgb(116,116,116)" strokeWidth="0" />
         <circle
           cx="40"
           cy="40"
@@ -74,8 +108,17 @@ export const ReactionButton = ({ reaction, count, selected, tracing, onReact, cl
           style={{ opacity: selected || tracing ? 1 : 0 }}
         />
       </svg>
-      <img src={reaction.image} alt="" aria-hidden="true" loading="lazy" decoding="async" className="relative h-[55%] w-[55%] object-contain" />
+      <img
+        src={DETAIL_REACTION_IMAGES[reaction.id] ?? reaction.image}
+        alt=""
+        aria-hidden="true"
+        width="48"
+        height="48"
+        loading="lazy"
+        decoding="async"
+        className="relative h-[64%] w-[64%] shrink-0 object-contain"
+      />
     </button>
-    <span className={`font-anta text-xl font-normal leading-6 tabular-nums ${selected ? 'text-mukai-magenta' : 'text-ink'}`}>{count}</span>
+    <span className={`manga-reaction-count ${selected ? 'text-mukai-magenta' : 'text-ink'}`}>{count}</span>
   </>
 );

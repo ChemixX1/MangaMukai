@@ -1,5 +1,6 @@
 import { MANGAMUKAI_API } from '../config/api';
-import { clearStoredAuth, getStoredToken } from './authService';
+import { clearStoredAuth, getStoredToken, getStoredUser } from './authService';
+import { recordCompletedRewardChapter } from './mangaRewardProgress';
 import type { ProfileSocialLinks } from './wordpressService';
 import type { ProfilePost } from './profilePostService';
 
@@ -252,6 +253,7 @@ export const getSocialLibrary = async (): Promise<SocialLibrary> => {
  * al final (completed=true). Alimenta la pestaña Actividad de "Más".
  */
 export const recordChapterProgress = async (chapterId: number | string, mangaId: number | string, completed: boolean): Promise<void> => {
+  const userId = getStoredToken() ? getStoredUser()?.id : undefined;
   const response = await fetch(`${MANGAMUKAI_API}/social/reading-progress`, {
     method: 'POST',
     credentials: 'include',
@@ -259,6 +261,7 @@ export const recordChapterProgress = async (chapterId: number | string, mangaId:
     body: JSON.stringify({ chapter_id: Number(chapterId), manga_id: Number(mangaId), completed }),
   });
   await ensureResponse(response);
+  if (completed && userId !== undefined) recordCompletedRewardChapter(userId, mangaId, chapterId);
 };
 
 /** Anota la serie como leída al abrir un capítulo; devuelve el total de series leídas. */

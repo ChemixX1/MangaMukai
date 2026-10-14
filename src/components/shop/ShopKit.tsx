@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { ArrowUpRight, Plus, ShoppingBag, X } from 'lucide-react';
+import { ArrowUpRight, Heart, Plus, ShoppingBag, X } from 'lucide-react';
 import type { ShopCategory, ShopProduct } from '../../data/shopProducts';
 import { SHOP_CART_MAX_UNITS } from '../../hooks/useShopCart';
 
@@ -29,21 +29,26 @@ interface ProductCardProps {
   quantity: number;
   onOpen: () => void;
   onAdd: () => void;
+  favorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
-/** Portada completa, una sola etiqueta de estado y acceso directo a la bolsa. */
-export const ProductCard = ({ product, quantity, onOpen, onAdd }: ProductCardProps) => (
-  <article className="shop-product">
-    <button type="button" onClick={onOpen} aria-label={`Ver ${product.title}`} className="shop-product-cover">
-      <img src={product.image} alt={product.title} loading="lazy" decoding="async" />
-      {(product.soldOut || product.sale || product.hot) && <span className={`shop-product-badge ${product.soldOut ? 'is-sold-out' : product.sale ? 'is-sale' : ''}`}>{product.soldOut ? 'Agotado' : product.sale ? 'Oferta' : 'Selección Mukai'}</span>}
-      <span className="shop-product-peek" aria-hidden="true"><ArrowUpRight size={17} /></span>
-    </button>
+/** Portada apaisada, descuento y accesos a favoritos y bolsa. */
+export const ProductCard = ({ product, quantity, onOpen, onAdd, favorite, onToggleFavorite }: ProductCardProps) => (
+  <article className={`shop-product ${product.soldOut ? 'is-sold-out' : ''}`}>
+    <div className="shop-product-art">
+      <button type="button" onClick={onOpen} aria-label={`Ver ${product.title}`} className="shop-product-cover">
+        <img src={product.image} alt={product.title} loading="lazy" decoding="async" />
+        {product.soldOut && <span className="shop-product-badge is-sold-out">Agotado</span>}
+        <span className="shop-product-peek" aria-hidden="true"><ArrowUpRight size={17} /></span>
+      </button>
+      {onToggleFavorite && <button type="button" className={`shop-product-favorite ${favorite ? 'is-saved' : ''}`} onClick={onToggleFavorite} aria-label={`${favorite ? 'Quitar de' : 'Añadir a'} favoritos: ${product.title}`} aria-pressed={favorite}><Heart size={17} fill={favorite ? 'currentColor' : 'none'} /></button>}
+    </div>
     <div className="shop-product-info">
       <span className="shop-product-category">{categoryLabel(product.category)}</span>
       <h3><button type="button" onClick={onOpen}>{product.title}</button></h3>
       <div className="shop-product-bottom">
-        <div><strong>{formatPrice(product.price)} <small>USD</small></strong><span className="shop-product-quantity">{quantity > 0 ? `${quantity} en tu bolsa` : '\u00a0'}</span></div>
+        <div><div className="shop-product-prices">{product.originalPrice && product.originalPrice > product.price && <><span className="shop-discount">-{Math.round((1 - product.price / product.originalPrice) * 100)}%</span><del>{formatPrice(product.originalPrice)}</del></>}<strong>{formatPrice(product.price)}</strong></div></div>
         <button type="button" disabled={!canAddToCart(product, quantity)} onClick={onAdd} aria-label={`Añadir ${product.title} al carrito`} className="shop-product-add" title={product.soldOut ? 'Producto agotado' : quantity >= SHOP_CART_MAX_UNITS ? `Máximo ${SHOP_CART_MAX_UNITS} unidades` : 'Añadir a mi bolsa'}><Plus size={18} /></button>
       </div>
     </div>
@@ -61,7 +66,7 @@ interface ProductSheetProps {
 export const ProductSheet = forwardRef<HTMLDialogElement, ProductSheetProps>(({ product, quantity, onAdd, onClose, notice }, ref) => (
   <dialog ref={ref} aria-label="Detalle del producto" onClose={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }} className="shop-dialog shop-product-dialog">
     {product && (
-      <div className="shop-product-detail">
+      <div className={`shop-product-detail ${product.soldOut ? 'is-sold-out' : ''}`}>
         <button type="button" aria-label="Cerrar detalle" onClick={onClose} className="shop-dialog-close"><X size={21} /></button>
         <div className="shop-detail-art"><img src={product.image} alt={product.title} /><span>{categoryLabel(product.category)}</span></div>
         <div className="shop-detail-copy">

@@ -73,7 +73,7 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }
   // reproductor ni se monta, así no se ve ni se puede enfocar por detrás.
   if (isLocked) {
     return (
-      <aside aria-label="Mukai Music" className={`w-full shrink-0 overflow-hidden rounded-2xl border border-white/50 ${heightClass}`}>
+      <aside aria-label="Mukai Music" className="manga-music-locked-card w-full shrink-0 overflow-hidden rounded-2xl">
         <MukaiMusicPromo onUnlock={openSubscriptionModal} />
       </aside>
     );

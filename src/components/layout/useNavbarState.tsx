@@ -33,7 +33,7 @@ export const useNavbarState = () => {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const isLightMode = theme === 'light';
-  const isProfileRoute = location.pathname === '/perfil';
+  const isProfileRoute = location.pathname === '/mas';
 
   const [currentUser, setCurrentUser] = useState<MMUser | null>(getCurrentStoredUser);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -58,7 +58,7 @@ export const useNavbarState = () => {
   const searchFilter = useSearchFilter();
   // En la ficha de un manga y en "Más" (móvil) la imagen ocupa toda la parte superior: la cabecera no se pinta.
   // Character Chat (/chat, la ficha /chat/:id y la conversación) va sin cabecera en móvil: solo su flecha de volver.
-  const hideHeaderOnMobile = /^\/manga\/[^/]+/.test(location.pathname) || /^\/chat(\/|$)/.test(location.pathname) || (location.pathname === '/mas' && !!currentUser) || location.pathname === '/perfil/editar' || isMobileSectionRoute(location.pathname);
+  const hideHeaderOnMobile = location.pathname.startsWith('/comunidad/publicacion/') || /^\/usuarios\/[^/]+\/publicacion\/[^/]+$/.test(location.pathname) || /^\/manga\/[^/]+/.test(location.pathname) || /^\/chat(\/|$)/.test(location.pathname) || location.pathname === '/mas' || location.pathname === '/perfil/editar' || isMobileSectionRoute(location.pathname);
   // El chat de mensajes (botón "Mensajes" de la Comunidad) y las notificaciones van a pantalla
   // completa: sin cabecera en ningún tamaño. El componente sigue montado para conservar la alarma,
   // los avisos y el evento openChat.

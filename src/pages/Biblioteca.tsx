@@ -5,7 +5,9 @@ import { searchGenres } from "../config/searchAppearance";
 import "../styles/search.css";
 import { useTheme } from "../hooks/useTheme";
 import { setSearchTerm, useSearchFilter, useSearchTerm, type SearchFilter } from "../hooks/useSearchTerm";
-import { getCachedSearchCatalog, loadSearchCatalog } from "../services/searchCatalog";
+import { getCachedSearchCatalog, loadSearchCatalog, subscribeSearchCatalog } from "../services/searchCatalog";
+import { preloadImages } from '../utils/preloadImages';
+import { loadSearchSections, type SearchCollection, type SearchSectionStage } from '../utils/progressiveSearchSections';
 import { displayViews } from "../utils/seriesViews";
 import { toTitleCase } from "../utils/titleCase";
 import { hasBlackWhiteTag, hasHotTag } from "../utils/womenBlackWhite";
@@ -87,6 +89,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
 
   const [allCatalog, setAllCatalog] = useState<MangaCapitulo[]>(() => getCachedSearchCatalog() ?? []);
   const [loading, setLoading] = useState(() => getCachedSearchCatalog() === null);
+  const [stages, setStages] = useState<Record<SearchCollection, SearchSectionStage>>({ todos: 0, bn: 0, hot: 0 });
   const [visibleResults, setVisibleResults] = useState(RESULTS_PAGE_SIZE);
 
   // ?buscar= permite compartir una búsqueda (y es el destino del SearchAction del
@@ -103,7 +106,8 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
 
   useEffect(() => {
     let cancelled = false;
-    // El catálogo llega sin vistas: se completan con las de los rankings históricos.
+    const unsubscribe = subscribeSearchCatalog(items => { if (!cancelled) setAllCatalog(items); });
+    // Publica el catálogo sin esperar a los rankings secundarios.
     loadSearchCatalog()
       .then((catalogData) => {
         if (cancelled) return;
@@ -111,7 +115,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
       })
       .catch((error) => console.error("Biblioteca load error:", error))
       .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; unsubscribe(); };
   }, []);
 
   useEffect(() => { setVisibleResults(RESULTS_PAGE_SIZE); }, [deferredSearchTerm, searchFilter]);
@@ -130,6 +134,21 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   // Al pasar de explorar a resultados (o volver) se empieza desde arriba.
   useEffect(() => { if (!embedded) window.scrollTo({ top: 0, behavior: "auto" }); }, [embedded, isSearching]);
 
+  useEffect(() => {
+    if (loading) return;
+    let active = true;
+    void loadSearchSections(async (collection, stage) => {
+      const items = allCatalog.filter(manga => matchesFilter(manga, collection));
+      const sources = stage === 1
+        ? [...items].sort((a, b) => displayViews(b) - displayViews(a)).slice(0, TOP_SEARCHED_COUNT).map(manga => manga.portada)
+        : stage === 2 ? searchGenres.map(genre => genre.cover)
+        : [...items].sort((a, b) => releaseTime(b) - releaseTime(a)).slice(0, NEW_RELEASES_COUNT).map(manga => manga.portada);
+      await preloadImages(sources);
+    }, (collection, stage) => setStages(current => ({ ...current, [collection]: Math.max(current[collection], stage) as SearchSectionStage })), () => active);
+    return () => { active = false; };
+  }, [allCatalog, loading]);
+
+  const stage = stages[searchFilter];
   const skeleton = isLight ? "bg-black/[0.06]" : "bg-white/[0.08]";
 
   return (
@@ -162,7 +181,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
           <>
             {/* "+ Buscados": cuatro filas ordenadas por vistas, con portada pequeña,
                 título, etiqueta rosa con el tipo y contador negro con el ojo. */}
-            <section aria-label="Más buscados">
+            <section aria-label="Más buscados" aria-busy={loading || stage < 1}>
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">+ Buscados</h2>
               {loading ? (
                 <div className="space-y-1">
@@ -194,7 +213,7 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
             </section>
 
             {/* Tarjetas por género: portada de un manga del género con un tinte de color y la etiqueta abajo. */}
-            <section aria-label="Explorar por género" className="search-genres mt-7">
+            <section aria-busy={loading || stage < 2} aria-label="Explorar por género" className="search-genres mt-7">
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Explorar por género</h2>
               <div className="grid grid-cols-2 gap-2.5">
                 {loading
@@ -220,9 +239,9 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
             </section>
 
             {/* "Nuevos lanzamientos": el más reciente en grande y los tres siguientes debajo. */}
-            <section aria-label="Nuevos lanzamientos" className="search-releases mt-7">
+            <section aria-busy={loading || stage < 3} aria-label="Nuevos lanzamientos" className="search-releases mt-7">
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Nuevos lanzamientos</h2>
-              {loading || newReleases.length === 0 ? (
+              {loading || stage < 3 ? (
                 <>
                   <div className={`aspect-[4/5] animate-pulse rounded-2xl ${skeleton}`} />
                   <div className="search-release-grid mt-3 grid grid-cols-3 gap-2">

@@ -66,10 +66,10 @@ export default {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.2' },
         },
-        // Punto del tipo de obra: encendido/apagado seco.
+        // Punto del tipo de obra: pulso suave sin apagarse por completo.
         'dot-blink': {
-          '0%, 55%': { opacity: '1' },
-          '56%, 100%': { opacity: '0.15' },
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.45' },
         },
         // Llama de "NUEVO": se aviva desde la base con un leve vaivén.
         flame: {
@@ -127,7 +127,7 @@ export default {
       },
       animation: {
         blink: 'blink 1.3s ease-in-out infinite',
-        'dot-blink': 'dot-blink 1.6s steps(1, end) infinite',
+        'dot-blink': 'dot-blink 2.8s ease-in-out infinite',
         flame: 'flame 1.15s ease-in-out infinite',
         'flame-sway': 'flame-sway 3.1s ease-in-out infinite',
         'flame-lick': 'flame-lick 1.3s ease-in-out infinite',

@@ -1,0 +1,175 @@
+@font-face {
+  font-family: 'Nosifer';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/community/nosifer-latin-400.ttf') format('truetype');
+}
+
+.community-pro-card {
+  width: 100%;
+  min-height: 204px;
+  flex-shrink: 0;
+  aspect-ratio: 256 / 176;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+}
+
+.community-pro-card .mukai-music-promo.mukai-music-promo--subscription {
+  min-height: 204px;
+}
+
+.community-pro-card .mukai-music-promo--subscription .mukai-music-promo-content {
+  min-height: 204px;
+  padding: 20px 16px 17px;
+}
+
+.community-pro-card .mukai-music-promo--subscription .mukai-music-promo-content > .mukai-music-crown {
+  width: 40px;
+  height: 40px;
+}
+
+.community-pro-card .mukai-music-promo--subscription .mukai-music-title {
+  width: auto;
+  font-size: 21px;
+  line-height: 26px;
+}
+
+.community-pro-card .mukai-music-promo--subscription .mukai-music-description {
+  width: min(240px, 100%);
+  height: auto;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.community-pro-card .mukai-music-promo--subscription .mukai-music-promo-content > .mukai-music-subscribe {
+  width: 134px;
+  min-height: 36px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.community-store-card {
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1040 / 853;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #070d27;
+  color: #fff;
+  box-shadow: inset 0 0 4px 4px rgb(0 0 0 / 14%);
+  text-decoration: none;
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.community-store-card__image {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 300ms ease;
+}
+
+.community-store-card::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0%) 22%, rgb(0 0 0 / 20%) 46%, #000 100%);
+  box-shadow: inset 0 0 4px 4px rgb(0 0 0 / 14%);
+  content: '';
+  pointer-events: none;
+}
+
+.community-store-card__arrow {
+  position: absolute;
+  top: 24px;
+  right: 23px;
+  color: #fff;
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 45%));
+  transition: transform 160ms ease;
+}
+
+.community-store-card__copy {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  left: 20px;
+}
+
+.community-store-card__title {
+  margin: 0 0 9px;
+  color: #fff;
+  font: 400 23px/32px Nosifer, fantasy;
+  font-size: clamp(18px, 8.3cqw, 23px);
+  white-space: nowrap;
+}
+
+.community-store-card__description {
+  margin: 0;
+  color: rgb(255 255 255 / 80%);
+  font: 400 12px/16px Montserrat, sans-serif;
+}
+
+.community-store-card:hover .community-store-card__arrow {
+  transform: translate(2px, -2px);
+}
+
+@media (hover: hover) {
+  .community-store-card:hover {
+    transform: scale(1.015);
+    box-shadow: 0 8px 22px rgb(0 0 0 / 22%);
+  }
+
+  .community-store-card:hover .community-store-card__image {
+    transform: scale(1.07);
+  }
+}
+
+.community-store-card:focus-visible {
+  outline: 3px solid #ff008c;
+  outline-offset: 4px;
+}
+
+@media (max-width: 767px) {
+  .community-store-card__copy {
+    right: 28px;
+    bottom: 18px;
+    left: 28px;
+  }
+
+  .community-store-card__description {
+    font-size: 14px;
+    line-height: 18px;
+  }
+}
+
+@media (max-width: 374px) {
+  .community-store-card__copy {
+    right: 20px;
+    left: 20px;
+  }
+
+  .community-store-card__title {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .community-store-card,
+  .community-store-card__image,
+  .community-store-card__arrow {
+    transition: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .community-sidebar .community-store-card { border-radius: 20px; }
+}

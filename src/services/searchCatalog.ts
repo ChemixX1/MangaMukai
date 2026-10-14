@@ -5,24 +5,35 @@ import { getPopularMenByViews, getPopularWomenByViews, getUltimosCapitulos } fro
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let cached: { items: MangaCapitulo[]; expiresAt: number } | null = null;
 let pending: Promise<MangaCapitulo[]> | null = null;
+const listeners = new Set<(items: MangaCapitulo[]) => void>();
+
+export const subscribeSearchCatalog = (listener: (items: MangaCapitulo[]) => void) => {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+};
 
 export const getCachedSearchCatalog = () =>
   cached && cached.expiresAt > Date.now() ? cached.items : null;
 
-/** La precarga y el buscador comparten datos enriquecidos y la petición en curso. */
+/** El catálogo se muestra primero; los rankings actualizan sus vistas en segundo plano. */
 export const loadSearchCatalog = (): Promise<MangaCapitulo[]> => {
   const items = getCachedSearchCatalog();
   if (items) return Promise.resolve(items);
   if (pending) return pending;
-  pending = Promise.all([
-    getUltimosCapitulos(),
-    getPopularWomenByViews('historical', false),
-    getPopularMenByViews('historical', false),
-  ]).then(([catalog, women, men]) => {
-    const result = withKnownViews(catalog, buildViewsIndex(women, men));
-    // Un fallo de red no se conserva como catálogo vacío durante cinco minutos.
-    if (result.length) cached = { items: result, expiresAt: Date.now() + CACHE_TTL_MS };
-    return result;
+  pending = getUltimosCapitulos().then((catalog) => {
+    if (!catalog.length) return catalog;
+    const entry = { items: catalog, expiresAt: Date.now() + CACHE_TTL_MS };
+    cached = entry;
+    listeners.forEach(listener => listener(catalog));
+    void Promise.allSettled([
+      getPopularWomenByViews('historical', false),
+      getPopularMenByViews('historical', false),
+    ]).then((rankings) => {
+      if (cached !== entry) return;
+      entry.items = withKnownViews(catalog, buildViewsIndex(...rankings.map(result => result.status === 'fulfilled' ? result.value : [])));
+      listeners.forEach(listener => listener(entry.items));
+    });
+    return catalog;
   }).finally(() => { pending = null; });
   return pending;
 };

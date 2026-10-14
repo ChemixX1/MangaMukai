@@ -33,7 +33,7 @@ export const MobileReactions = ({ counts, selected, error, onReact }: {
   );
 
   return (
-    <section aria-label="Reacciones" className="ml-[6.8182%] w-[87.2727%]">
+    <section aria-label="Reacciones" className="manga-mobile-reactions">
       <ReactionRingGradient />
       <div className="rounded-[20px] border-[0.5px] border-zinc-400/60 px-[18px] py-[17px] max-[400px]:px-3">
         {error && <p role="alert" className="mb-3 text-center font-montserrat text-[11px] text-red-400">{error}</p>}

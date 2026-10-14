@@ -1,11 +1,11 @@
-import { ShoppingCart, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SEARCH_FILTERS, setSearchFilter, setSearchTerm } from '../../hooks/useSearchTerm';
 import { SearchGlyph } from '../common';
 import type { NavbarViewProps } from './useNavbarState';
 
 export function NavbarM({ model }: NavbarViewProps) {
-  const { isProfileRoute, isHeaderHidden, isSearchMode, isStoreMode, headerUsesDarkText, searchTerm, searchFilter, hideHeaderOnMobile, cartCount, searchInputRef, searchGlyphRef, openSearch, openCart, closeSearch, renderMobileBell, handleLogoClick } = model;
+  const { isProfileRoute, isHeaderHidden, isSearchMode, headerUsesDarkText, searchTerm, searchFilter, hideHeaderOnMobile, searchInputRef, searchGlyphRef, openSearch, closeSearch, renderMobileBell, handleLogoClick } = model;
   return (<header
         className={`${isProfileRoute ? 'sticky' : 'fixed'} site-navbar-surface left-0 top-0 z-[100] w-full ${isSearchMode ? 'py-2.5' : 'site-navbar-mobile h-14'} transition-transform duration-300 lg:py-3 ${hideHeaderOnMobile ? 'hidden lg:block' : ''} ${isSearchMode ? 'pb-0' : ''}`}
         style={{ transform: isHeaderHidden && !isSearchMode ? 'translateY(-100%)' : 'translateY(0)' }}
@@ -14,10 +14,10 @@ export function NavbarM({ model }: NavbarViewProps) {
         <div className={`max-w-[1400px] mx-auto ${isSearchMode ? 'px-4' : 'h-full px-6'} sm:px-8 lg:!max-w-[1366px] lg:px-6 xl:px-16 items-center ${isSearchMode ? 'flex justify-between' : 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]'}`}>
           {isSearchMode ? (
             <div className="w-full">
-              <div className="flex h-12 w-full items-center gap-2">
+              <div className="flex h-14 w-full items-center gap-2">
                 {/* Píldora: la lupa (que llega volando desde la derecha) y el campo hasta justo antes de la X.
                     El fondo va en ::before para que su fundido no arrastre a la lupa. */}
-                <div className={`navbar-search-pill relative flex h-12 min-w-0 flex-1 items-center gap-2 pl-3 pr-1.5 before:absolute before:inset-0 before:rounded before:border before:content-[''] ${headerUsesDarkText ? 'text-black before:border-black/[0.06] before:bg-[#f2f2f4]' : 'text-white before:border-white/10 before:bg-white/10'}`}>
+                <div className={`navbar-search-pill relative flex h-14 min-w-0 flex-1 items-center gap-2 pl-3 pr-1.5 before:absolute before:inset-0 before:rounded before:border before:content-[''] ${headerUsesDarkText ? 'text-black before:border-black/[0.06] before:bg-[#f2f2f4]' : 'text-white before:border-white/10 before:bg-white/10'}`}>
                   <span ref={searchGlyphRef} className="relative flex shrink-0 items-center">
                     <SearchGlyph size={24} />
                   </span>
@@ -90,27 +90,13 @@ export function NavbarM({ model }: NavbarViewProps) {
             </Link>
 
             {/* 3. DERECHA */}
-            <div className="col-start-3 flex items-center justify-self-end gap-0 sm:gap-1 lg:gap-4 lg:translate-y-0.5 xl:gap-6">
+            <div className={`flex col-start-3 items-center justify-self-end gap-0 sm:gap-1 lg:gap-4 lg:translate-y-0.5 xl:gap-6`}>
 
                 <div className="contents">
                 {/* Herramientas: la alarma móvil está en el menú principal. */}
-                <div className={`relative hidden items-center gap-0 min-[360px]:flex lg:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} lg:border-r lg:mr-1 lg:pr-6`}>
+                <div className={`relative flex items-center gap-0 lg:gap-2 ${headerUsesDarkText ? 'border-zinc-200' : 'border-white/10'} lg:border-r lg:mr-1 lg:pr-6`}>
 
-                    {isStoreMode ? (
-                    /* Tienda móvil: en el sitio de la lupa va el carrito, que abre su ventana lateral hasta el centro de la página. */
-                    <button
-                        type="button"
-                        onClick={openCart}
-                        aria-label={cartCount > 0 ? `Abrir carrito, ${cartCount} ${cartCount === 1 ? 'producto' : 'productos'}` : 'Abrir carrito'}
-                        title="Carrito"
-                        className={`${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'} relative -mr-2 rounded-full p-2 transition-colors`}
-                    >
-                        <ShoppingCart size={26} strokeWidth={2.25} />
-                        {/* Globo rosa en la esquina con cuántos productos hay seleccionados. */}
-                        {cartCount > 0 && <span aria-hidden="true" className={`absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff4a7d] px-1 font-[Montserrat] text-[9px] font-bold leading-none text-white ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`}>{cartCount > 9 ? '9+' : cartCount}</span>}
-                    </button>
-                    ) : (
-                    /* El buscador vive en la Biblioteca: la lupa abre su ventana (y en móvil, en /biblioteca, vuela a la píldora). */
+                    {/* La lupa abre el buscador también en Comunidad y Tienda. */}
                     <button
                         onClick={openSearch}
                         aria-label="Buscar mangas"
@@ -119,7 +105,6 @@ export function NavbarM({ model }: NavbarViewProps) {
                     >
                         <span ref={searchGlyphRef} className="flex items-center"><SearchGlyph size={25.2} /></span>
                     </button>
-                    )}
                 </div>
 
                 </div>

@@ -1,7 +1,7 @@
 /* navigation: estilos compartidos entre tamaños de pantalla. */
 
 @media (max-width: 1023px) {
-  .mobile-tabbar-space:not(:has(.reader-page, .conversation-page, .character-intro-page)) {
+  .mobile-tabbar-space:not(:has(.reader-page, .conversation-page, .character-intro-page, .profile-page)) {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
+import { ChapterNewBadge, ChapterCommentedIcon } from './ChapterStateIcons';
+import { isRecentChapter } from '../../utils/chapterFreshness';
 import { PurchaseModal } from '../modals';
 import { getChapterPreviewImage, type SeriesChapter } from '../../services/mangaService';
-import { getChapterEngagement, setEntityReaction } from '../../services/communityService';
+import { getChapterEngagement, getMangaComments, setEntityReaction } from '../../services/communityService';
 import { buyChapter, getStoredToken } from '../../services/authService';
 import {
   ChapterCommentIcon,
-  ChapterLikeHeartIcon,
   CoinStackIcon,
   LikeHeartIcon,
   PurchasedIcon,
@@ -50,8 +51,7 @@ const formatUnlockTime = (remainingMilliseconds: number): string => {
 
 /**
  * Cuenta atrás de los capítulos de pago que se liberan solos: "¡Gratis En!" y el
- * tiempo que falta se turnan junto al precio. Solo se ve en escritorio, donde la
- * fila tiene sitio; en móvil sigue contando para desbloquear el capítulo a tiempo.
+ * tiempo que falta se turnan junto al precio y desbloquean el capítulo a tiempo.
  */
 function FreeCountdown({ chapterId, targetDate, onExpire }: {
   chapterId: number;
@@ -87,17 +87,17 @@ function FreeCountdown({ chapterId, targetDate, onExpire }: {
     if (hasExpired) onExpire(chapterId);
   }, [chapterId, hasExpired, onExpire]);
 
-  const label = <span className="manga-free-holo">¡Gratis En!</span>;
+  const label = <span>¡Gratis En!</span>;
 
   return (
     <span
       role="timer"
       aria-label={`¡Gratis en! ${countdown}`}
       title={`¡Gratis en! ${countdown}`}
-      className="hidden h-8 min-w-[104px] shrink-0 items-center justify-center overflow-hidden whitespace-nowrap font-montserrat text-xs font-semibold text-ink tabular-nums lg:inline-flex"
+      className="manga-chapter-countdown"
     >
       {reduceMotion ? (
-        <span aria-hidden="true" className="flex items-center gap-1">{label} {countdown}</span>
+        <span aria-hidden="true" className="flex flex-col items-center leading-3">{label} {countdown}</span>
       ) : (
         <span aria-hidden="true" className="relative inline-grid h-5 w-full items-center overflow-hidden">
           <AnimatePresence initial={false} mode="wait">
@@ -217,7 +217,7 @@ function ChapterThumbnail({ chapter }: { chapter: SeriesChapter }) {
   }, [chapter.chapter_number, chapter.id, uploadedCover, useUploadedCover]);
 
   return (
-    <span className="h-[76px] w-[87px] shrink-0 overflow-hidden rounded-lg border border-ink bg-ink/10 max-[400px]:w-16">
+    <span className="manga-chapter-thumbnail">
       {imageUrl && (
         <img
           src={imageUrl}
@@ -245,7 +245,8 @@ function ChapterThumbnail({ chapter }: { chapter: SeriesChapter }) {
  * la derecha, el precio en monedas (o el sello verde si ya es suyo), los
  * comentarios y los me gusta.
  */
-export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, sortOrder = 'desc', loading = false, loadError = '' }: {
+export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, sortOrder = 'desc', loading = false, loadError = '' }: {
+  mangaId: string;
   loading?: boolean;
   loadError?: string;
   chapters: SeriesChapter[];
@@ -265,6 +266,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [chapterLikes, setChapterLikes] = useState<Record<string, number>>({});
   const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(new Set());
+  const [commentedIds, setCommentedIds] = useState<Set<string>>(new Set());
   const [likeBusy, setLikeBusy] = useState(false);
 
   const chapterIds = chapters.map((chapter) => String(chapter.id)).join(',');
@@ -283,7 +285,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
     window.addEventListener('focus', load);
     window.addEventListener('mm_chapter_comments_changed', load);
     return () => { active = false; window.removeEventListener('focus', load); window.removeEventListener('mm_chapter_comments_changed', load); };
-  }, [chapterIds]);
+  }, [chapterIds, userInfo.id]);
 
   const returnTo = () => `${window.location.pathname}${window.location.search}`;
   const goToLogin = () => navigate('/auth/login', { state: { returnTo: returnTo() } });
@@ -354,6 +356,27 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
   });
   const visible = showAll ? ordered : ordered.slice(0, VISIBLE_CHAPTERS);
 
+  const visibleCommentIds = visible.filter(chapter => (commentCounts[String(chapter.id)] || 0) > 0).map(chapter => String(chapter.id)).join(',');
+  useEffect(() => {
+    const controller = new AbortController();
+    setCommentedIds(new Set());
+    if (!userInfo.id || !visibleCommentIds) return () => controller.abort();
+    const load = async () => {
+      const ids = visibleCommentIds.split(',');
+      const mine = new Set<string>();
+      // Comprobar autoría real, sin confundir comentarios de otros con los propios.
+      for (let start = 0; start < ids.length && !controller.signal.aborted; start += 6) {
+        await Promise.all(ids.slice(start, start + 6).map(async id => {
+          const comments = await getMangaComments(mangaId, id, controller.signal);
+          if (comments.some(comment => String(comment.user_id) === String(userInfo.id))) mine.add(id);
+        }));
+        if (!controller.signal.aborted) setCommentedIds(new Set(mine));
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [mangaId, userInfo.id, visibleCommentIds, commentCounts]);
+
   if (loading) return <div role="status" aria-label="Cargando capítulos" className="space-y-2"><span className="sr-only">Cargando capítulos…</span>{Array.from({ length: VISIBLE_CHAPTERS }, (_, i) => <div key={i} aria-hidden="true" className="h-20 rounded-lg bg-ink/5 animate-pulse motion-reduce:animate-none" />)}</div>;
   if (loadError) return <p role="alert" className="py-14 text-center text-sm text-red-500">{loadError}</p>;
   if (chapters.length === 0) {
@@ -362,7 +385,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
 
   return (
     <>
-      <ul className="flex flex-col gap-1.5">
+      <ul className="manga-chapter-list">
         {visible.map((chapter) => {
           const id = String(chapter.id);
           const locked = isLocked(chapter);
@@ -371,27 +394,27 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
           const freesLater = locked && Boolean(chapter.free_at) && new Date(chapter.free_at as string) > new Date();
           return (
             <li key={id}>
-              <div className="flex h-24 items-center gap-2 rounded-lg border border-zinc-400/25 pl-[5px] pr-2.5 transition-colors max-[400px]:gap-[5px] max-[400px]:pr-[5px] lg:gap-3 lg:pr-4 lg:hover:border-mukai-magenta/60">
-                <button type="button" onClick={() => openChapter(chapter)} className="flex min-w-0 flex-1 items-center gap-2 text-left max-[400px]:gap-1.5 lg:gap-3" aria-label={`Leer capítulo ${chapter.chapter_number}`}>
+              <div className="manga-chapter-row">
+                <button type="button" onClick={() => openChapter(chapter)} className="manga-chapter-open" aria-label={`Leer capítulo ${chapter.chapter_number}`}>
                   <ChapterThumbnail chapter={chapter} />
-                  <span className="flex min-w-0 flex-col gap-2">
-                    <span className="truncate font-montserrat text-xs font-semibold leading-3 text-ink lg:text-sm lg:leading-4">Capítulo {chapter.chapter_number}</span>
-                    <span className="truncate font-montserrat text-xs font-light leading-3 text-ink/80 lg:leading-4">{formatChapterAge(chapter.created_at)}</span>
+                  <span className="manga-chapter-info">
+                    <span className="manga-chapter-title">Capítulo {chapter.chapter_number}</span>
+                    <span className="manga-chapter-age">{isRecentChapter(chapter.created_at) ? <ChapterNewBadge /> : formatChapterAge(chapter.created_at)}</span>
                   </span>
                 </button>
 
-                <span className="flex shrink-0 items-center gap-2 max-[400px]:gap-[5px] max-[400px]:[&_:is(button,span)]:gap-0.5 max-[400px]:[&_:is(button,span)]:text-xs max-[400px]:[&_svg]:w-4 lg:gap-3">
+                <span className="manga-chapter-stats">
                   {freesLater && <FreeCountdown chapterId={chapter.id} targetDate={chapter.free_at as string} onExpire={handleTimedUnlock} />}
 
                   {/* Precio mientras esté bloqueado; si lo compró, el sello verde. */}
                   {locked ? (
-                    <span title={`${chapter.price_coins} monedas`} className="flex items-center gap-1 font-anta text-sm font-normal text-mukai-orange">
+                    <span title={`${chapter.price_coins} monedas`} className="manga-chapter-price">
                       <CoinStackIcon size={20} />
                       {chapter.price_coins}
                     </span>
                   ) : isPurchased(chapter) ? (
-                    <span role="img" aria-label="Comprado" title="Comprado" className="flex text-green-500">
-                      <PurchasedIcon size={30} />
+                    <span role="img" aria-label="Comprado" title="Comprado" className="manga-chapter-purchased">
+                      <PurchasedIcon size={21} /><span>Comprado</span>
                     </span>
                   ) : null}
 
@@ -400,15 +423,15 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
                     onClick={() => navigate(`/read/${chapter.id}#comentarios`)}
                     aria-label={`${comments} comentarios del capítulo ${chapter.chapter_number}`}
                     title="Comentarios"
-                    className="flex items-center gap-1 font-anta text-base font-normal text-ink"
+                    className="flex items-center gap-1 font-montserrat text-base font-normal text-ink"
                   >
-                    <ChapterCommentIcon size={20} className={comments ? 'text-mukai-magenta' : 'text-ink'} />
-                    <span className={comments ? 'text-mukai-magenta' : ''}>{comments}</span>
+                    <span className="manga-chapter-comment-icon">{commentedIds.has(id) ? <ChapterCommentedIcon size={19} /> : <ChapterCommentIcon size={19} className="text-ink" />}</span>
+                    <span className={commentedIds.has(id) ? 'manga-commented-count' : ''}>{comments}</span>
                   </button>
 
-                  <button type="button" onClick={() => void toggleLike(chapter.id)} disabled={likeBusy} aria-label={liked ? 'Quitar me gusta' : 'Me gusta'} aria-pressed={liked} className="flex items-center gap-1 font-anta text-base font-normal text-ink disabled:opacity-60">
-                    {liked ? <ChapterLikeHeartIcon size={16} /> : <LikeHeartIcon size={18} className="text-ink" />}
-                    <span className={liked ? 'text-mukai-magenta' : ''}>{chapterLikes[id] || 0}</span>
+                  <button type="button" onClick={() => void toggleLike(chapter.id)} disabled={likeBusy} aria-label={liked ? 'Quitar me gusta' : 'Me gusta'} aria-pressed={liked} className="flex items-center gap-1 font-montserrat text-base font-normal text-ink disabled:opacity-60">
+                    <LikeHeartIcon size={26} filled={liked} className="text-ink" />
+                    <span className={liked ? 'manga-liked-count' : ''}>{chapterLikes[id] || 0}</span>
                   </button>
                 </span>
               </div>
@@ -421,7 +444,7 @@ export const ChapterList = ({ chapters, purchasedChapterIds, userCoins, userInfo
         <button
           type="button"
           onClick={() => setShowAll((current) => !current)}
-          className="mx-auto mt-2.5 flex h-12 w-48 items-center justify-center gap-2 rounded-[20px] border-[0.5px] border-zinc-400/25 font-montserrat text-sm text-ink/75 transition-colors lg:hover:border-mukai-magenta/60 lg:hover:text-ink"
+          className="manga-show-all"
         >
           {showAll ? 'Mostrar Menos' : 'Mostrar Todos'}
           <ShowAllIcon size={20} className={showAll ? 'rotate-180' : ''} />

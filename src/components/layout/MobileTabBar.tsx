@@ -1,27 +1,6 @@
-import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { isMobileSectionRoute } from '../../utils/mobileSections';
-
-/** La barra se esconde al bajar y reaparece en cuanto se sube (igual que la cabecera). */
-const useHideOnScrollDown = () => {
-  const [hidden, setHidden] = useState(false);
-  useEffect(() => {
-    let lastY = window.scrollY;
-    const onScroll = () => {
-      const currentY = window.scrollY;
-      const delta = currentY - lastY;
-      // Umbral pequeño para que el rebote del scroll no la haga parpadear.
-      if (Math.abs(delta) < 6) return;
-      lastY = currentY;
-      const maxY = document.documentElement.scrollHeight - window.innerHeight;
-      // Al llegar al final (o cerca) siempre a la vista, aunque se haya bajado.
-      setHidden(currentY > 90 && delta > 0 && currentY < maxY - 40);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  return hidden;
-};
+import { useHideOnScrollDown } from '../../hooks/useHideOnScrollDown';
 
 interface IconProps { active: boolean }
 
@@ -92,7 +71,7 @@ export const MobileTabBar = () => {
   const { pathname } = useLocation();
   const hidden = useHideOnScrollDown();
   // El lector, la edición rápida del perfil y la ficha/conversación de un personaje (/chat/:id…) van a pantalla completa, sin barra.
-  if (pathname.startsWith('/read/') || /^\/chat\/.+/.test(pathname) || pathname === '/perfil/editar' || isMobileSectionRoute(pathname)) return null;
+  if (pathname.startsWith('/read/') || pathname.startsWith('/comunidad/publicacion/') || /^\/usuarios\/[^/]+\/publicacion\/[^/]+$/.test(pathname) || /^\/chat\/.+/.test(pathname) || pathname === '/perfil/editar' || isMobileSectionRoute(pathname)) return null;
 
   const labelClass = (active: boolean) => `flex h-full w-full flex-col items-center justify-center gap-1.5 pb-0.5 font-[Montserrat] text-[10px] leading-none transition-colors ${active ? 'font-bold text-black dark:text-white' : 'font-semibold text-[#262626] dark:text-[#e4e4e7]'}`;
 

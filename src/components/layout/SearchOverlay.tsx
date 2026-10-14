@@ -36,8 +36,8 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
         <div ref={centerRef} className="search-center">
       <div className={`search-header sticky top-0 z-10 px-4 pt-[calc(env(safe-area-inset-top)+10px)] sm:px-8 ${isLight ? 'bg-white' : 'bg-black'}`}>
         <div className="search-header-inner mx-auto w-full max-w-lg">
-          <div className="search-input-row flex h-12 w-full items-center gap-2">
-            <div className={`search-input relative flex h-12 min-w-0 flex-1 items-center gap-2 rounded border pl-3 pr-1.5 ${isLight ? 'border-black/[0.06] bg-[#f2f2f4] text-black' : 'border-white/10 bg-white/10 text-white'}`}>
+          <div className="search-input-row flex h-14 w-full items-center gap-2">
+            <div className={`search-input relative flex h-14 min-w-0 flex-1 items-center gap-2 rounded border pl-3 pr-1.5 ${isLight ? 'border-black/[0.06] bg-[#f2f2f4] text-black' : 'border-white/10 bg-white/10 text-white'}`}>
               <span className="flex shrink-0 items-center"><SearchIcon className="search-input-icon" /></span>
               <input
                 ref={inputRef}

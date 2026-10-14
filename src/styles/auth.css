@@ -438,6 +438,10 @@ body:has(.auth-reference) .navbar-primary-link { font-family: 'Anta', sans-serif
   .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding: 114px 24px 70px; }
   .auth-reference .auth-form-card-register { padding: 0 8px; max-width: 440px; }
 }
+@media (max-width: 639px) {
+  .auth-reference:has(.auth-form-card-login) .auth-form-shell { padding-top: 126px; }
+  .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding-top: 104px; }
+}
 
 .auth-reference .auth-fields-panel svg { width: 24px; height: 24px; flex-shrink: 0; }
 .auth-reference .auth-fields-panel button[aria-haspopup='listbox'] > svg:last-child { width: 14px; height: 14px; }

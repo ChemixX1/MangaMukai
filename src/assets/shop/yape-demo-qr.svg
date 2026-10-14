@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 164 164" role="img" aria-label="Muestra no válida para pagos">
+  <rect width="164" height="164" rx="12" fill="#fff"/>
+  <g fill="none" stroke="#26336c" stroke-width="6">
+    <rect x="14" y="14" width="40" height="40" rx="3"/>
+    <rect x="110" y="14" width="40" height="40" rx="3"/>
+    <rect x="14" y="110" width="40" height="40" rx="3"/>
+  </g>
+  <g fill="#26336c">
+    <rect x="26" y="26" width="16" height="16"/>
+    <rect x="122" y="26" width="16" height="16"/>
+    <rect x="26" y="122" width="16" height="16"/>
+    <path d="M68 17h8v18h12v9H68zm31 2h8v23h-8zM69 54h31v8H81v12H69zm45 13h11v17h-11zM137 67h12v8h-12zM66 96h11v13H66zm21 0h9v18h-9zm13 23h12v11h-12zm30-16h18v9h-9v16h-9zm-56 28h14v13H74zm44 9h27v8h-27z"/>
+  </g>
+  <rect x="9" y="65" width="146" height="34" rx="6" fill="#6a27c9"/>
+  <text x="82" y="87" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="16" font-weight="700">SOLO DEMO</text>
+</svg>

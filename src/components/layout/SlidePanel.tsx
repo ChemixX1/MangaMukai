@@ -11,11 +11,12 @@ const CLOSE_DURATION = 420;
  * dentro se navega a otra página, se cierra sola. El contenido solo se monta
  * mientras está abierta (o saliendo), para no dejarlo vivo.
  */
-export const SlidePanel = ({ open, from, size = 'full', scrollable = true, isLight, label, onClose, children }: {
+export const SlidePanel = ({ open, from, size = 'full', scrollable = true, blurBackdrop = false, isLight, label, onClose, children }: {
   open: boolean;
   from: 'left' | 'right';
-  size?: 'full' | 'half';
+  size?: 'full' | 'half' | 'wide';
   scrollable?: boolean;
+  blurBackdrop?: boolean;
   isLight: boolean;
   label: string;
   onClose: () => void;
@@ -50,14 +51,13 @@ export const SlidePanel = ({ open, from, size = 'full', scrollable = true, isLig
 
   const hidden = from === 'left' ? '-translate-x-full' : 'translate-x-full';
   const shadow = from === 'left' ? 'shadow-[16px_0_40px_rgba(0,0,0,0.25)]' : 'shadow-[-16px_0_40px_rgba(0,0,0,0.25)]';
-  // A media pantalla se pega al lado por el que entra y llega justo al centro.
-  const frame = size === 'half' ? `inset-y-0 w-1/2 ${from === 'left' ? 'left-0' : 'right-0'}` : 'inset-0';
+  const frame = size === 'full' ? 'inset-0' : `inset-y-0 ${size === 'wide' ? 'w-[62vw]' : 'w-[50vw]'} ${from === 'left' ? 'left-0' : 'right-0'}`;
 
   return (
     <>
       {/* Fondo atenuado, como el panel de opciones de "Más": da profundidad y suaviza la entrada.
           En la ventana a media pantalla es la parte visible de la página: tocarla cierra. */}
-      <div aria-hidden="true" onClick={onClose} className={`fixed inset-0 z-[119] bg-black/40 transition-opacity duration-[400ms] ${open ? 'opacity-100' : 'pointer-events-none opacity-0'}`} />
+      <div aria-hidden="true" onClick={onClose} className={`fixed inset-0 z-[119] bg-black/40 transition-[opacity,backdrop-filter] duration-[400ms] ${open ? `opacity-100 ${blurBackdrop ? 'backdrop-blur-[5px]' : ''}` : 'pointer-events-none opacity-0 backdrop-blur-none'}`} />
       <div
         role="dialog"
         aria-modal="true"
