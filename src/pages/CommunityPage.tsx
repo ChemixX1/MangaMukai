@@ -6,6 +6,7 @@ import { communityImage, communitySeeds, formatCount, handleOf, suggestedReaders
 import { CommunityIcon } from '../components/community/CommunityIcons';
 import { CommunityProCard, CommunityStoreCard } from '../components/community/CommunityPromotions';
 import { CommunityMangaPicker } from '../components/community/CommunityMangaPicker';
+import PulseHeart from '../components/common/PulseHeart';
 import { useHideOnScrollDown } from '../hooks/useHideOnScrollDown';
 import { openSubscriptionModal } from '../utils/subscriptionModal';
 import '../styles/community.css';
@@ -241,7 +242,27 @@ function MangaAttachment({ manga }: { manga: CommunityMangaTag }) {
 function PostActions({ post, onUpdate, onComment, onShare, detail = false }: { post: CommunityPost; onUpdate: (post: CommunityPost) => boolean; onComment: () => void; onShare: (post: CommunityPost) => void; detail?: boolean }) {
   return <div className="community-post-actions">
     <button type="button" className="community-action" onClick={onComment} aria-label="Comentar"><CommunityIcon name="comment" size={24} /><span>{formatCount(post.comments.length)}</span></button>
-    <button type="button" className={`community-action${post.liked ? ' is-active' : ''}`} aria-pressed={!!post.liked} aria-label="Me gusta" onClick={() => onUpdate({ ...post, liked: !post.liked, likes: Math.max(0, post.likes + (post.liked ? -1 : 1)) })}><CommunityIcon name="like" size={18} /><span>{formatCount(post.likes)}</span></button>
+    <PulseHeart
+      liked={!!post.liked}
+      count={post.likes}
+      onChange={(liked, count) => onUpdate({ ...post, liked, likes: Math.max(0, count) })}
+      showCount
+      icon="heart"
+      idleOutline
+      size={22}
+      corner={32}
+      likedColor="var(--community-accent)"
+      idleColor="var(--community-muted)"
+      pillColor="var(--community-soft)"
+      textColor="var(--community-ink)"
+      duration={560}
+      dotSize={0.3}
+      overshoot={1.7}
+      beat={3}
+      rollDuration={350}
+      label="Me gusta"
+      className="community-pulse-like"
+    />
     {!detail && <span className="community-views" aria-label={`${post.views || 0} visualizaciones`}><CommunityIcon name="views" size={18} />{formatCount(post.views || 0)}</span>}
     <span className="community-action-spacer" />
     <button type="button" className={`community-action${post.saved ? ' is-active' : ''}`} aria-label="Guardar" aria-pressed={!!post.saved} onClick={() => onUpdate({ ...post, saved: !post.saved })}><CommunityIcon name="bookmark" size={26} />{detail && <span>{post.saved ? 1 : 0}</span>}</button>

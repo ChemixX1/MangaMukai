@@ -331,7 +331,13 @@ export const getMangaById = async (id: number | string): Promise<MangaCapitulo |
      
     const item: any = await res.json();
     if (!item.success) return null;
-    return mapearMangaCatalog(item);
+    return {
+      ...mapearMangaCatalog(item),
+      // El detalle puede omitir estos campos; la cifra de vistas se completa
+      // desde /catalog, donde el servidor sí la publica.
+      tipo: typeof item.tipo === 'string' ? item.tipo.trim() : '',
+      totalViews: typeof item.totalViews === 'number' ? item.totalViews : undefined,
+    };
   } catch (error) {
     console.error('Error getMangaById:', error);
     return null;

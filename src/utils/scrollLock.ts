@@ -9,7 +9,9 @@ export const lockPageScroll = () => {
   }
 
   activeScrollLocks += 1;
-  document.body.style.overflow = 'hidden';
+  // Clip without creating a body scroll container: sticky columns must keep
+  // tracking the viewport while the root owns the modal's scroll lock.
+  document.body.style.overflow = 'clip';
   document.documentElement.style.overflow = 'hidden';
 
   let released = false;

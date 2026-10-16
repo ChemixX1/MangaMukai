@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 export type ThemeMode = "light" | "dark";
 
@@ -25,42 +25,54 @@ function applyTheme(theme: ThemeMode) {
  * suspenden las transiciones CSS (`.theme-switching`) para no animar cientos de
  * `transition-colors` a la vez, que era lo que hacía sentir pesado el cambio.
  */
+let themeChangeVersion = 0;
+
 function applyThemeInstantly(theme: ThemeMode) {
+  const version = ++themeChangeVersion;
   const root = document.documentElement;
   root.classList.add("theme-switching");
   applyTheme(theme);
-  const release = () => root.classList.remove("theme-switching");
+  const release = () => {
+    if (version === themeChangeVersion) root.classList.remove("theme-switching");
+  };
   window.requestAnimationFrame(() => window.requestAnimationFrame(release));
   // rAF no corre con la pestaña en segundo plano; el temporizador garantiza la salida.
   window.setTimeout(release, 160);
 }
 
+function subscribeTheme(onChange: () => void) {
+  const syncStorage = (event: StorageEvent) => {
+    if (event.key !== STORAGE_KEY && event.key !== null) return;
+    applyThemeInstantly(readTheme());
+    onChange();
+  };
+  window.addEventListener(THEME_CHANGED_EVENT, onChange);
+  window.addEventListener("storage", syncStorage);
+  return () => {
+    window.removeEventListener(THEME_CHANGED_EVENT, onChange);
+    window.removeEventListener("storage", syncStorage);
+  };
+}
+
+function setThemeMode(nextTheme: ThemeMode) {
+  localStorage.setItem(STORAGE_KEY, nextTheme);
+  applyThemeInstantly(nextTheme);
+  window.dispatchEvent(new CustomEvent<ThemeMode>(THEME_CHANGED_EVENT, { detail: nextTheme }));
+}
+
+function toggleTheme() {
+  // Leer el estado actual evita reutilizar el tema de un render anterior.
+  setThemeMode(readTheme() === "light" ? "dark" : "light");
+}
+
+const serverTheme = (): ThemeMode => "light";
+
 export const useTheme = () => {
-  const [theme, setTheme] = useState<ThemeMode>(readTheme);
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, serverTheme);
 
   useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const syncTheme = (event: Event) => {
-      const nextTheme = (event as CustomEvent<ThemeMode>).detail;
-      setTheme(nextTheme || readTheme());
-    };
-
-    window.addEventListener(THEME_CHANGED_EVENT, syncTheme);
-    return () => window.removeEventListener(THEME_CHANGED_EVENT, syncTheme);
+    applyTheme(readTheme());
   }, []);
-
-  const setThemeMode = useCallback((nextTheme: ThemeMode) => {
-    localStorage.setItem(STORAGE_KEY, nextTheme);
-    applyThemeInstantly(nextTheme);
-    window.dispatchEvent(new CustomEvent<ThemeMode>(THEME_CHANGED_EVENT, { detail: nextTheme }));
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setThemeMode(theme === "light" ? "dark" : "light");
-  }, [setThemeMode, theme]);
 
   return { theme, setTheme: setThemeMode, toggleTheme };
 };

@@ -1,3 +1,5 @@
+import { GooeySelector } from './GooeySelector';
+
 interface PillTabsProps<T extends string> {
   options: readonly T[];
   value: T;
@@ -12,7 +14,8 @@ interface PillTabsProps<T extends string> {
  * redondeado y la opción elegida rellena con la tinta del tema.
  */
 export const PillTabs = <T extends string>({ options, value, onChange, label, className = '' }: PillTabsProps<T>) => (
-  <div role="tablist" aria-label={label} className={`flex h-11 items-center rounded-3xl border border-[color:var(--mm-tab-line)] p-px ${className}`}>
+  <div role="tablist" aria-label={label} className={`relative isolate flex h-11 items-center rounded-3xl border border-[color:var(--mm-tab-line)] p-px ${className}`}>
+    <GooeySelector activeIndex={options.indexOf(value)} itemCount={options.length} />
     {options.map((option) => {
       const active = option === value;
       return (
@@ -22,7 +25,7 @@ export const PillTabs = <T extends string>({ options, value, onChange, label, cl
           role="tab"
           aria-selected={active}
           onClick={() => onChange(option)}
-          className={`h-10 flex-1 rounded-3xl px-2 font-montserrat text-xs uppercase leading-3 transition-colors ${active ? 'bg-ink font-black text-surface' : 'font-bold text-ink'}`}
+          className={`relative z-[1] h-10 flex-1 rounded-3xl px-2 font-montserrat text-xs uppercase leading-3 transition-colors ${active ? 'font-black text-surface' : 'font-bold text-ink'}`}
         >
           {option}
         </button>

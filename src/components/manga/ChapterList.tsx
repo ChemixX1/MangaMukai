@@ -5,13 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import { ChapterNewBadge, ChapterCommentedIcon } from './ChapterStateIcons';
 import { isRecentChapter } from '../../utils/chapterFreshness';
 import { PurchaseModal } from '../modals';
+import PulseHeart from '../common/PulseHeart';
+import { readGuestChapterLike, setGuestChapterLike } from '../../utils/guestChapterLikes';
 import { getChapterPreviewImage, type SeriesChapter } from '../../services/mangaService';
 import { getChapterEngagement, getMangaComments, setEntityReaction } from '../../services/communityService';
 import { buyChapter, getStoredToken } from '../../services/authService';
 import {
   ChapterCommentIcon,
   CoinStackIcon,
-  LikeHeartIcon,
   PurchasedIcon,
   ShowAllIcon,
 } from './designIcons';
@@ -277,8 +278,9 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
       void getChapterEngagement(chapterIds.split(',')).then(({ counts, engagement }) => {
         if (!active) return;
         setCommentCounts(counts);
-        setChapterLikes(Object.fromEntries(Object.entries(engagement).map(([id, state]) => [id, state.reactions.like || 0])));
-        setLikedChapterIds(new Set(Object.entries(engagement).filter(([, state]) => state.my_reaction === 'like').map(([id]) => id)));
+        const guest = !getStoredToken();
+        setChapterLikes(Object.fromEntries(chapterIds.split(',').map(id => [id, (engagement[id]?.reactions.like || 0) + Number(guest && readGuestChapterLike(id))])));
+        setLikedChapterIds(new Set(chapterIds.split(',').filter(id => guest ? readGuestChapterLike(id) : engagement[id]?.my_reaction === 'like')));
       }).catch(() => undefined);
     };
     load();
@@ -312,8 +314,20 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
 
   const toggleLike = async (chapterId: number) => {
     if (likeBusy) return;
-    if (!getStoredToken()) { goToLogin(); return; }
     const id = String(chapterId);
+    if (!getStoredToken()) {
+      const liked = likedChapterIds.has(id);
+      try {
+        setGuestChapterLike(id, !liked);
+        setChapterLikes(current => ({ ...current, [id]: Math.max(0, (current[id] || 0) + (liked ? -1 : 1)) }));
+        setLikedChapterIds(current => {
+          const next = new Set(current);
+          if (liked) next.delete(id); else next.add(id);
+          return next;
+        });
+      } catch { /* El almacenamiento bloqueado no confirma un like que no se guardó. */ }
+      return;
+    }
     setLikeBusy(true);
     try {
       const result = await setEntityReaction('chapter', id, likedChapterIds.has(id) ? '' : 'like');
@@ -429,10 +443,25 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
                     <span className={commentedIds.has(id) ? 'manga-commented-count' : ''}>{comments}</span>
                   </button>
 
-                  <button type="button" onClick={() => void toggleLike(chapter.id)} disabled={likeBusy} aria-label={liked ? 'Quitar me gusta' : 'Me gusta'} aria-pressed={liked} className="flex items-center gap-1 font-montserrat text-base font-normal text-ink disabled:opacity-60">
-                    <LikeHeartIcon size={26} filled={liked} className="text-ink" />
-                    <span className={liked ? 'manga-liked-count' : ''}>{chapterLikes[id] || 0}</span>
-                  </button>
+                  <PulseHeart
+                    bare
+                    liked={liked}
+                    count={chapterLikes[id] || 0}
+                    onChange={() => { void toggleLike(chapter.id); }}
+                    disabled={likeBusy}
+                    label={liked ? 'Quitar me gusta' : 'Me gusta'}
+                    className="manga-chapter-like font-montserrat"
+                    size={19}
+                    icon="heart"
+                    idleOutline
+                    idleColor="rgb(var(--mm-ink))"
+                    likedColor="#ff008c"
+                    textColor={liked ? '#ff008c' : 'rgb(var(--mm-ink))'}
+                    duration={560}
+                    dotSize={0.3}
+                    overshoot={1.7}
+                    beat={0}
+                  />
                 </span>
               </div>
             </li>

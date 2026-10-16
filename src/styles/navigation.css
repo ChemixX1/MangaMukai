@@ -165,6 +165,19 @@
   backdrop-filter: blur(18px) saturate(1.25);
 }
 
+.site-navbar-desktop[data-manga-detail] {
+  transition: transform 480ms cubic-bezier(.22, 1, .36, 1), opacity 320ms ease;
+  will-change: transform;
+}
+.site-navbar-desktop[data-manga-detail][data-hidden] {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 300ms, 220ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-navbar-desktop[data-manga-detail] { transition: none; }
+}
+
 html.dark .site-navbar-surface {
   border-bottom-color: rgba(255, 255, 255, 0.1);
   background: #000;

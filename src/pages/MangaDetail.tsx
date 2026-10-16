@@ -1,6 +1,9 @@
 import { BookmarkIcon } from '../components/ui/icons';
+import { GooeySelector } from '../components/ui/GooeySelector';
+import { createQueuedLike } from '../utils/queuedLike';
+import { readGuestMangaLike } from '../utils/guestMangaLikes';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BookOpen, ChevronDown, Loader2 } from 'lucide-react';
 
@@ -28,8 +31,8 @@ import {
 import type { MangaCapitulo } from '../types/manga';
 import { ChapterList, MangaComments, MangaMusicCard, MangaRecommendations } from '../components/manga';
 import { MobileMangaDetail } from '../components/manga/mobile/MobileMangaDetail';
+import HoloCard from '../components/manga/HoloCard';
 import {
-  LikeHeartIcon,
   PaletteIcon,
   PlatformIcon,
   PublishedIcon,
@@ -45,21 +48,48 @@ import {
 import { MANGA_REACTIONS, ReactionButton, ReactionRingGradient, createReactionCounts, type MangaReactionId } from '../components/manga/reactions';
 import { useIsMobileViewport } from '../hooks/useIsMobileViewport';
 import { MangaDetailClock } from '../components/common';
-import { Footer, FOOTER_SOCIALS } from '../components/layout/Footer';
+import { Footer } from '../components/layout/Footer';
 import { useTheme } from '../hooks/useTheme';
 import { toTitleCase } from '../utils/titleCase';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { collectionBadge } from '../utils/womenBlackWhite';
 import { whenIdle } from '../utils/whenIdle';
 import { MangaCommunityLinks } from '../components/manga/MangaCommunityLinks';
-import { MangaReaderActivity } from '../components/manga/MangaReaderActivity';
+import { MangaSeasonSelector } from '../components/manga/MangaSeasonSelector';
+import { MangaSeriesLikeButton } from '../components/manga/MangaSeriesLikeButton';
 import { MangaRewardProgress } from '../components/manga/MangaRewardProgress';
-import { DetailViewsIcon, DetailNewIcon, DetailXIcon, DetailYoutubeIcon, DetailTelegramIcon, DetailDiscordIcon, DetailInstagramIcon, DetailFacebookIcon } from '../components/manga/referenceIcons';
+import { MangaDetailSocials } from '../components/manga/MangaDetailSocials';
+import { DetailViewsIcon } from '../components/manga/referenceIcons';
 
 const formatCompactNumber = (value: number) => new Intl.NumberFormat('es-PE', {
   notation: value >= 1000 ? 'compact' : 'standard',
   maximumFractionDigits: 1,
 }).format(value);
+
+const guestReactionKey = (mangaId: string | number) => `mm_manga_guest_reaction:${mangaId}`;
+
+const readGuestReaction = (mangaId: string | number): MangaReactionId | null => {
+  try {
+    const stored = window.localStorage.getItem(guestReactionKey(mangaId));
+    return MANGA_REACTIONS.find(({ id }) => id === stored)?.id ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const saveGuestReaction = (mangaId: string | number, reaction: MangaReactionId | null) => {
+  try {
+    if (reaction) window.localStorage.setItem(guestReactionKey(mangaId), reaction);
+    else window.localStorage.removeItem(guestReactionKey(mangaId));
+  } catch {
+    // La selección sigue funcionando durante esta visita si el navegador bloquea el almacenamiento.
+  }
+};
+
+const withGuestReaction = (counts: Record<MangaReactionId, number>, reaction: MangaReactionId | null) => {
+  if (!reaction) return counts;
+  return { ...counts, [reaction]: counts[reaction] + 1 };
+};
 
 const formatDate = (value?: string, fallback = 'N/A') => {
   if (!value) return fallback;
@@ -107,15 +137,6 @@ const BADGE = 'manga-detail-badge';
 
 /** Pestañas Capítulos · Sinopsis · Comentarios: la activa sobre la píldora que se desliza. */
 const tabClass = (active = false) => `manga-detail-tab ${active ? 'is-active' : ''}`;
-const SOCIAL_ICONS = { X: DetailXIcon, Instagram: DetailInstagramIcon, YouTube: DetailYoutubeIcon, Telegram: DetailTelegramIcon, Discord: DetailDiscordIcon, Facebook: DetailFacebookIcon };
-const DETAIL_SOCIALS = [
-  { name: 'Facebook', size: 23, left: 0, top: 3 },
-  { name: 'Instagram', size: 23, left: 31, top: 3 },
-  { name: 'Discord', size: 29, left: 62, top: 0 },
-  { name: 'Telegram', size: 22, left: 100, top: 2 },
-  { name: 'YouTube', size: 28, left: 130, top: 1 },
-  { name: 'X', size: 21, left: 168, top: 3 },
-] as const;
 
 
 export const MangaDetail = () => {
@@ -139,11 +160,13 @@ export const MangaDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   const [synopsisHasOverflow, setSynopsisHasOverflow] = useState(false);
-  const [activeContent, setActiveContent] = useState<'chapters' | 'synopsis'>('chapters');
+  const [activeContent, setActiveContent] = useState<'chapters' | 'synopsis' | 'comments'>('chapters');
+  const [tabIndex, setTabIndex] = useState(0);
   const [chapterSearch, setChapterSearch] = useState('');
   const [chapterSortOrder, setChapterSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedReaction, setSelectedReaction] = useState<MangaReactionId | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<MangaReactionId, number>>(createReactionCounts);
+  const guestReactionRef = useRef<MangaReactionId | null>(null);
   // Solo la ultima peticion de reaccion puede reconciliar el estado optimista.
   const reactionSequence = useRef(0);
   const [reactionError, setReactionError] = useState('');
@@ -153,12 +176,20 @@ export const MangaDetail = () => {
   useEffect(() => {
     if (!manga?.id) return;
     let active = true;
+    const isGuest = !getStoredToken();
+    const guestReaction = isGuest ? readGuestReaction(manga.id) : null;
+    guestReactionRef.current = guestReaction;
     setReactionError('');
+    if (isGuest) {
+      setSelectedReaction(guestReaction);
+      setReactionCounts(withGuestReaction(createReactionCounts(), guestReaction));
+    }
     void getEntityReactions('manga', manga.id).then(result => {
       if (!active) return;
-      setReactionCounts({ ...createReactionCounts(), ...result.reactions });
-      setSelectedReaction((result.my_reaction || null) as MangaReactionId | null);
-    }).catch(() => { if (active) setReactionError('No se pudieron cargar las reacciones.'); });
+      const counts = { ...createReactionCounts(), ...result.reactions };
+      setReactionCounts(isGuest ? withGuestReaction(counts, guestReactionRef.current) : counts);
+      setSelectedReaction(isGuest ? guestReactionRef.current : (result.my_reaction || null) as MangaReactionId | null);
+    }).catch(() => { if (active && !isGuest) setReactionError('No se pudieron cargar las reacciones.'); });
     return () => { active = false; };
   }, [manga?.id]);
 
@@ -168,8 +199,19 @@ export const MangaDetail = () => {
 
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const likeQueueRef = useRef<ReturnType<typeof createQueuedLike> | null>(null);
+  useEffect(() => {
+    likeQueueRef.current = null;
+    return () => { likeQueueRef.current?.dispose(); likeQueueRef.current = null; };
+  }, [id]);
   const [interactionBusy, setInteractionBusy] = useState<'bookmark' | 'like' | ''>('');
   const [engagement, setEngagement] = useState({ online: 0, bookmarks: 0, likes: 0 });
+  useEffect(() => {
+    if (!manga?.id || getStoredToken()) return;
+    const liked = readGuestMangaLike(String(manga.id));
+    setIsLiked(liked);
+    setEngagement((current) => ({ ...current, likes: Number(liked) }));
+  }, [manga?.id]);
   const synopsisRef = useRef<HTMLParagraphElement>(null);
   const coverColumnRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -246,12 +288,12 @@ export const MangaDetail = () => {
     setIsBookmarked(interactions.bookmarks?.some((item) => String(item) === mangaId) || false);
     // La lista completa ya viene en la respuesta: se comparte con los botones "Guardar" del resto de la web.
     seedSavedMangas(interactions.bookmarks ?? []);
-    setIsLiked(interactions.likes?.some((item) => String(item) === mangaId) || false);
-    setEngagement({
+    if (!likeQueueRef.current) setIsLiked(interactions.likes?.some((item) => String(item) === mangaId) || false);
+    setEngagement((current) => ({
       online: Number(interactions.online_readers || 0),
       bookmarks: Number(interactions.manga_bookmarks || 0),
-      likes: Number(interactions.manga_likes || 0),
-    });
+      likes: likeQueueRef.current ? current.likes : Number(interactions.manga_likes || 0),
+    }));
   }, []);
 
   useEffect(() => {
@@ -284,6 +326,7 @@ export const MangaDetail = () => {
     setInitialComments([]);
     setSynopsisExpanded(false);
     setActiveContent('chapters');
+    setTabIndex(0);
     setChapterSearch('');
     setChapterSortOrder('desc');
     setSelectedReaction(null);
@@ -303,30 +346,41 @@ export const MangaDetail = () => {
         setManga(mangaData);
         const mangaPostId = mangaData.eroSeri || mangaData.id;
 
-        // La ficha se publica con sus metadatos; ninguna imagen ni lista la bloquea.
+        // Publica la ficha y monta la música enseguida. Las series similares
+        // empiezan a cargarse antes que capítulos y comentarios.
         setLoading(false);
-        const commentsRequest = getMangaComments(String(mangaData.id)).then(data => {
-          if (active) setInitialComments(data);
-        }).catch(() => { if (active) setCommentsError('No se pudieron cargar los comentarios.'); })
-          .finally(() => { if (active) setCommentsLoading(false); });
+        setSecondaryReady(true);
         const relatedRequest = getRelatedMangas(mangaPostId, 18).then(data => {
           if (active) setRelated(data);
         }).catch(() => {}).finally(() => { if (active) setRelatedLoading(false); });
+        const catalogRequest = getUltimosCapitulos();
+        void catalogRequest.then(catalog => {
+          if (!active) return;
+          const catalogManga = catalog.find(item => String(item.eroSeri || item.id) === String(mangaPostId));
+          if (catalogManga?.totalViews !== undefined) {
+            setManga(current => current && String(current.id) === String(mangaData.id)
+              ? { ...current, totalViews: catalogManga.totalViews }
+              : current);
+          }
+        });
+        void Promise.all([catalogRequest, relatedRequest]).then(([catalog]) => {
+          if (!active) return;
+          const counts = new Map(catalog.map(item => [String(item.eroSeri || item.id), item.chapterCount]));
+          setRelated(current => current.map(item => ({ ...item, chapterCount: counts.get(String(item.id)) ?? item.chapterCount })));
+        });
         const chaptersRequest = getChaptersBySeries(mangaPostId).then(data => {
           if (active) setChapters(data);
         }).catch(() => { if (active) setChaptersError('No se pudieron cargar los capítulos.'); })
           .finally(() => { if (active) setChaptersLoading(false); });
         void loadInteractions(String(mangaData.id), () => active).catch(() => {});
-        await Promise.allSettled([commentsRequest, relatedRequest, chaptersRequest]);
+        await Promise.allSettled([relatedRequest, chaptersRequest]);
         if (!active) return;
         cancelSecondary = whenIdle(() => {
           if (!active) return;
-          setSecondaryReady(true);
-          void getUltimosCapitulos().then(catalog => {
-            if (!active) return;
-            const counts = new Map(catalog.map(item => [String(item.eroSeri || item.id), item.chapterCount]));
-            setRelated(current => current.map(item => ({ ...item, chapterCount: counts.get(String(item.id)) ?? item.chapterCount })));
-          }).catch(() => {});
+          void getMangaComments(String(mangaData.id)).then(data => {
+            if (active) setInitialComments(data);
+          }).catch(() => { if (active) setCommentsError('No se pudieron cargar los comentarios.'); })
+            .finally(() => { if (active) setCommentsLoading(false); });
         });
       } catch (requestError) {
         console.error('Error MangaDetail:', requestError);
@@ -382,20 +436,22 @@ export const MangaDetail = () => {
     setInteractionBusy('');
   };
 
-  const handleLike = async () => {
-    if (!manga || interactionBusy) return;
-    if (!getStoredToken()) {
-      goToLogin();
-      return;
-    }
+  const handleLike = () => {
+    if (!manga || interactionBusy === 'bookmark') return;
 
-    setInteractionBusy('like');
-    const result = await toggleMangaLike(String(manga.id));
-    if (result) {
-      setIsLiked(result.action === 'added');
-      setEngagement((current) => ({ ...current, likes: result.total }));
+    if (!likeQueueRef.current) {
+      const mangaId = String(manga.id);
+      const guestPublicTotal = Math.max(0, engagement.likes - Number(readGuestMangaLike(mangaId)));
+      likeQueueRef.current = createQueuedLike(
+        { liked: isLiked, count: engagement.likes },
+        () => toggleMangaLike(mangaId, guestPublicTotal),
+        ({ liked, count }) => {
+          setIsLiked(liked);
+          setEngagement((current) => ({ ...current, likes: count }));
+        },
+      );
     }
-    setInteractionBusy('');
+    likeQueueRef.current.click();
   };
 
   const handlePurchaseSuccess = useCallback(() => {
@@ -405,7 +461,6 @@ export const MangaDetail = () => {
   // Optimista: el contador y el resaltado cambian en el mismo clic; la red solo confirma o revierte.
   const handleReaction = (reactionId: MangaReactionId) => {
     if (!manga) return;
-    if (!getStoredToken()) { navigate('/auth/login', { state: { returnTo: `/manga/${manga.id}` } }); return; }
 
     const previousSelection = selectedReaction;
     const previousCounts = reactionCounts;
@@ -419,6 +474,12 @@ export const MangaDetail = () => {
     setReactionError('');
     setSelectedReaction(nextSelection);
     setReactionCounts(optimistic);
+
+    if (!getStoredToken()) {
+      guestReactionRef.current = nextSelection;
+      saveGuestReaction(manga.id, nextSelection);
+      return;
+    }
 
     void setEntityReaction('manga', manga.id, nextSelection || '')
       .then(result => {
@@ -500,7 +561,6 @@ export const MangaDetail = () => {
     );
   }
 
-  const tabIndex = activeContent === 'chapters' ? 0 : 1;
 
   return (
     <main className="manga-detail-desktop relative min-h-screen overflow-x-clip bg-surface text-ink">
@@ -519,18 +579,11 @@ export const MangaDetail = () => {
             <div className="mx-auto w-full xl:col-start-1 xl:row-start-1">
               <MangaDetailClock />
             </div>
-            <div className="manga-detail-socials text-center xl:col-start-3 xl:row-start-1">
-              <p className="font-orbitron text-[13px] font-bold text-ink/70">¡Síguenos!</p>
-              <div className="manga-detail-social-icons" aria-label="Redes sociales de MangaMukai">
-                {DETAIL_SOCIALS.map(({ name, size, left, top }) => { const SocialIcon = SOCIAL_ICONS[name]; const href = FOOTER_SOCIALS.find(social => social.name === name)?.href; return (
-                  <a key={name} href={href} target="_blank" rel="noreferrer" aria-label={name} title={name} style={{ width: size, height: size, left, top }} className="absolute flex items-center justify-center text-ink transition-transform hover:-translate-y-0.5 hover:text-mukai-magenta">
-                    <SocialIcon size={size} />
-                  </a>
-                ); })}
-              </div>
+            <div className="xl:col-start-3 xl:row-start-1">
+              <MangaDetailSocials />
             </div>
           </div>
-          <div className="mb-5 h-px w-full bg-gradient-to-r from-transparent via-ink/20 to-transparent" aria-hidden="true" />
+          <div className="mb-5 h-[2px] w-full bg-gradient-to-r from-transparent via-ink/20 to-transparent" aria-hidden="true" />
 
           <div className="manga-detail-grid grid items-start gap-9 lg:grid-cols-[270px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
             <motion.aside
@@ -540,8 +593,8 @@ export const MangaDetail = () => {
               transition={{ duration: 0.45 }}
               className="manga-detail-cover-column w-full xl:col-start-1 xl:row-start-1"
             >
-              <div className="manga-detail-cover relative aspect-[3/4.35] overflow-hidden rounded-lg bg-media">
-                <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} fetchPriority="high" decoding="async" className="h-full w-full object-cover" />
+              <div className="manga-detail-cover relative aspect-[3/4.35] rounded-lg">
+                <HoloCard image={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} foilEnabled={false} tiltMax={14} hoverScale={1.04} radius={0} idle={false} />
               </div>
 
               {/* Ambos botones comparten el ancho de la portada a partes iguales. */}
@@ -561,12 +614,13 @@ export const MangaDetail = () => {
                 </button>
               </div>
 
-              <MangaReaderActivity online={engagement.online} />
+              <MangaSeasonSelector key={manga.id} cover={manga.portada} title={toTitleCase(manga.titulo)} likeAction={
+                <MangaSeriesLikeButton liked={isLiked} likes={engagement.likes} busy={interactionBusy === 'like'} disabled={interactionBusy !== ''} onClick={() => void handleLike()} />
+              } />
 
-              {/* Etiquetas de la colección y "Me gusta" en una sola fila. */}
+              {/* Etiquetas de la colección. */}
               <div className="manga-detail-badges">
-                <span className="manga-detail-views" aria-label={`${formatCompactNumber(manga.totalViews ?? 0)} vistas`}><DetailViewsIcon size={18} />{formatCompactNumber(manga.totalViews ?? 0)}</span>
-                <span className={`${BADGE} bg-mukai-magenta text-white`}><DetailNewIcon size={14} />Estreno</span>
+                <span className="manga-detail-views" aria-label={manga.totalViews === undefined ? 'Vistas no disponibles' : `${formatCompactNumber(manga.totalViews)} vistas`}><DetailViewsIcon size={18} />{manga.totalViews === undefined ? '--' : formatCompactNumber(manga.totalViews)}</span>
                 {coverBadge === 'bn' ? (
                   <span className={`${BADGE} bg-zinc-100 text-black`}>B&amp;N</span>
                 ) : coverBadge === 'hot' ? (
@@ -574,26 +628,13 @@ export const MangaDetail = () => {
                 ) : (
                   <span className={`${BADGE} bg-mukai-purple text-white`}><PaletteIcon size={16} />Color</span>
                 )}
-                <button
-                  type="button"
-                  onClick={handleLike}
-                  disabled={interactionBusy !== ''}
-                  aria-pressed={isLiked}
-                  aria-label={isLiked ? 'Quitar Me gusta' : 'Me gusta'}
-                  className="ml-auto flex shrink-0 items-center gap-1.5 transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {interactionBusy === 'like'
-                    ? <Loader2 size={24} className="animate-spin" />
-                    : <LikeHeartIcon size={26} filled={isLiked} className="text-ink" />}
-                  <span className="font-anta text-sm font-normal tabular-nums">{engagement.likes}</span>
-                </button>
               </div>
 
               <div className="manga-detail-metadata mt-4 px-1">
-                <MetaRow icon={<TypeIcon size={26} />} label="Tipo" value={manga.tipo || 'Manga'} dotColor={typeDotColor(manga.tipo)} />
+                <MetaRow icon={<TypeIcon size={26} />} label="Tipo" value={manga.tipo?.trim() || '--'} dotColor={manga.tipo?.trim() ? typeDotColor(manga.tipo) : undefined} />
                 {manga.author && <MetaRow icon={<StudioIcon size={25} />} label="Autor" value={manga.author} />}
-                <MetaRow icon={<StudioIcon size={25} />} label="Estudio" value={manga.studio || 'N/A'} />
-                <MetaRow icon={<PlatformIcon size={26} />} label="Plataforma" value={manga.platform || 'N/A'} />
+                <MetaRow icon={<StudioIcon size={25} />} label="Estudio" value={manga.studio?.trim() || '--'} />
+                <MetaRow icon={<PlatformIcon size={26} />} label="Plataforma" value={manga.platform?.trim() || '--'} />
                 <MetaRow icon={<PublishedIcon size={27} />} label="Publicación" value={formatDate(publishedDate)} />
               </div>
             </motion.aside>
@@ -601,15 +642,16 @@ export const MangaDetail = () => {
             <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.5 }} className="manga-detail-content min-w-0 xl:col-start-2 xl:row-start-1 xl:px-1">
               <header className="border-b border-line pb-5">
                 <h1 className="text-center font-montserrat text-[clamp(1.3rem,1.7vw,1.8rem)] font-black leading-[1.15] text-ink">{toTitleCase(manga.titulo)}</h1>
+                {manga.tituloOriginal?.trim() && <p className="manga-detail-original-title">{manga.tituloOriginal.trim()}</p>}
 
                 {genres.length > 0 && (
-                  <nav aria-label="Géneros" className="manga-detail-genres">
+                  <div role="list" aria-label="Géneros" className="manga-detail-genres">
                     {genres.slice(0, 6).map((genre) => (
-                      <Link key={genre} to={`/biblioteca?genre=${encodeURIComponent(genre)}`} className="flex h-6 items-center border border-line bg-surface px-2.5 font-anta text-[11px] font-normal leading-6 text-ink transition-colors hover:border-mukai-magenta hover:text-mukai-magenta">
+                      <span key={genre} role="listitem" className="flex h-6 items-center border border-line bg-surface px-2.5 font-anta text-[11px] font-normal leading-6 text-ink">
                         {genre}
-                      </Link>
+                      </span>
                     ))}
-                  </nav>
+                  </div>
                 )}
                 <MangaRewardProgress mangaId={String(manga.eroSeri || manga.id)} chapterIds={chapters.map(chapter => chapter.id)} purchasedIds={purchasedIds} userId={userInfo.id} cover={manga.portada} loading={chaptersLoading} />
               </header>
@@ -617,16 +659,16 @@ export const MangaDetail = () => {
               {/* Pestañas: una sola píldora que viaja entre ellas. */}
               <nav aria-label="Secciones del manga" className="manga-detail-section-nav">
                 <div className="manga-detail-tabs">
-                  <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-black transition-transform duration-[360ms] ease-[cubic-bezier(0.22,0.9,0.3,1)] will-change-transform motion-reduce:transition-none" style={{ transform: `translateX(${tabIndex * 100}%)` }} />
-                  <button type="button" onClick={() => setActiveContent('chapters')} aria-current={activeContent === 'chapters'} className={tabClass(activeContent === 'chapters')}>
+                  <GooeySelector activeIndex={tabIndex} color="#000000" />
+                  <button type="button" onClick={() => { setActiveContent('chapters'); setTabIndex(0); }} aria-current={tabIndex === 0} className={tabClass(tabIndex === 0)}>
                     <ChaptersTabIcon size={22} /> Capítulos ({chapters.length})
                   </button>
-                  <button type="button" onClick={() => setActiveContent('synopsis')} aria-current={activeContent === 'synopsis'} className={tabClass(activeContent === 'synopsis')}>
+                  <button type="button" onClick={() => { setActiveContent('synopsis'); setTabIndex(1); }} aria-current={tabIndex === 1} className={tabClass(tabIndex === 1)}>
                     <SynopsisTabIcon size={19} /> Sinopsis
                   </button>
-                  <a href="#comentarios" className={tabClass()}>
+                  <button type="button" onClick={() => { setActiveContent('comments'); setTabIndex(2); }} aria-current={tabIndex === 2} className={tabClass(tabIndex === 2)}>
                     <CommentsTabIcon size={22} /> Comentarios
-                  </a>
+                  </button>
                 </div>
               </nav>
 
@@ -661,9 +703,8 @@ export const MangaDetail = () => {
                     <ChapterList mangaId={String(manga.eroSeri || manga.id)} loading={chaptersLoading} loadError={chaptersError} chapters={filteredChapters} purchasedChapterIds={purchasedIds} userCoins={userCoins} userInfo={userInfo} onPurchaseSuccess={handlePurchaseSuccess} sortOrder={chapterSortOrder} />
                   )}
                 </section>
-              ) : (
+              ) : activeContent === 'synopsis' ? (
                 <section id="sinopsis" aria-label="Sinopsis" className="mt-5 scroll-mt-28 rounded-2xl border-[0.5px] border-line bg-surface/60 p-5">
-                  {manga.tituloOriginal && <p className="mb-3 text-center text-xs">{manga.tituloOriginal}</p>}
                   <p ref={synopsisRef} className={`text-justify font-montserrat text-[14px] font-normal leading-6 text-ink/90 ${synopsisExpanded ? '' : 'line-clamp-[9]'}`}>{synopsis || 'La sinopsis de este manga todavía no está disponible.'}</p>
                   {synopsisHasOverflow && (
                     <button type="button" onClick={() => setSynopsisExpanded((current) => !current)} className="mx-auto mt-3 flex items-center gap-1 font-montserrat text-[11px] font-semibold text-mukai-magenta">
@@ -671,8 +712,9 @@ export const MangaDetail = () => {
                     </button>
                   )}
                 </section>
-              )}
+              ) : null}
 
+              <div className="flex flex-col">
               <MangaCommunityLinks />
               <div className="manga-detail-reactions" aria-label="Reacciones del manga">
                 {reactionError && <p role="alert" className="mb-3 text-center font-montserrat text-xs text-red-500">{reactionError}</p>}
@@ -691,7 +733,8 @@ export const MangaDetail = () => {
                   ))}
                 </div>
               </div>
-              <div className="manga-detail-comments"><MangaComments key={manga.id} mangaId={String(manga.id)} initialComments={initialComments} loading={commentsLoading} loadError={commentsError} /></div>
+              <div className={`manga-detail-comments${activeContent === 'comments' ? ' order-first' : ''}`}><MangaComments key={manga.id} mangaId={String(manga.id)} initialComments={initialComments} loading={commentsLoading} loadError={commentsError} /></div>
+              </div>
               <Footer homeDesign className="manga-detail-footer" />
             </motion.section>
 

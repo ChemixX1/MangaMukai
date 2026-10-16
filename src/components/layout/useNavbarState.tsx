@@ -5,12 +5,9 @@ import { useShopCart } from "../../hooks/useShopCart";
 import { useTheme } from "../../hooks/useTheme";
 import { AUTH_CHANGED_EVENT, AUTH_SESSION_EXPIRED_EVENT, clearAuth, getStoredToken, getStoredUser, refreshUser, type MMUser, } from "../../services/authService";
 import { getInteractions } from "../../services/interactionsService";
-import { getUltimosCapitulos } from "../../services/mangaService";
 import { getConversations, getNotifications, OPEN_CHAT_EVENT, SOCIAL_REFRESH_EVENT, syncMangaSubscriptions, type FriendUser } from "../../services/socialService";
 import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "../../services/wordpressService";
-import { seedSharedAuthCovers } from "../../utils/authCoverCache";
 import { isMobileSectionRoute } from "../../utils/mobileSections";
-import { preloadImages } from "../../utils/preloadImages";
 import { NavbarBellIcon } from "../ui";
 
 // El modal vive montado una sola vez en App: aquí solo se precarga y se abre.
@@ -151,9 +148,26 @@ export const useNavbarState = () => {
   /** La cabecera se esconde al bajar y reaparece en cuanto se sube. */
   useEffect(() => {
     let lastY = window.scrollY;
+    let travel = 0;
+    const isMangaDetail = /^\/manga\/[^/]+/.test(location.pathname);
     const onScroll = () => {
-      const currentY = window.scrollY;
+      const currentY = Math.max(0, window.scrollY);
       const delta = currentY - lastY;
+      if (isMangaDetail) {
+        lastY = currentY;
+        if (currentY <= 90) {
+          travel = 0;
+          setIsHeaderHidden(false);
+          return;
+        }
+        if (delta === 0) return;
+        travel = Math.sign(delta) === Math.sign(travel) ? travel + delta : delta;
+        if (travel >= 24 || travel <= -16) {
+          setIsHeaderHidden(travel > 0);
+          travel = 0;
+        }
+        return;
+      }
       // Umbral pequeño para que el rebote del scroll no la haga parpadear.
       if (Math.abs(delta) < 6) return;
       lastY = currentY;
@@ -162,7 +176,7 @@ export const useNavbarState = () => {
 
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  }, [location.pathname]);
 
   const refreshSocialCounts = useCallback(async () => {
     if (!getCurrentStoredUser()) {
@@ -273,16 +287,12 @@ export const useNavbarState = () => {
     };
   }, []);
 
-  // Al acercarse a "Iniciar Sesión" / "Crear cuenta" se adelantan la página de
-  // acceso y las portadas de su fondo, para que se abra sin esperas.
+  // Adelanta solo el código de acceso. Las portadas se reutilizan desde el home,
+  // sin competir con sus imágenes ni pedir otro catálogo al acercarse al enlace.
   const authPrefetched = useRef(false);
   const prefetchAuth = useCallback(() => {
     if (authPrefetched.current) return;
     authPrefetched.current = true;
-    void getUltimosCapitulos().then((mangas) => {
-      const covers = seedSharedAuthCovers(mangas);
-      void preloadImages(covers.slice(0, 24).map((cover) => cover.src));
-    });
     void import('../../pages/AuthPage');
   }, []);
 

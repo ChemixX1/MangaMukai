@@ -114,14 +114,14 @@ export const postMangaComment = async (
   chapterId?: string,
 ): Promise<MangaComment | null> => {
   const token = getStoredToken();
-  if (!token) return null;
+  if (!token && !chapterId) return null;
 
   try {
     const res = await fetch(`${MANGAMUKAI_API}/comments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...authHeaders(),
       },
       body: JSON.stringify({
         manga_id: mangaId,
@@ -130,7 +130,7 @@ export const postMangaComment = async (
         parent_id: parentId,
       }),
     });
-    if (res.status === 401 || res.status === 403) clearStoredAuth('expired');
+    if ((res.status === 401 || res.status === 403) && token) clearStoredAuth('expired');
     if (!res.ok) return null;
     const data = await res.json();
     if (data.error) return null;

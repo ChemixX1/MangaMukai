@@ -122,6 +122,7 @@
 .community-image-link { display: block; width: 100%; text-align: left; }
 .community-post-image { display: block; width: 100%; aspect-ratio: 533 / 360; max-height: 440px; margin: 16px 0 24px; border-radius: 0; object-fit: cover; object-position: center; }
 .community-post-actions { display: flex; align-items: center; gap: 17px; min-height: 41px; padding-top: 10px; border-top: 1px solid var(--community-border); }
+.community-post-actions > .community-pulse-like { flex-shrink: 0; }
 .community-action, .community-views { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 5px; min-height: 26px; color: var(--community-ink); font-size: 16px; font-weight: 400; line-height: 20px; }
 .community-action { position: relative; transition: color .16s, transform .16s; }
 .community-action > svg { flex-shrink: 0; }

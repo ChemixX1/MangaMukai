@@ -324,7 +324,7 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
     const trimmed = body.trim();
     if (!richTextToPlain(trimmed) || posting) return false;
     if (richTextToPlain(trimmed.replace(STICKER_TOKEN, '')).length > 1000) { setError('El comentario no puede superar los 1000 caracteres.'); return false; }
-    if (!requireSession()) return false;
+    if (!chapterId && !requireSession()) return false;
     setPosting(true);
     setError('');
     const created = await postMangaComment(mangaId, trimmed, parentId, chapterId);
@@ -405,7 +405,7 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
                 );
               })}
               {((comment.reactions?.fire || 0) > 0 || comment.my_reaction === 'fire') && <button type="button" className="manga-comment-reaction" data-reaction="fire" title="Candente" aria-label={'Candente' + (comment.my_reaction === 'fire' ? ': ' + (comment.reactions?.fire || 0) : '')} aria-pressed={comment.my_reaction === 'fire'} onClick={() => void react(comment, 'fire')}><CommentFireActiveIcon size={23} />{comment.my_reaction === 'fire' && <span className="manga-comment-reaction-count">{comment.reactions?.fire || 0}</span>}</button>}
-              <button type="button" className="manga-comment-reply" aria-expanded={replyTo?.id === comment.id} onClick={() => { if (requireSession()) { setReplyTo(replyTo?.id === comment.id ? null : comment); setReplyContent(''); setReplySticker(null); setError(''); } }}><CommentReplyIcon size={22} />Responder</button>
+              <button type="button" className="manga-comment-reply" aria-expanded={replyTo?.id === comment.id} onClick={() => { if (chapterId || requireSession()) { setReplyTo(replyTo?.id === comment.id ? null : comment); setReplyContent(''); setReplySticker(null); setError(''); } }}><CommentReplyIcon size={22} />Responder</button>
             </footer>
             {!!replies.length && <button type="button" className="manga-comment-toggle" aria-expanded={openReplies.has(comment.id)} onClick={() => toggleReplies(comment.id)}><ChevronDown size={16} aria-hidden="true" className={openReplies.has(comment.id) ? 'rotate-180' : ''} />{openReplies.has(comment.id) ? 'Ocultar Respuestas' : 'Ver Respuestas (' + replies.length + ')'}</button>}
             {replyTo?.id === comment.id && (

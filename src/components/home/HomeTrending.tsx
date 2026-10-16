@@ -1,4 +1,5 @@
 import { useReducedMotion } from 'framer-motion';
+import { GooeySelector } from '../ui/GooeySelector';
 import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -74,6 +75,7 @@ const TrendingCard = ({ manga, rank, accent, isCopy, isMobile }: TrendingCardPro
  */
 const PeriodTabs = ({ value, onChange, className }: { value: RankingPeriod; onChange: (period: RankingPeriod) => void; className: string }) => (
   <div role="tablist" aria-label="Periodo del ranking" className={`flex h-11 shrink-0 rounded-3xl border border-[#878383] dark:border-[color:var(--mm-tab-line)] dark:bg-black lg:h-12 lg:shadow-[0_4px_4px_rgba(0,0,0,1)] ${className}`}>
+    <GooeySelector activeIndex={RANKING_PERIODS.indexOf(value)} />
     {RANKING_PERIODS.map((option) => {
       const active = option === value;
       return (
@@ -83,7 +85,7 @@ const PeriodTabs = ({ value, onChange, className }: { value: RankingPeriod; onCh
           role="tab"
           aria-selected={active}
           onClick={() => onChange(option)}
-          className={`h-full flex-1 rounded-3xl font-montserrat text-xs uppercase leading-3 transition-colors lg:-my-px lg:h-12 lg:w-[var(--tab-width)] lg:flex-none lg:first:-ml-px lg:last:-mr-px ${active ? 'bg-ink font-black text-surface' : 'font-bold text-ink'}`}
+          className={`relative z-[1] h-full flex-1 rounded-3xl font-montserrat text-xs uppercase leading-3 transition-colors lg:-my-px lg:h-12 lg:w-[var(--tab-width)] lg:flex-none lg:first-of-type:-ml-px lg:last:-mr-px ${active ? 'font-black text-surface' : 'font-bold text-ink'}`}
           style={{ '--tab-width': `${PERIOD_WIDTHS[option]}px` } as CSSProperties}
         >
           {option}

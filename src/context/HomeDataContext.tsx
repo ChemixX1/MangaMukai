@@ -42,8 +42,15 @@ export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Guarda referencias para autenticación; no descarga imágenes ni bloquea el home.
-    if (data.popularHistorical.length) seedSharedAuthCovers(data.popularHistorical);
-  }, [data.popularHistorical]);
+    seedSharedAuthCovers([
+      ...data.popularHistorical,
+      ...data.popularWeekly,
+      ...data.latestWomen,
+      ...data.popularMenHistorical,
+      ...data.latestMen,
+      ...data.newReleases,
+    ], 24);
+  }, [data.popularHistorical, data.popularWeekly, data.latestWomen, data.popularMenHistorical, data.latestMen, data.newReleases]);
 
   useEffect(() => {
     if (!data.isReady || data.isOutage) return;

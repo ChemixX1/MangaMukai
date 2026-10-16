@@ -17,6 +17,8 @@ export function NavbarP({ model }: NavbarViewProps) {
   const { theme, isLightMode, isProfileRoute, currentUser, showUserMenu, setShowUserMenu, showNotifications, setShowNotifications, unreadMessages, unreadNotifications, isHeaderHidden, userMenuRef, headerUsesDarkText, openSearch, isTimerModalOpen, setIsTimerModalOpen, isTimerActive, prefetchAuth, handleThemeToggle, handleLogout, goToRecharge, handleLogoClick, desktopIconClass } = model;
   return (<header
       className={`${isProfileRoute ? 'sticky' : 'fixed'} site-navbar-surface site-navbar-desktop left-0 top-0 z-[100] h-[73px] w-full transition-transform duration-300`}
+      data-manga-detail={/^\/manga\/[^/]+/.test(model.location.pathname) || undefined}
+      data-hidden={isHeaderHidden || undefined}
       style={{ transform: isHeaderHidden ? 'translateY(-100%)' : 'translateY(0)' }}
     >
       <div className="mx-auto flex h-full w-full max-w-[1440px] items-center px-5 xl:pl-[36px] xl:pr-[57px]">

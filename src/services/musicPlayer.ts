@@ -20,6 +20,7 @@ export interface MusicPlayerState {
   duration: number;
   error: boolean;
   likedIds: number[];
+  volume: number;
 }
 
 const initialState: MusicPlayerState = {
@@ -31,6 +32,7 @@ const initialState: MusicPlayerState = {
   duration: 0,
   error: false,
   likedIds: [],
+  volume: 50,
 };
 
 let state: MusicPlayerState = initialState;
@@ -70,6 +72,7 @@ const ensureAudio = (): HTMLAudioElement => {
   if (audio) return audio;
 
   audio = new Audio();
+  audio.volume = state.volume / 100;
   audio.preload = 'metadata';
   audio.addEventListener('timeupdate', () => setState({ currentTime: audio?.currentTime ?? 0 }));
   audio.addEventListener('loadedmetadata', () => setState({ duration: audio?.duration ?? 0 }));
@@ -198,6 +201,13 @@ const step = (offset: number, autoplay: boolean) => {
 
 export const playNext = (autoplay = true) => step(1, autoplay);
 export const playPrev = (autoplay = true) => step(-1, autoplay);
+
+export const setVolume = (value: number) => {
+  if (!Number.isFinite(value)) return;
+  const volume = Math.min(100, Math.max(0, value));
+  if (audio) audio.volume = volume / 100;
+  setState({ volume });
+};
 
 export const seekTo = (seconds: number) => {
   const element = ensureAudio();

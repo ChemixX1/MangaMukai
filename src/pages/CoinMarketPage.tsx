@@ -1,121 +1,67 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Check, CircleCheck, Download, Mail, ReceiptText, ShieldCheck, UploadCloud, X } from 'lucide-react';
+import { ArrowRight, CircleCheck, Send, ReceiptText, UploadCloud, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/coin-market.css';
 import { MANGAMUKAI_API } from '../config/api';
-import { MANGAMUKAI_COIN_3D_ICON } from '../components/common/MangaDetailIcons';
-import { useTheme } from '../hooks/useTheme';
-import { getStoredToken, getStoredUser, refreshUser } from '../services/authService';
-import yapeDemoQr from '../assets/shop/yape-demo-qr.svg';
+import { getStoredToken, refreshUser } from '../services/authService';
+import saleIcon from '../assets/recharge/icon-0.svg';
+import coins50 from '../assets/recharge/icon-1.svg';
+import coins1000 from '../assets/recharge/icon-2.svg';
+import coins1500 from '../assets/recharge/icon-3.svg';
+import coins2500 from '../assets/recharge/icon-4.svg';
+import coins5000 from '../assets/recharge/icon-5.svg';
+import coins10000 from '../assets/recharge/icon-6.svg';
+import paypalIcon from '../assets/recharge/icon-7.svg';
+import plinIcon from '../assets/recharge/icon-8.svg';
+import receiptIcon from '../assets/recharge/icon-9.svg';
+import yapeIcon from '../assets/recharge/icon-10.svg';
+import transferIcon from '../assets/recharge/icon-11.svg';
 
 interface CoinPack {
   id: string;
   coins: number;
   price: number;
-  tag?: string;
+  image: string;
+  sale?: boolean;
 }
 
 const COIN_PACKS: CoinPack[] = [
-  { id: 'c500', coins: 500, price: 5 },
-  { id: 'c1000', coins: 1000, price: 10 },
-  { id: 'c1500', coins: 1500, price: 15 },
-  { id: 'c2500', coins: 2500, price: 25 },
-  { id: 'c5000', coins: 5000, price: 50 },
-  { id: 'promo10000', coins: 10000, price: 80, tag: 'Super promo' },
+  { id: 'c50', coins: 50, price: 5, image: coins50 },
+  { id: 'c1000', coins: 1000, price: 10, image: coins1000 },
+  { id: 'c1500', coins: 1500, price: 15, image: coins1500, sale: true },
+  { id: 'c2500', coins: 2500, price: 25, image: coins2500 },
+  { id: 'c5000', coins: 5000, price: 50, image: coins5000 },
+  { id: 'promo10000', coins: 10000, price: 80, image: coins10000 },
 ];
 
-type PaymentMethod = 'paypal' | 'yape';
+type PaymentMethod = 'paypal' | 'plin' | 'yape' | 'transfer';
+const PAYMENT_METHODS = [
+  { id: 'paypal', label: 'PayPal', image: paypalIcon },
+  { id: 'plin', label: 'Plin', image: plinIcon },
+  { id: 'yape', label: 'Yape', image: yapeIcon },
+  { id: 'transfer', label: 'Transfer', image: transferIcon },
+] as const;
 
-const configuredYapeEmail = import.meta.env.VITE_YAPE_CONTACT_EMAIL?.trim() || '';
-const YAPE_EMAIL = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(configuredYapeEmail)
-  ? configuredYapeEmail : 'recargas@example.com';
-const YAPE_HAS_CONTACT = YAPE_EMAIL !== 'recargas@example.com';
-const YAPE_DEMO_PHONE = '999 999 999';
+const PAYMENT_PHONE = '998 996 963';
 const MAX_RECEIPT_SIZE = 5 * 1024 * 1024;
-const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-const formatCoins = (value: number) => value.toLocaleString('es-PE');
-const formatPrice = (value: number) => `$${value.toFixed(2)}`;
-const stackSize = (index: number) => Math.min(5, 3 + Math.floor(index / 2));
-
-const toMailBase64 = (bytes: Uint8Array) => {
-  let binary = '';
-  for (let offset = 0; offset < bytes.length; offset += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
-  }
-  return btoa(binary).match(/.{1,76}/g)?.join('\r\n') || '';
-};
-
-// Create an email draft with a real attachment; downloading never sends the mail
-// or credits coins. Manual review is independent of the existing PayPal API.
-const downloadYapeDraft = async (pack: CoinPack, receipt: File) => {
-  const user = getStoredUser();
-  const boundary = `mukai-receipt-${crypto.randomUUID()}`;
-  const message = [
-    'Solicitud de recarga por Yape',
-    '',
-    `Usuario: ${user?.username || 'Completar usuario'}`,
-    `Correo de la cuenta: ${user?.email || 'Completar correo'}`,
-    `Paquete: ${formatCoins(pack.coins)} monedas`,
-    `Precio de referencia: ${formatPrice(pack.price)} USD`,
-    'Monto pagado en soles: completar',
-    'Numero de operacion Yape: completar',
-    '',
-    'Adjunto el comprobante para revision manual.',
-    'La solicitud no confirma el pago ni acredita monedas.',
-    ...(!YAPE_HAS_CONTACT ? ['', 'IMPORTANTE: reemplazar el destinatario de ejemplo por el correo confirmado de MangaMukai antes de enviar.'] : []),
-  ].join('\r\n');
-  const attachment = toMailBase64(new Uint8Array(await receipt.arrayBuffer()));
-  const body = toMailBase64(new TextEncoder().encode(message));
-  const extension = receipt.type === 'application/pdf' ? 'pdf' : receipt.type.split('/')[1];
-  const draft = [
-    `To: ${YAPE_EMAIL}`,
-    `Subject: Solicitud de recarga Yape - ${pack.coins} monedas`,
-    'X-Unsent: 1',
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
-    '', body,
-    `--${boundary}`,
-    `Content-Type: ${receipt.type}`,
-    'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="comprobante-yape.${extension}"`,
-    '', attachment,
-    `--${boundary}--`,
-    '',
-  ].join('\r\n');
-  const url = URL.createObjectURL(new Blob([draft], { type: 'message/rfc822' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `solicitud-yape-${pack.id}.eml`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const WALLET_QR: Record<'yape' | 'plin', string> = {
+  yape: import.meta.env.VITE_YAPE_QR_URL?.trim() || '',
+  plin: import.meta.env.VITE_PLIN_QR_URL?.trim() || '',
 };
 
 export const CoinMarketPage = () => {
   const navigate = useNavigate();
-  const { theme } = useTheme();
-  const [method, setMethod] = useState<PaymentMethod>('paypal');
+  const [method, setMethod] = useState<PaymentMethod>('yape');
   const [selectedPackId, setSelectedPackId] = useState('c1000');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [receipt, setReceipt] = useState<File | null>(null);
   const [receiptPreview, setReceiptPreview] = useState('');
-  const [draftReady, setDraftReady] = useState(false);
+  const [receiptSent, setReceiptSent] = useState(false);
   const receiptInput = useRef<HTMLInputElement>(null);
   const pack = COIN_PACKS.find((option) => option.id === selectedPackId) || COIN_PACKS[1];
 
-  useEffect(() => {
-    if (!getStoredToken()) {
-      navigate('/auth/login', { replace: true, state: { returnTo: '/recargar' } });
-      return;
-    }
-    void refreshUser();
-  }, [navigate]);
 
   useEffect(() => {
     if (!receipt || !receipt.type.startsWith('image/')) {
@@ -129,7 +75,7 @@ export const CoinMarketPage = () => {
 
   const resetReceipt = () => {
     setReceipt(null);
-    setDraftReady(false);
+    setReceiptSent(false);
     if (receiptInput.current) receiptInput.current.value = '';
   };
 
@@ -144,7 +90,7 @@ export const CoinMarketPage = () => {
     resetReceipt();
     if (!file) return;
     if (!RECEIPT_TYPES.includes(file.type)) {
-      setError('El comprobante debe ser una imagen JPG, PNG, WebP o un archivo PDF.');
+      setError('El comprobante debe ser una imagen JPG, PNG o WebP.');
       return;
     }
     if (file.size === 0 || file.size > MAX_RECEIPT_SIZE) {
@@ -155,7 +101,7 @@ export const CoinMarketPage = () => {
   };
 
   const checkout = async () => {
-    if (pending || (method === 'yape' && !receipt)) return;
+    if (pending || method === 'transfer' || (method !== 'paypal' && (!receipt || receiptSent))) return;
     const token = getStoredToken();
     if (!token) {
       navigate('/auth/login', { state: { returnTo: '/recargar' } });
@@ -164,9 +110,25 @@ export const CoinMarketPage = () => {
     setPending(true);
     setError('');
     try {
-      if (method === 'yape' && receipt) {
-        await downloadYapeDraft(pack, receipt);
-        setDraftReady(true);
+      if ((method === 'yape' || method === 'plin') && receipt) {
+        const body = new FormData();
+        body.append('receipt', receipt);
+        body.append('pack', pack.id);
+        body.append('method', method);
+        body.append('_token', token);
+        const response = await fetch(`${MANGAMUKAI_API}/coin-receipts`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${token}` },
+          body,
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.success) {
+          throw new Error(response.status === 404
+            ? 'El envío de comprobantes aún no está habilitado. Inténtalo más tarde.'
+            : data?.message || 'No se pudo enviar el comprobante. Inténtalo nuevamente.');
+        }
+        setReceiptSent(true);
         return;
       }
       await refreshUser();
@@ -187,116 +149,88 @@ export const CoinMarketPage = () => {
         return;
       }
       setError(data.message || 'No se pudo generar el pago.');
-    } catch {
-      setError(method === 'yape'
-        ? 'No pudimos preparar el comprobante. Vuelve a seleccionar el archivo e inténtalo otra vez.'
-        : 'No pudimos conectar con PayPal. Revisa tu conexión e inténtalo otra vez.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No pudimos conectar. Revisa tu conexión e inténtalo otra vez.');
     } finally {
       setPending(false);
     }
   };
 
   return (
-    <main className="coin-market-page coin-recharge" data-theme={theme === 'light' ? 'light' : 'dark'}>
+    <main className="coin-market-page coin-recharge">
       <div className="coin-recharge__content">
-        <header className="coin-recharge__header">
-          <span className="coin-recharge__eyebrow">TU PRÓXIMA HISTORIA TE ESPERA</span>
-          <h1 className="coin-recharge__title">Recargar <span>Monedas</span></h1>
-          <p className="coin-recharge__subtitle">Elige tu paquete y sigue disfrutando de tus mangas favoritos.</p>
-        </header>
-
+        <h1 className="coin-recharge__title">Recargar <span>Monedas</span></h1>
         <div className="coin-recharge__layout">
-          <section className="coin-recharge__selection" aria-labelledby="coin-pack-heading">
-            <div className="coin-recharge__section-heading">
-              <span className="coin-recharge__step">01</span>
-              <div><h2 id="coin-pack-heading">Elige tus monedas</h2><p>Un nuevo capítulo empieza aquí.</p></div>
-            </div>
-            <div className="coin-recharge__packs" role="radiogroup" aria-labelledby="coin-pack-heading">
-              {COIN_PACKS.map((option, index) => (
-                <label key={option.id} className={`coin-pack${option.tag ? ' coin-pack--featured' : ''}${pack.id === option.id ? ' coin-pack--selected' : ''}${pending ? ' coin-pack--disabled' : ''}`}>
-                  <input className="coin-pack__radio" type="radio" name="coin-pack" value={option.id} checked={pack.id === option.id} disabled={pending} onChange={() => selectPack(option.id)} />
-                  <span className="coin-pack__check" aria-hidden="true">{pack.id === option.id && <Check size={13} strokeWidth={3} />}</span>
-                  {option.tag && <span className="coin-pack__tag">{option.tag}</span>}
-                  <span className="coin-pack__stack" data-coins={stackSize(index)} aria-hidden="true">
-                    {Array.from({ length: stackSize(index) }, (_, position) => (
-                      <img key={position} src={MANGAMUKAI_COIN_3D_ICON} alt="" decoding="async" draggable={false} />
-                    ))}
-                  </span>
-                  <span className="coin-pack__info">
-                    <span className="coin-pack__amount coin-market-number">{formatCoins(option.coins)}</span>
-                    <span className="coin-pack__label">monedas</span>
-                  </span>
-                  <span className="coin-pack__price coin-market-number">{formatPrice(option.price)} <small>USD</small></span>
-                </label>
-              ))}
-            </div>
-            <p className="coin-recharge__assurance"><ShieldCheck size={17} /> Revisa tu selección antes de confirmar el pago.</p>
+          <section className="coin-recharge__packs" aria-label="Paquetes de monedas" role="radiogroup">
+            {COIN_PACKS.map((option) => (
+              <label key={option.id} className="coin-pack">
+                <input type="radio" name="coin-pack" value={option.id} checked={pack.id === option.id} disabled={pending} onChange={() => selectPack(option.id)} />
+                <span className="coin-pack__name">{option.coins} Monedas</span>
+                <img className="coin-pack__art" src={option.image} alt="" />
+                <span className="coin-pack__price">$ {option.price.toFixed(2)}</span>
+                {option.sale && <img className="coin-pack__sale" src={saleIcon} alt="Oferta" />}
+              </label>
+            ))}
           </section>
-
           <aside className="coin-checkout" aria-labelledby="coin-checkout-heading">
-            <div className="coin-recharge__section-heading">
-              <span className="coin-recharge__step">02</span>
-              <div><h2 id="coin-checkout-heading">Detalle de tu compra</h2><p>Ya casi estás listo.</p></div>
+            <h2 id="coin-checkout-heading">Orden de Compra</h2>
+            <div className="coin-checkout__summary" aria-live="polite">
+              <span>{pack.coins} Monedas</span><strong>$ {pack.price.toFixed(2)}</strong>
             </div>
-            <div className="coin-checkout__product" aria-live="polite">
-              <span className="coin-checkout__coin"><img src={MANGAMUKAI_COIN_3D_ICON} alt="" /></span>
-              <div><strong>{formatCoins(pack.coins)} monedas</strong><span>Saldo para tus lecturas</span></div>
-              <strong className="coin-market-number">{formatPrice(pack.price)}</strong>
-            </div>
-            <div className="coin-checkout__total" aria-live="polite"><span>Total a pagar</span><strong className="coin-market-number">{formatPrice(pack.price)} <small>USD</small></strong></div>
-
             <fieldset className="coin-checkout__payments" disabled={pending}>
-              <legend>Método de pago</legend>
+              <legend>Métodos de Pago</legend>
               <div className="coin-recharge__methods">
-                {(['paypal', 'yape'] as const).map((option) => (
-                  <label key={option} className={`coin-recharge__method${method === option ? ' coin-recharge__method--selected' : ''}`}>
-                    <input type="radio" name="payment-method" value={option} checked={method === option} onChange={() => { setMethod(option); setError(''); setDraftReady(false); }} />
-                    <span className={`coin-recharge__brand coin-recharge__brand--${option}`} aria-hidden="true">{option === 'paypal' ? 'P' : 'Y'}</span>
-                    <span><strong>{option === 'paypal' ? 'PayPal' : 'Yape'}</strong><small>{option === 'paypal' ? 'Pago en línea' : 'Revisión manual'}</small></span>
-                    <span className="coin-recharge__method-check" aria-hidden="true">{method === option && <Check size={12} strokeWidth={3} />}</span>
+                {PAYMENT_METHODS.map((option) => (
+                  <label key={option.id} className={`coin-recharge__method coin-recharge__method--${option.id}`}>
+                    <input type="radio" name="payment-method" value={option.id} checked={method === option.id} onChange={() => { setMethod(option.id); setError(''); resetReceipt(); }} aria-label={option.label} />
+                    <img src={option.image} alt={option.id === 'transfer' ? '' : option.label} />
+                    {option.id === 'transfer' && <span>Transfer</span>}
                   </label>
                 ))}
               </div>
             </fieldset>
-
-            {method === 'paypal' ? (
-              <p className="coin-checkout__payment-note">Continúa a PayPal para completar tu compra de forma segura.</p>
-            ) : (
-              <div className="coin-yape">
-                <div className="coin-yape__payment-card">
-                  <span className="coin-yape__demo-badge">Demostración</span>
-                  <h3>Recarga con Yape</h3>
-                  <div className="coin-yape__qr"><img src={yapeDemoQr} alt="QR de ejemplo de MangaMukai, no válido para realizar pagos" width="164" height="164" /></div>
-                  <span className="coin-yape__phone-label">Número de ejemplo</span>
-                  <strong className="coin-yape__phone">{YAPE_DEMO_PHONE}</strong>
-                  <p>QR y número de muestra. No realices pagos a estos datos.</p>
+            {(method === 'yape' || method === 'plin') && (
+              <div className="coin-wallet">
+                <div className={`coin-wallet__card coin-wallet__card--${method}`}>
+                  <h3>Recarga con {method === 'plin' ? 'Plin' : 'Yape'}</h3>
+                  {WALLET_QR[method]
+                    ? <img className="coin-wallet__qr" src={WALLET_QR[method]} alt={`Código QR de pago con ${method === 'plin' ? 'Plin' : 'Yape'}`} width="174" height="174" />
+                    : <div className="coin-wallet__brand" aria-hidden="true">{method === 'plin' ? 'plin' : 'yape'}</div>}
+                  <span>Recarga con {method === 'plin' ? 'Plin' : 'Yape'}</span>
+                  <strong>{PAYMENT_PHONE}</strong>
                 </div>
-                <div className="coin-yape__heading"><ReceiptText size={17} /><strong>Tu comprobante de Yape</strong></div>
-                <p>Confirma por correo el monto en soles y los datos de pago. Luego adjunta tu comprobante para preparar la solicitud.</p>
-                {YAPE_HAS_CONTACT ? <a className="coin-yape__email" href={`mailto:${YAPE_EMAIL}`}><Mail size={15} />{YAPE_EMAIL}</a> : <span className="coin-yape__email"><Mail size={15} />{YAPE_EMAIL}</span>}
-                {!YAPE_HAS_CONTACT && <p className="coin-yape__setup" role="note">Correo de ejemplo. Falta confirmar el contacto de Yape antes de realizar un pago o enviar tu solicitud.</p>}
-                <label className={`coin-yape__upload${pending ? ' coin-yape__upload--disabled' : ''}`}>
-                  <input ref={receiptInput} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={pending} onChange={(event) => attachReceipt(event.target.files?.[0])} />
-                  <UploadCloud size={22} />
-                  <strong>{receipt ? 'Cambiar comprobante' : 'Subir comprobante'}</strong>
-                  <span>JPG, PNG, WebP o PDF · hasta 5 MB</span>
-                </label>
-                {receipt && <div className="coin-yape__attachment">
-                  {receiptPreview ? <img src={receiptPreview} alt="Vista previa del comprobante seleccionado" /> : <ReceiptText size={26} />}
-                  <span><strong>{receipt.name}</strong><small>{(receipt.size / 1024 / 1024).toFixed(2)} MB · Archivo seleccionado</small></span>
-                  {!pending && <button type="button" onClick={resetReceipt} aria-label="Quitar comprobante"><X size={16} /></button>}
-                </div>}
-                <p className="coin-yape__local-note">Descarga un borrador de correo con tu comprobante adjunto y envíalo manualmente. No se envía ningún archivo desde esta página.</p>
+                <div className="coin-wallet__receipt">
+                  <h3 className="coin-wallet__receipt-title">
+                    <img src={receiptIcon} alt="" width="29" height="29" />
+                    Tu comprobante de {method === 'plin' ? 'Plin' : 'Yape'}
+                  </h3>
+                  <input className="coin-wallet__file-input" ref={receiptInput} type="file" accept="image/jpeg,image/png,image/webp" disabled={pending} aria-label="Seleccionar imagen del comprobante" onChange={(event) => attachReceipt(event.target.files?.[0])} />
+                  <div className="coin-wallet__actions">
+                    <button className="coin-wallet__upload" type="button" disabled={pending} onClick={() => receiptInput.current?.click()}>
+                      <UploadCloud size={19} />{receipt ? 'Cambiar imagen' : 'Subir comprobante'}
+                    </button>
+                    <button className="coin-checkout__submit" type="button" onClick={() => void checkout()} disabled={pending || !receipt || receiptSent} aria-busy={pending}>
+                      <Send size={17} />{pending ? 'Enviando…' : receiptSent ? 'Enviado' : 'Enviar imagen'}
+                    </button>
+                  </div>
+                  <p className="coin-checkout__note">JPG, PNG o WebP · hasta 5 MB</p>
+                  {receipt && <div className="coin-wallet__attachment">
+                    {receiptPreview ? <img src={receiptPreview} alt="Vista previa del comprobante" /> : <ReceiptText size={26} />}
+                    <span>{receipt.name}</span>
+                    <button type="button" disabled={pending} onClick={resetReceipt} aria-label="Quitar comprobante"><X size={16} /></button>
+                  </div>}
+                </div>
               </div>
             )}
-
+            {method === 'paypal' && <div className="coin-checkout__online">
+              <p className="coin-checkout__note">Continúa a PayPal para completar tu compra.</p>
+              <button className="coin-checkout__submit" type="button" onClick={() => void checkout()} disabled={pending} aria-busy={pending}>
+                {pending ? 'Conectando…' : 'Pagar con PayPal'}<ArrowRight size={17} />
+              </button>
+            </div>}
+            {method === 'transfer' && <p className="coin-checkout__note coin-checkout__online" role="status">Las transferencias estarán disponibles cuando se configure la cuenta bancaria.</p>}
             {error && <p role="alert" className="coin-recharge__error">{error}</p>}
-            {draftReady && <p className="coin-yape__success" role="status"><CircleCheck size={18} />Borrador descargado. Ábrelo en tu aplicación de correo, revisa el destinatario y envíalo para la verificación manual.</p>}
-            <button type="button" className="coin-checkout__submit" onClick={() => void checkout()} disabled={pending || (method === 'yape' && !receipt)} aria-busy={pending}>
-              {pending ? (method === 'yape' ? 'Preparando solicitud…' : 'Conectando con PayPal…') : method === 'paypal' ? 'Pagar con PayPal' : 'Descargar solicitud Yape'}
-              {!pending && (method === 'paypal' ? <ArrowRight size={17} /> : <Download size={17} />)}
-            </button>
-            <p className="coin-checkout__footnote">{method === 'paypal' ? 'Tus monedas se acreditan al confirmar el pago.' : 'Las monedas se acreditan después de verificar el pago.'}</p>
+            {receiptSent && <p className="coin-wallet__success" role="status"><CircleCheck size={18} />Comprobante enviado. Revisaremos tu pago para acreditar las monedas.</p>}
           </aside>
         </div>
       </div>

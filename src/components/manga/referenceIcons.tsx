@@ -361,6 +361,6 @@ export const EditorGifIcon = ({size = 17, className}: IconProps) => {
 
 export const DetailBackIcon = ({size = 30, className}: IconProps) => {
   return (<svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 30 30" fill="none">
-<path d="M14.625 24L5 15L14.625 6M5 15H27" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+<path d="M14.625 24L5 15L14.625 6M5 15H27" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
 </svg>);
 };

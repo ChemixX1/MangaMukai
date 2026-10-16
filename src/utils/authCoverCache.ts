@@ -9,7 +9,7 @@ export const getSharedAuthCovers = () => sharedAuthCovers;
 
 export const seedSharedAuthCovers = (
   mangas: Array<{ portada?: string; titulo?: string }>,
-  limit = 48,
+  limit = Number.POSITIVE_INFINITY,
 ) => {
   const seen = new Set<string>();
   const covers: SharedAuthCover[] = [];
@@ -22,7 +22,7 @@ export const seedSharedAuthCovers = (
     if (covers.length >= limit) break;
   }
 
-  if (covers.length > 0) sharedAuthCovers = covers;
+  if (covers.length > (sharedAuthCovers?.length ?? 0)) sharedAuthCovers = covers;
   return covers;
 };
 

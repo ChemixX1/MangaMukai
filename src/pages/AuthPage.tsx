@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
-  ChevronDown,
+  Globe2,
   Loader2,
 
 } from "lucide-react";
@@ -11,6 +11,7 @@ import { MANGAMUKAI_API, SOCIAL_LOGIN_SESSION_URL, socialLoginUrl, wordpressUrl 
 import { useTheme } from "../hooks/useTheme";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { saveAuth } from "../services/authService";
+import { getAuthPhoneCountry } from '../utils/authPhone';
 import { clearSocialReturn, readSocialReturn, rememberSocialReturn, safeAuthReturn } from "../utils/socialLoginReturn";
 import { getUltimosCapitulos } from "../services/mangaService";
 import {
@@ -26,8 +27,14 @@ import { AuthUserIcon, AuthMailIcon, AuthBirthdayIcon, AuthCalendarIcon, AuthPer
 
 import googleIcon from '../assets/auth/google.svg';
 import { AuthPasswordIcon } from '../components/auth/AuthPasswordIcon';
+import DriftWall, { type DriftWallItem } from '../components/auth/DriftWall';
 
 type CoverItem = SharedAuthCover;
+
+const FALLBACK_COVERS: CoverItem[] = [
+  '54961', '58016', '57841', '57821', '57410', '57266', '56981', '56903',
+  '55778', '55446', '55443', '55284', '55281', '55239', '55005', '54977',
+].map((id) => ({ src: `/images/collection/${id}.webp`, title: 'Manga Mukai' }));
 
 interface AuthResponse {
   success?: boolean;
@@ -66,20 +73,6 @@ const exchangeSocialSession = (code: string) => {
   return request;
 };
 
-// `example` es el formato nacional del móvil (sin prefijo ni cero inicial) que se muestra como placeholder.
-const COUNTRY_CODES = [
-  { code: "+51", iso: "pe", country: "Perú", example: "965 894 123" },
-  { code: "+54", iso: "ar", country: "Argentina", example: "11 2345 6789" },
-  { code: "+591", iso: "bo", country: "Bolivia", example: "712 34567" },
-  { code: "+56", iso: "cl", country: "Chile", example: "9 6123 4567" },
-  { code: "+57", iso: "co", country: "Colombia", example: "310 123 4567" },
-  { code: "+593", iso: "ec", country: "Ecuador", example: "99 123 4567" },
-  { code: "+34", iso: "es", country: "España", example: "612 345 678" },
-  { code: "+52", iso: "mx", country: "México", example: "55 1234 5678" },
-  { code: "+1", iso: "us", country: "Estados Unidos", example: "202 555 0123" },
-  { code: "+58", iso: "ve", country: "Venezuela", example: "412 123 4567" },
-];
-
 const SOCIAL_AUTH = [
   {
     provider: "discord",
@@ -113,9 +106,6 @@ const socialErrorMessage = (code: string, provider: string | null) =>
     providerLabel(provider),
   );
 
-const makeColumn = (covers: CoverItem[], offset: number) =>
-  Array.from({ length: 8 }, (_, index) => covers[(offset * 8 + index) % covers.length]);
-
 const selectCatalogCovers = (mangas: Awaited<ReturnType<typeof getUltimosCapitulos>>) => {
   const seen = new Set<string>();
   const available = mangas.reduce<CoverItem[]>((items, manga) => {
@@ -131,10 +121,8 @@ const selectCatalogCovers = (mangas: Awaited<ReturnType<typeof getUltimosCapitul
     [available[index], available[randomIndex]] = [available[randomIndex], available[index]];
   }
 
-  return available.slice(0, 48);
+  return available.slice(0, 24);
 };
-
-const countryFlag = (iso: string) => `https://flagcdn.com/w40/${iso}.png`;
 
 const formatBirthDate = (value: string) => {
   if (!value) return "";
@@ -142,95 +130,25 @@ const formatBirthDate = (value: string) => {
   return day && month && year ? `${day}/${month}/${year}` : value;
 };
 
-const CountryCodeSelect = ({
-  value,
-  onChange,
-  isLight,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  isLight: boolean;
-}) => {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const selected = COUNTRY_CODES.find((country) => country.code === value) ?? COUNTRY_CODES[0];
+const parseBirthDate = (value: string) => {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if (!match) return "";
+  const [, day, month, year] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  const iso = `${year}-${month}-${day}`;
+  return date.getUTCFullYear() === Number(year)
+    && date.getUTCMonth() + 1 === Number(month)
+    && date.getUTCDate() === Number(day)
+    && iso >= "1900-01-01"
+    && iso <= new Date().toISOString().slice(0, 10)
+    ? iso : "";
+};
 
-  useEffect(() => {
-    if (!open) return;
-
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [open]);
-
-  const surface = isLight
-    ? "border-black/15 bg-white text-black"
-    : "border-white/10 bg-[#111111] text-white";
-
-  return (
-    <div ref={containerRef} className="relative h-full">
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`Código de país: ${selected.country} ${selected.code}`}
-        onClick={() => setOpen((visible) => !visible)}
-        className={`flex h-[50px] w-full items-center gap-1.5 rounded-xl border px-2.5 text-sm font-normal outline-none transition-all hover:border-[#FF4D88]/60 ${surface}`}
-      >
-        {selected.iso === "pe" ? <AuthPeruIcon className="shrink-0" /> : <img
-          src={countryFlag(selected.iso)}
-          alt={`Bandera de ${selected.country}`}
-          width="24"
-          height="18"
-          className="h-[16px] w-[22px] shrink-0 rounded-[3px] object-cover shadow-sm"
-        />}
-        <span>{selected.code}</span>
-        <ChevronDown className={`ml-auto shrink-0 transition-transform ${open ? "rotate-180" : ""}`} size={15} />
-      </button>
-
-      {open && (
-        <div
-          role="listbox"
-          aria-label="Seleccionar código de país"
-          className={`absolute left-0 top-[calc(100%+9px)] z-40 max-h-48 min-w-[198px] overflow-y-auto rounded-2xl border p-1.5 shadow-2xl ${surface}`}
-        >
-          {COUNTRY_CODES.map((country) => (
-            <button
-              key={`${country.country}-${country.code}`}
-              type="button"
-              role="option"
-              aria-selected={country.code === value}
-              onClick={() => {
-                onChange(country.code);
-                setOpen(false);
-              }}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-normal transition-colors ${
-                country.code === value
-                  ? "bg-[#FF4D88] text-white"
-                  : isLight
-                    ? "hover:bg-black/[0.05]"
-                    : "hover:bg-white/[0.07]"
-              }`}
-            >
-              <img
-                src={countryFlag(country.iso)}
-                alt=""
-                width="24"
-                height="18"
-                loading="lazy"
-                className="h-[16px] w-[22px] shrink-0 rounded-[3px] object-cover shadow-sm"
-              />
-              <span className="min-w-0 flex-1 truncate">{country.country}</span>
-              <span>{country.code}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+const formatTypedBirthDate = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length > 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  if (digits.length > 2) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return digits;
 };
 
 const AuthField = ({ label, children }: { label: string; children: ReactNode }) => (
@@ -241,103 +159,6 @@ const AuthField = ({ label, children }: { label: string; children: ReactNode }) 
     {children}
   </div>
 );
-
-const CoverColumn = ({
-  covers,
-  direction,
-}: {
-  covers: CoverItem[];
-  direction: "up" | "down" | "up-slow";
-}) => {
-  const renderGroup = (duplicate = false) => (
-    <div className="auth-cover-group" aria-hidden={duplicate || undefined}>
-      {covers.map((cover, index) => (
-        <div className="auth-cover-card" key={`${cover.src}-${index}-${duplicate ? "copy" : "original"}`}>
-          <img
-            src={cover.src}
-            alt=""
-            loading={duplicate ? "lazy" : "eager"}
-            fetchPriority={index === 0 && !duplicate ? "high" : "auto"}
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="auth-cover-viewport">
-      <div className={`auth-cover-route-track auth-cover-route-track-${direction}`}>
-        <div className={`auth-cover-column auth-cover-column-${direction}`}>
-          {renderGroup()}
-          {renderGroup(true)}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const AuthCoverCollage = ({ covers, isLight, impulseToken }: { covers: CoverItem[]; isLight: boolean; impulseToken: number }) => {
-  const directions = ["up", "down", "up-slow", "down", "up", "down"] as const;
-  const collageRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (impulseToken === 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const animations = Array.from(
-      collageRef.current?.querySelectorAll<HTMLElement>(".auth-cover-column") ?? [],
-    ).flatMap((column) => column.getAnimations());
-    if (animations.length === 0) return;
-
-    const impulseDuration = 4000;
-    const maximumPlaybackRate = 120;
-    const startedAt = performance.now();
-    let animationFrame = 0;
-
-    const setPlaybackRate = (rate: number) => {
-      animations.forEach((animation) => animation.updatePlaybackRate(rate));
-    };
-
-    const decelerate = (timestamp: number) => {
-      const progress = Math.min(1, (timestamp - startedAt) / impulseDuration);
-      const remainingImpulse = Math.pow(1 - progress, 3);
-      setPlaybackRate(1 + (maximumPlaybackRate - 1) * remainingImpulse);
-
-      if (progress < 1) animationFrame = window.requestAnimationFrame(decelerate);
-      else setPlaybackRate(1);
-    };
-
-    setPlaybackRate(maximumPlaybackRate);
-    animationFrame = window.requestAnimationFrame(decelerate);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      setPlaybackRate(1);
-    };
-  }, [impulseToken]);
-
-  return (
-    <div
-      ref={collageRef}
-      className={`auth-collage-shell ${isLight ? "auth-collage-light" : "auth-collage-dark"}`}
-      aria-hidden="true"
-    >
-      <div className="auth-collage-perspective">
-        <div className="auth-collage-grid">
-          {[0, 1].map((half) => (
-            <div className={'auth-collage-half auth-collage-half-' + half} key={half}>
-              {directions.slice(half * 3, half * 3 + 3).map((direction, index) => (
-                <CoverColumn key={index} covers={makeColumn(covers, half * 3 + index)} direction={direction} />
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="auth-collage-veil" />
-    </div>
-  );
-};
 
 export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
   const location = useLocation();
@@ -356,17 +177,21 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [birthDateInput, setBirthDateInput] = useState("");
   const [countryCode, setCountryCode] = useState("+51");
   const [phone, setPhone] = useState("");
-  const phoneExample = (COUNTRY_CODES.find((country) => country.code === countryCode) ?? COUNTRY_CODES[0]).example;
+  const phoneCountry = useMemo(() => getAuthPhoneCountry(countryCode), [countryCode]);
   const [rememberSession, setRememberSession] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [remoteCovers, setRemoteCovers] = useState<CoverItem[]>(() => getSharedAuthCovers() ?? []);
-  const [coverImpulseToken, setCoverImpulseToken] = useState(0);
-  const previousAuthView = useRef(isLogin);
+  const wallItems = useMemo<DriftWallItem[]>(
+    () => (remoteCovers.length ? remoteCovers : FALLBACK_COVERS)
+      .map((cover) => ({ image: cover.src, title: cover.title })),
+    [remoteCovers],
+  );
   const birthDatePickerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -380,7 +205,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
 
   useEffect(() => {
     const cachedCovers = getSharedAuthCovers();
-    if (cachedCovers) {
+    if (cachedCovers?.length) {
       setRemoteCovers(cachedCovers);
       return;
     }
@@ -391,8 +216,12 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
       if (!active) return;
 
       const selectedCovers = selectCatalogCovers(mangas);
-      setSharedAuthCovers(selectedCovers);
-      setRemoteCovers(selectedCovers);
+      if (selectedCovers.length) {
+        setSharedAuthCovers(selectedCovers);
+        setRemoteCovers(selectedCovers);
+      }
+    }).catch(() => {
+      // Las portadas locales mantienen el fondo si el catálogo no responde.
     });
 
     return () => {
@@ -401,17 +230,11 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
   }, []);
 
   useEffect(() => {
-    if (previousAuthView.current === isLogin) return;
-
-    previousAuthView.current = isLogin;
-    setCoverImpulseToken((currentToken) => currentToken + 1);
-  }, [isLogin]);
-
-  useEffect(() => {
     setEmail("");
     setPassword("");
     setUsername("");
     setBirthDate("");
+    setBirthDateInput("");
     setCountryCode("+51");
     setPhone("");
     setRememberSession(false);
@@ -482,6 +305,10 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
 
   const handleAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!isLogin && !birthDate) {
+      setError("Escribe una fecha de nacimiento válida en formato dd/mm/aaaa.");
+      return;
+    }
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -532,7 +359,32 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
   return (
     <div className={`auth-page auth-reference min-h-screen ${isLight ? "auth-page-light" : "auth-page-dark"}`}>
       <main className="auth-visual-stage relative min-h-screen overflow-hidden">
-        {remoteCovers.length > 0 && <AuthCoverCollage covers={remoteCovers} isLight={isLight} impulseToken={coverImpulseToken} />}
+        <div className="auth-drift-wall" aria-hidden="true">
+            <DriftWall
+              items={wallItems}
+              columns={5}
+              tileWidth={200}
+              tileHeight={132}
+              gap={18}
+              tilt={16}
+              turn={-14}
+              perspective={1200}
+              depth={120}
+              speed={42}
+              direction="up"
+              variance={0.45}
+              parallax={0.6}
+              lift={64}
+              fade={0.6}
+              dim={0.55}
+              overlayColor={isLight ? '#ffffff' : '#000000'}
+              radius={14}
+              roll={0}
+              pauseOnHover={false}
+              grayscale={false}
+              fillWidth
+            />
+        </div>
 
         <section className="auth-form-shell relative z-20 flex min-h-[100svh] items-center justify-center px-5 pb-10 pt-24 sm:px-8 sm:pb-16 sm:pt-28">
           <motion.div
@@ -624,20 +476,28 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
                       <span className="relative block">
                         <AuthBirthdayIcon className={`pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 ${fieldIconClass}`} size={18} />
                         <input
-                          value={formatBirthDate(birthDate)}
+                          value={birthDateInput}
+                          onChange={(event) => {
+                            const nextValue = formatTypedBirthDate(event.target.value);
+                            setBirthDateInput(nextValue);
+                            setBirthDate(parseBirthDate(nextValue));
+                          }}
                           type="text"
-                          inputMode="none"
+                          inputMode="numeric"
                           autoComplete="bday"
                           placeholder="dd/mm/aaaa"
-                          readOnly
+                          maxLength={10}
                           required
                           aria-label="Fecha de nacimiento"
-                          className={`min-h-[50px] w-full cursor-default rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
+                          className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-12 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
                         />
                         <input
                           ref={birthDatePickerRef}
                           value={birthDate}
-                          onChange={(event) => setBirthDate(event.target.value)}
+                          onChange={(event) => {
+                            setBirthDate(event.target.value);
+                            setBirthDateInput(formatBirthDate(event.target.value));
+                          }}
                           type="date"
                           min="1900-01-01"
                           max={new Date().toISOString().slice(0, 10)}
@@ -656,14 +516,36 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
                       </span>
                     </AuthField>
 
-                    <div className="grid grid-cols-[104px_minmax(0,1fr)] gap-3.5">
+                    <div className="auth-phone-grid grid grid-cols-[104px_minmax(0,1fr)] gap-3.5">
                       <AuthField label="País">
-                        <CountryCodeSelect value={countryCode} onChange={setCountryCode} isLight={isLight} />
+                        <span className="auth-country-field">
+                          <span className="auth-country-flag" role="img" aria-label={phoneCountry ? `Bandera de ${phoneCountry.name}` : 'Prefijo internacional'} title={phoneCountry?.name}>
+                            {phoneCountry?.iso === 'pe' ? <AuthPeruIcon /> : phoneCountry ? (
+                              <img src={`https://flagcdn.com/w40/${phoneCountry.iso}.png`} alt="" width={20} height={15} />
+                            ) : <Globe2 aria-hidden="true" />}
+                          </span>
+                          <input
+                            value={countryCode}
+                            onChange={(event) => {
+                              const digits = event.target.value.replace(/\D/g, "").slice(0, 4);
+                              setCountryCode(digits ? `+${digits}` : event.target.value.includes("+") ? "+" : "");
+                            }}
+                            type="tel"
+                            inputMode="tel"
+                            autoComplete="tel-country-code"
+                            pattern="[+][0-9]{1,4}"
+                            maxLength={5}
+                            required
+                            aria-label="Código de país"
+                            placeholder="+51"
+                            className={`auth-country-code min-h-[50px] w-full rounded-xl border text-sm font-normal outline-none transition-all ${inputClass}`}
+                          />
+                        </span>
                       </AuthField>
 
                       <AuthField label="Teléfono">
                         <span className="relative block">
-                          <AuthPhoneIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
+                          <AuthPhoneIcon className={`auth-phone-icon pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
                           <input
                             value={phone}
                             onChange={(event) => setPhone(event.target.value)}
@@ -672,8 +554,8 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
                             autoComplete="tel-national"
                             required
                             aria-label="Teléfono"
-                            placeholder={phoneExample}
-                            className={`min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
+                            placeholder={phoneCountry?.example ?? 'Tu número'}
+                            className={`auth-phone-number min-h-[50px] w-full rounded-xl border py-3 pl-12 pr-4 text-sm font-normal outline-none transition-all placeholder:text-[13px] ${inputClass}`}
                           />
                         </span>
                       </AuthField>

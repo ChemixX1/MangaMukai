@@ -1,12 +1,20 @@
 import { BookmarkIcon } from '../../ui/icons';
+import { GooeySelector } from '../../ui/GooeySelector';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown, Loader2 } from 'lucide-react';
 
 import { MangaCommunityLinks } from '../MangaCommunityLinks';
-import { MangaReaderActivity } from '../MangaReaderActivity';
+import { MangaSeriesLikeButton } from '../MangaSeriesLikeButton';
 import { MangaRewardProgress } from '../MangaRewardProgress';
-import { DetailViewsIcon, DetailNewIcon, DetailBackIcon } from '../referenceIcons';
+import { MangaSeasonSelector } from '../MangaSeasonSelector';
+import HoloCard from '../HoloCard';
+import { MangaDetailSocials } from '../MangaDetailSocials';
+import { MangaDetailClock } from '../../common';
+import { DetailViewsIcon, DetailNewIcon } from '../referenceIcons';
+import { AlarmIcon, MoonIcon, SunIcon } from '../../ui';
+import { useTheme } from '../../../hooks/useTheme';
+import { OPEN_TIMER_EVENT } from '../../layout/useNavbarState';
 import { Footer } from '../../layout/Footer';
 import { ChapterList } from '../ChapterList';
 import { MangaComments } from '../MangaComments';
@@ -17,7 +25,6 @@ import type { MangaReactionId } from '../reactions';
 import {
   ChaptersTabIcon,
   CommentsTabIcon,
-  LikeHeartIcon,
   PaletteIcon,
   PlatformIcon,
   PublishedIcon,
@@ -64,7 +71,7 @@ const tabClass = (active = false) => `manga-detail-tab ${active ? 'is-active' : 
  */
 export const MobileMangaDetail = ({
   manga, chapters, related, initialComments, commentsLoading, commentsError, chaptersLoading, chaptersError, relatedLoading, secondaryReady,
-  isBookmarked, isLiked, likes, online, interactionBusy, onBookmark, onLike,
+  isBookmarked, isLiked, likes, interactionBusy, onBookmark, onLike,
   reactionCounts, selectedReaction, reactionError, onReact,
   purchasedIds, userCoins, userInfo, onPurchaseSuccess, onReadFirst, hasFirstChapter,
   synopsis,
@@ -98,8 +105,10 @@ export const MobileMangaDetail = ({
   hasFirstChapter: boolean;
   synopsis: string;
 }) => {
-  const navigate = useNavigate();
-  const [tab, setTab] = useState<'chapters' | 'synopsis'>('chapters');
+  const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
+  const [tab, setTab] = useState<'chapters' | 'synopsis' | 'comments'>('chapters');
+  const [sectionIndex, setSectionIndex] = useState(0);
   const [search, setSearch] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
@@ -129,26 +138,50 @@ export const MobileMangaDetail = ({
         <div className="absolute inset-0 bg-gradient-to-b from-surface/40 via-transparent to-surface" />
       </div>
     <div className="manga-detail-mobile focus-scope tap-transparent relative z-10 mx-auto flow-root min-h-screen w-full max-w-[440px] overflow-x-hidden text-ink [--focus-color:#ff008c] [--focus-offset:2px]">
-      {/* Portada a sangre, seguida por las acciones y el título. */}
-      <header className="relative aspect-[440/630]">
-        <img src={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} fetchPriority="high" className="block h-full w-full object-cover object-top" />
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 shadow-[inset_0_0_20px_#0004]" />
-
-        <button
-          type="button"
-          onClick={() => { if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1); else navigate('/'); }}
-          aria-label="Volver"
-          title="Volver"
-          className="manga-detail-back"
-        >
-          <DetailBackIcon size={30} />
-        </button>
-
-
+      <div className="manga-detail-mobile-topbar">
+        <div className="manga-detail-mobile-clock-row">
+          <div className="manga-detail-mobile-controls">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
+              title={theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
+            >
+              {theme === 'light' ? <MoonIcon size={26} /> : <SunIcon size={26} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event(OPEN_TIMER_EVENT))}
+              aria-label="Abrir temporizador"
+              title="Abrir temporizador"
+            >
+              <AlarmIcon size={22} />
+            </button>
+            <Link
+              to="/recargar"
+              state={{ returnTo: `${location.pathname}${location.search}` }}
+              aria-label="Recargar monedas"
+              title="Recargar monedas"
+            >
+              <svg width="26" height="26" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M6.123 7.25L6.914 2H2.8L1.081 6.5C1.02767 6.66 1.00067 6.82667 1 7C1 8.104 2.15 9 3.571 9C4.881 9 5.964 8.236 6.123 7.25ZM10 9C11.42 9 12.571 8.104 12.571 7C12.5703 6.95867 12.5687 6.91833 12.566 6.879L12.057 2H7.943L7.433 6.875L7.429 7C7.429 8.104 8.58 9 10 9ZM15 10.046V14H5V10.052C4.562 10.21 4.08 10.3 3.571 10.3C3.376 10.3 3.187 10.277 3 10.251V16.6C3 17.37 3.629 18 4.398 18H15.6C16.37 18 17 17.369 17 16.6V10.252C16.8111 10.282 16.6203 10.2983 16.429 10.301C15.9415 10.2996 15.4579 10.2133 15 10.046ZM18.92 6.5L17.199 2H13.086L13.876 7.242C14.03 8.232 15.113 9 16.429 9C17.849 9 19 8.104 19 7C18.9993 6.82667 18.9727 6.66 18.92 6.5Z" fill="currentColor" />
+              </svg>
+            </Link>
+          </div>
+          <MangaDetailClock />
+        </div>
+        <div className="manga-detail-mobile-follow">
+          <span className="manga-detail-mobile-clock-divider" aria-hidden="true" />
+          <MangaDetailSocials />
+        </div>
+      </div>
+      {/* La portada y las acciones comparten los mismos bordes laterales. */}
+      <header className="manga-detail-mobile-cover relative aspect-[440/630]">
+        <HoloCard image={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} foilEnabled={false} tiltMax={8} tiltDamping={26} hoverScale={1.015} radius={14} idle={false} />
       </header>
 
       {/* Acciones */}
-      <div className="manga-detail-mobile-actions ml-[12.7273%] mt-[19px] flex min-h-[50px] w-[74.3182%] items-start justify-center gap-[7px]">
+      <div className="manga-detail-mobile-actions flex min-h-[50px] items-start justify-center">
         <button
           type="button"
           onClick={onReadFirst}
@@ -172,24 +205,27 @@ export const MobileMangaDetail = ({
         <h1 className="manga-detail-mobile-title">
           {toTitleCase(manga.titulo)}
         </h1>
+        {manga.tituloOriginal?.trim() && <p className="manga-detail-original-title">{manga.tituloOriginal.trim()}</p>}
       {/* Géneros */}
       {genres.length > 0 && (
-        <nav aria-label="Géneros" className="manga-detail-genres">
+        <div role="list" aria-label="Géneros" className="manga-detail-genres">
           {genres.map((genre) => (
-            <Link key={genre} to={`/biblioteca?genre=${encodeURIComponent(genre)}`} className="flex h-5 items-center border border-neutral-500/70 bg-black px-[7px] font-anta text-[10px] font-normal leading-5 text-white">
+            <span key={genre} role="listitem" className="flex h-5 items-center border border-mukai-magenta bg-mukai-magenta px-[7px] font-anta text-[10px] font-normal leading-5 text-white">
               {genre}
-            </Link>
+            </span>
           ))}
-        </nav>
+        </div>
       )}
 
 
       <MangaRewardProgress mangaId={String(manga.eroSeri || manga.id)} chapterIds={chapters.map(chapter => chapter.id)} purchasedIds={purchasedIds} userId={userInfo.id} cover={manga.portada} loading={chaptersLoading} />
-      <MangaReaderActivity online={online} />
+      <MangaSeasonSelector key={manga.id} cover={manga.portada} title={toTitleCase(manga.titulo)} likeAction={
+        <MangaSeriesLikeButton liked={isLiked} likes={likes} busy={interactionBusy === 'like'} disabled={interactionBusy === 'like'} onClick={onLike} />
+      } />
       {/* Etiquetas de la colección */}
       <div className="manga-detail-badges">
-        <span className="manga-detail-views" aria-label={`${new Intl.NumberFormat("es-PE").format(manga.totalViews ?? 0)} vistas`}><DetailViewsIcon size={18} />{new Intl.NumberFormat("es-PE", { notation: "compact" }).format(manga.totalViews ?? 0)}</span>
-        <span className="flex h-6 w-16 items-center justify-center rounded-lg bg-mukai-magenta font-montserrat text-xs font-bold leading-4 text-white"><DetailNewIcon size={14} />Estreno</span>
+        <span className="manga-detail-views" aria-label={manga.totalViews === undefined ? 'Vistas no disponibles' : `${new Intl.NumberFormat('es-PE').format(manga.totalViews)} vistas`}><DetailViewsIcon size={18} />{manga.totalViews === undefined ? '--' : new Intl.NumberFormat('es-PE', { notation: 'compact' }).format(manga.totalViews)}</span>
+        <span className="manga-mobile-new-badge flex items-center justify-center rounded-lg bg-mukai-magenta font-montserrat text-xs font-bold leading-4 text-white"><DetailNewIcon size={16} />Estreno</span>
         {badge === 'bn' ? (
           <span className="flex h-6 w-16 items-center justify-center rounded-lg bg-zinc-100 font-montserrat text-xs font-bold leading-4 text-black">B&amp;N</span>
         ) : badge === 'hot' ? (
@@ -202,14 +238,12 @@ export const MobileMangaDetail = ({
         )}
       </div>
 
-      <button type="button" onClick={onLike} disabled={interactionBusy === 'like'} aria-pressed={isLiked} aria-label={isLiked ? 'Quitar Me gusta' : 'Me gusta'} className="manga-mobile-like"><LikeHeartIcon size={26} filled={isLiked} /><span>{likes}</span></button>
-
       {/* Ficha técnica */}
       <div className="manga-detail-mobile-metadata mx-auto mt-7 w-[74.5455%] max-[400px]:w-[calc(100%-48px)]">
-        <MetaRow icon={<TypeIcon size={26} />} label="Tipo" value={manga.tipo || 'Manga'} dotColor={typeColor} />
+        <MetaRow icon={<TypeIcon size={26} />} label="Tipo" value={manga.tipo?.trim() || '--'} dotColor={manga.tipo?.trim() ? typeColor : undefined} />
         {manga.author && <MetaRow icon={<StudioIcon size={25} />} label="Autor" value={manga.author} />}
-                <MetaRow icon={<StudioIcon size={25} />} label="Estudio" value={manga.studio || 'N/A'} />
-        <MetaRow icon={<PlatformIcon size={26} />} label="Plataforma" value={manga.platform || 'N/A'} />
+        <MetaRow icon={<StudioIcon size={25} />} label="Estudio" value={manga.studio?.trim() || '--'} />
+        <MetaRow icon={<PlatformIcon size={26} />} label="Plataforma" value={manga.platform?.trim() || '--'} />
         <MetaRow icon={<PublishedIcon size={27} />} label="Publicación" value={formatDate(manga.publishedAt || manga.rawFecha)} />
       </div>
 
@@ -221,19 +255,19 @@ export const MobileMangaDetail = ({
       <nav aria-label="Secciones del manga" className="mx-auto mt-[46px] w-[88.6364%]">
         <div className="manga-detail-tabs">
           {/* Selección que se desplaza entre las pestañas. */}
-          <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1/3 rounded-full bg-black transition-transform duration-[360ms] ease-[cubic-bezier(0.22,0.9,0.3,1)] will-change-transform motion-reduce:transition-none ${tab === 'synopsis' ? 'translate-x-full' : ''}`} />
-          <button type="button" onClick={() => setTab('chapters')} aria-current={tab === 'chapters'} className={tabClass(tab === 'chapters')}>
+          <GooeySelector activeIndex={sectionIndex} color="#000000" />
+          <button type="button" onClick={() => { setTab('chapters'); setSectionIndex(0); }} aria-current={sectionIndex === 0} className={tabClass(sectionIndex === 0)}>
             <ChaptersTabIcon size={13} />
             Capítulos ({chapters.length})
           </button>
-          <button type="button" onClick={() => setTab('synopsis')} aria-current={tab === 'synopsis'} className={tabClass(tab === 'synopsis')}>
+          <button type="button" onClick={() => { setTab('synopsis'); setSectionIndex(1); }} aria-current={sectionIndex === 1} className={tabClass(sectionIndex === 1)}>
             <SynopsisTabIcon size={14} />
             Sinopsis
           </button>
-          <a href="#comentarios" className={tabClass()}>
+          <button type="button" onClick={() => { setTab('comments'); setSectionIndex(2); }} aria-current={sectionIndex === 2} className={tabClass(sectionIndex === 2)}>
             <CommentsTabIcon size={16} />
             Comentarios
-          </a>
+          </button>
         </div>
       </nav>
 
@@ -280,10 +314,9 @@ export const MobileMangaDetail = ({
             )}
           </div>
         </section>
-      ) : (
+      ) : tab === 'synopsis' ? (
         <section aria-label="Sinopsis" className="mx-auto mt-7 w-[89.0909%]">
           <div className="rounded-2xl border-[0.5px] border-zinc-400/60 p-4">
-            {manga.tituloOriginal && <p className="mb-3 text-center text-xs">{manga.tituloOriginal}</p>}
             <p className={`text-justify font-montserrat text-[13px] font-normal leading-5 text-ink/90 ${synopsisExpanded ? '' : 'line-clamp-6'}`}>
               {synopsis || 'La sinopsis de este manga todavía no está disponible.'}
             </p>
@@ -295,18 +328,20 @@ export const MobileMangaDetail = ({
             )}
           </div>
         </section>
-      )}
+      ) : null}
 
+      <div className="flex flex-col">
       <div className="mx-auto w-[89.0909%]"><MangaCommunityLinks /></div>
       <div className="mt-[35px]">
         <MobileReactions counts={reactionCounts} selected={selectedReaction} error={reactionError} onReact={onReact} />
       </div>
 
-      <div className="manga-detail-comments">
+      <MangaRecommendations loading={relatedLoading} items={related} currentId={manga.id} className="mx-auto mt-[37px] min-h-[709px] w-[89.0909%]" />
+
+      <div className={`manga-detail-comments${tab === 'comments' ? ' order-first' : ''}`}>
         <MangaComments mangaId={String(manga.id)} initialComments={initialComments} loading={commentsLoading} loadError={commentsError} />
       </div>
-
-      <MangaRecommendations loading={relatedLoading} items={related} currentId={manga.id} className="mx-auto mt-[37px] min-h-[709px] w-[89.0909%]" />
+      </div>
 
       <div className="mt-12">
         <Footer homeDesign className="-mt-6" />

@@ -1,6 +1,7 @@
 import { clearStoredAuth, getStoredToken } from './authService';
 import { MANGAMUKAI_API } from '../config/api';
 import { syncMangaSubscriptions } from './socialService';
+import { readGuestMangaLike, toggleGuestMangaLike } from '../utils/guestMangaLikes';
 
 const WP_AUTH = MANGAMUKAI_API;
 
@@ -41,6 +42,10 @@ export const getInteractions = async (mangaId?: string): Promise<UserInteraction
     if (token && clearIfUnauthorized(res)) return null;
     const data = await res.json();
     if (data.success) {
+      if (!token && mangaId) {
+        const liked = readGuestMangaLike(mangaId);
+        return { ...data, likes: liked ? [mangaId] : [], manga_likes: Number(data.manga_likes || 0) + Number(liked) } as UserInteractions;
+      }
       return data as UserInteractions;
     }
   } catch { /* silent */ }
@@ -74,10 +79,10 @@ export const toggleBookmarkWithTotal = async (mangaId: string): Promise<ToggleIn
   return null;
 };
 
-/** Alterna el like del usuario autenticado y devuelve el total actualizado. */
-export const toggleMangaLike = async (mangaId: string): Promise<ToggleInteractionResult | null> => {
+/** Guarda en el servidor para cuentas, o en este navegador para invitados. */
+export const toggleMangaLike = async (mangaId: string, guestPublicTotal = 0): Promise<ToggleInteractionResult | null> => {
   const token = getStoredToken();
-  if (!token) return null;
+  if (!token) return toggleGuestMangaLike(mangaId, guestPublicTotal);
 
   try {
     const res = await fetch(`${WP_AUTH}/like`, {

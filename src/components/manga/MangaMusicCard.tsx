@@ -1,30 +1,20 @@
-import { useRef, useState, type MouseEvent } from 'react';
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  Heart,
-  ListMusic,
-  Loader2,
-  MoreHorizontal,
-  Music,
-  Pause,
-  Play,
-  Shuffle,
-  SkipBack,
-  SkipForward,
-  X,
-} from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Playlist01Icon, Loading03Icon, MusicNote01Icon, PauseIcon, PlayIcon, PreviousIcon, NextIcon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import {
   isPlayableTrack,
   playNext,
   playPrev,
   seekTo,
   selectTrack,
-  toggleLike,
+  setVolume,
   togglePlay,
   useMusicPlayer,
 } from '../../services/musicPlayer';
 import { MukaiMusicPromo } from './MukaiMusicPromo';
 import { openSubscriptionModal } from '../../utils/subscriptionModal';
+import ElasticSlider from '../ui/ElasticSlider';
 
 interface MangaMusicCardProps {
   cover: string;
@@ -39,24 +29,19 @@ const formatTime = (time: number) => {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
-export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }: MangaMusicCardProps) => {
+export const MangaMusicCard = ({ compactHeight = false, isLight = false }: MangaMusicCardProps) => {
   // Estado compartido: la misma lista y el mismo audio en la ficha y en el lector.
-  const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, likedIds } = useMusicPlayer();
+  const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, volume } = useMusicPlayer();
   const [showPlaylist, setShowPlaylist] = useState(false);
-  const progressBarRef = useRef<HTMLDivElement>(null);
+  const [seekPreview, setSeekPreview] = useState<{ trackId: number | null; time: number } | null>(null);
+  const progressTime = seekPreview?.trackId === currentId ? seekPreview.time : currentTime;
+  const [failedCover, setFailedCover] = useState<string | null>(null);
 
   const currentTrack = tracks.find((track) => track.id === currentId) ?? null;
   const canPlay = isPlayableTrack(currentTrack);
   const isLocked = !loading && !canPlay;
-  const trackLiked = currentTrack ? likedIds.includes(currentTrack.id) : false;
-  const displayImage = currentTrack?.cover_url || cover;
-  const progressPercent = duration ? (currentTime / duration) * 100 : 0;
-
-  const handleProgressBarClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (!canPlay || !progressBarRef.current || !duration) return;
-    const rect = progressBarRef.current.getBoundingClientRect();
-    seekTo(((event.clientX - rect.left) / rect.width) * duration);
-  };
+  const canBrowsePlaylist = canPlay;
+  const displayImage = currentTrack?.cover_url;
 
   const playTrack = (id: number, locked: boolean) => {
     if (locked) {
@@ -67,7 +52,7 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }
     setShowPlaylist(false);
   };
 
-  const heightClass = compactHeight ? 'h-[215px] lg:h-[235px]' : 'h-[220px] lg:h-[250px]';
+  const heightClass = compactHeight ? 'min-h-[228px] lg:min-h-[252px]' : 'min-h-[243px] lg:min-h-[267px]';
 
   // Sin acceso a la música, solo el cartel de Mukai Music (como en móvil): el
   // reproductor ni se monta, así no se ve ni se puede enfocar por detrás.
@@ -80,68 +65,112 @@ export const MangaMusicCard = ({ cover, compactHeight = false, isLight = false }
   }
 
   return (
-    <aside className={`group relative isolate flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border shadow-none ${heightClass} ${isLight ? 'bg-white text-black' : 'bg-[#0a0a0d] text-white'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
-      {loading && <div className={`absolute inset-0 z-50 flex items-center justify-center ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`}><Loader2 size={22} className={`animate-spin ${isLight ? 'text-black/50' : 'text-white/50'}`} /></div>}
+    <aside className={`manga-music-player group relative isolate flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border shadow-sm ${heightClass} ${isLight ? 'bg-white text-black' : 'bg-[#0a0a0d] text-white'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
+      {loading && <div className={`absolute inset-0 z-50 flex items-center justify-center ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`}><HugeiconsIcon icon={Loading03Icon} size={22} className={`animate-spin ${isLight ? 'text-black/50' : 'text-white/50'}`} /></div>}
 
-      {/* Fondo sólido: el degradado con transparencia dejaba ver el fondo de la
-          página durante el cambio de tema. */}
-      <div aria-hidden="true" className={`absolute -inset-px z-0 rounded-2xl ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`} />
+      {/* Degradado opaco para que el fondo de la página no altere el blanco. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-px z-0 rounded-2xl"
+        style={{
+          background: isLight
+            ? 'radial-gradient(ellipse at 25% 15%, #ffffff 0%, #ffffff 45%, #f5f8ff 100%)'
+            : '#0a0a0d',
+        }}
+      />
 
-      <div className="z-20 flex items-center justify-between px-5 pt-4">
-        <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isLight ? 'text-black/45' : 'text-white/40'}`}>Now Playing</span>
-        <button type="button" disabled={!canPlay} className={`transition-colors disabled:opacity-40 ${isLight ? 'text-black/45 hover:text-black' : 'text-white/40 hover:text-white'}`}><MoreHorizontal size={14} /></button>
-      </div>
-
-      <div className="z-20 flex flex-1 flex-col justify-end px-5 pb-5">
-        <div className="mb-2 flex items-center gap-4 lg:mb-4">
-          <motion.div className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border lg:h-14 lg:w-14 ${isLight ? 'border-black/10 bg-zinc-100' : 'border-white/10 bg-zinc-900'}`} whileHover={canPlay ? { scale: 1.05 } : {}}>
-            {displayImage ? <img src={displayImage} alt="Cover" className={`h-full w-full object-cover transition-transform duration-700 ${isPlaying ? 'scale-100' : 'scale-110 grayscale'}`} /> : <Music size={20} className={isLight ? 'text-zinc-400' : 'text-zinc-600'} />}
+      <div className="z-20 flex flex-1 flex-col gap-2 px-5 pt-4 pb-2 lg:gap-3 lg:pt-5 lg:pb-2">
+        <div className="flex items-center gap-4">
+          <div className="relative h-12 w-12 shrink-0">
+          <motion.div className={`absolute left-0 top-0 flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-xl border bg-black ${isLight ? 'border-black/10' : 'border-white/10'}`} whileHover={canPlay ? { scale: 1.05 } : {}}>
+            {displayImage && displayImage !== failedCover && <img src={displayImage} onError={() => setFailedCover(displayImage)} alt="Portada de la pista" className={`h-full w-full object-cover transition-transform duration-700 ${isPlaying ? 'scale-100' : 'scale-110'}`} />}
           </motion.div>
+          </div>
 
-          <div className="min-w-0 flex-1 overflow-hidden">
-            <h3 className={`truncate text-xs font-bold leading-tight lg:text-sm ${isLight ? 'text-black' : 'text-white'}`}>{currentTrack?.title || 'Sin Pista'}</h3>
+          <div className="min-w-0 flex-1 overflow-hidden pl-3">
+            <h3 className={`truncate text-base font-semibold leading-tight ${isLight ? 'text-black' : 'text-white'}`}>{currentTrack?.title || 'Sin Pista'}</h3>
             <p className={`mt-0.5 truncate text-[9px] font-medium uppercase lg:text-[10px] ${isLight ? 'text-black/60' : 'text-white/60'}`}>{currentTrack?.genre || 'OST'}</p>
           </div>
 
-          <button type="button" disabled={!canPlay} onClick={() => currentTrack && toggleLike(currentTrack.id)} className={`transition-transform active:scale-90 disabled:opacity-40 ${trackLiked ? 'text-[#1DB954]' : isLight ? 'text-black hover:text-[#1DB954]' : 'text-white hover:text-[#1DB954]'}`} aria-label="Marcar canción como favorita">
-            <Heart size={16} fill={trackLiked ? 'currentColor' : 'transparent'} />
-          </button>
         </div>
 
-        <div className="mb-2 w-full lg:mb-4">
-          <div className="mb-1 flex justify-end"><span className={`font-mono text-[8px] font-bold tracking-wider lg:text-[9px] ${isLight ? 'text-black/90' : 'text-white/90'}`}>{formatTime(currentTime)} / {formatTime(duration)}</span></div>
-          <div ref={progressBarRef} onClick={handleProgressBarClick} className={`group/bar relative -my-2 flex h-1 w-full items-center overflow-hidden rounded-full bg-white/0 py-2 ${canPlay ? 'cursor-pointer' : 'cursor-default'}`}>
-            <div className={`pointer-events-none absolute top-1/2 h-1 w-full -translate-y-1/2 rounded-full ${isLight ? 'bg-black/25' : 'bg-white/30'}`} />
-            <motion.div className={`pointer-events-none relative h-1 rounded-full ${isLight ? 'bg-black' : 'bg-white'}`} style={{ width: `${progressPercent}%` }} transition={{ ease: 'linear', duration: 0.1 }}>
-              {canPlay && <div className={`absolute right-0 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full opacity-0 transition-opacity group-hover/bar:opacity-100 ${isLight ? 'bg-black shadow-[0_0_10px_rgba(0,0,0,0.45)]' : 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]'}`} />}
-            </motion.div>
+        <div className="mt-1.5 w-full">
+          <ElasticSlider
+            key={currentId}
+            value={progressTime}
+            maxValue={duration || 1}
+            onChange={(time) => setSeekPreview({ trackId: currentId, time })}
+            onChangeEnd={(time) => {
+              seekTo(time);
+              setSeekPreview(null);
+            }}
+            disabled={!canPlay || !duration}
+            ariaLabel="Progreso de la canción"
+            leftIcon={null}
+            rightIcon={null}
+            valuePosition="none"
+            thickness={6}
+            activeThickness={12}
+            radius={40}
+            maxStretch={16}
+            bounce={0.5}
+            growOnHover
+            wheel={false}
+            jumpToClick
+            style={{ width: '100%' }}
+          />
+          <div className={`-mt-1 flex justify-between font-montserrat text-[12px] font-normal leading-4 tabular-nums ${isLight ? 'text-black' : 'text-white'}`}>
+            <span>{formatTime(progressTime)}</span><span>{formatTime(duration)}</span>
           </div>
         </div>
-
         <div className="flex items-center justify-between">
-          <button type="button" disabled={!canPlay} className={`transition-colors disabled:opacity-40 ${isLight ? 'text-black/60 hover:text-black' : 'text-white/60 hover:text-white'}`}><Shuffle size={14} /></button>
+          <span className="w-[22px]" aria-hidden="true" />
           <div className="flex items-center gap-4 lg:gap-5">
-            <button type="button" onClick={() => playPrev(isPlaying)} disabled={!canPlay} className={`transition-all hover:-translate-x-0.5 disabled:opacity-40 ${isLight ? 'text-black hover:text-black/70' : 'text-white hover:text-white/70'}`}><SkipBack size={18} fill="currentColor" /></button>
-            <button type="button" onClick={togglePlay} disabled={!canPlay} className={`flex h-8 w-8 items-center justify-center rounded-full transition-all hover:scale-110 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 lg:h-10 lg:w-10 ${isLight ? 'bg-black text-white' : 'bg-white text-black'}`} aria-label={isPlaying ? 'Pausar música' : 'Reproducir música'}>
-              {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+            <button type="button" aria-label="Pista anterior" onClick={() => playPrev(isPlaying)} disabled={!canPlay} className={`transition-transform enabled:hover:-translate-x-0.5 disabled:cursor-not-allowed ${isLight ? 'text-black' : 'text-white'}`}><HugeiconsIcon icon={PreviousIcon} size={24} fill="none" /></button>
+            <button type="button" onClick={togglePlay} disabled={!canPlay} className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-transform enabled:hover:scale-105 enabled:active:scale-95 disabled:cursor-not-allowed ${isLight ? 'border-black/15 bg-black/5 text-black shadow-[inset_0_2px_5px_rgba(0,0,0,0.2),inset_0_-1px_2px_rgba(255,255,255,0.8)]' : 'border-white/20 bg-white/10 text-white shadow-[inset_0_2px_6px_rgba(0,0,0,0.75),inset_0_-1px_2px_rgba(255,255,255,0.15)]'}`} aria-label={isPlaying ? 'Pausar música' : 'Reproducir música'}>
+              {isPlaying ? <HugeiconsIcon icon={PauseIcon} size={24} fill="none" /> : <HugeiconsIcon icon={PlayIcon} size={24} fill="none" className="ml-0.5" />}
             </button>
-            <button type="button" onClick={() => playNext(isPlaying)} disabled={!canPlay} className={`transition-all hover:translate-x-0.5 disabled:opacity-40 ${isLight ? 'text-black hover:text-black/70' : 'text-white hover:text-white/70'}`}><SkipForward size={18} fill="currentColor" /></button>
+            <button type="button" aria-label="Pista siguiente" onClick={() => playNext(isPlaying)} disabled={!canPlay} className={`transition-transform enabled:hover:translate-x-0.5 disabled:cursor-not-allowed ${isLight ? 'text-black' : 'text-white'}`}><HugeiconsIcon icon={NextIcon} size={24} fill="none" /></button>
           </div>
-          <button type="button" onClick={() => canPlay && setShowPlaylist((show) => !show)} disabled={!canPlay} className={`relative transition-colors disabled:opacity-40 ${showPlaylist ? 'text-[#1DB954]' : isLight ? 'text-black/60 hover:text-black' : 'text-white/60 hover:text-white'}`} aria-label="Mostrar lista de reproducción"><ListMusic size={16} /></button>
+          <button type="button" onClick={() => canBrowsePlaylist && setShowPlaylist((show) => !show)} disabled={!canBrowsePlaylist} className={`relative transition-colors disabled:opacity-40 ${showPlaylist ? 'text-[#1DB954]' : isLight ? 'text-black/60 hover:text-black' : 'text-white/60 hover:text-white'}`} aria-label="Mostrar lista de reproducción"><HugeiconsIcon icon={Playlist01Icon} size={22} /></button>
+        </div>
+        <div className="flex justify-center">
+          <ElasticSlider
+            value={volume}
+            onChange={setVolume}
+            ariaLabel="Volumen de la música"
+            maxStretch={16}
+            bounce={0.5}
+            growOnHover
+            wheel={false}
+            orientation="horizontal"
+            iconPlacement="outside"
+            valuePosition="none"
+            thickness={6}
+            activeThickness={12}
+            restOpacity={0.7}
+            fillFrom={0}
+            isStepped={false}
+            stepSize={10}
+            ticks={false}
+            thumb={false}
+            jumpToClick
+            style={{ width: '100%' }}
+          />
         </div>
       </div>
 
       <AnimatePresence>
-        {showPlaylist && canPlay && (
-          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className={`absolute inset-0 z-30 flex flex-col ${isLight ? 'bg-white/95' : 'bg-black/95'}`}>
+        {showPlaylist && canBrowsePlaylist && (
+          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className={`absolute inset-0 z-30 flex flex-col ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`}>
             <div className={`flex items-center justify-between border-b p-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
               <span className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/80' : 'text-white/80'}`}>Playlist ({tracks.length})</span>
-              <button type="button" onClick={() => setShowPlaylist(false)} className={`transition-all hover:rotate-90 ${isLight ? 'text-black' : 'text-white'}`}><X size={14} /></button>
+              <button type="button" aria-label="Cerrar lista de reproducción" onClick={() => setShowPlaylist(false)} className={`transition-all hover:rotate-90 ${isLight ? 'text-black' : 'text-white'}`}><HugeiconsIcon icon={Cancel01Icon} size={22} /></button>
             </div>
             <div className="hide-scroll flex-1 space-y-1 overflow-y-auto p-2">
               {tracks.map((track) => (
                 <button type="button" key={track.id} onClick={() => playTrack(track.id, !isPlayableTrack(track))} className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-all ${currentId === track.id ? isLight ? 'border-black/5 bg-black/10' : 'border-white/5 bg-white/10' : isLight ? 'border-transparent hover:bg-black/5' : 'border-transparent hover:bg-white/5'}`}>
-                  <div className={`relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>{track.cover_url ? <img src={track.cover_url} className="h-full w-full object-cover opacity-80" alt="" /> : <Music size={12} className={isLight ? 'text-black/50' : 'text-white/50'} />}</div>
+                  <div className={`relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded ${isLight ? 'bg-black/5' : 'bg-white/5'}`}>{track.cover_url ? <img src={track.cover_url} className="h-full w-full object-cover opacity-80" alt="" /> : <HugeiconsIcon icon={MusicNote01Icon} size={16} className={isLight ? 'text-black/50' : 'text-white/50'} />}</div>
                   <h4 className={`min-w-0 flex-1 truncate text-[10px] font-bold ${currentId === track.id ? 'text-[#1DB954]' : isLight ? 'text-black' : 'text-white'}`}>{track.title}</h4>
                   <span className={`font-mono text-[9px] ${isLight ? 'text-black/35' : 'text-white/30'}`}>{track.duration}</span>
                 </button>
