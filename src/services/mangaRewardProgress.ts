@@ -39,6 +39,29 @@ export const getCompletedRewardChapterIds = (userId: ChapterId, mangaId: Chapter
   }
 };
 
+/** Combine every manga saved for this account, including existing browser history. */
+export const getAccountCompletedRewardChapterIds = (userId: ChapterId): Set<string> => {
+  const user = normalizeId(userId);
+  const completed = new Set<string>();
+  if (!user) return completed;
+  try {
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(STORAGE_PREFIX)) continue;
+      try {
+        const scope: unknown = JSON.parse(key.slice(STORAGE_PREFIX.length));
+        if (!Array.isArray(scope) || scope.length !== 2 || scope[0] !== user || typeof scope[1] !== 'string') continue;
+        for (const chapter of getCompletedRewardChapterIds(user, scope[1])) completed.add(chapter);
+      } catch {
+        // A malformed entry must not hide progress from other manga.
+      }
+    }
+  } catch {
+    // Browser storage may be unavailable.
+  }
+  return completed;
+};
+
 /** Called only after the existing reading-progress endpoint confirms completion. */
 export const recordCompletedRewardChapter = (userId: ChapterId, mangaId: ChapterId, chapterId: ChapterId): void => {
   const key = storageKey(userId, mangaId);

@@ -1,7 +1,6 @@
 import { X } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { AlarmAlert, TimerModal } from '../modals';
-import { NotificationsPanel } from '../social';
 import { NavbarM } from './NavbarM';
 import { NavbarP } from './NavbarP';
 import { useNavbarState } from './useNavbarState';
@@ -12,7 +11,7 @@ const CartOverlay = lazy(() => import('./CartOverlay').then(({ CartOverlay }) =>
 
 export function Navbar() {
   const model = useNavbarState();
-  const { isLightMode, currentUser, sessionNotice, setSessionNotice, showNotifications, setShowNotifications, setUnreadNotifications, isMobile, isStoreMode, isMessagesRoute, isSearchOpen, closeSearchOverlay, isNotificationsOpen, closeNotificationsOverlay, isCartOpen, closeCartOverlay, isTimerModalOpen, setIsTimerModalOpen, isAlarmAlertOpen, setIsAlarmAlertOpen, timeLeft, isTimerActive, startTimer, stopTimer, openAuthPage } = model;
+  const { isLightMode, currentUser, sessionNotice, setSessionNotice, isMobile, isStoreMode, isMessagesRoute, isSearchOpen, closeSearchOverlay, isNotificationsOpen, closeNotificationsOverlay, isCartOpen, closeCartOverlay, isTimerModalOpen, setIsTimerModalOpen, isAlarmAlertOpen, setIsAlarmAlertOpen, timeLeft, isTimerActive, startTimer, stopTimer, openAuthPage } = model;
   return (
     <>
       {!isMessagesRoute && (isMobile ? <NavbarM model={model} /> : <NavbarP model={model} />)}
@@ -38,11 +37,9 @@ export function Navbar() {
         </div>
       )}
 
-      <NotificationsPanel isOpen={showNotifications} isLight={isLightMode} onClose={() => setShowNotifications(false)} onUnreadChange={setUnreadNotifications} />
-
       <Suspense fallback={null}>
         <SearchOverlay open={isSearchOpen} isLight={isLightMode} onClose={closeSearchOverlay} />
-        <NotificationsOverlay open={isNotificationsOpen} isLight={isLightMode} onClose={closeNotificationsOverlay} />
+        <NotificationsOverlay desktop={!isMobile} open={isNotificationsOpen} isLight={isLightMode} onClose={closeNotificationsOverlay} />
         {/* Sigue montado mientras esté abierto al salir de la Tienda, para que el panel se cierre solo con la ruta. */}
         {(isStoreMode || isCartOpen) && <CartOverlay open={isCartOpen} isLight={isLightMode} onClose={closeCartOverlay} />}
       </Suspense>

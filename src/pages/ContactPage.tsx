@@ -101,7 +101,6 @@ export const ContactPage = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             
-            {/* --- COLUMNA IZQUIERDA --- */}
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -169,7 +168,6 @@ export const ContactPage = () => {
               </div>
             </motion.div>
 
-            {/* --- COLUMNA DERECHA --- */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}

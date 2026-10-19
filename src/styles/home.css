@@ -1,8 +1,5 @@
 /* home: portada y marco de la colección B&N. */
 
-/* Portada: colores del diseño de Figma (rosa #ff008c, celeste #00e1ff y manhua
-   #b000ad), tarjetas blancas sobre el fondo #f7f4f4, paginación de relleno
-   plano y el avión de Telegram en blanco. */
 .home-page {
   --mm-accent-pink: #ff008c;
   --mm-accent-cyan: #00e1ff;
@@ -13,17 +10,20 @@
   --mm-pagination-edge: transparent;
 }
 
-.home-theme-light .home-page {
+.home-theme-light :is(.home-page, .manga-bn-page, .collection-landing, .reader-page) {
   --mm-surface: 247 244 244;
   --mm-panel: 255 255 255;
 }
 
-/* Tema oscuro en móvil y PC: gris carbón #141414, tarjetas negras y acentos
-   pink-600/cyan-400. El tema claro conserva los colores de su referencia. */
+.home-theme-dark :is(.home-page, .manga-bn-page, .collection-landing, .reader-page) {
+  --mm-surface: 20 20 20;
+  --mm-panel: 0 0 0;
+}
+
 .home-theme-dark .home-page {
   --mm-surface: 20 20 20;
   --mm-panel: 0 0 0;
-  --mm-accent-pink: #db2777;
+  --mm-accent-pink: #ff008c;
   --mm-accent-cyan: #22d3ee;
   --mm-type-manhua: #a21caf;
   --mm-pc-card: #000;
@@ -66,7 +66,6 @@
   perspective-origin: 0 0;
 }
 
-/* PC: un poco de aire bajo las portadas, conservando el trazado original (el podio móvil ya va a su altura del diseño). */
 @media (min-width: 1024px) {
   .home-hero-podium {
     transform: translateY(12px);
@@ -121,26 +120,26 @@
 
 /* La base queda anclada mientras el contorno y el hueco central fluctúan
    a ritmos distintos, como dos lenguas de la misma llama. */
-.home-page .trending-flame-body,
-.home-page .trending-flame-core {
+.trending-flame-body,
+.trending-flame-core {
   transform-box: fill-box;
   transform-origin: 50% 100%;
 }
 
-.home-page .trending-flame-body {
+.trending-flame-body {
   animation: home-flame-sway 2.6s ease-in-out infinite;
 }
 
-.home-page .trending-flame-core {
+.trending-flame-core {
   animation: home-flame-flicker 1.7s ease-in-out infinite;
 }
 
-.home-page .home-block-youth .trending-flame-body {
+.home-block-youth .trending-flame-body {
   animation-duration: 2.9s;
   animation-delay: -1.1s;
 }
 
-.home-page .home-block-youth .trending-flame-core {
+.home-block-youth .trending-flame-core {
   animation-duration: 1.9s;
   animation-delay: -0.7s;
 }
@@ -161,17 +160,17 @@
 }
 
 /* Llama pequeña de «New»: titila rápido sin desplazar el pie del dibujo. */
-.home-page .home-new-flame {
+.home-new-flame {
   overflow: visible;
 }
 
-.home-page .home-new-flame > path {
+.home-new-flame > path {
   transform-box: fill-box;
   transform-origin: 50% 100%;
   animation: home-new-flame-flicker 820ms ease-in-out infinite;
 }
 
-.home-page .home-block-youth-latest .home-new-flame > path {
+.home-block-youth-latest .home-new-flame > path {
   animation-duration: 940ms;
   animation-delay: -310ms;
 }
@@ -466,7 +465,9 @@
 .home-community-telegram .home-social-decoration { left: 0; }
 .home-community-discord .home-social-decoration { right: 0; }
 
-.home-design-footer { position: relative; min-height: 475px; margin-top: 153px; overflow: hidden; }
+.home-design-footer { --mm-accent-pink: #ff008c; position: relative; min-height: 475px; margin-top: 153px; overflow: hidden; color: rgb(var(--mm-ink)); }
+.home-theme-light .home-design-footer { --mm-panel: 255 255 255; }
+.home-theme-dark .home-design-footer { --mm-panel: 0 0 0; }
 .home-footer-content { position: relative; display: flex; flex-direction: column; align-items: center; }
 .home-footer-content > a span { font-style: italic; font-size: 34px; line-height: 34px; }
 .home-footer-content .text-mukai-magenta { color: var(--mm-accent-pink); }
@@ -488,7 +489,8 @@
 .home-footer-credit svg { width: 12px; height: 12px; }
 
 @media (min-width: 1024px) {
-  .home-theme-light .home-page { --mm-surface: 244 244 245; }
+  .home-theme-light :is(.home-page, .manga-bn-page, .collection-landing, .reader-page) { --mm-surface: 244 244 245; }
+  .home-announcement-art { top: 0; height: 100%; object-fit: cover; transform: none; }
   .home-carousel-scrim { background: linear-gradient(180deg, rgb(var(--mm-surface) / .8), rgb(var(--mm-surface))); }
   .home-hero h2 { font-size: 30px; line-height: 32px; }
   .home-hero-glass { background: linear-gradient(180deg, rgb(var(--mm-panel) / .7), rgb(var(--mm-panel) / .9)); }

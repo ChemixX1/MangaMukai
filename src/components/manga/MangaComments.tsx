@@ -15,7 +15,6 @@ import { getStoredToken } from '../../services/authService';
 import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from '../../services/wordpressService';
 import { useTheme } from '../../hooks/useTheme';
 import {
-  CommentFireActiveIcon,
   CommentReplyIcon,
   CommentsHeadingIcon,
   PublishIcon,
@@ -28,7 +27,7 @@ import '../../styles/manga-comments.css';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
-type CommentReactionId = MangaReactionId | 'fire';
+type CommentReactionId = MangaReactionId;
 
 const VISIBLE_COMMENTS = 4;
 
@@ -360,7 +359,7 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
         : item)));
       // El autor recibe el aviso de la reacción (el "me gusta" lo avisa el propio servidor).
       if (!next || next === 'like') void notifyCommentReaction(comment.id, null);
-      else if (next === 'fire' || next === 'love' || next === 'haha' || next === 'sad') void notifyCommentReaction(comment.id, next);
+      else if (next === 'love' || next === 'haha' || next === 'sad') void notifyCommentReaction(comment.id, next);
     } catch {
       if (reactionSequences.current.get(comment.id) === sequence) await reload();
     }
@@ -404,7 +403,6 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
                   </button>
                 );
               })}
-              {((comment.reactions?.fire || 0) > 0 || comment.my_reaction === 'fire') && <button type="button" className="manga-comment-reaction" data-reaction="fire" title="Candente" aria-label={'Candente' + (comment.my_reaction === 'fire' ? ': ' + (comment.reactions?.fire || 0) : '')} aria-pressed={comment.my_reaction === 'fire'} onClick={() => void react(comment, 'fire')}><CommentFireActiveIcon size={23} />{comment.my_reaction === 'fire' && <span className="manga-comment-reaction-count">{comment.reactions?.fire || 0}</span>}</button>}
               <button type="button" className="manga-comment-reply" aria-expanded={replyTo?.id === comment.id} onClick={() => { if (chapterId || requireSession()) { setReplyTo(replyTo?.id === comment.id ? null : comment); setReplyContent(''); setReplySticker(null); setError(''); } }}><CommentReplyIcon size={22} />Responder</button>
             </footer>
             {!!replies.length && <button type="button" className="manga-comment-toggle" aria-expanded={openReplies.has(comment.id)} onClick={() => toggleReplies(comment.id)}><ChevronDown size={16} aria-hidden="true" className={openReplies.has(comment.id) ? 'rotate-180' : ''} />{openReplies.has(comment.id) ? 'Ocultar Respuestas' : 'Ver Respuestas (' + replies.length + ')'}</button>}
@@ -453,7 +451,7 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
         {error && !replyTo && <p role="alert" className="mt-2 text-xs text-red-500">{error}</p>}
       </form>
 
-      {loading ? <p role="status" className="py-12 text-center text-sm text-ink/50">Cargando comentarios…</p> : loadError ? <p role="alert" className="py-12 text-center text-sm text-red-500">{loadError}</p> : topLevel.length === 0 ? (
+      {loading ? <div role="status" aria-label="Cargando comentarios" className="h-28" /> : loadError ? <p role="alert" className="py-12 text-center text-sm text-red-500">{loadError}</p> : topLevel.length === 0 ? (
         <p className="mt-6 text-center font-montserrat text-xs text-ink/50 lg:text-sm">¡Sé el primero en compartir tu opinión!</p>
       ) : (
         <>

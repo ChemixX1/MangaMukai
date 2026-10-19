@@ -70,7 +70,7 @@ export const PublicProfilePage = () => {
   };
   const handleMessage = () => { if (profile && requireSession()) openChat(profile); };
 
-  if (loading) return <main className={`profile-page mobile-profile ${isLight ? 'mobile-profile-light' : 'mobile-profile-dark'}`}><p className="mobile-profile-empty">Cargando perfil…</p></main>;
+  if (loading) return <main className={`profile-page mobile-profile ${isLight ? 'mobile-profile-light' : 'mobile-profile-dark'}`}><span role="status" aria-label="Cargando perfil" /></main>;
   if (!profile) return <main className={`profile-page mobile-profile ${isLight ? 'mobile-profile-light' : 'mobile-profile-dark'}`}><div className="mobile-profile-guest"><section><h1>Perfil no disponible</h1><p>{error || 'El usuario no existe.'}</p><Link to="/comunidad">Volver a Comunidad</Link></section></div></main>;
   const chaptersRead = profile.chapters_read_count ?? profile.mangas_read_count ?? 0;
   const avatar = profile.avatar_url;

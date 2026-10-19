@@ -1,5 +1,6 @@
 import { SOCIAL_LINKS } from '../../config/social';
 import announcementBanner from '../../assets/home/BannerAnuncio.png';
+import announcementBannerPc from '../../assets/home/anuncio-pc.webp';
 import { HomeAnnouncementIcon, HomeDiscordIcon, HomeNextIcon, HomePreviousIcon, HomeSocialEndIcon, HomeSocialStartIcon, HomeTelegramIcon } from './HomeIcons';
 
 /** Banner de 1111 px; debajo, dos enlaces de 544 px separados por 30 px. */
@@ -8,7 +9,10 @@ export const HomeAnnouncements = () => (
     <h2><HomeAnnouncementIcon /><span>Anuncios</span></h2>
     <div className="home-announcement-banner">
       <a href={SOCIAL_LINKS.discordRecruit} target="_blank" rel="noopener noreferrer" aria-label="Buscamos traductor de inglés y cleaner: postula en Discord">
-        <img src={announcementBanner} alt="MangaMukai" className="home-announcement-art" loading="lazy" decoding="async" />
+        <picture>
+          <source media="(min-width: 1024px)" srcSet={announcementBannerPc} type="image/webp" />
+          <img src={announcementBanner} alt="MangaMukai" className="home-announcement-art" loading="lazy" decoding="async" />
+        </picture>
       </a>
       <button type="button" aria-label="Anuncio anterior" disabled><HomePreviousIcon /></button>
       <button type="button" aria-label="Anuncio siguiente" disabled><HomeNextIcon /></button>

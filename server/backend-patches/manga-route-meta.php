@@ -191,14 +191,6 @@ $static_routes = [
         'intro' => 'Catálogo de manga, manhwa y manhua en español con capítulos nuevos cada día.',
         'list' => ['pattern' => '', 'limit' => 30],
     ],
-    '/biblioteca' => [
-        'kind' => 'collection',
-        'title' => 'Biblioteca de manga en español — Catálogo completo | MangaMukai',
-        'description' => 'Catálogo completo de manga, manhwa y manhua en español: filtra por género, tipo y público, y lee online gratis en MangaMukai.',
-        'heading' => 'Biblioteca de manga en español',
-        'intro' => 'Todo el catálogo de MangaMukai: busca por título, género o tipo y lee gratis.',
-        'list' => ['pattern' => '', 'limit' => 48],
-    ],
     '/manga-19' => [
         'kind' => 'collection',
         'title' => 'Mangas +19 en español — Colección para adultos | MangaMukai',
@@ -215,6 +207,12 @@ $static_routes = [
         'heading' => 'Manga en blanco y negro',
         'intro' => 'Historias clásicas, acción y tinta pura para lectores de manga tradicional.',
         'list' => ['pattern' => $mono_pattern, 'limit' => 36],
+    ],
+    '/pro' => [
+        'kind' => 'page',
+        'title' => 'Mukai Pro | MangaMukai',
+        'description' => 'Descubre los beneficios de Mukai Pro y elige tu plan mensual o anual.',
+        'heading' => 'Mukai Pro',
     ],
     '/nosotros' => [
         'kind' => 'page',
@@ -262,9 +260,9 @@ $static_routes = [
 
 // Rutas privadas o transaccionales: se sirven, pero fuera del indice.
 $private_routes = [
-    '/perfil' => 'Mi perfil',
-    '/saved' => 'Mis guardados',
+    '/profile' => 'Profile',
     '/recargar' => 'Recargar monedas',
+    '/recargar/pago' => 'Recargar monedas',
     '/pago-exitoso' => 'Pago completado',
     '/auth/login' => 'Iniciar sesión',
     '/auth/register' => 'Crear cuenta',
@@ -340,14 +338,6 @@ $website = [
     'name' => 'MangaMukai',
     'inLanguage' => 'es',
     'publisher' => ['@id' => $site_url . '/#organization'],
-    'potentialAction' => [
-        '@type' => 'SearchAction',
-        'target' => [
-            '@type' => 'EntryPoint',
-            'urlTemplate' => $site_url . '/biblioteca?buscar={search_term_string}',
-        ],
-        'query-input' => 'required name=search_term_string',
-    ],
 ];
 
 if ($route['kind'] === 'private') {

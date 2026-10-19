@@ -1,3 +1,4 @@
+import { openSearchPanel } from '../../hooks/useSearchTerm';
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -15,7 +16,6 @@ import { toLatestMangas, type Audience, type LatestChapter, type LatestManga } f
 /** Tres filas de seis columnas en PC y de dos en móvil; tablet usa tres columnas. */
 const LATEST_PER_PAGE = 18;
 const MOBILE_LATEST_PER_PAGE = 6;
-const LIBRARY_AUDIENCE: Record<Audience, string> = { women: 'mujer', men: 'hombre' };
 /** Posición de cada pestaña de tipo (la misma en los dos diseños). */
 const TYPE_TAB_POSITION: Record<MangaTypeTab, string> = { Manga: 'left-0', Manhua: 'left-[78px]', Manhwa: 'left-[165px]' };
 
@@ -148,13 +148,14 @@ export const LatestSection = ({ audience, className }: { audience: Audience; cla
           <h2 className="absolute left-[68px] top-px whitespace-pre font-dela text-xl font-normal leading-8 text-ink lg:left-[67px] lg:top-[7px] lg:text-[28px] lg:leading-[30px]">
             {'Lo Más  '}<span style={{ color: accentColor }}>Reciente</span>
           </h2>
-          <Link
-            to={`/biblioteca?audience=${LIBRARY_AUDIENCE[audience]}`}
+          <button
+            type="button"
+            onClick={() => openSearchPanel()}
             className="absolute right-0 top-[14px] hidden h-[39px] w-[122px] items-center rounded-lg border border-[rgba(147,147,147,0.4)] bg-panel pl-[17.5px] font-montserrat text-sm font-medium text-ink shadow-[0_4px_4px_rgba(0,0,0,0.25)] transition-colors hover:border-ink lg:flex"
           >
             <ViewAllIcon size={21} className="shrink-0" />
             <span className="ml-[4.5px]">Ver todo</span>
-          </Link>
+          </button>
           <div role="tablist" aria-label="Tipo de obra" className="absolute left-[70px] top-[44px] lg:left-[71px] lg:top-[52px]">
             {TYPE_TABS.map((option) => {
               const active = option === activeTab;
@@ -209,4 +210,3 @@ export const LatestSection = ({ audience, className }: { audience: Audience; cla
   );
 };
 
-/* --------------------------------------------------------------- Portada */

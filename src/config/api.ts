@@ -1,3 +1,5 @@
+import { safeAuthReturn } from '../utils/socialLoginReturn';
+
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
 const getDefaultWebsiteUrl = () => {
@@ -40,11 +42,12 @@ export const SOCIAL_LOGIN_SESSION_URL = useDevProxy
 export const wordpressUrl = (path: string) =>
   `${WEBSITE_URL}/${path.replace(/^\/+/, "")}`;
 
-export const socialLoginUrl = (provider: 'google' | 'discord') => {
+export const socialLoginUrl = (provider: 'google' | 'discord', returnTo = '/') => {
   const localOrigin = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
     ? trimTrailingSlash(window.location.origin)
     : '';
-  const callbackUrl = `${localOrigin || WEBSITE_URL}/auth/login?social=${provider}`;
+  const callbackQuery = new URLSearchParams({ social: provider, returnTo: safeAuthReturn(returnTo) });
+  const callbackUrl = `${localOrigin || WEBSITE_URL}/auth/login?${callbackQuery.toString()}`;
   const redirectUrl = localOrigin
     ? `${WEBSITE_URL}/?${new URLSearchParams({
         mm_social_return: '1',

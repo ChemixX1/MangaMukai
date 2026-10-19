@@ -179,20 +179,11 @@ export const CommentsHeadingIcon = ({size = 33, className}: IconProps) => {
 </svg>);
 };
 
-export const PublishIcon = ({size = 19, className}: IconProps) => {
-  const id = useId();
-  return (<svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 19 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clipPath={`url(#${id}-clip0_119_712)`}>
-<path d="M5.15224 0.46875H13.1666C13.1666 0.46875 14.3115 0.46875 14.3115 1.40625V6.09375C14.3115 6.09375 14.3115 7.03125 13.1666 7.03125H5.15224C5.15224 7.03125 4.00732 7.03125 4.00732 6.09375V1.40625C4.00732 1.40625 4.00732 0.46875 5.15224 0.46875Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-<path d="M4.00724 1.40625L9.15935 3.75L14.3114 1.40625M14.3114 1.875L17.7462 0.46875C17.7462 5.625 14.3114 5.15625 14.3114 5.15625M4.00724 1.875L0.57251 0.46875C0.57251 5.625 4.00724 5.15625 4.00724 5.15625M9.15935 9.84375V14.5312M12.0216 8.90625V11.7188M6.29707 8.90625V11.7188" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-</g>
-<defs>
-<clipPath id={`${id}-clip0_119_712`}>
-<rect width="18.3186" height="15" fill="currentColor"/>
-</clipPath>
-</defs>
-</svg>);
-};
+export const PublishIcon = ({size = 24, className}: IconProps) => (
+  <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.9995 2.416C23.01 2.60971 22.9828 2.80363 22.9195 2.987L16.4195 21.988C16.3198 22.2773 16.1343 22.5292 15.8878 22.7104C15.6412 22.8916 15.3453 22.9933 15.0395 23.002C14.7333 23.0098 14.4321 22.9238 14.1763 22.7554C13.9205 22.587 13.7223 22.3443 13.6085 22.06L10.6715 14.738L10.7075 14.708L22.5625 2.855L22.9995 2.416ZM21.5845 1.004L21.1485 1.441L9.29449 13.291L9.26049 13.328L1.94249 10.394C1.73031 10.3087 1.54045 10.176 1.38741 10.0061C1.23436 9.83621 1.1222 9.63355 1.05948 9.41365C0.996756 9.19374 0.985145 8.96241 1.02553 8.73733C1.06592 8.51225 1.15723 8.29938 1.29249 8.115L1.36249 8.025C1.53669 7.82258 1.76177 7.67033 2.01449 7.584L21.0145 1.083C21.1985 1.019 21.3915 0.994996 21.5845 1.004Z" fill="currentColor" />
+  </svg>
+);
 
 export const CommentReplyIcon = ({size = 24, className}: IconProps) => {
   return (<svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

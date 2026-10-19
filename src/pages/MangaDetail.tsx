@@ -54,6 +54,8 @@ import { toTitleCase } from '../utils/titleCase';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { collectionBadge } from '../utils/womenBlackWhite';
 import { whenIdle } from '../utils/whenIdle';
+import { mangaReaderSession } from '../services/readerPrefetchSession';
+import { ensureMusicLibrary } from '../services/musicPlayer';
 import { MangaCommunityLinks } from '../components/manga/MangaCommunityLinks';
 import { MangaSeasonSelector } from '../components/manga/MangaSeasonSelector';
 import { MangaSeriesLikeButton } from '../components/manga/MangaSeriesLikeButton';
@@ -344,6 +346,9 @@ export const MangaDetail = () => {
         }
 
         setManga(mangaData);
+        // También en móvil, donde la ficha muestra el cartel: el lector reutiliza
+        // esta petición, la lista y el audio compartidos sin empezar otra carga.
+        void ensureMusicLibrary();
         const mangaPostId = mangaData.eroSeri || mangaData.id;
 
         // Publica la ficha y monta la música enseguida. Las series similares
@@ -357,9 +362,13 @@ export const MangaDetail = () => {
         void catalogRequest.then(catalog => {
           if (!active) return;
           const catalogManga = catalog.find(item => String(item.eroSeri || item.id) === String(mangaPostId));
-          if (catalogManga?.totalViews !== undefined) {
+          if (catalogManga) {
             setManga(current => current && String(current.id) === String(mangaData.id)
-              ? { ...current, totalViews: catalogManga.totalViews }
+              ? {
+                  ...current,
+                  totalViews: catalogManga.totalViews ?? current.totalViews,
+                  chapterCount: catalogManga.chapterCount ?? current.chapterCount,
+                }
               : current);
           }
         });
@@ -399,6 +408,15 @@ export const MangaDetail = () => {
   }, [id, loadInteractions]);
 
   const firstChapter = useMemo(() => [...chapters].sort((a, b) => a.chapter_number - b.chapter_number)[0], [chapters]);
+  useEffect(() => {
+    if (!id || !manga || loading || chaptersLoading || commentsLoading || relatedLoading || !chapters.length) return;
+    const session = mangaReaderSession(id, String(manga.eroSeri || manga.id), chapters);
+    const warm = () => session.warmAround([...chapters].sort((a, b) => a.chapter_number - b.chapter_number), '', purchasedIds);
+    const cancel = whenIdle(warm);
+    const visibility = () => { if (document.hidden) session.pause(); else warm(); };
+    document.addEventListener('visibilitychange', visibility);
+    return () => { cancel(); session.pause(); document.removeEventListener('visibilitychange', visibility); };
+  }, [id, manga, loading, chaptersLoading, commentsLoading, relatedLoading, chapters, purchasedIds]);
   const filteredChapters = useMemo(() => {
     const query = chapterSearch.trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (!query) return chapters;
@@ -575,7 +593,7 @@ export const MangaDetail = () => {
       <section className="manga-detail-stage relative z-10 pb-20 pt-32">
         <div className="manga-detail-container mx-auto w-full max-w-[1780px] px-4 lg:!max-w-[1366px] 2xl:px-6">
           <div className="manga-detail-topbar mb-2 grid items-center gap-4 xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
-            {/* Va en la primera columna para quedar justo encima de la portada. */}
+            {/* Reloj sobre la portada y redes en el extremo derecho. */}
             <div className="mx-auto w-full xl:col-start-1 xl:row-start-1">
               <MangaDetailClock />
             </div>
@@ -653,15 +671,15 @@ export const MangaDetail = () => {
                     ))}
                   </div>
                 )}
-                <MangaRewardProgress mangaId={String(manga.eroSeri || manga.id)} chapterIds={chapters.map(chapter => chapter.id)} purchasedIds={purchasedIds} userId={userInfo.id} cover={manga.portada} loading={chaptersLoading} />
+                <MangaRewardProgress purchasedIds={purchasedIds} userId={userInfo.id} loading={chaptersLoading} />
               </header>
 
               {/* Pestañas: una sola píldora que viaja entre ellas. */}
               <nav aria-label="Secciones del manga" className="manga-detail-section-nav">
                 <div className="manga-detail-tabs">
-                  <GooeySelector activeIndex={tabIndex} color="#000000" />
+                  <GooeySelector activeIndex={tabIndex} />
                   <button type="button" onClick={() => { setActiveContent('chapters'); setTabIndex(0); }} aria-current={tabIndex === 0} className={tabClass(tabIndex === 0)}>
-                    <ChaptersTabIcon size={22} /> Capítulos ({chapters.length})
+                    <ChaptersTabIcon size={22} /> Capítulos ({Math.max(chapters.length, manga.chapterCount ?? 0)})
                   </button>
                   <button type="button" onClick={() => { setActiveContent('synopsis'); setTabIndex(1); }} aria-current={tabIndex === 1} className={tabClass(tabIndex === 1)}>
                     <SynopsisTabIcon size={19} /> Sinopsis

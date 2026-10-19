@@ -16,7 +16,8 @@ Frontend React + TypeScript + Vite + Tailwind, conectado a WordPress.
 - `public/`: recursos con URL fija (favicon, imágenes de colección y promociones).
 - `backend/`: plugins de WordPress y conexiones con el servidor. `server/`: configuración y archivos SEO del servidor.
 - `scripts/`: compilación y despliegue. `tools/moderacion-mensajes/`: herramienta local de moderación.
-- `docs/`: documentación del servidor, tienda y chat.
+- `docs/`: documentación del servidor y referencias de diseño.
+- La raíz contiene la configuración de desarrollo y compilación. Las imágenes de cada sección viven en `src/assets/`; las de perfil están en `src/assets/profile/`.
 
 ## Estilos compartidos
 
@@ -40,8 +41,18 @@ Vite muestra el puerto local en la terminal. `npm run build` comprueba TypeScrip
 
 `src/config/api.ts` centraliza las rutas del backend. Puedes copiar `.env.example` a `.env` para configurar `VITE_WORDPRESS_URL`. En desarrollo, `vite.config.ts` incluye el proxy de WordPress del proyecto; en producción, sin variable, se usa el mismo origen.
 
-## Documentación
+## Vista compartida en GitHub Pages
+
+Enlace: https://chemixx1.github.io/MangaMukai/
+
+La rama `gh-pages` contiene una copia compilada del frontend. Para preparar otra
+copia, ejecutar `npx tsc -b` y `node scripts/build-pages.mjs`; publicar el contenido
+de `dist-pages/` en esa rama. La publicación no actualiza el servidor WordPress.
+La vista usa rutas con `#` para que los enlaces internos funcionen en Pages,
+y consulta la API de `https://mangamukai.com`. Las funciones que necesitan PHP
+local (como `/api/character-chat`) no están disponibles en este alojamiento.
+
+## Documentación del servidor
 
 - [Servidor y despliegue](docs/servidor.md)
-- [Catálogo y promociones de muestra](docs/shop-local-design.md)
-- [Chat de personajes y cuota](docs/character-chat-local.md)
+- [Referencias de iconos](docs/design/icons.md)

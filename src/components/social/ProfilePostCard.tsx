@@ -211,6 +211,6 @@ export function ProfilePostCard({ initialPost, isLight, onShared, variant = 'def
     </div></>}
     {variant === 'default' && reactionsOpen && <div className="flex justify-center gap-1 p-3" aria-label="Elegir reacción">{reactions.map(reaction => <button key={reaction.id} type="button" aria-label={reaction.label} aria-pressed={selected?.id === reaction.id} title={reaction.label} onClick={() => react(reaction.id)} className={`rounded-full p-2 text-2xl transition hover:-translate-y-1 ${selected?.id === reaction.id ? 'bg-[#FF4D88]/15' : ''}`}>{reaction.emoji}</button>)}</div>}
     {error && <p role="alert" className="px-4 py-3 text-sm text-red-500">{error}</p>}
-    {notice && <p role="status" className="px-4 py-3 text-sm text-[#FF4D88]">{notice} <Link to="/perfil" className="font-bold underline">Ver perfil</Link></p>}
+    {notice && <p role="status" className="px-4 py-3 text-sm text-[#FF4D88]">{notice} <Link to="/profile" className="font-bold underline">Ver perfil</Link></p>}
   </article>;
 }

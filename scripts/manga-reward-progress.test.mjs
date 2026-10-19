@@ -5,6 +5,7 @@ import {
   REWARD_PROGRESS_EVENT,
   calculateMangaRewardProgress,
   getCompletedRewardChapterIds,
+  getAccountCompletedRewardChapterIds,
   recordCompletedRewardChapter,
   subscribeMangaRewardProgress,
 } from '../src/services/mangaRewardProgress.ts';
@@ -12,6 +13,8 @@ import {
 const installBrowser = t => {
   const entries = new Map();
   const storage = {
+    get length() { return entries.size; },
+    key: index => [...entries.keys()][index] ?? null,
     getItem: key => entries.get(key) ?? null,
     setItem: (key, value) => entries.set(key, value),
     removeItem: key => entries.delete(key),
@@ -83,6 +86,22 @@ test('corrupted or denied local storage does not invent progress or break comple
   assert.deepEqual([...getCompletedRewardChapterIds(1, 20)], ['100']);
   t.mock.method(storage, 'getItem', () => { throw new Error('Storage denied'); });
   assert.equal(getCompletedRewardChapterIds(1, 20).size, 0);
+});
+
+test('account rewards combine existing manga history without duplicates or other accounts', t => {
+  const { storage } = installBrowser(t);
+  storage.setItem('mm_reward_completed_v1:["1","20"]', '[100,101]');
+  storage.setItem('mm_reward_completed_v1:["1","21"]', '[101,102]');
+  storage.setItem('mm_reward_completed_v1:["2","20"]', '[200]');
+  storage.setItem('mm_reward_completed_v1:broken', '[300]');
+  storage.setItem('mm_reward_completed_v1:["1","22"]', '{broken');
+  assert.deepEqual([...getAccountCompletedRewardChapterIds(1)], ['100', '101', '102']);
+  assert.deepEqual([...getAccountCompletedRewardChapterIds(2)], ['200']);
+  assert.equal(getAccountCompletedRewardChapterIds('').size, 0);
+  recordCompletedRewardChapter(1, 23, 103);
+  assert.equal(calculateMangaRewardProgress([100, 400], getAccountCompletedRewardChapterIds(1)).points, 4);
+  t.mock.method(storage, 'key', () => { throw new Error('Storage denied'); });
+  assert.equal(getAccountCompletedRewardChapterIds(1).size, 0);
 });
 
 test('only successful completed requests add progress and the API contract is unchanged', async t => {

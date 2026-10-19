@@ -36,8 +36,8 @@ export const PreviewChat = ({ preview, characterName, characterImage, accent }: 
       <div className="mt-3">
         {/* Narrador */}
         <div className="flex items-start gap-2">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-zinc-200 text-[#1c1c1e] dark:bg-[#2a2a2e] dark:text-white"><NarratorIcon /></span>
-          <div className="max-w-[82%] space-y-4 rounded-2xl px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-[#1c1c1e]" style={{ backgroundColor: `color-mix(in srgb, ${accent} 16%, white)` }}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-zinc-200 text-[#1c1c1e] shadow-sm dark:bg-[#2a2a2e] dark:text-white"><NarratorIcon /></span>
+          <div className="max-w-[82%] space-y-4 rounded-2xl px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-[#1c1c1e] shadow-[0_6px_18px_-4px_rgba(0,0,0,0.12)]" style={{ backgroundColor: `color-mix(in srgb, ${accent} 16%, white)` }}>
             {preview.scene.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
           </div>
         </div>
@@ -51,18 +51,18 @@ export const PreviewChat = ({ preview, characterName, characterImage, accent }: 
             className="overflow-hidden"
           >
             <div className="flex justify-end pt-3">
-              <div className="max-w-[82%] space-y-3 rounded-2xl bg-[#e9e9ec] px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-[#1c1c1e] dark:bg-[#f1f1f3]">
+              <div className="max-w-[82%] space-y-3 rounded-2xl bg-[#e9e9ec] px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-[#1c1c1e] shadow-[0_6px_18px_-4px_rgba(0,0,0,0.12)] dark:bg-[#f1f1f3]">
                 <p>{preview.user.line}</p>
                 {preview.user.narration && <p className="italic opacity-80">{preview.user.narration}</p>}
               </div>
             </div>
 
-            <div className="pt-3">
+            <div className="pt-3 pb-2">
               <p className="flex items-center gap-2 font-montserrat text-[11px] font-semibold text-ink">
-                <span className="block h-7 w-7 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-300"><img src={characterImage} alt="" className="h-full w-full object-cover object-top" /></span>
+                <span className="block h-7 w-7 overflow-hidden rounded-full bg-zinc-200 shadow-sm dark:bg-zinc-300"><img src={characterImage} alt="" className="h-full w-full object-cover object-top" /></span>
                 {characterName}
               </p>
-              <div className="mt-1.5 max-w-[82%] space-y-3 rounded-2xl px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-white" style={{ backgroundColor: accent }}>
+              <div className="mt-1.5 max-w-[82%] space-y-3 rounded-2xl px-3.5 py-3 font-raleway text-[13px] leading-[1.45] text-white shadow-[0_8px_20px_-4px_rgba(0,0,0,0.28)]" style={{ backgroundColor: accent }}>
                 {preview.character.narration && <p className="italic">{preview.character.narration}</p>}
                 <p>{preview.character.line}</p>
               </div>

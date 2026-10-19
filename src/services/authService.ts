@@ -34,6 +34,14 @@ const emitAuthChanged = () => {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 };
 
+/** Una renovación del JWT conserva la cuenta y sus recursos ya descargados. */
+export const getAuthCacheKey = (): string => {
+  const token = getStoredToken();
+  if (!token) return '';
+  const user = getStoredUser();
+  return `${user?.id ?? token}|${user?.isPremium || user?.is_premium ? 1 : 0}`;
+};
+
 export const updateStoredUser = (patch: Partial<MMUser>): MMUser | null => {
   const current = getStoredUser();
   const token = getStoredToken();
@@ -170,7 +178,8 @@ export const refreshUser = async (): Promise<MMUser | null> => {
 };
 
 export const startSubscriptionPayment = async (
-  plan: 'monthly' | 'yearly' = 'monthly'
+  plan: 'monthly' | 'yearly' = 'monthly',
+  tier?: 'standard' | 'pro'
 ): Promise<{ success: boolean; url?: string; message: string }> => {
   const token = getStoredToken();
   if (!token) return { success: false, message: 'Debes iniciar sesion para suscribirte.' };
@@ -183,7 +192,7 @@ export const startSubscriptionPayment = async (
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ plan, _token: token }),
+      body: JSON.stringify({ plan, ...(tier ? { tier } : {}), _token: token }),
     });
 
     if (clearIfUnauthorized(res)) {
@@ -191,6 +200,11 @@ export const startSubscriptionPayment = async (
     }
 
     const data = await readJson<any>(res);
+    // Legacy checkout only knows monthly/yearly; do not send a tiered purchase
+    // to an unverified legacy plan with a different price or benefits.
+    if (tier && data?.success && data.url && data.tier !== tier) {
+      return { success: false, message: 'PayPal aún no confirma este plan de suscripción. Elige otro método de pago o inténtalo más tarde.' };
+    }
     if (data?.success && data.url) {
       return { success: true, url: data.url, message: '' };
     }

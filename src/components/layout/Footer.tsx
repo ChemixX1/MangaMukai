@@ -259,13 +259,7 @@ const DESKTOP_LEGAL_ROW_TOPS = [398, 437];
 
 const fromCenter = (offset: number) => ({ left: `calc(50% + ${offset}px)` });
 
-/**
- * Pie de escritorio (lg+) según el diseño de PC: la marca asomando sobre las
- * montañas de `FooterPC.png` (bajo un velo del tema), las redes, las páginas
- * y las políticas en filas centradas (40 y 32 px entre enlaces), el boletín
- * con el gato y, al pie de las montañas, el crédito, donde termina el pie. La
- * imagen va anclada arriba: si la caja la recorta, pierde solo el bosque de abajo.
- */
+/** El fondo se ancla arriba para que los recortes afecten solo al bosque inferior. */
 const DesktopFooter = ({ className }: { className: string }) => (
   <footer className={`relative bg-surface pt-[7px] text-ink ${className}`}>
     <div className="relative aspect-[1983/725] min-h-[524px] w-full">
@@ -324,11 +318,7 @@ const DesktopFooter = ({ className }: { className: string }) => (
   </footer>
 );
 
-/**
- * Pie de página de todo el sitio: en móvil, su composición sobre las montañas
- * rosas (marca, redes, boletín con el gato y políticas); en escritorio, la del
- * diseño de PC.
- */
+
 export const Footer = ({ className = '', homeDesign = false }: { className?: string; homeDesign?: boolean }) => {
   const isMobile = useIsMobileViewport();
   if (homeDesign) return (

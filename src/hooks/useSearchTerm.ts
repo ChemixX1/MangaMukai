@@ -42,3 +42,11 @@ export const setSearchFilter = (value: SearchFilter) => {
 };
 
 export const useSearchFilter = () => useSyncExternalStore(subscribe, getSearchFilter, () => 'todos' as SearchFilter);
+
+export const OPEN_SEARCH_EVENT = 'mm_open_search';
+
+export const openSearchPanel = (filter: SearchFilter = 'todos') => {
+  setSearchFilter(filter);
+  setSearchTerm('');
+  window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
+};

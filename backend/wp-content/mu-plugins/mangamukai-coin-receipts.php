@@ -41,6 +41,11 @@ function mm_coin_receipt_permission($request) {
 }
 
 add_action('rest_api_init', function () {
+    register_rest_route('mangamukai/v1', '/coin-quote', [
+        'methods' => 'GET',
+        'permission_callback' => '__return_true',
+        'callback' => 'mm_coin_quote_create',
+    ]);
     register_rest_route('mangamukai/v1', '/coin-receipts', [
         'methods' => 'POST',
         'permission_callback' => 'mm_coin_receipt_permission',
@@ -48,17 +53,61 @@ add_action('rest_api_init', function () {
     ]);
 });
 
-function mm_coin_receipt_create($request) {
-    $packs = [
-        'c50' => [50, 5], 'c1000' => [1000, 10], 'c1500' => [1500, 15],
+function mm_coin_packs() {
+    return [
+        'sub_standard' => [0, 4.99], 'sub_pro' => [500, 9.99],
+        'sub_monthly' => [0, 4.99], 'sub_yearly' => [0, 47.88],
+        'c50' => [500, 5], 'c1000' => [1000, 10], 'c1500' => [1500, 15],
         'c2500' => [2500, 25], 'c5000' => [5000, 50], 'promo10000' => [10000, 80],
     ];
+}
+
+function mm_coin_quote_create($request) {
+    $pack = sanitize_key($request->get_param('pack'));
+    $packs = mm_coin_packs();
+    if (!isset($packs[$pack])) return new WP_Error('quote_pack', 'Paquete inválido.', ['status' => 400]);
+    $rate = get_transient('mm_coin_usd_pen');
+    if (!$rate) {
+        $response = wp_remote_get('https://api.frankfurter.dev/v2/rate/USD/PEN', ['timeout' => 10]);
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return new WP_Error('quote_rate', 'No se pudo consultar el tipo de cambio. Inténtalo nuevamente.', ['status' => 503]);
+        }
+        $rate = json_decode(wp_remote_retrieve_body($response), true);
+        $date = is_array($rate) ? strtotime($rate['date'] ?? '') : false;
+        if (!is_array($rate) || ($rate['base'] ?? '') !== 'USD' || ($rate['quote'] ?? '') !== 'PEN'
+            || !is_numeric($rate['rate'] ?? null) || $rate['rate'] <= 0 || !is_finite((float) $rate['rate'])
+            || !$date || $date < time() - 7 * DAY_IN_SECONDS || $date > time() + DAY_IN_SECONDS) {
+            return new WP_Error('quote_rate', 'El tipo de cambio no está disponible. Inténtalo nuevamente.', ['status' => 503]);
+        }
+        set_transient('mm_coin_usd_pen', $rate, HOUR_IN_SECONDS);
+    }
+    // Round upward to the next price ending in .90, without floating-point boundary noise.
+    $price = (ceil(round($packs[$pack][1] * $rate['rate'] * 100, 6) / 100 - 0.90) * 100 + 90) / 100;
+    $quote = ['pack' => $pack, 'price_pen' => $price, 'rate' => (float) $rate['rate'], 'date' => $rate['date'], 'expires' => time() + DAY_IN_SECONDS];
+    $payload = base64_encode(wp_json_encode($quote));
+    $quote['token'] = $payload . '.' . hash_hmac('sha256', $payload, wp_salt('auth'));
+    $result = new WP_REST_Response($quote);
+    $result->header('Cache-Control', 'no-store');
+    return $result;
+}
+
+function mm_coin_quote_verify($token, $pack) {
+    $parts = explode('.', $token);
+    if (count($parts) !== 2 || !hash_equals(hash_hmac('sha256', $parts[0], wp_salt('auth')), $parts[1])) return false;
+    $quote = json_decode(base64_decode($parts[0], true), true);
+    return is_array($quote) && ($quote['pack'] ?? '') === $pack && ($quote['expires'] ?? 0) > time() ? $quote : false;
+}
+
+function mm_coin_receipt_create($request) {
+    $packs = mm_coin_packs();
     $pack = sanitize_key($request->get_param('pack'));
     $method = sanitize_key($request->get_param('method'));
     $user_id = absint($request->get_param('_receipt_user_id'));
-    if (!isset($packs[$pack]) || !in_array($method, ['yape', 'plin'], true)) {
+    if (!isset($packs[$pack]) || !in_array($method, ['yape', 'plin', 'transfer'], true)) {
         return new WP_Error('receipt_selection', 'Selecciona un paquete y una billetera válidos.', ['status' => 400]);
     }
+    $quote = mm_coin_quote_verify((string) $request->get_param('quote'), $pack);
+    if (!$quote) return new WP_Error('receipt_quote', 'La cotización venció. Recarga la página para consultar el importe actualizado.', ['status' => 400]);
     $files = $request->get_file_params();
     $file = $files['receipt'] ?? [];
     if (empty($file['tmp_name']) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) {
@@ -85,16 +134,20 @@ function mm_coin_receipt_create($request) {
     if ($bytes === false) {
         return new WP_Error('receipt_read', 'No se pudo leer la imagen. Inténtalo nuevamente.', ['status' => 500]);
     }
+    $product = $pack === 'sub_standard' ? 'Mukai Standard mensual' : ($pack === 'sub_pro' ? 'Mukai Pro mensual (500 monedas)' : $packs[$pack][0] . ' monedas');
+    if ($pack === 'sub_monthly') $product = 'Mukai Pro mensual';
+    if ($pack === 'sub_yearly') $product = 'Mukai Pro anual';
     $id = wp_insert_post([
         'post_type' => 'mm_coin_receipt', 'post_status' => 'private', 'post_author' => $user_id,
-        'post_title' => sprintf('%s · %d monedas · Usuario #%d · %s', ucfirst($method), $packs[$pack][0], $user_id, current_time('mysql')),
+        'post_title' => sprintf('%s · %s · Usuario #%d · %s', ucfirst($method), $product, $user_id, current_time('mysql')),
     ], true);
     if (is_wp_error($id) || !$id) {
         return new WP_Error('receipt_save', 'No se pudo guardar el comprobante. Inténtalo nuevamente.', ['status' => 500]);
     }
     // Store the image privately in post metadata, never in public uploads/media.
     $saved = add_post_meta($id, '_receipt_data', [
-        'method' => $method, 'coins' => $packs[$pack][0], 'price_usd' => $packs[$pack][1],
+        'pack' => $pack, 'product' => $product, 'method' => $method, 'coins' => $packs[$pack][0], 'price_usd' => $packs[$pack][1],
+        'price_pen' => $quote['price_pen'], 'exchange_rate' => $quote['rate'], 'exchange_date' => $quote['date'],
         'mime' => $image['mime'], 'image' => base64_encode($bytes),
         'filename' => sanitize_file_name($file['name']),
     ], true);
@@ -114,8 +167,9 @@ add_action('add_meta_boxes_mm_coin_receipt', function () {
         if (!is_array($receipt)) return;
         $user = get_userdata($post->post_author);
         echo '<p><strong>Cuenta:</strong> ' . esc_html($user ? $user->user_login . ' · ' . $user->user_email : $post->post_author) . '</p>';
-        echo '<p>' . esc_html(ucfirst($receipt['method']) . ' · ' . $receipt['coins'] . ' monedas · USD ' . $receipt['price_usd']) . '</p>';
-        echo '<p>Verifica el pago antes de acreditar las monedas. Esta solicitud no modifica el saldo.</p>';
+        echo '<p>' . esc_html(ucfirst($receipt['method']) . ' · ' . ($receipt['product'] ?? ($receipt['coins'] . ' monedas')) . ' · USD ' . $receipt['price_usd']) . '</p>';
+        if (isset($receipt['price_pen'])) echo '<p>' . esc_html('Total a pagar: S/ ' . number_format($receipt['price_pen'], 2) . ' · Tipo de cambio: ' . $receipt['exchange_rate'] . ' (' . $receipt['exchange_date'] . ')') . '</p>';
+        echo '<p>Verifica el pago y el producto antes de activar la suscripción o acreditar monedas. Esta solicitud no activa beneficios ni modifica el saldo.</p>';
         echo '<img alt="Comprobante" style="max-width:100%;max-height:900px;object-fit:contain" src="data:' . esc_attr($receipt['mime']) . ';base64,' . esc_attr($receipt['image']) . '" />';
     }, 'mm_coin_receipt', 'normal', 'high');
 });

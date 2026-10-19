@@ -1,4 +1,5 @@
 import { Minus, Plus, ShoppingCart, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { shopProducts as products } from '../../data/shopProducts';
 import { SHOP_CART_MAX_UNITS, useShopCart } from '../../hooks/useShopCart';
 import { SlidePanel } from './SlidePanel';
@@ -73,7 +74,7 @@ export const CartOverlay = ({ open, isLight, onClose }: { open: boolean; isLight
               <span className="text-[11px] font-semibold uppercase tracking-[0.04em]">Total</span>
               <strong className="text-[14px] font-bold">{money(total)}</strong>
             </div>
-            <p className={`mt-1.5 font-[Montserrat] text-[10px] font-medium leading-snug ${muted}`}>Selección guardada en este navegador, sin pagos habilitados</p>
+            <Link to={`/recargar/pago?monto=${total.toFixed(2)}`} onClick={onClose} className="mt-3 flex justify-center rounded-xl bg-gradient-to-r from-[#ff008c] to-[#ff4a7d] px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:brightness-110">Ir a medios de pago {money(total)}</Link>
           </div>
         </>
       )}

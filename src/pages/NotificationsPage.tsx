@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIsMobileViewport } from '../hooks/useIsMobileViewport';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, X } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
@@ -25,6 +26,8 @@ export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: bo
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isLight = theme === 'light';
+  const isMobile = useIsMobileViewport();
+  const loadingRequest = useRef(false);
   // Arranca con la última respuesta del navbar (si la hay) y refresca en segundo plano.
   const [notifications, setNotifications] = useState<SocialNotification[]>(() => getCachedNotifications() || []);
   const [loading, setLoading] = useState(() => getCachedNotifications() === null);
@@ -37,21 +40,32 @@ export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: bo
   }, [embedded, navigate]);
 
   const load = useCallback(async () => {
+    if (loadingRequest.current || !getStoredToken()) return;
+    loadingRequest.current = true;
     try {
       const result = await getNotifications();
+      if (isMobile && result.unread > 0) {
+        await markNotificationsRead();
+        result.notifications = result.notifications.map((item) => ({ ...item, read: true }));
+        window.dispatchEvent(new Event(SOCIAL_REFRESH_EVENT));
+      }
       setNotifications(result.notifications);
       setError('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'No se pudieron cargar las notificaciones.');
     } finally {
+      loadingRequest.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [isMobile]);
 
   useEffect(() => {
     void load();
     const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 30000);
-    return () => window.clearInterval(timer);
+    const refresh = () => { void load(); };
+    window.addEventListener(SOCIAL_REFRESH_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener(SOCIAL_REFRESH_EVENT, refresh); window.removeEventListener('focus', refresh); };
   }, [load]);
 
   const notifyNavbar = () => window.dispatchEvent(new Event(SOCIAL_REFRESH_EVENT));
@@ -87,7 +101,7 @@ export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: bo
             Notificaciones
             {unread > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black text-white" style={{ backgroundColor: ACCENT }}>{unread}</span>}
           </h1>
-          {unread > 0 && (
+          {!isMobile && unread > 0 && (
             <button type="button" onClick={() => void markAll()} aria-label="Marcar todas como leídas" className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${hover}`} style={{ color: ACCENT }}>
               <CheckCheck size={16} /> Leído
             </button>

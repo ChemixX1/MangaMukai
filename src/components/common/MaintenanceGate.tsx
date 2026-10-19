@@ -18,7 +18,7 @@ export const MaintenanceGate = () => {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/mantenimiento.json', { cache: 'no-store', signal: controller.signal })
+    fetch(`${import.meta.env.BASE_URL}mantenimiento.json`, { cache: 'no-store', signal: controller.signal })
       .then((res) => (res.ok ? (res.json() as Promise<MaintenanceFlag>) : null))
       .then((data) => { if (data?.activo) setFlag(data); })
       .catch(() => { /* Sin archivo o sin red: no hay mantenimiento manual. */ });

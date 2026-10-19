@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 import './HoloCard.css';
 
@@ -9,7 +9,9 @@ type HoloPreset = 'bursts' | 'stars' | 'shards' | 'cosmos' | 'rainbow' | 'swirl'
 
 export interface HoloCardProps {
   image?: string;
+  imageFit?: 'fill' | 'cover';
   backImage?: string;
+  backContent?: ReactNode;
   alt?: string;
   preset?: HoloPreset;
   intensity?: number;
@@ -31,6 +33,7 @@ export interface HoloCardProps {
 }
 
 interface Settings {
+  imageFit: 'fill' | 'cover';
   preset: number;
   intensity: number;
   scale: number;
@@ -62,6 +65,7 @@ precision highp float;
 uniform sampler2D uArt;
 uniform vec2 uSize;
 uniform float uAspect;
+uniform float uArtAspect;
 uniform vec2 uTilt;
 uniform vec2 uLight;
 uniform float uDistance;
@@ -252,7 +256,10 @@ void main() {
   float outside = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uRadius;
   float pixel = 1.0 / uSize.x;
   float alpha = clamp(0.5 - outside / pixel, 0.0, 1.0);
-  vec4 sampled = texture(uArt, uv);
+  // Match centered object-fit: cover when the card and artwork have different proportions.
+  float coverRatio = uAspect * uArtAspect;
+  vec2 artScale = vec2(min(1.0, 1.0 / coverRatio), min(1.0, coverRatio));
+  vec4 sampled = texture(uArt, (uv - 0.5) * artScale + 0.5);
   if (uReady > 0.5) alpha *= sampled.a;
   if (alpha <= 0.0) {
     outColor = vec4(0.0);
@@ -346,7 +353,9 @@ const compile = (gl: WebGL2RenderingContext, type: number, source: string): WebG
 
 export default function HoloCard({
   image,
+  imageFit = 'fill',
   backImage,
+  backContent,
   alt = '',
   preset = 'bursts',
   intensity = 0.85,
@@ -378,9 +387,10 @@ export default function HoloCard({
   const [ratio, setRatio] = useState(CARD_RATIO);
   const [ready, setReady] = useState(false);
   const [flipped, setFlipped] = useState(false);
-  const flippable = Boolean(backImage);
+  const flippable = Boolean(backImage || backContent);
 
   settingsRef.current = {
+    imageFit,
     preset: Math.max(0, PRESETS.indexOf(preset)),
     intensity: clamp(intensity, 0, 1),
     scale: clamp(scale, 0.25, 4),
@@ -417,6 +427,7 @@ export default function HoloCard({
     let buffer: WebGLBuffer | null = null;
     const uniforms: Record<string, WebGLUniformLocation | null> = {};
     let textureReady = false;
+    let artAspect = CARD_RATIO;
 
     if (gl) {
       const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX);
@@ -451,6 +462,7 @@ export default function HoloCard({
           'uArt',
           'uSize',
           'uAspect',
+          'uArtAspect',
           'uTilt',
           'uLight',
           'uDistance',
@@ -505,6 +517,7 @@ export default function HoloCard({
       gl.uniform1i(uniforms.uArt, 0);
       gl.uniform2f(uniforms.uSize, w, h);
       gl.uniform1f(uniforms.uAspect, h / w);
+      gl.uniform1f(uniforms.uArtAspect, s.imageFit === 'cover' ? artAspect : w / h);
       gl.uniform2f(uniforms.uTilt, (state.tiltX * Math.PI) / 180, ((state.tiltY + state.turn) * Math.PI) / 180);
       gl.uniform2f(uniforms.uLight, state.lightX, state.lightY);
       gl.uniform1f(uniforms.uDistance, PERSPECTIVE / Math.max(1, canvas.clientWidth));
@@ -618,7 +631,10 @@ export default function HoloCard({
       img.decoding = 'async';
       img.onload = () => {
         if (!alive) return;
-        if (img.naturalWidth && img.naturalHeight) setRatio(img.naturalWidth / img.naturalHeight);
+        if (img.naturalWidth && img.naturalHeight) {
+          artAspect = img.naturalWidth / img.naturalHeight;
+          setRatio(artAspect);
+        }
         if (!gl || !program) return;
         try {
           gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -722,7 +738,8 @@ export default function HoloCard({
         </div>
         {flippable ? (
           <div className="holo-card__face holo-card__face--back">
-            <img src={backImage} alt="" draggable={false} />
+            {backImage ? <img src={backImage} alt="" draggable={false} /> : null}
+            {backContent}
           </div>
         ) : null}
       </div>

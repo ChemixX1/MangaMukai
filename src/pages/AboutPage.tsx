@@ -45,7 +45,6 @@ export const AboutPage = () => {
         
         <div className="max-w-[1200px] mx-auto px-6 relative z-10">
           
-          {/* --- HEADER --- */}
           <div className="flex flex-col md:flex-row gap-12 items-end mb-20">
             <div className="w-full md:w-1/2">
               <motion.div
@@ -75,7 +74,6 @@ export const AboutPage = () => {
             </div>
           </div>
 
-          {/* --- BENTO GRID --- */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {FEATURES.map((feature, index) => (
               <motion.div
@@ -105,7 +103,6 @@ export const AboutPage = () => {
             ))}
           </div>
 
-          {/* --- STATS FOOTER --- */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}

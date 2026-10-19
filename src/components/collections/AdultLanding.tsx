@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { HERO_AUTOPLAY_MS, HERO_TRANSITION_SECONDS } from '../home/heroMotion';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useHomeData } from '../../context/HomeDataContext';
 import { useTheme } from '../../hooks/useTheme';
@@ -8,10 +10,13 @@ import { preloadImages } from '../../utils/preloadImages';
 import { buildViewsIndex, withKnownViews } from '../../utils/seriesViews';
 import { whenIdle } from '../../utils/whenIdle';
 import { byTotalViews, filterMenHot, filterWomenHot } from '../../utils/womenBlackWhite';
+import { HomeAnnouncements } from '../home/HomeAnnouncements';
+import { Footer } from '../layout/Footer';
 import { TrendingCarousel } from './TrendingCarousel';
 import { AdultLatestUpdates } from './AdultLatestUpdates';
 import { AdultHeroCoverflow } from './AdultMotionCarousels';
-import { AdultYouthMotionCarousel } from './AdultYouthMotionCarousel';
+import { HeroCarousel } from '../home/HomeHero';
+import { toHeroItems } from '../home/homeModels';
 
 const ADULT_PATTERN = /\+19|adult|ecchi|hentai|hot|er[oó]tico|maduro|harem|yuri/i;
 
@@ -29,8 +34,8 @@ const uniqueMangas = (items: MangaCapitulo[]) => {
 };
 
 /**
- * Colección +19 (/manga-19): hero en coverflow, tendencias, últimas
- * actualizaciones y los bloques juveniles, todo filtrado por la etiqueta HOT.
+ * Colección +19 (/manga-19): mismas secciones, titulares, filtros y efectos
+ * que el Home, manteniendo los estilos de portada propios de la colección.
  */
 export function AdultLanding() {
   const { theme: colorMode } = useTheme();
@@ -47,6 +52,12 @@ export function AdultLanding() {
   const isLightMode = colorMode === 'light';
   const [mangas, setMangas] = useState<MangaCapitulo[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const heroRef = useRef<HTMLElement>(null);
+  const reduceMotion = useReducedMotion();
+  const [isPaused, setIsPaused] = useState(false);
+  const [isInView, setIsInView] = useState(true);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+  const [backdropSrc, setBackdropSrc] = useState('');
   const [loading, setLoading] = useState(true);
   const [popularMenMonthly, setPopularMenMonthly] = useState<MangaCapitulo[]>([]);
 
@@ -82,24 +93,16 @@ export function AdultLanding() {
     return () => { mounted = false; };
   }, []);
 
-  useEffect(() => {
-    if (mangas.length < 2) return;
-    const timer = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % Math.min(mangas.length, 8));
-    }, 6000);
-    return () => window.clearInterval(timer);
-  }, [mangas.length]);
-
   /* Cada bloque exige la etiqueta HOT literal: Mujer arriba, Hombre en juveniles
      y abajo. Los rankings de vistas casi no traen mangas HOT, así que cada pool
      suma la biblioteca completa (`mangas`) y el filtro decide. */
   const latestWomenWithChapters = useMemo(
-    () => filterWomenHot(uniqueMangas([...latestWomen, ...mangas])),
-    [latestWomen, mangas],
+    () => filterWomenHot(uniqueMangas([...latestWomen, ...popularWeekly, ...popularHistorical, ...newReleases, ...mangas])),
+    [latestWomen, popularWeekly, popularHistorical, newReleases, mangas],
   );
   const latestMenWithChapters = useMemo(
-    () => filterMenHot(uniqueMangas([...latestMen, ...mangas])),
-    [latestMen, mangas],
+    () => filterMenHot(uniqueMangas([...latestMen, ...popularMenWeekly, ...popularMenHistorical, ...newReleases, ...mangas])),
+    [latestMen, popularMenWeekly, popularMenHistorical, newReleases, mangas],
   );
   /* Vistas por serie: las últimas actualizaciones y el catálogo llegan sin
      `totalViews`, así que el contador de juveniles se completa con la cifra
@@ -118,7 +121,39 @@ export function AdultLanding() {
     const pool = uniqueMangas([...popularHistorical, ...popularWeekly, ...latestWomen, ...newReleases, ...mangas]);
     return filterWomenHot(pool).sort(byTotalViews).slice(0, 8);
   }, [mangas, popularHistorical, popularWeekly, latestWomen, newReleases]);
+  useEffect(() => {
+    setActiveIndex((index) => Math.min(index, Math.max(0, heroItems.length - 1)));
+  }, [heroItems.length]);
+
+  useEffect(() => {
+    const onVisibility = () => setIsPageVisible(!document.hidden);
+    onVisibility();
+    document.addEventListener('visibilitychange', onVisibility);
+    const observer = new IntersectionObserver(([entry]) => setIsInView(entry.isIntersecting));
+    if (heroRef.current) observer.observe(heroRef.current);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (heroItems.length < 2 || isPaused || !isInView || !isPageVisible || reduceMotion) return;
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % heroItems.length);
+    }, HERO_AUTOPLAY_MS);
+    return () => window.clearInterval(timer);
+  }, [heroItems.length, activeIndex, isPaused, isInView, isPageVisible, reduceMotion]);
+
   const active = heroItems[activeIndex % Math.max(heroItems.length, 1)];
+  const activeCover = active?.portada ?? '';
+  useEffect(() => {
+    let cancelled = false;
+    if (activeCover) void preloadImages([activeCover]).then(() => {
+      if (!cancelled) setBackdropSrc(activeCover);
+    });
+    return () => { cancelled = true; };
+  }, [activeCover]);
   const heroCoverKey = heroItems.map((manga) => manga.portada).filter(Boolean).join('|');
 
   // Se adelanta la descarga de las portadas del hero para que aparezcan ya
@@ -138,16 +173,19 @@ export function AdultLanding() {
     setActiveIndex((current) => (current + 1) % heroItems.length);
   };
 
-  const sectionBackground = isLightMode ? 'bg-[#f5f6f8]' : 'bg-black';
+  const sectionBackground = 'bg-surface';
+  const isDataReady = !loading || homeReady;
 
   return (
-    <main className={`collection-landing min-h-screen overflow-hidden transition-colors duration-700 ${isLightMode ? 'home-theme-light bg-[#f5f6f8] text-slate-950' : 'home-theme-dark bg-[#0b0509] text-white'}`}>
+    <main className={`collection-landing min-h-screen overflow-hidden transition-colors duration-700 ${isDataReady ? 'home-data-ready' : 'home-data-pending'} ${isLightMode ? 'home-theme-light bg-surface text-slate-950' : 'home-theme-dark bg-surface text-white'}`}>
       {/* El título grande del hero es el manga destacado y va rotando: el H1 real
           de la colección se declara aquí para buscadores y lectores de pantalla. */}
       <h1 className="sr-only">Mangas +19 en español para adultos</h1>
-      <section className="relative min-h-[960px] overflow-hidden lg:min-h-[850px]">
-        <div className={`absolute inset-0 ${isLightMode ? 'bg-[#f5f6f8]' : 'bg-[#121212]'}`} aria-hidden="true">
-          {active?.portada && <img src={active.portada} alt="" className={`absolute inset-0 h-full w-full scale-105 object-cover grayscale blur-[2px] transition-[filter] duration-700 ${isLightMode ? 'brightness-[0.82] contrast-[1.03]' : 'brightness-[0.36] contrast-[1.08]'}`} />}
+      <section ref={heroRef} onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)} onTouchCancel={() => setIsPaused(false)} className="home-block home-block-hero relative min-h-[960px] overflow-hidden lg:min-h-[850px]">
+        <div className={`absolute inset-0 bg-surface`} aria-hidden="true">
+          <AnimatePresence initial={false}>
+          {backdropSrc && <motion.img key={backdropSrc} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0, delay: reduceMotion ? 0 : HERO_TRANSITION_SECONDS } }} transition={{ duration: reduceMotion ? 0 : HERO_TRANSITION_SECONDS, ease: 'easeOut' }} src={backdropSrc} alt="" className={`absolute inset-0 h-full w-full scale-105 object-cover grayscale blur-[2px] transition-[filter] duration-700 ${isLightMode ? 'brightness-[0.82] contrast-[1.03]' : 'brightness-[0.36] contrast-[1.08]'}`} />}
+          </AnimatePresence>
           <div className="home-hero-theme-scrim absolute inset-0" />
           <div className={`absolute inset-0 bg-gradient-to-r transition-colors duration-700 ${isLightMode ? 'from-white/90 via-white/55 to-white/5' : 'from-black/90 via-black/65 to-black/10'}`} />
         </div>
@@ -160,29 +198,40 @@ export function AdultLanding() {
           onSelect={setActiveIndex}
         />
       </section>
-      <section className={`relative -mt-3 pb-10 pt-8 sm:-mt-4 sm:pb-12 sm:pt-8 ${sectionBackground}`}>
-        <TrendingCarousel audience="women" filterMangas={filterWomenHot} />
+      <section className={`home-block home-block-popular relative -mt-3 pb-10 pt-8 sm:-mt-4 sm:pb-12 sm:pt-8 ${sectionBackground}`}>
+        <TrendingCarousel selectorColor="#ff6b00" audience="women" filterMangas={filterWomenHot} />
       </section>
-      <AdultLatestUpdates
-        items={latestWomenWithChapters}
-        isLight={isLightMode}
-        sectionId="adult-latest-women"
-        rowTone="neutral"
-        includeUpcoming
-      />
-      <AdultYouthMotionCarousel items={youthHotMen} isLight={isLightMode} />
-      <section className={`relative py-14 sm:py-16 ${sectionBackground}`}>
-        <TrendingCarousel audience="men" filterMangas={filterMenHot} minItemsForMotion={7} />
+      <div className="home-block home-block-latest">
+        <AdultLatestUpdates
+          items={latestWomenWithChapters}
+          isLight={isLightMode}
+          sectionId="adult-latest-women"
+          rowTone="neutral"
+          includeUpcoming
+          loading={loading && !homeReady}
+        />
+      </div>
+      <div className={`pb-8 pt-2 ${sectionBackground}`}>
+        <HomeAnnouncements />
+      </div>
+      <div className="home-block home-block-men">
+        <HeroCarousel items={toHeroItems(youthHotMen)} loading={loading && !homeReady} accent="cyan" label="Mangas juveniles destacados" coverLayout="row" />
+      </div>
+      <section className={`home-block home-block-youth relative py-14 sm:py-16 ${sectionBackground}`}>
+        <TrendingCarousel selectorColor="#ff6b00" audience="men" filterMangas={filterMenHot} minItemsForMotion={7} />
       </section>
-      <AdultLatestUpdates
-        items={latestMenWithChapters}
-        isLight={isLightMode}
-        titleAccent="actualizaciones"
-        sectionId="adult-latest-youth"
-        accent="blue"
-        rowTone="neutral"
-        includeUpcoming
-      />
+      <div className="home-block home-block-youth-latest">
+        <AdultLatestUpdates
+          items={latestMenWithChapters}
+          isLight={isLightMode}
+          sectionId="adult-latest-youth"
+          accent="blue"
+          rowTone="neutral"
+          includeUpcoming
+          loading={loading && !homeReady}
+        />
+      </div>
+      <Footer homeDesign className="mt-[94px] lg:mt-[125px]" />
     </main>
   );
 }

@@ -1,10 +1,11 @@
+import { prefetchRoute } from '../../utils/prefetchRoute';
 import { Link, useLocation } from 'react-router-dom';
 import { isMobileSectionRoute } from '../../utils/mobileSections';
 import { useHideOnScrollDown } from '../../hooks/useHideOnScrollDown';
 
 interface IconProps { active: boolean }
 
-// Iconos de 24×23 (un pelín más anchos que altos, como pidió el diseño).
+
 const base = { width: 24, height: 23, viewBox: '0 0 24 24', preserveAspectRatio: 'none', 'aria-hidden': true as const };
 
 /** Mangas: libro con marcapáginas (dos hojas). */
@@ -51,12 +52,12 @@ const MoreIcon = ({ active }: IconProps) => (
 );
 
 const TABS = [
-  { key: 'mangas', label: 'Mangas', to: '/', Icon: BookIcon, match: (path: string) => path === '/' || path.startsWith('/manga') || path.startsWith('/biblioteca') || path.startsWith('/read/') },
+  { key: 'mangas', label: 'Mangas', to: '/', Icon: BookIcon, match: (path: string) => path === '/' || path.startsWith('/manga') || path.startsWith('/read/') },
   { key: 'character', label: 'Character', to: '/chat', Icon: FlameIcon, match: (path: string) => path.startsWith('/chat') },
   { key: 'tienda', label: 'Tienda', to: '/tienda', Icon: BagIcon, match: (path: string) => path.startsWith('/tienda') },
   // La pestaña Chat abre la Comunidad; el chat de mensajes (/mensajes) se abre desde su botón flotante.
   { key: 'chat', label: 'Chat', to: '/comunidad', Icon: BubbleIcon, match: (path: string) => path.startsWith('/comunidad') || path.startsWith('/mensajes') },
-  { key: 'more', label: 'Más', to: '/mas', Icon: MoreIcon, match: (path: string) => path.startsWith('/mas') },
+  { key: 'more', label: 'Más', to: '/profile', Icon: MoreIcon, match: (path: string) => path.startsWith('/profile') },
 ] as const;
 
 /**
@@ -87,7 +88,7 @@ export const MobileTabBar = () => {
           const active = match(pathname);
           return (
             <li key={key} className="min-w-0">
-              <Link to={to} aria-current={active ? 'page' : undefined} className={labelClass(active)}>
+              <Link to={to} onPointerEnter={() => prefetchRoute(to)} onFocus={() => prefetchRoute(to)} onTouchStart={() => prefetchRoute(to)} aria-current={active ? 'page' : undefined} className={labelClass(active)}>
                 <Icon active={active} />
                 <span className="truncate">{label}</span>
               </Link>

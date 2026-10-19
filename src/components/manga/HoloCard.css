@@ -65,7 +65,6 @@
 
 .holo-card[data-ready] .holo-card__face canvas { opacity: 1; }
 
-/* La ficha conserva las medidas y la posición originales de su portada. */
 .manga-detail-cover .holo-card,
 .manga-detail-mobile header .holo-card {
   display: block;

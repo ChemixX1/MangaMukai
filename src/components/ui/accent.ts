@@ -19,5 +19,5 @@ export const typeBadgeColor = (type: string, accent: Accent) => {
   if (normalized.includes('manhwa')) return 'var(--mm-type-manhwa)';
   if (normalized.includes('manhua')) return 'var(--mm-type-manhua)';
   if (normalized.includes('novel')) return 'var(--mm-type-novel)';
-  return ACCENT_COLOR[accent];
+  return `var(--mm-type-manga, ${ACCENT_COLOR[accent]})`;
 };

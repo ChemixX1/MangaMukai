@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
-import { AUTH_CHANGED_EVENT, getStoredToken, getStoredUser } from './authService';
+import { AUTH_CHANGED_EVENT, getAuthCacheKey } from './authService';
 import { getMusicTracks, type MusicTrack } from './communityService';
 
 /**
@@ -63,7 +63,6 @@ export const isPlayableTrack = (track: MusicTrack | null | undefined): track is 
 export const getCurrentTrack = (): MusicTrack | null =>
   state.tracks.find((track) => track.id === state.currentId) ?? null;
 
-// --- Audio compartido -------------------------------------------------------
 
 let audio: HTMLAudioElement | null = null;
 let loadedSrc = '';
@@ -114,13 +113,9 @@ const syncSource = (track: MusicTrack | null, autoplay: boolean) => {
   if (autoplay) startPlayback();
 };
 
-// --- Biblioteca -------------------------------------------------------------
 
-/** Token + estado premium: si cambia, la lista se vuelve a pedir. */
-const authSignature = () => {
-  const user = getStoredUser();
-  return `${getStoredToken() ?? ''}|${user?.isPremium || user?.is_premium ? 1 : 0}`;
-};
+/** Cuenta + acceso premium; renovar el token no reinicia la música. */
+const authSignature = getAuthCacheKey;
 
 let inflight: Promise<void> | null = null;
 let loadedSignature: string | null = null;
@@ -171,7 +166,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// --- Acciones ---------------------------------------------------------------
 
 export const selectTrack = (id: number, autoplay = true) => {
   const track = state.tracks.find((item) => item.id === id) ?? null;
@@ -223,7 +217,6 @@ export const toggleLike = (id: number) => {
   setState({ likedIds });
 };
 
-// --- Hook -------------------------------------------------------------------
 
 export const useMusicPlayer = (): MusicPlayerState => {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

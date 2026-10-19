@@ -1,7 +1,6 @@
 /**
- * Publicaciones de la Comunidad. Viven en el navegador (localStorage, una lista
- * por usuario) hasta que exista un feed global en el servidor: hoy la API solo
- * devuelve las publicaciones de un perfil concreto.
+ * Tipos de Comunidad y datos de ejemplo para referencias visuales.
+ * La página carga las publicaciones reales mediante communityFeedService.
  */
 import rainArtwork from '../assets/community/reading-rain.webp';
 import arianelArtwork from '../assets/character/arianel-backdrop.webp';
@@ -35,6 +34,7 @@ export type CommunityPost = {
   liked?: boolean;
   saved?: boolean;
   comments: CommunityComment[];
+  commentCount?: number;
   /** Publicación de ejemplo (no la escribió el lector). */
   demo?: boolean;
   createdAt?: string;
@@ -52,7 +52,7 @@ export const communitySeeds: CommunityPost[] = [
 ];
 
 /** Resuelve las portadas de muestra antiguas conservadas en localStorage. */
-export const communityImage = (src?: string) => src?.startsWith('/images/collection/') ? rainArtwork : src;
+export const communityImage = (src?: string) => src?.startsWith(`${import.meta.env.BASE_URL}images/collection/`) ? rainArtwork : src;
 
 /** Lectores sugeridos de ejemplo (autores de las publicaciones de muestra). */
 export const suggestedReaders = communitySeeds.map(({ userId, name, avatar }) => ({ userId, name, avatar }));
@@ -91,8 +91,8 @@ export const computeTrends = (posts: CommunityPost[], limit = 5): CommunityTrend
 
 /** Anuncios de Comunidad, compartidos por PC y móvil. */
 export const communityAds = [
-  { id: 'store', to: '/tienda', eyebrow: 'TIENDA MUKAI', title: 'Mangas para tu colección', text: 'Volúmenes, ilustraciones y colecciones.', cta: 'Ver tienda', image: '/images/collection/57821.webp' },
-  { id: 'chat', to: '/chat', eyebrow: 'CHARACTER', title: 'Chatea con personajes', text: 'Conversa con tus personajes favoritos.', cta: 'Explorar personajes', image: '/images/collection/57266.webp' },
+  { id: 'store', to: '/tienda', eyebrow: 'TIENDA MUKAI', title: 'Mangas para tu colección', text: 'Volúmenes, ilustraciones y colecciones.', cta: 'Ver tienda', image: `${import.meta.env.BASE_URL}images/collection/57821.webp` },
+  { id: 'chat', to: '/chat', eyebrow: 'CHARACTER', title: 'Chatea con personajes', text: 'Conversa con tus personajes favoritos.', cta: 'Explorar personajes', image: `${import.meta.env.BASE_URL}images/collection/57266.webp` },
 ];
 
 export const handleOf = (name: string) => `@${name.toLowerCase().replace(/\s+/g, '')}`;

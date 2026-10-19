@@ -86,12 +86,13 @@ uniform float uSmooth;
 uniform vec3 uPill;
 uniform vec4 uHoverColor;
 uniform float uShadow;
+uniform float uCornerRadius;
 
 out vec4 outColor;
 
 float sdPill(vec2 p, vec4 box) {
   vec2 extent = max(box.zw, vec2(0.0));
-  float r = min(extent.x, extent.y);
+  float r = min(min(extent.x, extent.y), uCornerRadius);
   vec2 q = abs(p - box.xy) - extent + r;
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
@@ -135,8 +136,9 @@ void main() {
 
   vec2 grad = vec2(dFdx(d), -dFdy(d));
   vec2 n = length(grad) > 0.0001 ? normalize(grad) : vec2(0.0, 1.0);
-  float rim = (1.0 - smoothstep(0.0, 1.6, -d)) * max(0.0, -n.y) * 0.3;
-  vec3 fill = mix(shape.rgb, vec3(1.0), rim) * (1.0 - 0.06 * max(0.0, n.y) * (1.0 - smoothstep(0.0, 6.0, -d)));
+  float rim = shape.r > 0.5 ? 0.0 : (1.0 - smoothstep(0.0, 1.6, -d)) * max(0.0, -n.y) * 0.3;
+  float shade = shape.r > 0.5 ? 1.0 : (1.0 - 0.06 * max(0.0, n.y) * (1.0 - smoothstep(0.0, 6.0, -d)));
+  vec3 fill = mix(shape.rgb, vec3(1.0), rim) * shade;
 
   float lifted = field(p - vec2(0.0, 3.0)).w;
   float shadow = (1.0 - smoothstep(-3.0, 9.0, lifted)) * uShadow * (1.0 - body);
@@ -177,9 +179,10 @@ const bezier = (a: number, b: number, c: number, d: number, t: number) => {
   return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
 };
 
-const pillPath = (x: number, y: number, w: number, h: number) => {
+const pillPath = (x: number, y: number, w: number, h: number, cornerRadius: number) => {
   if (w <= 0.5 || h <= 0.5) return '';
-  const r = Math.min(w, h) / 2;
+  const r = Math.min(Math.min(w, h) / 2, cornerRadius);
+  if (r === 0) return `M${x},${y}H${x + w}V${y + h}H${x}Z`;
   return `M${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}H${x + r}A${r},${r} 0 0 1 ${x},${y + h - r}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}Z`;
 };
 
@@ -190,7 +193,7 @@ const compile = (gl: WebGL2RenderingContext, type: number, source: string) => {
   return shader;
 };
 
-const UNIFORMS = [
+const UNIFORMS = ['uCornerRadius',
   'uSize',
   'uRatio',
   'uPills',
@@ -226,7 +229,7 @@ const build = (gl: WebGL2RenderingContext): Pipeline | null => {
 };
 
 
-export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeIndex: number; itemCount?: number; color?: string }) => {
+export const GooeySelector = ({ activeIndex, itemCount = 3, color, labelColor, activeLabelColor, cornerRadius = 9999 }: { activeIndex: number; itemCount?: number; color?: string; labelColor?: string; activeLabelColor?: string; cornerRadius?: number }) => {
   const { theme } = useTheme();
   const current = Math.min(Math.max(0, activeIndex), itemCount - 1);
   const pillColor = color || (theme === 'dark' ? '#ffffff' : '#000000');
@@ -234,7 +237,7 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
   const fallbackRef = useRef<HTMLSpanElement>(null);
   const engineRef = useRef<{ go: (index: number) => void; refresh: () => void } | null>(null);
   const indexRef = useRef(current);
-  const settings = { animationTime: 600, particleCount: 15, timeVariance: 300, spread: 56, gooeyness: 0.5, wobble: 0.5, hoverEffect: false, pillRgb: parse(pillColor), tints: [] as Rgba[], hoverRgb: [0, 0, 0, 0], shadow: 0 };
+  const settings = { cornerRadius: Math.max(0, cornerRadius), customColor: Boolean(color), labelColor: labelColor ?? (theme === 'dark' ? '#ffffff' : '#000000'), activeLabelColor: activeLabelColor ?? (color ? '#ffffff' : theme === 'dark' ? '#000000' : '#ffffff'), animationTime: 600, particleCount: 15, timeVariance: 300, spread: 56, gooeyness: 0.5, wobble: 0.5, hoverEffect: false, pillRgb: parse(pillColor), tints: [] as Rgba[], hoverRgb: [0, 0, 0, 0], shadow: 0 };
   const settingsRef = useRef(settings);
   useLayoutEffect(() => { indexRef.current = current; settingsRef.current = settings; });
   useLayoutEffect(() => {
@@ -260,6 +263,8 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
     const originalColors = labels.map(label => label.style.color);
     const syncLabels = () => {
       overlay.replaceChildren();
+      // Colored selectors use the real button labels; avoid a second animated text layer.
+      overlay.style.display = settingsRef.current.customColor ? 'none' : '';
       labels.forEach((label, index) => {
         const rect = rects[index];
         if (!rect) return;
@@ -268,11 +273,13 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
         for (const property of ['font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-transform', 'gap', 'padding', 'box-sizing', 'align-items', 'justify-content']) {
           copy.style.setProperty(property, computed.getPropertyValue(property));
         }
-        Object.assign(copy.style, { position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center', left: rect.x + 'px', top: rect.y + 'px', width: rect.w + 'px', height: rect.h + 'px', whiteSpace: 'nowrap', color: settingsRef.current.pillRgb[0] > 0.5 ? '#000000' : '#ffffff' });
+        Object.assign(copy.style, { position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center', left: rect.x + 'px', top: rect.y + 'px', width: rect.w + 'px', height: rect.h + 'px', whiteSpace: 'nowrap', color: settingsRef.current.activeLabelColor });
         for (const child of label.childNodes) copy.appendChild(child.cloneNode(true));
         copy.querySelectorAll('[id]').forEach(child => child.removeAttribute('id'));
         overlay.appendChild(copy);
-        label.style.color = settingsRef.current.pillRgb[0] > 0.5 ? '#ffffff' : '#000000';
+        label.style.color = settingsRef.current.customColor && index === indexRef.current
+          ? settingsRef.current.activeLabelColor
+          : settingsRef.current.labelColor;
       });
     };
 
@@ -324,7 +331,7 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
           d = value + (d - value) * h - smooth * h * (1 - h);
         };
         for (const box of boxes) {
-          const r = Math.min(box.hw, box.hh);
+          const r = Math.min(box.hw, box.hh, settingsRef.current.cornerRadius);
           const qx = Math.abs(x - box.cx) - box.hw + r;
           const qy = Math.abs(y - box.cy) - box.hh + r;
           merge(Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r);
@@ -470,7 +477,7 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
       const settledPill = boxes.length === 1 && !blobs.length;
       if (settledPill) {
         const box = boxes[0];
-        overlay.style.clipPath = `path('${pillPath(box.cx - box.hw, box.cy - box.hh, box.hw * 2, box.hh * 2)}')`;
+        overlay.style.clipPath = `path('${pillPath(box.cx - box.hw, box.cy - box.hh, box.hw * 2, box.hh * 2, s.cornerRadius)}')`;
       } else {
         overlay.style.clipPath = `path('${trace(boxes, blobs, smooth) || 'M0,0Z'}')`;
       }
@@ -533,6 +540,7 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
       gl.uniform3f(uniforms.uPill, s.pillRgb[0], s.pillRgb[1], s.pillRgb[2]);
       gl.uniform4f(uniforms.uHoverColor, s.hoverRgb[0], s.hoverRgb[1], s.hoverRgb[2], s.hoverRgb[3] * hover.alpha);
       gl.uniform1f(uniforms.uShadow, s.shadow);
+      gl.uniform1f(uniforms.uCornerRadius, s.cornerRadius);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     };
 
@@ -659,12 +667,12 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
     };
 
     const go = (index: number, animate: boolean) => {
+      syncLabels();
       if (index === target) return;
       if (!rects[index] || !animate || reduced || !pipeline || target < 0) {
         settle(index);
         return;
       }
-      syncLabels();
       const now = performance.now();
       target = index;
       pill(index);
@@ -691,6 +699,15 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
     });
     resizeObserver.observe(stage);
     for (const item of list.querySelectorAll(':scope > button, :scope > a')) resizeObserver.observe(item);
+
+    const mutationObserver = new MutationObserver(() => {
+      measure();
+      if (!drops.length) settle(target < 0 ? indexRef.current : target);
+      else render();
+    });
+    for (const item of labels) {
+      mutationObserver.observe(item, { childList: true, subtree: true, characterData: true });
+    }
 
     const onMotionChange = () => {
       reduced = motionQuery.matches;
@@ -720,6 +737,7 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
       disposed = true;
       cancelAnimationFrame(raf);
       resizeObserver.disconnect();
+      mutationObserver.disconnect();
       overlay.remove();
       labels.forEach((label, index) => { label.style.color = originalColors[index]; });
       motionQuery.removeEventListener('change', onMotionChange);
@@ -737,11 +755,11 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color }: { activeInd
 
   useEffect(() => {
     engineRef.current?.refresh();
-  }, [pillColor]);
+  }, [pillColor, theme, labelColor, activeLabelColor, cornerRadius]);
 
 
   return <>
     <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0" />
-    <span ref={fallbackRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 rounded-full" style={{ background: pillColor }} />
+    <span ref={fallbackRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 rounded-full" style={{ background: pillColor, borderRadius: Math.max(0, cornerRadius) }} />
   </>;
 };

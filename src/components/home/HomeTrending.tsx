@@ -12,6 +12,7 @@ import { formatHomeViews } from '../../utils/mangaFormat';
 import { toTitleCase } from '../../utils/titleCase';
 import { formatChapterCount } from '../../utils/trendingRanking';
 
+import type { MangaCapitulo } from '../../types/manga';
 import { type Audience } from './homeModels';
 
 /** Nueve portadas: el puesto siempre es de una cifra, como el número grande de las tarjetas. */
@@ -73,9 +74,9 @@ const TrendingCard = ({ manga, rank, accent, isCopy, isMobile }: TrendingCardPro
  * sombra, con tres pestañas iguales y la elegida dentro del borde; en PC, 48 px
  * con sombra.
  */
-const PeriodTabs = ({ value, onChange, className }: { value: RankingPeriod; onChange: (period: RankingPeriod) => void; className: string }) => (
+const PeriodTabs = ({ value, onChange, className, selectorColor }: { selectorColor?: string; value: RankingPeriod; onChange: (period: RankingPeriod) => void; className: string }) => (
   <div role="tablist" aria-label="Periodo del ranking" className={`flex h-11 shrink-0 rounded-3xl border border-[#878383] dark:border-[color:var(--mm-tab-line)] dark:bg-black lg:h-12 lg:shadow-[0_4px_4px_rgba(0,0,0,1)] ${className}`}>
-    <GooeySelector activeIndex={RANKING_PERIODS.indexOf(value)} />
+    <GooeySelector activeIndex={RANKING_PERIODS.indexOf(value)} color={selectorColor} />
     {RANKING_PERIODS.map((option) => {
       const active = option === value;
       return (
@@ -85,7 +86,7 @@ const PeriodTabs = ({ value, onChange, className }: { value: RankingPeriod; onCh
           role="tab"
           aria-selected={active}
           onClick={() => onChange(option)}
-          className={`relative z-[1] h-full flex-1 rounded-3xl font-montserrat text-xs uppercase leading-3 transition-colors lg:-my-px lg:h-12 lg:w-[var(--tab-width)] lg:flex-none lg:first-of-type:-ml-px lg:last:-mr-px ${active ? 'font-black text-surface' : 'font-bold text-ink'}`}
+          className={`relative z-[1] h-full flex-1 rounded-3xl font-montserrat text-xs uppercase leading-3 lg:-my-px lg:h-12 lg:w-[var(--tab-width)] lg:flex-none lg:first-of-type:-ml-px lg:last:-mr-px ${active ? `font-black ${selectorColor ? 'text-white' : 'text-surface'}` : 'font-bold text-black dark:text-white'}`}
           style={{ '--tab-width': `${PERIOD_WIDTHS[option]}px` } as CSSProperties}
         >
           {option}
@@ -100,13 +101,30 @@ const PeriodTabs = ({ value, onChange, className }: { value: RankingPeriod; onCh
  * infinita de nueve tarjetas que avanza sola, se puede arrastrar (ratón o dedo)
  * y se funde con el fondo en los dos bordes.
  */
-export const TrendingSection = ({ audience, className }: { audience: Audience; className: string }) => {
+export const TrendingSection = ({
+  audience,
+  className = '',
+  filterMangas,
+  selectorColor,
+}: {
+  audience: Audience;
+  className?: string;
+  selectorColor?: string;
+  filterMangas?: (items: MangaCapitulo[]) => MangaCapitulo[];
+}) => {
   const accent: Accent = audience === 'men' ? 'cyan' : 'pink';
   const accentColor = ACCENT_COLOR[accent];
   const prefersReducedMotion = useReducedMotion();
   const isMobile = useIsMobileViewport();
   const [period, setPeriod] = useState<RankingPeriod>('Semanal');
-  const { items, loading } = useTrendingRanking({ audience, period, size: TRENDING_SIZE, youthOnly: audience === 'men', preloadCount: 5 });
+  const { items, loading } = useTrendingRanking({
+    audience,
+    period,
+    size: TRENDING_SIZE,
+    youthOnly: !filterMangas && audience === 'men',
+    filterMangas,
+    preloadCount: 5,
+  });
   const { viewportRef, trackRef, sequenceRef, copies, viewportProps } = useInfiniteMarquee({
     itemCount: items.length,
     speed: prefersReducedMotion ? 0 : TRENDING_SPEED,
@@ -128,7 +146,7 @@ export const TrendingSection = ({ audience, className }: { audience: Audience; c
               {'Tendencia  '}<span style={{ color: accentColor }}>Ahora</span>
             </h2>
           </div>
-          <PeriodTabs value={period} onChange={setPeriod} className="absolute left-[43px] right-[43px] top-[67px] lg:left-auto lg:right-[95px] lg:top-[14px]" />
+          <PeriodTabs selectorColor={selectorColor} value={period} onChange={setPeriod} className="absolute left-[43px] right-[43px] top-[67px] lg:left-auto lg:right-[95px] lg:top-[14px]" />
         </div>
 
         <div className="home-trending-cards relative mt-[29px] min-h-[328px] lg:mt-0 lg:min-h-[339px]">
@@ -178,4 +196,3 @@ export const TrendingSection = ({ audience, className }: { audience: Audience; c
   );
 };
 
-/* -------------------------------------------------------- Lo Más Reciente */

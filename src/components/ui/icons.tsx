@@ -1,9 +1,4 @@
-/**
- * Iconos del sistema de diseño (trazados tal cual llegaron de Figma), comunes a
- * la versión móvil y a la de escritorio. Todos toman el color de
- * `currentColor`, salvo la pila de monedas de "PAGO", que lleva su degradado
- * naranja propio, y los bocadillos de Discord y Telegram.
- */
+/** Iconos compartidos; usan currentColor salvo los que tienen degradados propios. */
 
 import { useId } from 'react';
 
@@ -35,7 +30,7 @@ export const CrownIcon = ({ size = 12, className }: IconProps) => (
   </svg>
 );
 
-/** Degradados de cada cara de la pila de monedas ("icono moneda" de docs/design/icons.md). */
+/** Degradados por cara de la pila de monedas. */
 const COIN_GRADIENTS = [
   { x1: 4.72003, y1: 11.135, x2: 6.30346, y2: 14.9393, from: '#FFA43D', to: '#FB5937' },
   { x1: 12.7659, y1: 12.7482, x2: 8.05325, y2: 5.03812, from: '#FF8A69', to: '#FFCD0F' },
@@ -98,7 +93,6 @@ export const AgendaIcon = ({ size = 24, className }: IconProps) => (
   </svg>
 );
 
-/** Llama del capítulo nuevo ("icono fuego de nuevo" de docs/design/icons.md). */
 export const FlameIcon = ({ size = 18, className }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 18 18" fill="none" className={className} aria-hidden="true">
     <path d="M8.59954 17.4752C12.1619 17.4752 15.0492 15.2908 15.0492 11.4681C15.0492 9.8298 14.5117 7.0993 12.3618 4.9149C12.6306 6.5532 11.0182 7.0993 11.0182 7.0993C11.8244 4.3688 9.67448 0.5461 6.44966 0C6.83341 2.1844 6.98713 4.3688 4.29978 6.5532C2.95611 7.6454 2.1499 9.53381 2.1499 11.4681C2.1499 15.2908 5.03719 17.4752 8.59954 17.4752ZM8.59954 16.383C6.81836 16.383 5.37472 15.2908 5.37472 13.3794C5.37472 12.5603 5.64345 11.195 6.71839 10.1028C6.58403 10.922 7.5246 11.4681 7.5246 11.4681C7.1215 10.1028 8.06207 7.91845 9.67448 7.6454C9.48206 8.7376 9.40574 9.8298 10.7494 10.922C11.4213 11.4681 11.8244 12.4118 11.8244 13.3794C11.8244 15.2908 10.3807 16.383 8.59954 16.383Z" fill="currentColor" />
@@ -132,8 +126,6 @@ export const CodeIcon = ({ size = 10, className }: IconProps) => (
     <path d="M3.6 1 1 4.5 3.6 8M8.4 1 11 4.5 8.4 8M6.9 0.6 5.1 8.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
-
-/* ---- Redes del footer (trazados del diseño) ---- */
 
 export const FacebookIcon = ({ size = 24, className }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 26 26" fill="none" className={className} aria-hidden="true">
@@ -171,8 +163,6 @@ export const TelegramIcon = ({ size = 22, className }: IconProps) => (
   </svg>
 );
 
-/* ---- Tarjetas de Discord y Telegram ---- */
-
 /** Bocadillo azul con el logo de Discord recortado (la cola apunta a la tarjeta). */
 export const DiscordBubble = ({ className }: { className?: string }) => (
   <svg viewBox="8 6 57 64" width="57" height="64" fill="none" className={className} aria-hidden="true">
@@ -201,8 +191,6 @@ export const PaperPlaneIcon = ({ size = 62, className }: IconProps) => (
     <path fillRule="evenodd" clipRule="evenodd" d="M58.7594 61.8438V61.8376L58.8156 61.7032L68.1875 14.4532V14.3032C68.1875 13.1251 67.75 12.0969 66.8063 11.4813C65.9781 10.9407 65.025 10.9032 64.3562 10.9532C63.7338 11.01 63.1196 11.1358 62.525 11.3282C62.2712 11.4092 62.021 11.5009 61.775 11.6032L61.7344 11.6188L9.48438 32.1157L9.46875 32.122C9.30867 32.1729 9.15296 32.2366 9.00313 32.3126C8.63173 32.4799 8.27524 32.6786 7.9375 32.9063C7.26563 33.3688 5.9875 34.4563 6.20313 36.1813C6.38125 37.6126 7.36563 38.5188 8.03125 38.9907C8.42326 39.2675 8.84583 39.4981 9.29063 39.6782L9.39063 39.722L9.42188 39.7313L9.44375 39.7407L18.5875 42.8188C18.5542 43.3938 18.6135 43.9719 18.7656 44.5532L23.3437 61.9251C23.5939 62.872 24.1343 63.7168 24.8891 64.3409C25.644 64.9649 26.5754 65.3368 27.5524 65.4044C28.5295 65.472 29.5032 65.2318 30.3368 64.7176C31.1703 64.2034 31.8219 63.4411 32.2 62.5376L39.35 54.8938L51.6281 64.3063L51.8031 64.3813C52.9187 64.8688 53.9594 65.022 54.9125 64.8938C55.8656 64.7626 56.6219 64.3626 57.1906 63.9095C57.8486 63.3763 58.373 62.6968 58.7219 61.9251L58.7469 61.872L58.7562 61.8532L58.7594 61.8438ZM23.2969 43.3595C23.2462 43.1667 23.2582 42.9628 23.3313 42.7774C23.4043 42.5919 23.5346 42.4346 23.7031 42.3282L54.7063 22.6407C54.7063 22.6407 56.5313 21.5313 56.4656 22.6407C56.4656 22.6407 56.7906 22.8345 55.8125 23.7438C54.8875 24.6095 33.7156 45.0501 31.5719 47.1188C31.4555 47.2367 31.3725 47.3834 31.3312 47.5438L27.875 60.7313L23.2969 43.3595Z" fill="currentColor" />
   </svg>
 );
-
-/* ---- Portada de PC (docs/design/icons.md) ---- */
 
 /** Libro abierto de dos páginas: "Cap N" de las tarjetas de PC. */
 export const ChapterPagesIcon = ({ size = 15, className }: IconProps) => (
@@ -270,8 +258,6 @@ export const PlusIcon = ({ size = 26, className }: IconProps) => (
   </svg>
 );
 
-/* ---- docs/design/icons.md: botón "Ver todo", titular juvenil y redes del pie de PC ---- */
-
 /** Cuadro con la cruz del botón "Ver todo" ("icono Ver Todo"). */
 export const ViewAllIcon = ({ size = 21, className }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 21 21" fill="none" className={className} aria-hidden="true">
@@ -285,8 +271,6 @@ export const YouthMangaIcon = ({ size = 53, className }: IconProps) => (
     <path d="M33.2355 18.8525L41.0419 11.0417H30.9167V6.625H48.5834V24.2917H44.1667V14.1643L36.3558 21.9751C38.9039 25.3153 40.0875 29.4989 39.6669 33.6789C39.2463 37.8589 37.253 41.7229 34.0905 44.4884C30.9281 47.254 26.8329 48.7144 22.6341 48.574C18.4353 48.4336 14.4468 46.7028 11.4762 43.7322C8.50554 40.7616 6.77479 36.7731 6.63438 32.5743C6.49398 28.3755 7.9544 24.2803 10.7199 21.1179C13.4855 17.9554 17.3495 15.9621 21.5295 15.5415C25.7095 15.1209 29.8931 16.3044 33.2333 18.8525M23.1876 44.1667C26.4088 44.1667 29.4982 42.887 31.776 40.6092C34.0537 38.3315 35.3334 35.2421 35.3334 32.0208C35.3334 28.7996 34.0537 25.7102 31.776 23.4324C29.4982 21.1546 26.4088 19.875 23.1876 19.875C19.9663 19.875 16.8769 21.1546 14.5991 23.4324C12.3214 25.7102 11.0417 28.7996 11.0417 32.0208C11.0417 35.2421 12.3214 38.3315 14.5991 40.6092C16.8769 42.887 19.9663 44.1667 23.1876 44.1667Z" fill="currentColor" />
   </svg>
 );
-
-/* ---- docs/design/icons.md: portada móvil ---- */
 
 /** Campana de la cabecera móvil ("icono navbar movil notificaciones"). */
 export const NavbarBellIcon = ({ size = 27, className }: IconProps) => (

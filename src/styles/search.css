@@ -20,6 +20,7 @@
 .search-library-inner { max-width: 638px; }
 .search-library .search-library-inner { padding: 18px 30px 50px; }
 .search-library h2 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+.search-library .search-top-heading h2 { margin: 0; }
 .search-library ol { display: grid; gap: 14px; }
 .search-top-row { padding: 0 5px; gap: 15px; min-height: 71px; }
 .search-top-row > img { width: 59px; height: 71px; border-radius: 8px; }

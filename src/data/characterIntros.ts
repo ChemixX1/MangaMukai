@@ -46,7 +46,7 @@ export const characterIntros: Record<string, CharacterIntro> = {
       user: { line: '…Hola.', narration: 'Te apoyas en una columna del salón, lejos de la música. Un vaso se posa junto al tuyo y no levantas la vista de inmediato.' },
       character: { narration: 'Alex no responde enseguida. Se apoya en la columna, a tu lado, y observa la sala como si le aburriera todo lo que no seas tú.', line: 'Por fin alguien interesante.' },
     },
-    relatedMangaId: 30112,
+    relatedMangaId: 34523,
     accent: '#f97316',
   },
   raven: {
@@ -65,7 +65,7 @@ export const characterIntros: Record<string, CharacterIntro> = {
       user: { line: '…¿Se puede?', narration: 'Subes la escalera de piedra con una vela en la mano. Al final del pasillo, una luz. Te detienes en el umbral.' },
       character: { narration: 'Raven levanta la vista de los documentos y te observa en silencio unos segundos. Luego aparta los papeles, sin prisa.', line: 'No deberías andar por aquí a estas horas.' },
     },
-    relatedMangaId: 17220,
+    relatedMangaId: 51323,
     accent: '#c026d3',
   },
   arianel: {
@@ -84,7 +84,7 @@ export const characterIntros: Record<string, CharacterIntro> = {
       user: { line: '…¿Hola?', narration: 'Rodeas la fuente con cuidado. Una risa se corta de golpe detrás de los rosales y ves asomar un zapato… en una mano.' },
       character: { narration: 'Arianel se lleva un dedo a los labios y te mira con los ojos muy abiertos, entre el susto y la risa.', line: 'Shh. Si me encuentran, me devuelven a clase. ¿Me ayudas?' },
     },
-    relatedMangaId: 7079,
+    relatedMangaId: 34523,
     accent: '#0ea5e9',
   },
   estrella: {
@@ -103,7 +103,7 @@ export const characterIntros: Record<string, CharacterIntro> = {
       user: { line: '…Buenas noches.', narration: 'Sales al balcón buscando aire. Las luces de la ciudad parpadean abajo. No esperabas compañía.' },
       character: { narration: 'Estrella no se gira del todo. Sonríe sin apartar la vista de las luces, como si llevara un rato esperándote.', line: 'La música de dentro es preciosa, pero aquí fuera se piensa mejor.' },
     },
-    relatedMangaId: 1898,
+    relatedMangaId: 51323,
     accent: '#9333ea',
   },
 };

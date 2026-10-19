@@ -1,3 +1,5 @@
+import { HERO_AUTOPLAY_MS, HERO_TRANSITION_SECONDS, HERO_COVER_EASE } from './heroMotion';
+import { HERO_TAG_CLASS, HERO_TAG_ROW } from './heroTagStyles';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type TouchEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -219,14 +221,9 @@ const COVER_BADGES = {
   },
 } as const;
 
-const HERO_AUTOPLAY_MS = 4000;
-const HERO_TRANSITION_SECONDS = 0.8;
-const HERO_COVER_EASE = [0.22, 1, 0.36, 1] as const;
 const SWIPE_THRESHOLD = 40;
 
 /** Etiqueta de género en el color de la sección, con Anta en blanco: 20 px de alto y letra de 10 px en móvil, 24 y 14 px en PC. */
-const HERO_TAG_CLASS = 'flex h-5 shrink-0 items-center justify-center whitespace-nowrap border px-[7px] font-anta text-[10px] font-normal leading-5 text-white lg:h-6 lg:px-2 lg:text-sm';
-const HERO_TAG_ROW = 'flex-nowrap items-center gap-2 lg:gap-[6px]';
 
 /**
  * Géneros en una sola fila (centrada en móvil): se muestran los que caben
@@ -736,4 +733,3 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
   );
 };
 
-/* -------------------------------------------------------- Tendencia Ahora */

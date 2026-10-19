@@ -1,0 +1,5 @@
+.premium-avatar-frame { position: relative; display: inline-flex; align-self: start; flex-shrink: 0; border-radius: 50%; }
+.premium-avatar-frame--active { box-shadow: 0 0 0 1px #f4a22399, 0 0 4px #f4a22333; }
+.premium-avatar-frame--active .mobile-profile-avatar { border-color: #f4a223; }
+.premium-electric-border { position: absolute; z-index: 2; inset: -13%; pointer-events: none; border-radius: 50%; overflow: hidden; mask-image: radial-gradient(circle, #000 54%, transparent 72%); }
+@media (prefers-reduced-motion: reduce) { .premium-electric-border { display: none; } }

@@ -32,7 +32,7 @@ export const TermsAndPrivacy = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#02040a] text-zinc-300 font-sans selection:bg-[#FF4D88] selection:text-white pt-24 pb-12">
+    <div className="min-h-screen bg-[#02040a] text-zinc-300 font-sans pt-24 pb-12">
       
       {/* Fondo Decorativo */}
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -112,7 +112,6 @@ export const TermsAndPrivacy = () => {
   );
 };
 
-// --- CONTENIDO DE LOS DOCUMENTOS ---
 
 const TermsContent = () => (
   <div className="prose prose-invert prose-headings:font-[900] prose-headings:uppercase prose-headings:italic prose-headings:tracking-tighter prose-p:text-zinc-400 prose-p:text-sm prose-li:text-zinc-400 max-w-none">

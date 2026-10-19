@@ -62,13 +62,7 @@ const MetaRow = ({ icon, label, value, dotColor }: { icon: React.ReactNode; labe
 /** Pestañas del diseño: texto blanco sobre selección negra. */
 const tabClass = (active = false) => `manga-detail-tab ${active ? 'is-active' : ''}`;
 
-/**
- * Ficha de manga en móvil (< 1024px), según el diseño: portada a sangre con el
- * título encima, géneros, título original, los dos botones, el contador de
- * "Me gusta" con su barra en pico, las etiquetas, la ficha técnica, el cartel
- * de Mukai Music, las pestañas con los capítulos o la sinopsis, las reacciones,
- * los comentarios, las recomendaciones y el footer del inicio.
- */
+
 export const MobileMangaDetail = ({
   manga, chapters, related, initialComments, commentsLoading, commentsError, chaptersLoading, chaptersError, relatedLoading, secondaryReady,
   isBookmarked, isLiked, likes, interactionBusy, onBookmark, onLike,
@@ -218,7 +212,7 @@ export const MobileMangaDetail = ({
       )}
 
 
-      <MangaRewardProgress mangaId={String(manga.eroSeri || manga.id)} chapterIds={chapters.map(chapter => chapter.id)} purchasedIds={purchasedIds} userId={userInfo.id} cover={manga.portada} loading={chaptersLoading} />
+      <MangaRewardProgress purchasedIds={purchasedIds} userId={userInfo.id} loading={chaptersLoading} />
       <MangaSeasonSelector key={manga.id} cover={manga.portada} title={toTitleCase(manga.titulo)} likeAction={
         <MangaSeriesLikeButton liked={isLiked} likes={likes} busy={interactionBusy === 'like'} disabled={interactionBusy === 'like'} onClick={onLike} />
       } />
@@ -255,10 +249,10 @@ export const MobileMangaDetail = ({
       <nav aria-label="Secciones del manga" className="mx-auto mt-[46px] w-[88.6364%]">
         <div className="manga-detail-tabs">
           {/* Selección que se desplaza entre las pestañas. */}
-          <GooeySelector activeIndex={sectionIndex} color="#000000" />
+          <GooeySelector activeIndex={sectionIndex} />
           <button type="button" onClick={() => { setTab('chapters'); setSectionIndex(0); }} aria-current={sectionIndex === 0} className={tabClass(sectionIndex === 0)}>
             <ChaptersTabIcon size={13} />
-            Capítulos ({chapters.length})
+            Capítulos ({Math.max(chapters.length, manga.chapterCount ?? 0)})
           </button>
           <button type="button" onClick={() => { setTab('synopsis'); setSectionIndex(1); }} aria-current={sectionIndex === 1} className={tabClass(sectionIndex === 1)}>
             <SynopsisTabIcon size={14} />

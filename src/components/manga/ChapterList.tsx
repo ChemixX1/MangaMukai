@@ -88,7 +88,7 @@ function FreeCountdown({ chapterId, targetDate, onExpire }: {
     if (hasExpired) onExpire(chapterId);
   }, [chapterId, hasExpired, onExpire]);
 
-  const label = <span>¡Gratis En!</span>;
+  const label = <span>¡Gratis!</span>;
 
   return (
     <span
@@ -262,6 +262,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
   const [selectedChapter, setSelectedChapter] = useState<SeriesChapter | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [localUnlocked, setLocalUnlocked] = useState<Set<string>>(new Set());
   const [timedUnlocked, setTimedUnlocked] = useState<Set<string>>(new Set());
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
@@ -309,6 +310,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
     if (!isLocked(chapter)) { navigate(`/read/${chapter.id}`); return; }
     if (!userInfo.id) { goToLogin(); return; }
     setSelectedChapter(chapter);
+    setPurchaseComplete(false);
     setIsModalOpen(true);
   };
 
@@ -342,15 +344,14 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
   };
 
   const confirmPurchase = async () => {
-    if (!selectedChapter) return;
+    if (!selectedChapter || isProcessing || purchaseComplete) return;
     setIsProcessing(true);
     try {
       const result = await buyChapter(selectedChapter.id);
       if (result.success) {
         setLocalUnlocked((current) => new Set(current).add(String(selectedChapter.id)));
         onPurchaseSuccess();
-        setIsModalOpen(false);
-        navigate(`/read/${selectedChapter.id}`);
+        setPurchaseComplete(true);
       } else {
         window.alert(result.message || 'No se pudo comprar el capítulo.');
         setIsModalOpen(false);
@@ -484,6 +485,8 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onConfirm={confirmPurchase}
+        purchaseComplete={purchaseComplete}
+        onReadChapter={() => { if (selectedChapter) navigate(`/read/${selectedChapter.id}`); }}
         onRecharge={() => { setIsModalOpen(false); navigate('/recargar', { state: { returnTo: returnTo() } }); }}
         chapterNumber={selectedChapter?.chapter_number ?? ''}
         price={selectedChapter?.price_coins || 0}

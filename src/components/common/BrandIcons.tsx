@@ -1,8 +1,3 @@
-/**
- * Iconos vectoriales propios (trazados entregados por diseño): lupa y campana
- * del navbar y las monedas apiladas de la página "Más".
- */
-
 interface GlyphProps {
   size?: number;
   className?: string;

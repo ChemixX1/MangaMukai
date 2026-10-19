@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useHomeData } from '../../context/HomeDataContext';
 import { useSavedMangas } from '../../hooks/useSavedMangas';
 import { useTheme } from '../../hooks/useTheme';
+import { getUltimosCapitulos } from '../../services/mangaService';
 import type { MangaCapitulo } from '../../types/manga';
 import { collectionTags } from '../../utils/collectionTags';
 import { filterMenBlackWhite } from '../../utils/womenBlackWhite';
@@ -28,6 +29,7 @@ export function BlackWhiteYouthAccordion() {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { popularMenWeekly, popularMenHistorical, latestMen, isReady } = useHomeData();
+  const [catalog, setCatalog] = useState<MangaCapitulo[]>([]);
   const reduceMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -35,11 +37,23 @@ export function BlackWhiteYouthAccordion() {
   // Guardado real: mismo estado que la ficha y la página de guardados.
   const { isSaved, toggle: toggleSaved } = useSavedMangas();
 
+  useEffect(() => {
+    let mounted = true;
+    getUltimosCapitulos()
+      .then((list) => {
+        if (mounted) setCatalog(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const items = useMemo(() => {
     // Solo mangas con público Hombre dentro de la colección B&N.
-    const pool = uniqueBySeries([...latestMen, ...popularMenWeekly, ...popularMenHistorical]);
+    const pool = uniqueBySeries([...latestMen, ...popularMenWeekly, ...popularMenHistorical, ...catalog]);
     return filterMenBlackWhite(pool).slice(0, 7);
-  }, [latestMen, popularMenHistorical, popularMenWeekly]);
+  }, [catalog, latestMen, popularMenHistorical, popularMenWeekly]);
 
   useEffect(() => {
     if (isPaused || items.length < 2) return;

@@ -184,8 +184,7 @@ html.dark .site-navbar-surface {
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
 }
 
-/* Cabecera móvil (diseño de la portada móvil): 56 px sin línea inferior, con la campana y la lupa
-   centradas en cajas de 44 px; en el tema oscuro, un halo blanco. */
+
 .site-navbar-surface.site-navbar-mobile {
   border-bottom-width: 0;
 }
@@ -194,7 +193,7 @@ html.dark .site-navbar-surface.site-navbar-mobile {
   box-shadow: 0 1px 8px rgb(255 255 255 / 0.25);
 }
 
-/* Cabecera de escritorio (diseño de PC): fondo liso del tema y línea gris abajo, sin sombra ni desenfoque. */
+
 .site-navbar-surface.site-navbar-desktop,
 html.dark .site-navbar-surface.site-navbar-desktop {
   border-bottom: 1px solid var(--mm-pc-nav-line);
@@ -236,7 +235,7 @@ html.dark .site-navbar-surface.site-navbar-desktop {
 
 /* La geometría de la portada es compartida por todas las rutas y temas. */
 @media (min-width: 1024px) {
-  .site-navbar-desktop nav a { font-size: 14px; }
+  .site-navbar-desktop nav a { font-family: 'KoHo', Montserrat, sans-serif; font-size: 15px; font-weight: 600; }
 }
 @media (min-width: 1280px) {
   .site-navbar-desktop > div { padding-left: 56px; }

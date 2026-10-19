@@ -23,8 +23,8 @@ export const MANGA_REACTIONS = [
 
 export type MangaReactionId = (typeof MANGA_REACTIONS)[number]['id'];
 
-// Los recursos de iCONOSdereaccion.md son exclusivos de la ficha del manga.
-// «Me enoja» y «Me encanta» usan los últimos recursos adjuntos.
+// Las imágenes de reactions/detail son exclusivas de la ficha del manga.
+
 const DETAIL_REACTION_IMAGES: Partial<Record<MangaReactionId, string>> = {
   like: detailLikeImage,
   haha: detailHahaImage,

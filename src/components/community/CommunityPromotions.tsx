@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 
 import storeCover from '../../assets/community/store-cover.webp';
-import { openSubscriptionModal } from '../../utils/subscriptionModal';
 import { MukaiMusicPromo } from '../manga/MukaiMusicPromo';
 import { CommunityIcon } from './CommunityIcons';
 import '../../styles/community-promotions.css';
@@ -12,7 +11,7 @@ type CommunityPromotionProps = {
 
 export const CommunityProCard = ({ className = '' }: CommunityPromotionProps) => (
   <section className={`community-pro-card ${className}`} aria-label="Beneficios de MukaiPro">
-    <MukaiMusicPromo onUnlock={openSubscriptionModal} />
+    <MukaiMusicPromo />
   </section>
 );
 

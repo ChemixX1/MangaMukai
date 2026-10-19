@@ -3,11 +3,11 @@ import { ArrowLeft, Loader2, Search, X } from 'lucide-react';
 import { getChaptersBySeries, searchMangas, type SeriesChapter } from '../../services/mangaService';
 import type { MangaCapitulo } from '../../types/manga';
 import type { CommunityMangaTag } from '../../data/communityPosts';
-const divider = 'border-black/25 dark:border-white/25';
-const muted = 'text-black/60 dark:text-white/70';
+const divider = 'border-black/10 dark:border-white/10';
+const muted = 'text-black/60 dark:text-white/65';
 const rowHover = 'hover:bg-black/5 dark:hover:bg-white/10';
 const iconHover = rowHover;
-const pill = 'bg-[#db2777] text-white hover:bg-[#be185d]';
+const pill = 'bg-[#ff008c] text-white hover:bg-[#d90077]';
 export function CommunityMangaPicker({ onPick, onClose }: { onPick: (tag: CommunityMangaTag) => void; onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MangaCapitulo[]>([]);
@@ -45,7 +45,7 @@ export function CommunityMangaPicker({ onPick, onClose }: { onPick: (tag: Commun
   });
 
   return (
-    <div className={`mb-2 overflow-hidden rounded-xl border ${divider}`}>
+    <div className={`community-manga-picker mb-2 overflow-hidden rounded-xl border ${divider}`}>
       {!picked ? (
         <>
           <label className={`flex items-center gap-2 border-b px-3 py-2 ${divider}`}>
@@ -74,7 +74,7 @@ export function CommunityMangaPicker({ onPick, onClose }: { onPick: (tag: Commun
           </div>
           <p className={`px-3 pb-1 pt-2 text-[12px] font-semibold ${muted}`}>O elige un capítulo</p>
           <div className="max-h-48 overflow-y-auto pb-1">
-            {chapters === null && <p className={`flex items-center justify-center gap-2 py-4 text-[13px] ${muted}`}><Loader2 size={15} className="animate-spin" /> Cargando capítulos…</p>}
+            {chapters === null && <div role="status" aria-label="Cargando capítulos" className="h-12" />}
             {chapters?.map((chapter) => (
               <button key={chapter.id} type="button" onClick={() => onPick(tagFor(picked, chapter))} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] transition-colors ${rowHover}`}>
                 <span className="font-semibold">Capítulo {chapter.chapter_number}</span>

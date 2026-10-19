@@ -14,7 +14,7 @@ export const MobileSectionHeader = () => {
 
   const goBack = () => {
     if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1);
-    else navigate('/mas');
+    else navigate('/profile');
   };
 
   return (

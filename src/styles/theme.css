@@ -1,6 +1,9 @@
 /* theme: estilos compartidos entre tamaños de pantalla. */
 
 :root {
+  background-color: rgb(var(--mm-surface));
+  color-scheme: light;
+  scrollbar-color: #b8b8bd rgb(var(--mm-surface));
   --mm-surface: 255 255 255;
   --mm-ink: 0 0 0;
   --mm-panel: 240 240 240;
@@ -17,7 +20,7 @@
   --mm-legal-ink: #52525b;
   --mm-footer-scrim: 0.72;
   --mm-telegram-plane: #000;
-  --mm-accent-pink: #db2777;
+  --mm-accent-pink: #ff008c;
   --mm-accent-cyan: #22d3ee;
   --mm-type-manhwa: #7c3aed;
   --mm-type-manhua: #a21caf;

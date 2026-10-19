@@ -62,12 +62,12 @@ export const TimerModal = ({ isOpen, onClose, onStartTimer, onStopTimer, activeT
              role="dialog"
              aria-modal="true"
              aria-label="Temporizador de lectura"
-             className={`relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border p-6 shadow-2xl ${isLight ? 'border-zinc-200 bg-white text-zinc-950' : 'border-white/10 bg-black text-white'}`}
+             className={`relative z-10 w-full max-w-sm overflow-hidden rounded-3xl border p-5 sm:p-7 shadow-2xl font-montserrat font-normal ${isLight ? 'border-zinc-200 bg-white text-zinc-950' : 'border-white/10 bg-black text-white'}`}
            >
              {/* Header */}
              <div className="flex justify-between items-center mb-6">
-                 <h3 className={`flex items-center gap-2 text-sm font-[1000] uppercase italic tracking-wider ${isLight ? 'text-zinc-950' : 'text-white'}`}>
-                     <AlarmClock size={18} className="text-[#FF4D88]" /> Temporizador
+                 <h3 className={`flex items-center gap-3 text-base font-normal ${isLight ? 'text-zinc-950' : 'text-white'}`}>
+                     <AlarmClock size={28} strokeWidth={1.8} className="shrink-0 text-[#FF4D88]" /> Temporizador
                  </h3>
                  <button onClick={onClose} aria-label="Cerrar temporizador" className={`rounded-full p-1 text-zinc-500 transition-colors ${isLight ? 'hover:bg-zinc-100 hover:text-black' : 'hover:bg-white/10 hover:text-white'}`}>
                     <X size={18} />
@@ -77,15 +77,15 @@ export const TimerModal = ({ isOpen, onClose, onStartTimer, onStopTimer, activeT
              {isActive && activeTimer !== null ? (
                  // VISTA: ACTIVO
                  <div className="flex flex-col items-center py-6">
-                     <div className={`mb-2 text-6xl font-[1000] tabular-nums tracking-tighter ${isLight ? 'text-zinc-950' : 'text-white'}`}>
+                     <div className={`mb-2 text-6xl font-semibold tabular-nums tracking-tighter ${isLight ? 'text-zinc-950' : 'text-white'}`}>
                          {formatTime(activeTimer)}
                      </div>
-                     <p className="text-xs text-[#FF4D88] font-bold uppercase tracking-widest animate-pulse mb-8">
+                     <p className="text-xs text-[#FF4D88] font-normal mb-8">
                          Tiempo restante
                      </p>
                      <button 
                          onClick={onStopTimer}
-                         className="w-full py-3.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                         className="w-full py-3.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 rounded-xl text-xs font-normal flex items-center justify-center gap-2 transition-all"
                      >
                          <Square size={14} fill="currentColor" /> Detener
                      </button>
@@ -98,9 +98,9 @@ export const TimerModal = ({ isOpen, onClose, onStartTimer, onStopTimer, activeT
                              <button
                                  key={min}
                                  onClick={() => { onStartTimer(min); onClose(); }}
-                                 className={`rounded-xl border py-3 text-xs font-bold transition-all active:scale-95 hover:border-[#FF4D88] ${isLight ? 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-pink-50 hover:text-zinc-950' : 'border-white/5 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white'}`}
+                                 className={`rounded-xl border py-3.5 text-sm font-normal transition-all active:scale-95 hover:border-[#FF4D88] ${isLight ? 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-pink-50 hover:text-zinc-950' : 'border-white/5 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white'}`}
                              >
-                                 {min} min
+                                 <span className="font-semibold">{min}</span> min
                              </button>
                          ))}
                      </div>
@@ -108,13 +108,13 @@ export const TimerModal = ({ isOpen, onClose, onStartTimer, onStopTimer, activeT
                      <div className="relative">
                          <input 
                              type="number" 
-                             placeholder="Minutos personalizados..."
+                             placeholder="Minutos personalizados"
                              value={customMinutes}
                              onChange={(e) => setCustomMinutes(e.target.value)}
-                             className={`timer-minutes-input w-full rounded-xl border py-3.5 pl-4 pr-12 text-sm outline-none transition-colors focus:border-[#FF4D88] ${isLight ? 'border-zinc-200 bg-zinc-50 text-zinc-950 placeholder:text-zinc-400' : 'border-white/10 bg-[#050505] text-white placeholder:text-zinc-600'}`}
+                             className={`timer-minutes-input font-semibold placeholder:font-normal w-full rounded-xl border py-3.5 pl-4 pr-12 text-sm outline-none transition-colors focus:border-[#FF4D88] ${isLight ? 'border-zinc-200 bg-zinc-50 text-zinc-950 placeholder:text-zinc-400' : 'border-white/10 bg-[#050505] text-white placeholder:text-zinc-600'}`}
                          />
                          <button 
-                             onClick={handleStartCustom}
+                             aria-label="Iniciar temporizador" onClick={handleStartCustom}
                              disabled={!customMinutes}
                              className="absolute right-2 top-2 p-1.5 bg-[#FF4D88] text-white rounded-lg hover:bg-[#ff3377] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                          >

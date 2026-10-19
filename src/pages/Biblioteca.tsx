@@ -1,5 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode, type CSSProperties } from "react";
+import { Link } from "react-router-dom";
 import { SearchEyeIcon } from "../components/layout/SearchIcons";
 import { searchGenres } from "../config/searchAppearance";
 import "../styles/search.css";
@@ -76,13 +76,13 @@ const releaseTime = (manga: MangaCapitulo) => {
 /**
  * Biblioteca (móvil primero): el campo de búsqueda vive en el navbar; aquí van
  * los cuatro más buscados, las tarjetas por género, los últimos lanzamientos y,
- * al escribir, los resultados sobre el catálogo. Con `embedded` se pinta dentro
+ * al escribir, los resultados sobre el catálogo. Se pinta dentro
  * de la ventana del buscador (SearchOverlay), que ya trae el campo y las pestañas.
  */
-export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
+export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
-  const location = useLocation();
+
   const searchTerm = useSearchTerm();
   const searchFilter = useSearchFilter();
   const deferredSearchTerm = useDeferredValue(searchTerm);
@@ -92,17 +92,6 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   const [stages, setStages] = useState<Record<SearchCollection, SearchSectionStage>>({ todos: 0, bn: 0, hot: 0 });
   const [visibleResults, setVisibleResults] = useState(RESULTS_PAGE_SIZE);
 
-  // ?buscar= permite compartir una búsqueda (y es el destino del SearchAction del
-  // JSON-LD); la portada llega con state.filterCategory al tocar un género.
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const fromUrl = params.get("buscar") || params.get("q") || "";
-    const category = location.state?.filterCategory;
-    const fromState = typeof category === "string" && !["Mujer", "Hombre", "Todos"].includes(category) ? category : "";
-    const seed = fromState || fromUrl;
-    if (seed) setSearchTerm(seed);
-    if (location.state) window.history.replaceState({ ...window.history.state, usr: null }, document.title);
-  }, [location.key, location.search, location.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +121,6 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   const isSearching = deferredSearchTerm.trim().length > 0;
 
   // Al pasar de explorar a resultados (o volver) se empieza desde arriba.
-  useEffect(() => { if (!embedded) window.scrollTo({ top: 0, behavior: "auto" }); }, [embedded, isSearching]);
 
   useEffect(() => {
     if (loading) return;
@@ -152,8 +140,8 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
   const skeleton = isLight ? "bg-black/[0.06]" : "bg-white/[0.08]";
 
   return (
-    <div className={`biblioteca-page ${embedded ? "search-library" : ""} min-h-screen transition-colors duration-300 ${isLight ? "bg-white text-zinc-950" : "bg-black text-gray-100"}`}>
-      <div className={`search-library-inner mx-auto w-full max-w-lg px-4 pb-10 ${embedded ? "pt-5" : "pt-[140px]"}`}>
+    <div className={`biblioteca-page search-library min-h-screen transition-colors duration-300 ${isLight ? "bg-white text-zinc-950" : "bg-black text-gray-100"}`}>
+      <div className={`search-library-inner mx-auto w-full max-w-lg px-4 pb-10 pt-5`}>
         {isSearching ? (
           <section aria-label="Resultados de búsqueda">
             {loading ? (
@@ -182,7 +170,10 @@ export const Biblioteca = ({ embedded = false }: { embedded?: boolean }) => {
             {/* "+ Buscados": cuatro filas ordenadas por vistas, con portada pequeña,
                 título, etiqueta rosa con el tipo y contador negro con el ojo. */}
             <section aria-label="Más buscados" aria-busy={loading || stage < 1}>
-              <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">+ Buscados</h2>
+              <div className="search-top-heading mb-3 flex items-center justify-between gap-3">
+                <h2 className="font-[Montserrat] text-lg font-bold leading-tight">+ Buscados</h2>
+                {collectionAction}
+              </div>
               {loading ? (
                 <div className="space-y-1">
                   {Array.from({ length: TOP_SEARCHED_COUNT }).map((_, index) => <div key={index} className={`h-[84px] animate-pulse rounded-xl ${skeleton}`} />)}

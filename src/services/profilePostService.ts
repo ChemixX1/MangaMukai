@@ -1,5 +1,6 @@
 import { MANGAMUKAI_API } from '../config/api';
 import { clearStoredAuth, getStoredToken } from './authService';
+import type { CommunityMangaTag } from '../data/communityPosts';
 
 export interface ProfilePostAuthor {
   id: number;
@@ -9,6 +10,8 @@ export interface ProfilePostAuthor {
 }
 
 export interface ProfilePost {
+  community_manga?: CommunityMangaTag;
+  saved?: boolean;
   id: number;
   user_id: number;
   content: string;
@@ -27,6 +30,9 @@ export interface ProfilePost {
 }
 
 export interface ProfilePostComment {
+  image?: string;
+  likes?: number;
+  liked?: boolean;
   id: number;
   post_id: number;
   content: string;
@@ -97,12 +103,12 @@ export const uploadProfilePostMedia = async (file: File): Promise<{ id: number; 
   return payload.media;
 };
 
-export const createProfilePost = async (content: string, mediaId?: number): Promise<ProfilePost> => {
+export const createProfilePost = async (content: string, mediaId?: number, manga?: CommunityMangaTag): Promise<ProfilePost> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/posts`, {
     method: 'POST',
     credentials: 'include',
     headers: authHeaders(true),
-    body: JSON.stringify({ content, media_id: mediaId || 0 }),
+    body: JSON.stringify({ content, media_id: mediaId || 0, community_manga: manga }),
   });
   const payload = await ensureSuccess(response);
   if (!payload.post) throw new Error('El servidor no devolvió la publicación.');

@@ -6,11 +6,10 @@ import type { HomeLayoutProps } from '../../components/home/homeModels';
 import { TrendingSection } from '../../components/home/HomeTrending';
 import { Footer } from '../../components/layout/Footer';
 
-/** Composición de móvil; conserva las clases y el diseño anteriores. */
 export default function HomeM({ womenHero, menHero, isReady }: HomeLayoutProps) {
   const { loaded } = useHomeData();
   return (
-    <div className={`home-page flex min-h-screen flex-col overflow-x-clip bg-surface pt-12 font-sans text-ink selection:bg-mukai-magenta selection:text-white lg:pt-[73px] ${isReady ? 'home-data-ready' : 'home-data-pending'}`}>
+    <div className={`home-page flex min-h-screen flex-col overflow-x-clip bg-surface pt-12 font-sans text-ink lg:pt-[73px] ${isReady ? 'home-data-ready' : 'home-data-pending'}`}>
       <h1 className="sr-only">Leer manga online gratis en español</h1>
 
       <HeroCarousel items={womenHero} loading={!isReady} accent="pink" label="Mangas destacados" coverLayout="stacked" keyboardNavigation className="home-block home-block-hero z-10 pb-8 lg:pb-0" />

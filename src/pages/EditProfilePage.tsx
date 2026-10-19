@@ -69,7 +69,7 @@ const EditProfilePage = () => {
 
   const goBack = () => {
     if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1);
-    else navigate('/mas');
+    else navigate('/profile');
   };
 
   const handleImage = async (event: ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {

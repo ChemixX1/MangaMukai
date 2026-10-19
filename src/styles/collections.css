@@ -62,6 +62,8 @@
 
 .manga-bn-page [class^="text-[#FF4D88]"],
 .manga-bn-page [class*=" text-[#FF4D88]"],
+.manga-bn-page [class^="text-[#FF008C]"],
+.manga-bn-page [class*=" text-[#FF008C]"],
 .manga-bn-page [class^="text-[#00C2FF]"],
 .manga-bn-page [class*=" text-[#00C2FF]"],
 .manga-bn-page [class^="text-[#38BDF8]"],
@@ -79,6 +81,8 @@
 
 .manga-bn-page [class^="bg-[#FF4D88]"],
 .manga-bn-page [class*=" bg-[#FF4D88]"],
+.manga-bn-page [class^="bg-[#FF008C]"],
+.manga-bn-page [class*=" bg-[#FF008C]"],
 .manga-bn-page [class^="bg-[#00C2FF]"],
 .manga-bn-page [class*=" bg-[#00C2FF]"],
 .manga-bn-page [class^="bg-[#38BDF8]"],
@@ -96,6 +100,8 @@
 
 .manga-bn-page [class^="border-[#FF4D88]"],
 .manga-bn-page [class*=" border-[#FF4D88]"],
+.manga-bn-page [class^="border-[#FF008C]"],
+.manga-bn-page [class*=" border-[#FF008C]"],
 .manga-bn-page [class^="border-[#00C2FF]"],
 .manga-bn-page [class*=" border-[#00C2FF]"],
 .manga-bn-page [class^="border-[#38BDF8]"],
@@ -117,6 +123,14 @@
 
 .manga-bn-page img:not([alt^="Portada"]):not(.manga-bn-interactive-cover) {
   filter: grayscale(1);
+}
+
+.manga-bn-page .home-design-footer {
+  --mm-accent-pink: #ff008c !important;
+}
+
+.manga-bn-page .home-design-footer img {
+  filter: none !important;
 }
 
 .manga-bn-page [class^="border-[#5865F2]"],
@@ -160,16 +174,19 @@
 }
 
 .manga-bn-page [class*="hover:bg-[#FF4D88]"]:hover,
+.manga-bn-page [class*="hover:bg-[#FF008C]"]:hover,
 .manga-bn-page [class*="hover:bg-[#00C2FF]"]:hover {
   background-color: var(--bn-ink-bg) !important;
 }
 
 .manga-bn-page [class*="hover:text-[#FF4D88]"]:hover,
+.manga-bn-page [class*="hover:text-[#FF008C]"]:hover,
 .manga-bn-page [class*="hover:text-[#00C2FF]"]:hover {
   color: var(--bn-ink) !important;
 }
 
 .manga-bn-page [class*="hover:border-[#FF4D88]"]:hover,
+.manga-bn-page [class*="hover:border-[#FF008C]"]:hover,
 .manga-bn-page [class*="hover:border-[#00C2FF]"]:hover {
   border-color: var(--bn-ink) !important;
 }
@@ -177,17 +194,70 @@
 .manga-bn-page [class*=" bg-[#5865F2]"],
 .manga-bn-page [class*=" bg-[#229ED9]"],
 .home-theme-dark .manga-bn-page [class*="bg-[#00C2FF]"][class*="text-black"],
-.home-theme-dark .manga-bn-page [class*="bg-[#FF4D88]"][class*="text-black"] {
+.home-theme-dark .manga-bn-page [class*="bg-[#FF4D88]"][class*="text-black"],
+.home-theme-dark .manga-bn-page [class*="bg-[#FF008C]"][class*="text-black"] {
   color: var(--bn-on-ink) !important;
 }
 
 .manga-bn-page {
   --mm-accent-pink: #737373;
   --mm-accent-cyan: #737373;
+  --mm-type-manga: #737373;
   --mm-type-manhwa: #737373;
   --mm-type-manhua: #737373;
   --mm-type-novel: #737373;
   --mm-free: #737373;
+  --home-ranking-shade: 255 255 255;
+  --home-ranking-edge: 240 240 240;
+}
+
+.home-theme-dark .manga-bn-page {
+  --home-ranking-shade: 0 0 0;
+  --home-ranking-edge: var(--mm-surface);
+}
+
+.collection-landing {
+  --mm-accent-pink: #ff6b00;
+  --mm-accent-cyan: #00e1ff;
+  --mm-type-manga: #ff6b00;
+  --mm-type-manhua: #b000ad;
+  --home-ranking-shade: 255 255 255;
+  --home-ranking-edge: var(--mm-surface);
+}
+
+.collection-landing.home-theme-dark {
+  --mm-accent-pink: #ff6b00;
+  --mm-accent-cyan: #22d3ee;
+  --mm-type-manga: #ff6b00;
+  --mm-type-manhua: #a21caf;
+  --home-ranking-shade: 0 0 0;
+  --home-ranking-edge: var(--mm-surface);
+}
+
+/* En Manga Hot, la etiqueta de tipo de Tendencia usa contenedor naranja */
+.collection-landing .home-ranking-type {
+  background-color: #ff6b00 !important;
+}
+
+/* Destello diagonal estilo Home sobre las portadas de Lo Más Reciente en colecciones */
+.collection-latest-cover::after {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: -85%;
+  width: 60%;
+  height: 160%;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / .3) 48%, rgb(255 255 255 / .1) 65%, transparent);
+  transform: skewX(-22deg);
+  opacity: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .collection-latest-card:hover .collection-latest-cover::after {
+    animation: home-cover-sheen 950ms cubic-bezier(.2, .65, .3, 1) both;
+  }
 }
 
 .manga-bn-page .home-block-news a, .manga-bn-page .home-block-news button,
@@ -200,6 +270,32 @@
   --bn-ink-bg: #3f3f46;
   --bn-on-ink: #f4f4f5;
 }
+
 @media (min-width: 1024px) and (hover: hover) {
   .collection-trending-track:hover { animation-play-state: paused; }
 }
+
+/* El footer define su propio acento: conserva la paleta HOT. */
+.collection-landing .home-design-footer { --mm-accent-pink: #ff6b00; }
+.collection-landing .text-mukai-magenta { color: #ff6b00; }
+
+/* Acciones idénticas en ambos heroes; el acento pertenece a cada colección. */
+.collection-hero-actions { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 410px; }
+.collection-hero-action { display: inline-flex; flex: 1; min-width: 0; min-height: 48px; align-items: center; justify-content: center; gap: 8px; padding: 12px 14px; border: 1px solid transparent; border-radius: 7px; font-family: Montserrat, sans-serif; font-size: 12px; font-weight: 800; text-transform: uppercase; white-space: nowrap; transition: transform 180ms ease, filter 180ms ease, border-color 180ms ease; }
+.collection-hero-action svg { flex-shrink: 0; }
+.collection-hero-action--read { background: var(--mm-accent-pink); color: #fff; }
+.collection-hero-action--save { background: rgb(var(--mm-panel)); color: rgb(var(--mm-ink)); border-color: rgb(var(--mm-ink) / .25); }
+.collection-hero-action--save[aria-pressed="true"] { color: var(--mm-accent-pink); border-color: var(--mm-accent-pink); }
+.collection-hero-action:hover { filter: brightness(1.1); }
+.collection-hero-action--save:hover { border-color: var(--mm-accent-pink); }
+.collection-hero-action:active { transform: scale(.96); }
+.collection-hero-action:focus-visible { outline: 2px solid var(--mm-accent-pink); outline-offset: 4px; }
+@media (min-width: 1024px) { .collection-hero-action { min-height: 54px; font-size: 13px; } }
+@media (prefers-reduced-motion: reduce) { .collection-hero-action { transition: none; } }
+
+.manga-bn-page .home-theme-backdrop-base { background-color: rgb(var(--mm-surface)) !important; }
+
+/* HOT: el texto depende de la selección, independientemente de la animación. */
+.collection-landing [aria-label="Periodo del ranking"] > button[aria-selected="false"] { color: #000 !important; }
+.dark .collection-landing [aria-label="Periodo del ranking"] > button[aria-selected="false"] { color: #fff !important; }
+.collection-landing [aria-label="Periodo del ranking"] > button[aria-selected="true"] { color: #fff !important; }

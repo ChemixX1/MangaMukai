@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { prefetchRoute } from '../../utils/prefetchRoute';
 import backdrop from '../../assets/manga/mukai-music-background.webp';
 import '../../styles/mukai-music-promo.css';
 
@@ -9,14 +10,14 @@ const MusicCrown = () => (
   </svg>
 );
 
-export const MukaiMusicPromo = ({ onUnlock }: { onUnlock?: () => void }) => (
+export const MukaiMusicPromo = () => (
   <div className="mukai-music-promo mukai-music-promo--subscription">
-    <img src={backdrop} alt="" aria-hidden="true" loading="lazy" decoding="async" />
+    <img src={backdrop} alt="" aria-hidden="true" loading="eager" fetchPriority="low" decoding="async" />
     <div className="mukai-music-promo-content">
       <MusicCrown />
       <p className="mukai-music-title">MUKAI<span>MUSIC</span></p>
       <p className="mukai-music-description">Desbloquea los SoundTracks y escucha música mientras lees</p>
-      {onUnlock ? <button className="mukai-music-subscribe" type="button" onClick={onUnlock}>SUSCRÍBETE</button> : <Link className="mukai-music-subscribe" to="/recargar">SUSCRÍBETE</Link>}
+      <Link className="mukai-music-subscribe" to="/pro" onPointerEnter={() => prefetchRoute('/pro')} onFocus={() => prefetchRoute('/pro')} onTouchStart={() => prefetchRoute('/pro')}>SUSCRÍBETE</Link>
     </div>
   </div>
 );

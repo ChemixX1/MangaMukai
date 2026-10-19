@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
 import { Biblioteca } from '../../pages/Biblioteca';
 import { SearchIcon, SearchCloseIcon, SearchEraseIcon } from './SearchIcons';
@@ -71,7 +72,7 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => { setSearchFilter(id); inputRef.current?.focus({ preventScroll: true }); }}
+                  onClick={() => { setSearchFilter(id); if (window.matchMedia('(max-width: 1023px)').matches) inputRef.current?.blur(); else inputRef.current?.focus({ preventScroll: true }); }}
                   className={`relative pb-2.5 font-[Inter] text-[15px] leading-none transition-colors ${active ? `font-medium ${text}` : `font-normal ${isLight ? 'text-[#4b4b50] hover:text-black' : 'text-zinc-400 hover:text-white'}`}`}
                 >
                   {label}
@@ -80,9 +81,18 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
               );
             })}
           </div>
+
         </div>
       </div>
-      <Biblioteca embedded />
+      <Biblioteca collectionAction={searchFilter !== 'todos' ? (
+        <Link
+          to={searchFilter === 'bn' ? '/manga-bn' : '/manga-19'}
+          onClick={onClose}
+          className={`inline-flex shrink-0 items-center justify-center rounded-md px-2.5 py-1.5 font-montserrat text-[11px] font-semibold leading-tight text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 lg:hidden ${searchFilter === 'bn' ? 'bg-[#4C4C4C] focus-visible:outline-[#4C4C4C]' : 'bg-[#FB5937] focus-visible:outline-[#FB5937]'}`}
+        >
+          Ir a {searchFilter === 'bn' ? 'Manga B&N' : 'Manga Hot'}
+        </Link>
+      ) : undefined} />
         </div>
         <aside className="search-banner" aria-hidden="true"><img src={searchBanners.right} alt="" /></aside>
       </div>

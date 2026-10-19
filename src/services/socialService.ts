@@ -70,6 +70,8 @@ export interface Conversation extends ChatMessage {
 }
 
 export type SocialNotificationType =
+  | 'post_comment_like'
+  | 'message'
   | 'comment_like'
   | 'comment_reaction'
   | 'comment_reply'
@@ -191,8 +193,9 @@ const ensureResponse = async (response: Response): Promise<ApiPayload> => {
   return payload;
 };
 
-export const getPublicProfile = async (userId: string | number): Promise<PublicProfile> => {
+export const getPublicProfile = async (userId: string | number, signal?: AbortSignal): Promise<PublicProfile> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/profile/${userId}`, {
+    signal,
     credentials: 'include',
     headers: authHeaders(),
   });
@@ -324,6 +327,7 @@ export const getCachedNotifications = () => notificationsCache;
 
 export const getNotifications = async (): Promise<{ notifications: SocialNotification[]; unread: number }> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/notifications?limit=30`, {
+    cache: 'no-store',
     credentials: 'include',
     headers: authHeaders(),
   });
@@ -340,6 +344,7 @@ export const markNotificationsRead = async (id?: number): Promise<void> => {
     body: JSON.stringify(id ? { id } : {}),
   });
   await ensureResponse(response);
+  notificationsCache = notificationsCache?.map((item) => !id || item.id === id ? { ...item, read: true } : item) ?? null;
 };
 
 export const syncMangaSubscriptions = async (

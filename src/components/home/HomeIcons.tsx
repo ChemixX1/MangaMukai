@@ -1,6 +1,5 @@
 import { useId, type SVGProps } from 'react';
 
-// Trazados originales de docs/design/home-icons.md. El color se adapta a la sección y al tema.
 type IconProps = SVGProps<SVGSVGElement>;
 
 export const HomeReadIcon = (props: IconProps) => {

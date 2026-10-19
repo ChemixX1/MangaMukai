@@ -41,7 +41,6 @@ const getSnapshot = () => state;
 const withId = (ids: readonly string[], id: string) => (ids.includes(id) ? ids : [...ids, id]);
 const withoutId = (ids: readonly string[], id: string) => ids.filter((item) => item !== id);
 
-// --- Carga -------------------------------------------------------------------
 
 let inflight: Promise<void> | null = null;
 /** Token con el que se cargó la lista; si cambia, se vuelve a pedir. */
@@ -89,7 +88,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// --- Acciones ----------------------------------------------------------------
 
 export type ToggleSavedOutcome =
   | { status: 'login' }
@@ -127,14 +125,13 @@ export const toggleSavedManga = async (mangaId: string | number): Promise<Toggle
   return { status: 'ok', action: result.action, total: result.total };
 };
 
-// --- Hook --------------------------------------------------------------------
 
-export const useSavedMangasState = (): SavedMangasState => {
+export const useSavedMangasState = (enabled = true): SavedMangasState => {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    void ensureSavedMangas();
-  }, []);
+    if (enabled) void ensureSavedMangas();
+  }, [enabled]);
 
   return snapshot;
 };

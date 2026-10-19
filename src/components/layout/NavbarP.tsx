@@ -1,7 +1,9 @@
-import { Bookmark, Coins, Crown, LogOut, MessageCircle, User as UserIcon } from 'lucide-react';
+import { PremiumElectricBorder } from '../ui/PremiumElectricBorder';
+import { prefetchRoute } from '../../utils/prefetchRoute';
+import { User as UserIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { openSubscriptionModal } from '../../utils/subscriptionModal';
-import { BellGlyph, DetailCoin3DIcon } from '../common';
+import coins1000 from '../../assets/recharge/icon-2.svg';
+import { BellGlyph } from '../common';
 import { AlarmIcon, MoonIcon, SearchLensIcon, SunIcon } from '../ui';
 import type { NavbarViewProps } from './useNavbarState';
 const DESKTOP_LINKS = [
@@ -14,15 +16,16 @@ const DESKTOP_LINKS = [
 
 
 export function NavbarP({ model }: NavbarViewProps) {
-  const { theme, isLightMode, isProfileRoute, currentUser, showUserMenu, setShowUserMenu, showNotifications, setShowNotifications, unreadMessages, unreadNotifications, isHeaderHidden, userMenuRef, headerUsesDarkText, openSearch, isTimerModalOpen, setIsTimerModalOpen, isTimerActive, prefetchAuth, handleThemeToggle, handleLogout, goToRecharge, handleLogoClick, desktopIconClass } = model;
+  const { theme, currentUser, isNotificationsOpen, openNotifications, closeNotificationsOverlay, unreadNotifications, isHeaderHidden, headerUsesDarkText, openSearch, isTimerModalOpen, setIsTimerModalOpen, isTimerActive, prefetchAuth, handleThemeToggle, goToRecharge, handleLogoClick, desktopIconClass } = model;
+  const premium = Boolean(currentUser?.isPremium || currentUser?.is_premium);
   return (<header
-      className={`${isProfileRoute ? 'sticky' : 'fixed'} site-navbar-surface site-navbar-desktop left-0 top-0 z-[100] h-[73px] w-full transition-transform duration-300`}
+      className="fixed site-navbar-surface site-navbar-desktop left-0 top-0 z-[100] h-[73px] w-full transition-transform duration-300"
       data-manga-detail={/^\/manga\/[^/]+/.test(model.location.pathname) || undefined}
       data-hidden={isHeaderHidden || undefined}
       style={{ transform: isHeaderHidden ? 'translateY(-100%)' : 'translateY(0)' }}
     >
       <div className="mx-auto flex h-full w-full max-w-[1440px] items-center px-5 xl:pl-[36px] xl:pr-[57px]">
-        <Link to="/" onClick={handleLogoClick} aria-label="Volver al inicio de MangaMukai" className="relative -top-px shrink-0 xl:w-[276px]">
+        <Link to="/" onPointerEnter={() => prefetchRoute('/')} onFocus={() => prefetchRoute('/')} onTouchStart={() => prefetchRoute('/')} onClick={handleLogoClick} aria-label="Volver al inicio de MangaMukai" className="relative -top-px shrink-0 xl:w-[276px]">
           <span className="block select-none whitespace-nowrap font-montserrat text-[24px] font-black uppercase italic leading-5 text-ink xl:text-[30px]">
             MANGA<span className="text-mukai-magenta">MUKAI</span>
           </span>
@@ -30,7 +33,7 @@ export function NavbarP({ model }: NavbarViewProps) {
 
         <nav aria-label="Secciones" className="ml-6 flex items-center gap-3 whitespace-nowrap xl:ml-0 xl:gap-8">
           {DESKTOP_LINKS.map(({ to, label }) => (
-            <Link key={to} to={to} className="whitespace-nowrap font-anta text-[13px] font-normal text-ink transition-colors hover:text-[#ff4a7d] xl:text-[15px]">{label}</Link>
+            <Link key={to} to={to} onPointerEnter={() => prefetchRoute(to)} onFocus={() => prefetchRoute(to)} onTouchStart={() => prefetchRoute(to)} className="whitespace-nowrap font-koho text-[14px] font-semibold tracking-wide text-ink transition-transform duration-200 hover:scale-105 motion-reduce:transition-none xl:text-[16px]">{label}</Link>
           ))}
         </nav>
 
@@ -59,59 +62,36 @@ export function NavbarP({ model }: NavbarViewProps) {
             {theme === 'light' ? <MoonIcon size={23.52} /> : <SunIcon size={23.52} />}
           </button>
 
-          <div className="ml-3 flex w-[209px] shrink-0 items-center justify-end xl:ml-6">
+          <div className={`ml-3 flex shrink-0 items-center justify-end ${currentUser ? 'w-auto xl:ml-3' : 'w-[209px] xl:ml-6'}`}>
             {currentUser ? (
               <div className="flex items-center gap-4">
-                {/* ── Monedas ── */}
                 <button
                   type="button"
+                  onPointerEnter={() => prefetchRoute('/recargar')}
+                  onFocus={() => prefetchRoute('/recargar')}
                   onClick={() => goToRecharge()}
                   aria-label={`Abrir mercado de monedas. Saldo: ${currentUser.coins ?? 0}`}
                   title="Abrir mercado de monedas"
-                  className={`group flex items-center gap-2 rounded-xl border px-2.5 py-1.5 shadow-sm transition-all duration-200 hover:-translate-y-px ${headerUsesDarkText ? 'border-[#D99A16]/35 bg-[#FFF5D8]/95 hover:border-[#D99A16]/55 hover:bg-[#ffefbf]' : 'border-[#FFC53D]/25 bg-[#FFC53D]/10 hover:border-[#FFC53D]/45 hover:bg-[#FFC53D]/15'}`}
+                  className={`group flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition-all duration-200 hover:-translate-y-px ${headerUsesDarkText ? 'bg-[#f1f1f4] text-zinc-900 hover:bg-[#e6e6eb]' : 'bg-[#232328] text-white hover:bg-[#2d2d34]'}`}
                 >
-                  <DetailCoin3DIcon size={27} className="h-[27px] w-[27px] object-contain drop-shadow-[0_5px_7px_rgba(180,83,9,0.28)] transition-transform duration-200 group-hover:scale-[1.06] group-active:scale-95" />
-                  <span className={`font-[Montserrat] text-[15px] font-bold leading-none tracking-wide transition-transform duration-200 group-hover:scale-[1.06] group-active:scale-95 ${headerUsesDarkText ? 'text-[#D99A16]' : 'text-[#FFC53D]'}`}>{currentUser.coins ?? 0}</span>
+                  <img src={coins1000} alt="" aria-hidden="true" className="h-[23px] w-[27px] object-contain transition-transform duration-200 group-hover:scale-[1.06] group-active:scale-95" />
+                  <span className="font-[Montserrat] text-[15px] font-bold leading-none transition-transform duration-200 group-hover:scale-[1.06] group-active:scale-95">{currentUser.coins ?? 0}</span>
                 </button>
-                {/* ── Perfil (menú) y notificaciones ── */}
-                <div className="relative flex items-center gap-1" ref={userMenuRef}>
-                  <div className="relative">
-                    <button
-                      onClick={() => { setShowUserMenu((value) => !value); setShowNotifications(false); }}
-                      aria-label={`Abrir perfil de ${currentUser.username}`}
-                      aria-expanded={showUserMenu}
-                      title={currentUser.username}
-                      className={`flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors lg:border ${headerUsesDarkText ? 'text-black hover:text-[#ff4a7d] lg:border-black/20 lg:hover:border-black/40' : 'text-white hover:text-[#ff4a7d] lg:border-white/25 lg:hover:border-white/45'}`}
-                    >
-                      {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className="h-8 w-8 rounded-full object-cover" /> : <UserIcon size={20} strokeWidth={2.4} />}
-                    </button>
-
-                    {showUserMenu && (
-                      // Fondo sólido (blanco/negro según el tema), sin imagen ni degradado.
-                      <div className={`profile-user-popover fixed inset-x-4 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto overflow-x-hidden overscroll-contain lg:overflow-hidden rounded-2xl lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-2 lg:max-h-[calc(100dvh-4.5rem)] lg:w-[300px] border shadow-2xl ${isLightMode ? 'border-black/10 bg-white text-black' : 'border-white/10 bg-black text-white'}`}>
-                        <div className="relative z-10">
-                          <div className={`flex items-center gap-3 border-b p-4 ${isLightMode ? 'border-black/10' : 'border-white/10'}`}>
-                            <Link to="/perfil" onClick={() => setShowUserMenu(false)} aria-label="Ver mi perfil" className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#ff4a7d]">
-                            {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className={`h-11 w-11 rounded-full border object-cover ${isLightMode ? 'border-black/20' : 'border-white/25'}`} /> : <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border bg-transparent ${isLightMode ? 'border-black/20 text-black' : 'border-white/25 text-white'}`}><UserIcon size={20} /></span>}
-                            </Link>
-                            <div className="min-w-0"><p className="truncate font-[Montserrat] text-[15px] font-bold uppercase tracking-[0.035em]">{currentUser.username}</p><p className={`truncate font-[Montserrat] text-[11px] font-semibold ${isLightMode ? 'text-black/55' : 'text-white/55'}`}>{currentUser.email}</p></div>
-                          </div>
-                          <div className="flex flex-col gap-0.5 px-2 pb-2">
-                            <button type="button" onClick={goToRecharge} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Coins size={17} /> Recargar monedas</button>
-                            <Link to="/perfil" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option hidden lg:flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><UserIcon size={17} /> Mi Perfil</Link>
-                            <Link to="/saved" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Bookmark size={17} /> Guardados</Link>
-                            <Link to="/mensajes" onClick={() => setShowUserMenu(false)} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><MessageCircle size={17} /> Mensajes{unreadMessages > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff4a7d] px-1 text-[9px] text-white">{unreadMessages}</span>}</Link>
-                            <button type="button" onClick={() => { setShowUserMenu(false); openSubscriptionModal(); }} className={`profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] transition-colors lg:hidden ${isLightMode ? 'text-black hover:bg-black/5' : 'text-white hover:bg-white/10'}`}><Crown size={17} /> Suscripción</button>
-                            {/* Cerrar sesión va aquí (antes estaba en el menú de hamburguesa en móvil). */}
-                            <button type="button" onClick={handleLogout} className="profile-user-menu-option flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#ff4a7d] transition-colors hover:bg-[#ff4a7d]/10"><LogOut size={17} /> Cerrar Sesión</button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <button type="button" onClick={() => { setShowNotifications((value) => !value); setShowUserMenu(false); }} aria-label="Abrir notificaciones" aria-expanded={showNotifications} className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-colors ${headerUsesDarkText ? 'text-black hover:bg-black/5 hover:text-[#ff4a7d]' : 'text-white hover:bg-white/10 hover:text-[#ff4a7d]'}`}>
-                    <BellGlyph size={26} />
-                    {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/profile"
+                    onClick={closeNotificationsOverlay}
+                    aria-label={`Abrir perfil de ${currentUser.username}`}
+                    title={currentUser.username}
+                    className={`premium-avatar-frame ${premium ? 'premium-avatar-frame--active' : ''} flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-[transform,color] duration-200 ease-out hover:scale-110 motion-reduce:transform-none motion-reduce:transition-none ${headerUsesDarkText ? 'text-black hover:text-[#ff4a7d]' : 'text-white hover:text-[#ff4a7d]'}`}
+                  >
+                    {currentUser.avatar ? <img src={currentUser.avatar} alt={`Foto de perfil de ${currentUser.username}`} className="h-10 w-10 rounded-full object-cover" /> : <UserIcon size={28} />}
+                    {premium && <PremiumElectricBorder />}
+                  </Link>
+                  <span aria-hidden="true" className={`h-5 w-px shrink-0 ${headerUsesDarkText ? 'bg-black/15' : 'bg-white/20'}`} />
+                  <button type="button" onClick={openNotifications} aria-label="Abrir notificaciones" aria-haspopup="dialog" aria-expanded={isNotificationsOpen} className={desktopIconClass}>
+                    <BellGlyph size={20.16} />
+                    {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-0 top-0 h-2 w-2 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
                   </button>
                 </div>
               </div>

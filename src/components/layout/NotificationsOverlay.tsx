@@ -1,9 +1,9 @@
 import { NotificationsPage } from '../../pages/NotificationsPage';
 import { SlidePanel } from './SlidePanel';
 
-/** Campana del navbar (móvil): las notificaciones entran deslizándose hacia la derecha, sin cambiar de ruta. */
-export const NotificationsOverlay = ({ open, isLight, onClose }: { open: boolean; isLight: boolean; onClose: () => void }) => (
-  <SlidePanel open={open} from="left" isLight={isLight} label="Notificaciones" onClose={onClose}>
+/** Mismo contenido en ambos tamaños; en escritorio entra por la derecha en un panel compacto. */
+export const NotificationsOverlay = ({ open, isLight, onClose, desktop = false }: { open: boolean; isLight: boolean; onClose: () => void; desktop?: boolean }) => (
+  <SlidePanel open={open} from={desktop ? 'right' : 'left'} size={desktop ? 'compact' : 'full'} blurBackdrop={desktop} isLight={isLight} label="Notificaciones" onClose={onClose}>
     <NotificationsPage embedded onClose={onClose} />
   </SlidePanel>
 );

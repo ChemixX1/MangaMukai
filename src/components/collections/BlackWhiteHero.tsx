@@ -1,11 +1,14 @@
+import { toTitleCase } from '../../utils/titleCase';
+import { CollectionHeroActions } from './CollectionHeroActions';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bookmark, Play, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useHomeData } from '../../context/HomeDataContext';
 import { useSavedMangas } from '../../hooks/useSavedMangas';
 import { useTheme } from '../../hooks/useTheme';
+import { getUltimosCapitulos } from '../../services/mangaService';
 import type { MangaCapitulo } from '../../types/manga';
 import { collectionTags } from '../../utils/collectionTags';
 import { byTotalViews, filterWomenBlackWhite } from '../../utils/womenBlackWhite';
@@ -49,10 +52,23 @@ export function BlackWhiteHero() {
     newReleases,
     isReady,
   } = useHomeData();
+  const [catalog, setCatalog] = useState<MangaCapitulo[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const { isSaved, toggle: toggleSaved } = useSavedMangas();
   const isLightMode = theme === 'light';
+
+  useEffect(() => {
+    let mounted = true;
+    getUltimosCapitulos()
+      .then((list) => {
+        if (mounted) setCatalog(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const items = useMemo(() => {
     const allMangas = uniqueBySeries([
@@ -61,10 +77,11 @@ export function BlackWhiteHero() {
       ...popularMenHistorical,
       ...latestMen,
       ...newReleases,
+      ...catalog,
     ]);
     // Solo los más vistos con público Mujer dentro de la colección B&N.
     return filterWomenBlackWhite(allMangas).sort(byTotalViews).slice(0, 9);
-  }, [latestMen, latestWomen, newReleases, popularHistorical, popularMenHistorical]);
+  }, [catalog, latestMen, latestWomen, newReleases, popularHistorical, popularMenHistorical]);
 
   const nextSlide = useCallback(() => {
     if (items.length > 1) setActiveIndex((current) => (current + 1) % items.length);
@@ -87,7 +104,7 @@ export function BlackWhiteHero() {
         index: (activeIndex + offset + 1) % items.length,
       }))
     : [];
-  const title = cleanTitle(active?.titulo || 'Mangas en blanco y negro');
+  const title = toTitleCase(cleanTitle(active?.titulo || 'Mangas en blanco y negro'));
   const description = cleanDescription(title, active?.descripcion)
     || 'Historias clásicas, acción y tinta pura en una colección pensada para lectores de manga tradicional.';
   const genres = collectionTags(active, 'bn');
@@ -97,19 +114,19 @@ export function BlackWhiteHero() {
 
   return (
     <section
-      className={`bn-hero relative min-h-[985px] w-full overflow-hidden transition-colors duration-700 lg:h-[690px] lg:min-h-0 ${isLightMode ? 'bg-[#f5f6f8] text-black' : 'bg-[#101010] text-white'}`}
+      className={`bn-hero relative min-h-[985px] w-full overflow-hidden transition-colors duration-700 lg:h-[690px] lg:min-h-0 ${isLightMode ? 'bg-surface text-black' : 'bg-surface text-white'}`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       aria-label="Mangas en blanco y negro destacados"
     >
-      <div className={`home-theme-backdrop-base absolute inset-0 ${isLightMode ? 'bg-[#f5f6f8]' : 'bg-[#101010]'}`} aria-hidden="true">
+      <div className={`home-theme-backdrop-base absolute inset-0 bg-surface`} aria-hidden="true">
         <AnimatePresence initial={false} mode="popLayout">
           {active?.portada && (
             <motion.div key={active.id} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.9 }}>
               <img src={active.portada} alt="" className={`h-full w-full scale-110 object-cover grayscale blur-[3px] transition-[filter] duration-700 ${isLightMode ? 'brightness-[0.9] contrast-[0.96]' : 'brightness-[0.3] contrast-[1.12]'}`} />
               <div className="home-hero-theme-scrim absolute inset-0" />
               <div className={`absolute inset-0 bg-gradient-to-r transition-colors duration-700 ${isLightMode ? 'from-white/95 via-white/72 to-white/35' : 'from-black/95 via-black/72 to-black/35'}`} />
-              <div className={`absolute inset-0 bg-gradient-to-t ${isLightMode ? 'from-[#f5f6f8]/90 via-transparent to-white/15' : 'from-[#101010]/90 via-transparent to-black/15'}`} />
+              <div className={`absolute inset-0 bg-gradient-to-t ${isLightMode ? 'from-surface/90 via-transparent to-white/15' : 'from-surface/90 via-transparent to-black/15'}`} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -133,7 +150,7 @@ export function BlackWhiteHero() {
                   ))}
                 </div>
 
-                <h2 className="mb-6 line-clamp-3 text-center text-[clamp(1.55rem,3vw,3rem)] font-black uppercase italic leading-[0.98] tracking-[-0.045em] lg:text-left">
+                <h2 className="mb-6 line-clamp-3 text-center text-[clamp(1.2rem,1.9vw,1.95rem)] font-black italic leading-[1.1] tracking-[-0.045em] lg:text-left">
                   {title}
                 </h2>
 
@@ -159,14 +176,7 @@ export function BlackWhiteHero() {
                   </div>
                 </div>
 
-                <div className="flex flex-nowrap items-center justify-center gap-3 sm:gap-4 lg:justify-start">
-                  <button type="button" onClick={() => navigate(`/manga/${active.id}`)} className="h-[52px] shrink-0 -skew-x-[11deg] bg-white px-6 text-black transition hover:bg-[#FF4D88] hover:text-white active:scale-95 sm:px-8">
-                    <span className="flex skew-x-[11deg] items-center gap-3 text-[12px] font-black uppercase tracking-[0.13em]">Leer ahora <Play size={16} fill="currentColor" /></span>
-                  </button>
-                  <button type="button" onClick={() => void toggleSaved(active.id)} className={`h-[52px] shrink-0 -skew-x-[11deg] border-2 px-6 transition active:scale-95 sm:px-8 ${isBookmarked ? 'border-[#00C2FF] bg-[#00C2FF] text-black' : isLightMode ? 'border-black/30 bg-white/65 text-black hover:border-black' : 'border-white/30 bg-white/90 text-[#111827] hover:border-white'}`}>
-                    <span className="flex skew-x-[11deg] items-center gap-3 text-[12px] font-black uppercase tracking-[0.13em]"><Bookmark size={16} fill={isBookmarked ? 'currentColor' : 'none'} />{isBookmarked ? 'Guardado' : 'Guardar'}</span>
-                  </button>
-                </div>
+                <CollectionHeroActions saved={isBookmarked} onRead={() => navigate(`/manga/${active.id}`)} onSave={() => { void toggleSaved(active.id); }} />
               </motion.div>
             </AnimatePresence>
           )}

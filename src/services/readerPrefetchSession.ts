@@ -1,5 +1,5 @@
 import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from '../config/api';
-import { getStoredToken } from './authService';
+import { getAuthCacheKey, getStoredToken } from './authService';
 
 export interface ReaderBundle {
   id: string;
@@ -20,24 +20,39 @@ export interface ReaderSibling {
   is_paid: boolean;
   price_coins: number;
   free_at?: string | null;
+  cover_url?: string | null;
 }
 const cancelled = () => new DOMException('Reader session stopped', 'AbortError');
+export const READER_IMAGE_BATCH = 5;
 
-/** One reader visit owns all preloads. Nothing survives leaving the reader. */
+/** Una visita a la ficha y sus capítulos comparte la misma precarga cancelable. */
 export class ReaderPrefetchSession {
+  mangaId = '';
+  readonly detailRoutes = new Set<string>();
   private cache = new Map<string, ReaderBundle>();
   private pending = new Map<string, { promise: Promise<ReaderBundle>; controller: AbortController }>();
   private imageJobs = new Map<AbortController, string>();
   private series = new Map<string, ReaderSibling[]>();
   private seriesJobs = new Set<AbortController>();
-  private warmed = new Set<string>();
+  private warmed = new Map<string, number>();
   private generation = 0;
   private disposed = false;
   private focused = '';
   private schedule: ReturnType<typeof setTimeout> | null = null;
 
   peek(id: string) { return this.cache.get(id); }
-  invalidate(id: string) { this.cache.delete(id); this.warmed.delete(id); }
+  owns(id: string) { return this.focused === id || this.cache.has(id) || [...this.series.values()].some(chapters => chapters.some(chapter => String(chapter.id) === id)); }
+  seed(mangaId: string, chapters: ReaderSibling[], routeId = mangaId) {
+    this.mangaId = mangaId;
+    this.detailRoutes.add(routeId);
+    this.series.set(mangaId, [...chapters].sort((a, b) => a.chapter_number - b.chapter_number));
+  }
+  invalidate(id: string) {
+    this.pending.get(id)?.controller.abort();
+    for (const [controller, chapter] of this.imageJobs) if (chapter === id) controller.abort();
+    this.cache.delete(id);
+    this.warmed.delete(id);
+  }
   focus(id: string) {
     this.focused = id;
     this.pause();
@@ -46,7 +61,8 @@ export class ReaderPrefetchSession {
   pause() {
     this.generation++;
     if (this.schedule) clearTimeout(this.schedule);
-    for (const [controller, id] of this.imageJobs) if (id !== this.focused) controller.abort();
+    // Las imágenes del capítulo abierto pasan a pertenecer al DOM del lector.
+    for (const controller of this.imageJobs.keys()) controller.abort();
     for (const [id, job] of this.pending) if (id !== this.focused) job.controller.abort();
   }
   async load(id: string): Promise<ReaderBundle> {
@@ -57,8 +73,12 @@ export class ReaderPrefetchSession {
     if (existing && !existing.controller.signal.aborted) return existing.promise;
     const controller = new AbortController();
     const token = getStoredToken();
+    const known = this.series.get(this.mangaId)?.find(chapter => String(chapter.id) === id);
+    const metadataRequest = known?.title
+      ? Promise.resolve({ title: { rendered: known.title }, ero_seri: this.mangaId, ero_chapter: known.chapter_number })
+      : fetch(`${WORDPRESS_POSTS_API}/${id}?_fields=id,title,ero_seri,ero_chapter`, { signal: controller.signal }).then(async response => { if (!response.ok) throw new Error('Capítulo no encontrado.'); return response.json(); });
     const promise = Promise.all([
-      fetch(`${WORDPRESS_POSTS_API}/${id}?_fields=id,title,ero_seri,ero_chapter`, { signal: controller.signal }).then(async response => { if (!response.ok) throw new Error('Capítulo no encontrado.'); return response.json(); }),
+      metadataRequest,
       fetch(`${MANGAMUKAI_API}/chapters/content?id=${id}`, { signal: controller.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} }).then(response => response.json()),
     ]).then(([metadata, content]) => {
       if (this.disposed || controller.signal.aborted) throw cancelled();
@@ -75,6 +95,8 @@ export class ReaderPrefetchSession {
         requiresLogin: locked && !token,
         error: images.length || locked ? null : content.message || 'Este capítulo no tiene páginas disponibles.',
       };
+      if (this.mangaId && bundle.mangaId !== this.mangaId) throw cancelled();
+      this.mangaId = bundle.mangaId;
       this.cache.set(id, bundle);
       // Keep metadata bounded; already downloaded images remain in the browser's HTTP cache.
       if (this.cache.size > 48) for (const key of this.cache.keys()) { if (key !== this.focused && key !== id) { this.cache.delete(key); break; } }
@@ -84,6 +106,7 @@ export class ReaderPrefetchSession {
     return promise;
   }
   async siblings(mangaId: string): Promise<ReaderSibling[]> {
+    if (this.disposed) throw cancelled();
     const cached = this.series.get(mangaId); if (cached) return cached;
     const controller = new AbortController(); this.seriesJobs.add(controller);
     try {
@@ -94,10 +117,12 @@ export class ReaderPrefetchSession {
       this.series.set(mangaId, chapters); return chapters;
     } finally { this.seriesJobs.delete(controller); }
   }
-  async warmImages(bundle: ReaderBundle, firstOnly = false) {
+  async warmImages(bundle: ReaderBundle, full = false) {
     if (this.disposed) throw cancelled();
     const controller = new AbortController(); this.imageJobs.set(controller, bundle.id);
-    const images = firstOnly ? bundle.images.slice(0,2) : bundle.images;
+    const target = full ? bundle.images.length : Math.min(READER_IMAGE_BATCH, bundle.images.length);
+    const images = bundle.images.slice(this.warmed.get(bundle.id) || 0, target);
+    let successful = true;
     let cursor = 0;
     const worker = async () => {
       while (cursor < images.length && !controller.signal.aborted) {
@@ -106,28 +131,31 @@ export class ReaderPrefetchSession {
           const image = new Image();
           const cleanup = () => { clearTimeout(timer); image.onload = null; image.onerror = null; controller.signal.removeEventListener('abort', abort); };
           const done = () => { cleanup(); resolve(); };
+          const failed = () => { successful = false; done(); };
           const abort = () => { cleanup(); image.removeAttribute('src'); reject(cancelled()); };
-          const timer = setTimeout(() => { image.removeAttribute('src'); done(); }, 10000);
-          image.onload = done; image.onerror = done;
+          const timer = setTimeout(() => { image.removeAttribute('src'); failed(); }, 10000);
+          image.onload = done; image.onerror = failed;
+          image.fetchPriority = 'low';
           controller.signal.addEventListener('abort', abort, { once: true });
           if (controller.signal.aborted) { abort(); return; }
           image.src = url;
-          if (image.complete) done();
+          if (image.complete) { if (image.naturalWidth > 0) done(); else failed(); }
         });
       }
     };
-    try { await Promise.all([worker(), worker()]); if (!firstOnly && !controller.signal.aborted) this.warmed.add(bundle.id); }
+    try { await Promise.all([worker(), worker()]); if (!controller.signal.aborted && successful) this.warmed.set(bundle.id, Math.max(target, this.warmed.get(bundle.id) || 0)); }
     finally { this.imageJobs.delete(controller); }
   }
   warmAround(chapters: ReaderSibling[], currentId: string, unlocked: Set<string>) {
     this.pause();
     if (this.disposed || document.hidden) return;
     const index = chapters.findIndex(chapter => String(chapter.id) === currentId);
-    if (index < 0) return;
     const order: ReaderSibling[] = [];
-    for (let distance=1; distance<chapters.length; distance++) {
-      if (chapters[index- distance]) order.push(chapters[index-distance]);
-      if (chapters[index+distance]) order.push(chapters[index+distance]);
+    if (index < 0) order.push(...chapters);
+    if (index >= 0) {
+      // Tras terminar el capítulo, descarga completos solo sus dos vecinos.
+      if (chapters[index+1]) order.push(chapters[index+1]);
+      if (chapters[index-1]) order.push(chapters[index-1]);
     }
     const generation = this.generation;
     this.schedule = setTimeout(() => { void (async () => {
@@ -135,8 +163,12 @@ export class ReaderPrefetchSession {
         if (generation !== this.generation || this.disposed || document.hidden) return;
         const id = String(chapter.id);
         // Preloading never buys a chapter and never bypasses its server-side access check.
-        if (this.warmed.has(id) || (chapter.is_paid && !unlocked.has(id))) continue;
-        try { const bundle = await this.load(id); if (generation !== this.generation) return; if (!bundle.error) await this.warmImages(bundle); }
+        const released = !!chapter.free_at && new Date(chapter.free_at).getTime() <= Date.now();
+        if (id === this.focused || (chapter.is_paid && !released && !unlocked.has(id))) continue;
+        const cached = this.peek(id);
+        const target = cached ? (currentId ? cached.images.length : Math.min(READER_IMAGE_BATCH, cached.images.length)) : Infinity;
+        if ((this.warmed.get(id) ?? -1) >= target) continue;
+        try { const bundle = await this.load(id); if (generation !== this.generation) return; if (!bundle.error && !bundle.locked) await this.warmImages(bundle, !!currentId); }
         catch { if (generation !== this.generation || this.disposed) return; }
       }
     })(); }, 120);
@@ -148,4 +180,47 @@ export class ReaderPrefetchSession {
     for (const controller of this.seriesJobs) controller.abort();
     this.cache.clear(); this.series.clear(); this.warmed.clear();
   }
+}
+
+let shared: ReaderPrefetchSession | null = null;
+let owner: string | null = null;
+
+function ensureOwner() {
+  const identity = getAuthCacheKey();
+  if (owner !== identity) { clearReaderPrefetch(); owner = identity; }
+}
+
+export function syncReaderPrefetchAuth() { ensureOwner(); }
+
+export function clearReaderPrefetch() {
+  shared?.dispose();
+  shared = null;
+}
+
+export function mangaReaderSession(routeId: string, mangaId: string, chapters: ReaderSibling[]) {
+  ensureOwner();
+  if (shared && shared.mangaId !== mangaId) clearReaderPrefetch();
+  shared ??= new ReaderPrefetchSession();
+  shared.seed(mangaId, chapters, routeId);
+  shared.focus('');
+  return shared;
+}
+
+export function chapterReaderSession(id: string) {
+  ensureOwner();
+  if (shared && !shared.owns(id)) clearReaderPrefetch();
+  shared ??= new ReaderPrefetchSession();
+  shared.focus(id);
+  return shared;
+}
+
+/** Se ejecuta fuera de Suspense: salir cancela incluso si la siguiente ruta sigue descargándose. */
+export function syncReaderPrefetchRoute(pathname: string) {
+  ensureOwner();
+  if (!shared) return;
+  const chapter = /^\/read\/([^/]+)\/?$/.exec(pathname)?.[1];
+  if (chapter && shared.owns(chapter)) { shared.focus(chapter); return; }
+  const manga = /^\/manga\/([^/]+)\/?$/.exec(pathname)?.[1];
+  if (manga && (shared.mangaId === manga || shared.detailRoutes.has(manga))) { shared.pause(); return; }
+  clearReaderPrefetch();
 }

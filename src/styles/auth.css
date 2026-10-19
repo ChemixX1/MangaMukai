@@ -319,9 +319,9 @@ body:has(.auth-reference) .navbar-primary-link { font-family: 'Anta', sans-serif
 .auth-password-toggle { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
 
 @media (max-width: 639px) {
-  .auth-reference .auth-form-shell { padding-inline: clamp(24px, 9vw, 38px); }
-  .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding-inline: clamp(24px, 9vw, 38px); }
-  .auth-reference :is(.auth-form-card-login, .auth-form-card-register) { padding: 20px 18px 22px; border-radius: 22px; }
+  .auth-reference .auth-form-shell { padding-inline: clamp(20px, 6vw, 28px); }
+  .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding-inline: clamp(20px, 6vw, 28px); }
+  .auth-reference :is(.auth-form-card-login, .auth-form-card-register) { padding: 24px 18px 26px; border-radius: 22px; }
   .auth-reference .auth-heading { margin-bottom: 16px; }
   .auth-reference :is(.auth-form-card-login, .auth-form-card-register) .auth-title-audiowide { font-size: 20px; line-height: 27px; white-space: normal; }
   .auth-reference .auth-social { gap: 8px; }
@@ -337,9 +337,9 @@ body:has(.auth-reference) .navbar-primary-link { font-family: 'Anta', sans-serif
   .auth-reference .auth-bottom-divider,
   .auth-reference .auth-form-card-register .auth-bottom-divider { margin: 16px 0 14px; }
   .auth-reference :is(.auth-form-card-login, .auth-form-card-register) .auth-switch {
-    font-size: clamp(9px, 2.6vw, 11px);
-    line-height: 16px;
-    white-space: nowrap;
+    font-size: 13px;
+    line-height: 20px;
+    white-space: normal;
   }
   .auth-reference .auth-fields-panel svg { width: 18px; height: 18px; }
   .auth-reference .auth-social img { width: 19px; height: 19px; }

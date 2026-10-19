@@ -31,11 +31,6 @@ export const routeSeo = (pathname: string): RouteSeo => {
   switch (path) {
     case '/':
       return { section: null, description: DEFAULT_DESCRIPTION };
-    case '/biblioteca':
-      return {
-        section: 'Biblioteca de manga en español — Catálogo completo',
-        description: 'Catálogo completo de manga, manhwa y manhua en español: filtra por género, tipo y público, y lee online gratis en MangaMukai.',
-      };
     case '/manga-19':
       return {
         section: 'Mangas +19 en español — Colección para adultos',
@@ -46,6 +41,8 @@ export const routeSeo = (pathname: string): RouteSeo => {
         section: 'Manga en blanco y negro — Shounen, seinen y acción',
         description: 'Manga clásico en blanco y negro: shounen, seinen y acción en español, con capítulos nuevos y lector optimizado en MangaMukai.',
       };
+    case '/pro':
+      return { section: 'Mukai Pro', description: 'Descubre los beneficios de Mukai Pro y elige tu plan mensual o anual.' };
     case '/nosotros':
       return {
         section: 'Sobre MangaMukai',
@@ -81,10 +78,6 @@ export const routeSeo = (pathname: string): RouteSeo => {
         section: 'Política de cookies',
         description: 'Qué cookies y almacenamiento local usa MangaMukai, para qué sirven y cómo puedes gestionarlos.',
       };
-    case '/perfil':
-      return { section: 'Mi perfil', description: 'Área privada de MangaMukai.', noindex: true };
-    case '/saved':
-      return { section: 'Mis guardados', description: 'Área privada de MangaMukai.', noindex: true };
     case '/comunidad':
       return { section: 'Comunidad', description: 'Comparte lecturas, recomendaciones y fan art con otros lectores de MangaMukai.' };
     case '/mensajes':
@@ -95,9 +88,12 @@ export const routeSeo = (pathname: string): RouteSeo => {
       return { section: 'Mukai Chat', description: 'Conversa con personajes de manga en MangaMukai.' };
     case '/tienda':
       return { section: 'Tienda', description: 'Productos y colecciones de MangaMukai.' };
-    case '/mas':
-      return { section: 'Más', description: 'Área privada de MangaMukai.', noindex: true };
+    case '/profile':
+      return { section: 'Profile', description: 'Área privada de MangaMukai.', noindex: true };
+    case '/transacciones':
+      return { section: 'Transacciones', description: 'Historial privado de tu cuenta en MangaMukai.', noindex: true };
     case '/recargar':
+    case '/recargar/pago':
       return { section: 'Recargar monedas', description: 'Área privada de MangaMukai.', noindex: true };
     case '/pago-exitoso':
       return { section: 'Pago completado', description: 'Área privada de MangaMukai.', noindex: true };
@@ -105,8 +101,6 @@ export const routeSeo = (pathname: string): RouteSeo => {
     case '/login':
       return { section: 'Iniciar sesión', description: 'Área privada de MangaMukai.', noindex: true };
     case '/auth/register':
-    case '/register':
-    case '/registro':
       return { section: 'Crear cuenta', description: 'Área privada de MangaMukai.', noindex: true };
     default:
       break;

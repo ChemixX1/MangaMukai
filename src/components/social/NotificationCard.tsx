@@ -1,3 +1,5 @@
+import { notificationRoute } from '../../utils/notificationRoute';
+export { notificationRoute } from '../../utils/notificationRoute';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, User } from 'lucide-react';
@@ -23,6 +25,8 @@ const socialCopy = (notification: SocialNotification) => {
     love: 'Le encanta', like: 'Le dio like a', fire: 'Le dio fuego a', haha: 'Le divierte', sad: 'Le entristece', wow: 'Le sorprende',
   } as Record<string, string>)[reaction] || 'Reaccionó a';
   switch (notification.type) {
+    case 'message': return { text: 'Te envió un mensaje', button: 'Ver mensaje' };
+    case 'post_comment_like': return { text: 'Le dio like a tu comentario', button: 'Ver comentario' };
     case 'comment_like': return { text: 'Le dio like a tu comentario', button: 'Ver comentario' };
     case 'comment_reaction': return { text: `${reactionVerb} tu comentario`, button: 'Ver comentario' };
     case 'comment_reply': return { text: 'Respondió a tu comentario', button: 'Ver comentario' };
@@ -36,15 +40,6 @@ const socialCopy = (notification: SocialNotification) => {
   }
 };
 
-/** Ruta a la que lleva cada notificación. */
-export const notificationRoute = (notification: SocialNotification): string => {
-  const { type, payload, actor } = notification;
-  if (type === 'chapter_new' || type === 'manga_new' || type === 'manga_update') return payload.manga_id ? `/manga/${payload.manga_id}` : '/';
-  if ((type === 'comment_like' || type === 'comment_reaction' || type === 'comment_reply') && payload.manga_id) return `/manga/${payload.manga_id}#comentarios`;
-  if (type === 'post_reaction' || type === 'post_comment' || type === 'post_share') return '/perfil';
-  return actor ? `/usuarios/${actor.id}` : '/';
-};
-
 /** Flecha ↗ que va dentro de los botones de acción. */
 const ArrowIcon = () => <ArrowUpRight size={10} strokeWidth={3} className="shrink-0" aria-hidden="true" />;
 
@@ -52,7 +47,7 @@ const ArrowIcon = () => <ArrowUpRight size={10} strokeWidth={3} className="shrin
 const NewBadge = () => (
   <svg viewBox="0 0 44 44" className="h-11 w-11 shrink-0" aria-hidden="true">
     <path
-      fill="#fff"
+      fill="#fb923c"
       d="M22 2l3.6 4.9 5.6-2.3.9 6 6 .9-2.3 5.6L40.7 21 36.2 25l2.3 5.6-6 .9-.9 6-5.6-2.3L22 40l-3.6-4.9-5.6 2.3-.9-6-6-.9 2.3-5.6L3.3 21l4.5-4-2.3-5.6 6-.9.9-6 5.6 2.3z"
     />
     <text x="22" y="26" textAnchor="middle" fontFamily="Montserrat, sans-serif" fontWeight="900" fontSize="11" fill="#000" transform="rotate(-30 22 22)">NEW</text>
@@ -98,12 +93,12 @@ const ChapterCard = ({ notification, onOpen }: CardProps) => {
         </Link>
       </div>
       {!notification.read && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-fuchsia-500" />}
-      <span className="absolute bottom-1.5 right-4 font-[Montserrat] text-[8px] text-white/50">{timeAgo(notification.created_at)}</span>
+      <span className="absolute bottom-1.5 right-4 font-[Montserrat] text-[10px] font-medium text-white/90">{timeAgo(notification.created_at)}</span>
     </article>
   );
 };
 
-/** Tarjeta "manga nuevo": estrella NEW, título en negrita, lema en Michroma y "Ver manga". */
+/** Tarjeta "manga nuevo": estrella NEW, título en negrita, lema en Michroma y "Ver". */
 const NewMangaCard = ({ notification, onOpen }: CardProps) => {
   const { payload } = notification;
   return (
@@ -114,17 +109,16 @@ const NewMangaCard = ({ notification, onOpen }: CardProps) => {
       <div className="relative flex h-full items-center gap-2 pl-0.5 pr-4">
         <NewBadge />
         <div className="min-w-0 flex-1 -translate-y-0.5">
-          <p className="truncate font-[Montserrat] text-[15px] font-bold leading-5 text-white min-[420px]:text-base">{payload.title || 'Título del manga'}</p>
-          <p className="mt-1.5 truncate font-[Michroma] text-[6.5px] font-normal leading-4 text-white min-[420px]:text-[7.5px]">Descubre, disfruta y vive una nueva aventura</p>
+          <p title={payload.title || 'Título del manga'} className="truncate font-[Montserrat] text-[11px] font-bold leading-4 text-white min-[420px]:text-xs">{payload.title || 'Título del manga'}</p>
+          <p className="mt-1.5 font-[Michroma] text-[7.5px] font-normal leading-4 text-white min-[420px]:text-[8.5px]">Disfruta y vive una nueva aventura</p>
         </div>
-        {/* Botón alto, centrado en la tarjeta y un pelín a la derecha; "Ver" y "manga" en dos filas. */}
-        <Link to={notificationRoute(notification)} onClick={(event) => { event.stopPropagation(); onOpen(notification); }} className="flex h-12 shrink-0 translate-x-1.5 flex-col items-center justify-center rounded-md bg-purple-600 px-2.5 text-center font-[Montserrat] text-[9px] font-bold leading-[13px] text-white">
-          <span>Ver</span>
-          <span className="flex items-center gap-0.5">manga <ArrowIcon /></span>
+        <Link to={notificationRoute(notification)} aria-label={`Ver ${payload.title || 'manga'}`} onClick={(event) => { event.stopPropagation(); onOpen(notification); }} className="relative flex h-8 w-[88px] shrink-0 translate-x-1.5 items-center justify-center rounded-md bg-purple-600 text-center font-[Montserrat] text-[10px] font-bold leading-[13px] text-white">
+          <span>Ver manga</span>
         </Link>
       </div>
-      {!notification.read && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-fuchsia-500" />}
-      <span className="absolute bottom-1.5 right-4 font-[Montserrat] text-[8px] text-white/50">{timeAgo(notification.created_at)}</span>
+      <ArrowUpRight size={14} strokeWidth={3} className="absolute right-3 top-2.5 text-white" aria-hidden="true" />
+      {!notification.read && <span className="absolute right-9 top-3 h-2 w-2 rounded-full bg-fuchsia-500" />}
+      <span className="absolute bottom-1.5 right-4 font-[Montserrat] text-[10px] font-medium text-white/90">{timeAgo(notification.created_at)}</span>
     </article>
   );
 };
@@ -143,15 +137,18 @@ const SocialCard = ({ notification, onOpen }: CardProps) => {
             : actor ? <span className="font-[Montserrat] text-sm font-black text-black">{actor.username.charAt(0).toUpperCase()}</span> : <User size={18} className="text-black/60" />}
         </span>
         <div className="ml-2 min-w-0 flex-1">
-          <p className="truncate font-[Montserrat] text-[11px] font-medium leading-[15px] text-white">{actor?.username || 'Usuario'}</p>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pr-2">
+            <p className="min-w-0 truncate font-[Montserrat] text-[11px] font-medium leading-[15px] text-white">{actor?.username || 'Usuario'}</p>
+            <time dateTime={notification.created_at} className="shrink-0 font-[Montserrat] text-[10px] font-medium text-white/90">{timeAgo(notification.created_at)}</time>
+          </div>
           <p className="mt-0.5 truncate font-['Poiret_One'] text-xs font-normal leading-4 text-white">{copy.text}</p>
         </div>
-        <Link to={notificationRoute(notification)} onClick={(event) => { event.stopPropagation(); onOpen(notification); }} className="flex h-5 shrink-0 -translate-y-3 items-center justify-center gap-1 rounded-sm bg-black px-2 font-[Montserrat] text-[6px] font-bold text-white">
-          {copy.button} <ArrowIcon />
+        <Link to={notificationRoute(notification)} onClick={(event) => { event.stopPropagation(); onOpen(notification); }} className="flex h-8 shrink-0 items-center justify-center rounded-md bg-black px-3 font-[Montserrat] text-[10px] font-bold text-white">
+          {copy.button}
         </Link>
       </div>
-      {!notification.read && <span className="absolute right-3 top-2.5 h-2 w-2 rounded-full bg-fuchsia-500" />}
-      <span className="absolute bottom-1.5 right-4 font-[Montserrat] text-[8px] text-white/50">{timeAgo(notification.created_at)}</span>
+      <ArrowUpRight size={14} strokeWidth={3} className="absolute right-3 top-2.5 text-white" aria-hidden="true" />
+      {!notification.read && <span className="absolute right-9 top-3 h-2 w-2 rounded-full bg-fuchsia-500" />}
     </article>
   );
 };

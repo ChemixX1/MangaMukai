@@ -61,6 +61,7 @@ RewriteRule ^$ /index.php [L,QSA]
 # estatico de index.html, que declara canonical hacia la portada.
 RewriteRule ^$ /backend-patches/manga-route-meta.php [L,QSA]
 RewriteRule ^(biblioteca|manga-19|manga-bn|nosotros|contacto|legal|perfil|saved|recargar|pago-exitoso)/?$ /backend-patches/manga-route-meta.php [L,QSA]
+RewriteRule ^recargar/pago/?$ /backend-patches/manga-route-meta.php [L,QSA]
 RewriteRule ^read/([0-9]+)/?$ /backend-patches/manga-route-meta.php [L,QSA]
 RewriteRule ^auth/(login|register)/?$ /backend-patches/manga-route-meta.php [L,QSA]
 RewriteRule ^usuarios/([0-9]+)/?$ /backend-patches/manga-route-meta.php [L,QSA]

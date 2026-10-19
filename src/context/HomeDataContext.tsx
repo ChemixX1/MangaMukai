@@ -3,6 +3,7 @@ import { getPopularWomenByViews, getPopularMenByViews, getLatestWomenUpdates, ge
 import { seedSharedAuthCovers } from '../utils/authCoverCache';
 import { createHomeDataLoader, type HomeSnapshot } from '../utils/progressiveHomeData';
 import { loadSearchCatalog } from '../services/searchCatalog';
+import { scheduleSubscriptionBackground } from '../utils/subscriptionBackground';
 import { whenIdle } from '../utils/whenIdle';
 
 interface HomeData extends HomeSnapshot {
@@ -57,6 +58,18 @@ export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
     // Solo datos: las imágenes del buscador se solicitan cuando se abre.
     return whenIdle(() => { void loadSearchCatalog().catch(() => {}); });
   }, [data.isReady, data.isOutage]);
+
+  const allListsLoaded = Object.values(data.loaded).every(Boolean);
+  useEffect(() => {
+    if (!allListsLoaded) return;
+    let cancelled = false;
+    let cancelWarm: (() => void) | undefined;
+    // Let the existing search catalog preload finish before scheduling decoration.
+    void loadSearchCatalog().catch(() => {}).then(() => {
+      if (!cancelled) cancelWarm = scheduleSubscriptionBackground();
+    });
+    return () => { cancelled = true; cancelWarm?.(); };
+  }, [allListsLoaded]);
 
   return <HomeDataContext.Provider value={{ ...data, retry }}>{children}</HomeDataContext.Provider>;
 };

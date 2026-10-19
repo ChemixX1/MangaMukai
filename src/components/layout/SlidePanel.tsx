@@ -14,7 +14,7 @@ const CLOSE_DURATION = 420;
 export const SlidePanel = ({ open, from, size = 'full', scrollable = true, blurBackdrop = false, isLight, label, onClose, children }: {
   open: boolean;
   from: 'left' | 'right';
-  size?: 'full' | 'half' | 'wide';
+  size?: 'full' | 'half' | 'wide' | 'compact' | 'profile';
   scrollable?: boolean;
   blurBackdrop?: boolean;
   isLight: boolean;
@@ -51,7 +51,9 @@ export const SlidePanel = ({ open, from, size = 'full', scrollable = true, blurB
 
   const hidden = from === 'left' ? '-translate-x-full' : 'translate-x-full';
   const shadow = from === 'left' ? 'shadow-[16px_0_40px_rgba(0,0,0,0.25)]' : 'shadow-[-16px_0_40px_rgba(0,0,0,0.25)]';
-  const frame = size === 'full' ? 'inset-0' : `inset-y-0 ${size === 'wide' ? 'w-[62vw]' : 'w-[50vw]'} ${from === 'left' ? 'left-0' : 'right-0'}`;
+  const frame = size === 'full' ? 'inset-0' : `inset-y-0 ${size === 'compact' ? 'w-[440px] max-w-full' : size === 'profile' ? 'w-[62vw] lg:w-[320px]' : size === 'wide' ? 'w-[62vw]' : 'w-[50vw]'} ${from === 'left' ? 'left-0' : 'right-0'}`;
+
+  if (!open && !rendered) return null;
 
   return (
     <>

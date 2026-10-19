@@ -227,12 +227,11 @@ export const MessagesPage = () => {
     <main className={`messages-page pt-[env(safe-area-inset-top)] transition-colors ${surface}`}>
       {/* Sin navbar: toda la altura menos la barra inferior en móvil; en escritorio, la pantalla completa. */}
       <div className={`mx-auto flex h-[calc(100dvh-64px-env(safe-area-inset-bottom)-env(safe-area-inset-top))] w-full max-w-6xl lg:grid lg:h-[100dvh] lg:grid-cols-[360px_minmax(0,1fr)] lg:border-x ${divider}`}>
-        {/* ───────── Lista de chats ───────── */}
         <section className={`relative flex min-h-0 w-full min-w-0 flex-col lg:border-r ${divider} ${activeId ? 'hidden lg:flex' : 'flex'}`} aria-label="Chats">
           <header className={`flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3 ${divider}`}>
             <div className="flex items-center gap-1">
               <button type="button" onClick={goBack} aria-label="Volver" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${hover}`}><ArrowLeft size={20} /></button>
-              <Link to="/perfil" aria-label="Ir a mi perfil" className="shrink-0 rounded-full">
+              <Link to="/profile" aria-label="Ir a mi perfil" className="shrink-0 rounded-full">
                 {currentUser?.avatar
                   ? <img src={currentUser.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
                   : <span className={`flex h-8 w-8 items-center justify-center rounded-full ${pill}`}><User size={16} /></span>}
@@ -290,7 +289,6 @@ export const MessagesPage = () => {
           </div>
         </section>
 
-        {/* ───────── Conversación ───────── */}
         {/* w-full: como hijo flex sin ancho se encogía al contenido y el chat quedaba pegado a la izquierda en móvil. */}
         <section className={`min-h-0 w-full min-w-0 flex-col ${activeId ? 'flex' : 'hidden lg:flex'}`} aria-label={headerUser ? `Chat con ${headerUser.username}` : 'Conversación'}>
           {!activeId ? (
@@ -305,7 +303,7 @@ export const MessagesPage = () => {
                 <button type="button" onClick={() => navigate('/mensajes')} aria-label="Volver a los chats" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full lg:hidden ${hover}`}><ArrowLeft size={20} /></button>
                 {headerUser && <Link to={`/usuarios/${headerUser.id}`} className="shrink-0"><Avatar user={headerUser} size="h-8 w-8" text="text-xs" /></Link>}
                 <div className="min-w-0 flex-1">
-                  <Link to={headerUser ? `/usuarios/${headerUser.id}` : '/mensajes'} className="block truncate font-[Montserrat] text-[15px] font-extrabold leading-tight hover:underline">{headerUser?.username || 'Cargando…'}</Link>
+                  <Link to={headerUser ? `/usuarios/${headerUser.id}` : '/mensajes'} className="block truncate font-[Montserrat] text-[15px] font-extrabold leading-tight hover:underline">{headerUser?.username || ''}</Link>
                   <p className={`flex items-center gap-1.5 text-[11px] font-semibold leading-tight ${isOnline ? 'text-emerald-500' : muted}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : isLight ? 'bg-black/25' : 'bg-white/25'}`} />
                     {isOnline ? 'Online' : 'Offline'}

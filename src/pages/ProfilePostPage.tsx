@@ -35,7 +35,7 @@ export const ProfilePostPage = () => {
       <div className="community-main">
         <section className="community-thread">
           <button type="button" className="community-back" onClick={() => navigate(back)}><ArrowLeft size={21} />Regresar</button>
-          {post ? <ProfilePostCard initialPost={post} isLight={theme === 'light'} variant="community" detail /> : loading ? <p className="community-empty">Cargando publicación…</p> : <div className="community-empty"><p>{error}</p><Link to={back}>Volver al perfil</Link></div>}
+          {post ? <ProfilePostCard initialPost={post} isLight={theme === 'light'} variant="community" detail /> : loading ? <div role="status" aria-label="Cargando publicación" className="min-h-40" /> : <div className="community-empty"><p>{error}</p><Link to={back}>Volver al perfil</Link></div>}
         </section>
       </div>
     </div>

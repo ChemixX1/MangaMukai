@@ -13,7 +13,7 @@ import {
   useMusicPlayer,
 } from '../../services/musicPlayer';
 import { MukaiMusicPromo } from './MukaiMusicPromo';
-import { openSubscriptionModal } from '../../utils/subscriptionModal';
+import { useNavigate } from 'react-router-dom';
 import ElasticSlider from '../ui/ElasticSlider';
 
 interface MangaMusicCardProps {
@@ -30,6 +30,7 @@ const formatTime = (time: number) => {
 };
 
 export const MangaMusicCard = ({ compactHeight = false, isLight = false }: MangaMusicCardProps) => {
+  const navigate = useNavigate();
   // Estado compartido: la misma lista y el mismo audio en la ficha y en el lector.
   const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, volume } = useMusicPlayer();
   const [showPlaylist, setShowPlaylist] = useState(false);
@@ -45,21 +46,21 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
 
   const playTrack = (id: number, locked: boolean) => {
     if (locked) {
-      openSubscriptionModal();
+      navigate('/pro');
       return;
     }
     selectTrack(id);
     setShowPlaylist(false);
   };
 
-  const heightClass = compactHeight ? 'min-h-[228px] lg:min-h-[252px]' : 'min-h-[243px] lg:min-h-[267px]';
+  const heightClass = compactHeight ? 'min-h-[200px] lg:min-h-[220px]' : 'min-h-[220px] lg:min-h-[240px]';
 
   // Sin acceso a la música, solo el cartel de Mukai Music (como en móvil): el
   // reproductor ni se monta, así no se ve ni se puede enfocar por detrás.
   if (isLocked) {
     return (
       <aside aria-label="Mukai Music" className="manga-music-locked-card w-full shrink-0 overflow-hidden rounded-2xl">
-        <MukaiMusicPromo onUnlock={openSubscriptionModal} />
+        <MukaiMusicPromo />
       </aside>
     );
   }

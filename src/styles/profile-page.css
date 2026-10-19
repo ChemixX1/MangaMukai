@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/fonts/cinzel/Cinzel-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+}
+
 .mobile-profile {
   --profile-surface: #f4f4f5;
   --profile-text: #09090b;
@@ -65,13 +73,23 @@
 .profile-settings-list > :is(button, a) > span { min-width: 0; flex: 1; }
 .profile-settings-list > :is(button, a) > :last-child:not(span) { flex: none; }
 .profile-settings-list > :is(button, a) > small { font-size: 11px; font-weight: 500; opacity: .65; }
-.profile-settings-list > :is(button, a):hover, .profile-settings-header button:hover { color: #db2777; }
+.profile-settings-list > :is(button, a), .profile-settings-header button, .profile-settings-logout { transition: transform .18s ease; }
+.profile-settings-list > :is(button, a):is(:hover, :focus-visible), .profile-settings-header button:is(:hover, :focus-visible), .profile-settings-logout:is(:hover, :focus-visible) { transform: scale(1.025); }
+.profile-settings-list > :is(button, a):active, .profile-settings-header button:active, .profile-settings-logout:active { transform: scale(.98); }
+.profile-settings-panel :is(button, a):focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.profile-settings-list > .profile-settings-theme > .profile-theme-switch { display: flex; flex: 0 0 38px; height: 22px; padding: 3px; border-radius: 999px; background: #a1a1aa; }
+.profile-theme-switch > span { width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .18s ease; }
+.profile-settings-theme[aria-checked='true'] > .profile-theme-switch { background: #52525b; }
+.profile-settings-theme[aria-checked='true'] > .profile-theme-switch > span { transform: translateX(16px); }
+@media (prefers-reduced-motion: reduce) {
+  .profile-settings-panel :is(button, a), .profile-theme-switch > span { transition: none; }
+}
 .profile-settings-list > .profile-settings-theme:is(:hover, :active, :focus) { color: inherit; background: transparent; }
 .profile-settings-divider { height: 1px; margin: 10px 0; background: currentColor; opacity: .16; }
 .profile-settings-list > .profile-settings-danger { color: #dc2626; }
 .profile-settings-note { margin: 3px 2px 0; font-size: 10px; line-height: 1.5; opacity: .68; }
 .profile-settings-logout { display: flex; align-items: center; gap: 8px; min-height: 52px; margin-top: auto; padding: 12px 2px 0; border-top: 1px solid currentColor; text-align: left; font-size: 13px; font-weight: 700; }
-.profile-settings-logout:hover { color: #db2777; }
+
 .mobile-profile-identity { position: relative; z-index: 1; display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 14px; min-height: 140px; margin: -63px 22px 0; }
 .mobile-profile-avatar { display: flex; align-items: center; justify-content: center; width: 112px; height: 112px; overflow: hidden; border: 3px solid white; border-radius: 50%; background: black; color: white; }
 .mobile-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -100,9 +118,10 @@
 .mobile-profile-promo-artwork { width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .mobile-profile-pro-promo > .mobile-profile-promo-artwork { transform: scaleX(-1); }
 .mobile-profile-recharge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #fff8 0%, transparent 55%); pointer-events: none; }
-.mobile-profile-balance { position: absolute; z-index: 1; top: 11px; left: 36px; display: flex; align-items: center; gap: 4px; width: 104px; height: 33px; padding-left: 16px; border-radius: 11px; background: linear-gradient(90deg, #ffa43d00 0%, #ffa43d3d 48.56%, #ffa43d00 100%); color: #ffa43d; font-size: 16px; font-weight: 600; line-height: 20px; }
+.mobile-profile-recharge-details { position: absolute; z-index: 1; inset: 11px auto 13px 36px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+.mobile-profile-balance { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 33px; padding-inline: 8px; border-radius: 11px; background: linear-gradient(90deg, #ffa43d00 0%, #ffa43d3d 48.56%, #ffa43d00 100%); color: #ffa43d; font-size: 16px; font-weight: 600; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mobile-profile-coin { display: block; width: 22px; height: 22px; flex: none; }
-.mobile-profile-recharge-action { position: absolute; z-index: 1; left: 36px; bottom: 13px; padding: 6px 15px; border-radius: 10px; background: #db2777; color: white; font-size: 11px; font-weight: 600; box-shadow: 0 4px 4px #0004; }
+.mobile-profile-recharge-action { padding: 6px 15px; border-radius: 10px; background: #db2777; color: white; font-size: 11px; font-weight: 600; box-shadow: 0 4px 4px #0004; }
 .mobile-profile-pro-logo { position: absolute; top: 15px; right: 54px; width: 114px; height: 42px; object-fit: contain; }
 .mobile-profile-pro-promo-action { position: absolute; right: 63px; bottom: 10px; display: flex; width: 92px; height: 24px; align-items: center; justify-content: center; border-radius: 10px; background: linear-gradient(90deg, #ffa43d, #ffcd0f); color: white; font-size: 12px; font-weight: 500; text-shadow: 0 4px 4px #0004; }
 .mobile-profile-content { margin-top: 22px; }
@@ -121,8 +140,55 @@
 .mobile-profile-filters button.active { background: #09090b; color: #fff; }
 .mobile-profile-dark .mobile-profile-filters button { background: #3f3f46; color: #d4d4d8; }
 .mobile-profile-dark .mobile-profile-filters button.active { background: white; color: black; }
+.mobile-profile .mobile-profile-filters .mobile-profile-purchased-filter { background: linear-gradient(110deg, #eab94e, #ffe08a); color: #513507; }
+.mobile-profile .mobile-profile-filters .mobile-profile-purchased-filter.active { background: linear-gradient(110deg, #d69a20, #f7c94f); color: #332000; box-shadow: inset 0 0 0 2px #996515; }
 .mobile-profile-collection-grid, .mobile-profile-cover-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 19px; }
 .mobile-profile-collection-slot { aspect-ratio: 112 / 176; border: 5px solid #a21caf; border-radius: 20px; background: #d4d4d8; }
+.profile-collection-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+.profile-collection-loading { display: block; aspect-ratio: 3 / 4; border-radius: 12px; background: currentColor; opacity: .08; }
+.profile-collection-preview, .profile-cover-dialog {
+  --collection-frame: linear-gradient(125deg, #743790 0%, #f5d0fe 12%, #c876e3 24%, #743790 42%, #f3c6ff 53%, #a34fc1 74%, #f5d0fe 89%, #843b9c 100%);
+  --collection-rim: linear-gradient(125deg, #fff1ff, #bd72d2 34%, #6d3186 47%, #efb9fc 71%, #fff1ff);
+  --collection-edge: #502461;
+  --collection-glow: #a21caf30;
+  --collection-title: #f7eafb;
+}
+.profile-collection-preview[data-purchased], .profile-cover-dialog[data-purchased] {
+  --collection-frame: linear-gradient(125deg, #9c6112 0%, #fff8ce 12%, #ffd65b 24%, #bd811c 42%, #fff2a8 53%, #e8a72e 74%, #fff5b5 89%, #b97a1b 100%);
+  --collection-rim: linear-gradient(125deg, #fffde5, #edcc61 34%, #a46b19 47%, #fff0a6 71%, #fffde5);
+  --collection-edge: #80501a;
+  --collection-glow: #e8a72e38;
+  --collection-title: #fff1c1;
+}
+.profile-collection-preview { position: relative; display: block; width: 100%; min-width: 0; aspect-ratio: 3 / 4; border: 0; padding: 0; border-radius: 12px; background: transparent; text-align: left; filter: drop-shadow(0 3px 1px var(--collection-edge)) drop-shadow(0 5px 7px var(--collection-glow)); transition: transform .2s ease, filter .2s ease; }
+.profile-collection-preview:hover { transform: scale(1.045); }
+.profile-collection-preview:focus-visible { outline: 3px solid var(--collection-title); outline-offset: 4px; }
+.profile-collection-frame { position: absolute; inset: 0; overflow: hidden; border-radius: 12px; background: var(--collection-frame); }
+.profile-collection-frame::before { content: ''; position: absolute; inset: 4px; border-radius: 8px; background: var(--collection-rim); }
+.profile-collection-art { position: absolute; inset: 9px; overflow: hidden; border-radius: 4px; background: #201426; }
+.profile-collection-art > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.profile-collection-preview-title { position: absolute; inset: auto 0 0; padding: 32px 8px 14px; background: linear-gradient(transparent, #100818ed); color: var(--collection-title); font-family: 'Cinzel', Georgia, serif; font-size: 12px; font-weight: 700; letter-spacing: .035em; line-height: 1.3; text-align: center; text-wrap: balance; overflow-wrap: anywhere; text-shadow: 0 2px 3px #000, 0 0 8px #000b; }
+.profile-cover-dialog { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 24px; border: 0; background: transparent; color: white; overflow-y: auto; font-family: Montserrat, sans-serif; }
+.profile-cover-dialog[open] { display: grid; place-items: center; }
+.profile-cover-dialog::backdrop { background: #090611a6; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); animation: profile-cover-backdrop-in .42s ease both; }
+.profile-cover-dialog-content { position: relative; width: min(340px, 78vw, 49dvh); text-align: center; animation: profile-cover-reveal .42s cubic-bezier(.22, 1, .36, 1) both; }
+.profile-cover-dialog[data-closing] .profile-cover-dialog-content { animation: profile-cover-dismiss .22s ease-in both; pointer-events: none; }
+.profile-cover-dialog[data-closing]::backdrop { animation: profile-cover-backdrop-out .22s ease-in both; }
+.profile-cover-dialog-art.holo-card { display: block; width: 100%; aspect-ratio: 3 / 4; border-radius: 16px; cursor: pointer; }
+.profile-cover-dialog-art:focus-visible { outline: 2px solid #f5d0fe; outline-offset: 10px; }
+.profile-cover-dialog-art .holo-card__face { border-radius: 16px; background: var(--collection-frame); }
+.profile-cover-dialog-art .holo-card__face::before { content: ''; position: absolute; inset: 5px; border-radius: 11px; background: var(--collection-rim); }
+.profile-cover-dialog-art .holo-card__face img, .profile-cover-dialog-art .holo-card__face canvas { inset: 13px; width: calc(100% - 26px); height: calc(100% - 26px); border-radius: 4px; }
+.profile-cover-dialog-art .holo-card__shadow { background: var(--collection-glow); }
+.profile-collection-back-brand { position: absolute; inset: 13px; container-type: inline-size; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none; text-align: center; text-shadow: 0 2px 8px #10081866; }
+.profile-collection-back-logo { color: white; font-family: Montserrat, sans-serif; font-size: 9cqw; font-weight: 900; font-style: italic; line-height: 1; letter-spacing: normal; white-space: nowrap; }
+.profile-collection-back-signature { display: block; width: 49%; aspect-ratio: 2; background: var(--collection-title); mask: url('../assets/profile/mukai-signature.png') center / contain no-repeat; }
+.profile-cover-dialog-content h2 { margin: 26px -12px 0; color: var(--collection-title); font-family: 'Cinzel', Georgia, serif; font-size: clamp(20px, 2.2vw, 28px); font-weight: 600; letter-spacing: .055em; line-height: 1.35; text-wrap: balance; overflow-wrap: anywhere; text-shadow: 0 2px 8px #000, 0 0 22px var(--collection-glow); }
+@keyframes profile-cover-reveal { from { opacity: 0; transform: translateY(20px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes profile-cover-dismiss { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(10px) scale(.97); } }
+@keyframes profile-cover-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes profile-cover-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .profile-cover-dialog[open] .profile-cover-dialog-content, .profile-cover-dialog[open]::backdrop { animation-duration: 1ms; } .profile-collection-preview { transition: none; } }
 .mobile-profile-cover { position: relative; display: block; aspect-ratio: 128 / 176; overflow: hidden; border-radius: 8px; background: #d4d4d8; box-shadow: 0 1px 5px #fff; }
 .mobile-profile-cover > img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
 .mobile-profile-cover:hover > img { transform: scale(1.06); }
@@ -188,7 +254,13 @@
 .mobile-profile-guest a:last-child { border: 1px solid #db2777; background: white; color: #db2777; }
 @media (min-width: 1024px) {
   .public-profile-page .mobile-profile-content { grid-row: 3; }
+  .public-profile-page .mobile-profile-identity-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; align-content: start; }
+  .public-profile-page .mobile-profile-name-row, .public-profile-page .mobile-profile-bio, .public-profile-follows-you { grid-column: 1 / -1; }
+  .public-profile-page .mobile-profile-stats { grid-column: 1; grid-row: 2; align-self: center; width: 100%; }
+  .public-profile-actions { grid-column: 2; grid-row: 2; align-self: center; justify-self: end; width: auto; max-width: none; margin-top: 18px; }
+  .public-profile-actions button { flex: none; min-width: 112px; padding-inline: 16px; }
   .mobile-profile { min-height: 100vh; padding: 0 32px 64px; }
+  .mobile-profile-more { padding-top: 73px; }
   .mobile-profile-shell { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 16px; width: 100%; max-width: 1200px; min-height: 0; padding-bottom: 0; overflow: visible; }
   .mobile-profile-hero { grid-column: 1; height: 310px; overflow: hidden; border-radius: 0 0 20px 20px; }
   .mobile-profile-identity { grid-column: 1; grid-template-columns: 136px minmax(0, 1fr); min-height: 122px; gap: 24px; margin: -95px 32px 0; }
@@ -205,9 +277,10 @@
   .mobile-profile-bio { margin-top: 14px; font-size: 14px; }
   .mobile-profile-promos { grid-column: 1; grid-row: 3; grid-template-columns: repeat(2, minmax(0, 500px)); justify-content: center; align-content: start; gap: 24px; margin: 0; }
   .mobile-profile-promo { height: 112px; }
-  .mobile-profile-balance { top: 15px; left: 46px; width: 132px; height: 41px; padding-left: 18px; font-size: 18px; line-height: 22px; }
+  .mobile-profile-recharge-details { inset: 15px auto 17px 50px; }
+  .mobile-profile-balance { min-height: 41px; font-size: 18px; line-height: 22px; }
   .mobile-profile-coin { width: 27px; height: 27px; }
-  .mobile-profile-recharge-action { left: 50px; bottom: 17px; padding: 8px 20px; font-size: 13px; }
+  .mobile-profile-recharge-action { padding: 8px 20px; font-size: 13px; }
   .mobile-profile-pro-logo { top: 18px; right: 70px; width: 150px; height: 55px; }
   .mobile-profile-pro-promo-action { right: 83px; bottom: 15px; width: 120px; height: 31px; font-size: 14px; }
   .mobile-profile-content { grid-column: 1; grid-row: 4; min-width: 0; min-height: 460px; margin-top: 0; overflow: hidden; border-radius: 16px; background: #fff; box-shadow: 0 4px 18px #0002; }
@@ -218,8 +291,17 @@
   .mobile-profile-panel { padding: 22px 25px 32px; }
   .mobile-profile-posts { gap: 0; margin-top: 0; }
   .mobile-profile-collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 720px; gap: 16px; }
+  .profile-collection-preview-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 190px)); gap: 22px; }
+  .profile-collection-preview-title { font-size: 14px; }
   .mobile-profile-cover-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+  .mobile-profile-cover-title { right: 10px; bottom: 11px; left: 10px; font-size: 16px; line-height: 1.3; }
+  .mobile-profile-cover-badges { position: absolute; top: 7px; right: 7px; display: flex; align-items: center; gap: 4px; }
+  .mobile-profile-cover-badges > span { position: static; font-size: 10px; }
   .mobile-profile-history { gap: 16px; }
+  .mobile-profile-history-card .mobile-profile-chapter-info { padding: 12px 10px; }
+  .mobile-profile-history-card .mobile-profile-chapter-info strong { font-size: 15px; line-height: 1.3; }
+  .mobile-profile-history-card .mobile-profile-chapter-info > span { margin-top: 6px; font-size: 14px; line-height: 1.4; }
+  .mobile-profile-history-card em { left: 10px; }
   .profile-post-community > img, .profile-post-community > video { aspect-ratio: 533 / 360; }
   .profile-post-community > p { font-size: 16px; line-height: 24px; }
   .profile-post-community-actions > button { font-size: 15px; }
@@ -228,3 +310,17 @@
   .public-profile-pro::before { animation: none; }
   .mobile-profile * { transition-duration: 0.01ms !important; }
 }
+
+/* Same quiet pulse as the home hero, with the final profile geometry reserved. */
+.profile-loading-surface, .profile-loading-block, .profile-loading-text,
+.profile-promos-loading .mobile-profile-promo { background-color: rgb(var(--mm-ink) / .1); }
+.profile-priority-image { opacity: 0; transition: opacity .18s ease-out; }
+.profile-priority-image.is-ready { opacity: 1; }
+.profile-loading-text { color: transparent; border-radius: 6px; }
+.profile-loading-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 20px 0; }
+.profile-loading-block { display: block; aspect-ratio: 2 / 3; border-radius: 10px; }
+@media (prefers-reduced-motion: no-preference) {
+  .profile-loading-surface, .profile-loading-block, .profile-loading-text { animation: profile-loading-pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
+}
+@keyframes profile-loading-pulse { 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .profile-priority-image { transition: none; } }

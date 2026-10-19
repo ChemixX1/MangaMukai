@@ -1,12 +1,9 @@
-
 import type { MangaCapitulo } from '../../types/manga';
 import { cleanTitle, isRecentChapter, timeAgoDaysEs } from '../../utils/mangaFormat';
 import { displayViews } from '../../utils/seriesViews';
 import { toTitleCase } from '../../utils/titleCase';
 
 export type Audience = 'women' | 'men';
-
-/* ------------------------------------------------------------------ Datos */
 
 /** Siete mangas por hero (las siete barritas del diseño), con el tipo y hasta cinco géneros (tres en móvil). */
 export const HERO_SIZE = 7;
@@ -73,8 +70,5 @@ export const toLatestMangas = (mangas: MangaCapitulo[]): LatestManga[] =>
       date: timeAgoDaysEs(chapter.fecha),
     })),
   }));
-
-/* ------------------------------------------------------------------- Hero */
-
 
 export interface HomeLayoutProps { womenHero: HeroItem[]; menHero: HeroItem[]; isReady: boolean }

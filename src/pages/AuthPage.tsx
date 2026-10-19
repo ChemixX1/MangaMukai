@@ -26,7 +26,6 @@ import registerGoogleIcon from '../assets/auth/register-google.svg';
 import { AuthUserIcon, AuthMailIcon, AuthBirthdayIcon, AuthCalendarIcon, AuthPeruIcon, AuthPhoneIcon, AuthLockIcon, AuthEyeOffIcon, AuthEyeIcon } from '../components/auth/AuthIcons';
 
 import googleIcon from '../assets/auth/google.svg';
-import { AuthPasswordIcon } from '../components/auth/AuthPasswordIcon';
 import DriftWall, { type DriftWallItem } from '../components/auth/DriftWall';
 
 type CoverItem = SharedAuthCover;
@@ -34,7 +33,7 @@ type CoverItem = SharedAuthCover;
 const FALLBACK_COVERS: CoverItem[] = [
   '54961', '58016', '57841', '57821', '57410', '57266', '56981', '56903',
   '55778', '55446', '55443', '55284', '55281', '55239', '55005', '54977',
-].map((id) => ({ src: `/images/collection/${id}.webp`, title: 'Manga Mukai' }));
+].map((id) => ({ src: `${import.meta.env.BASE_URL}images/collection/${id}.webp`, title: 'Manga Mukai' }));
 
 interface AuthResponse {
   success?: boolean;
@@ -353,7 +352,6 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
   const inputClass = isLight
     ? "border-black/15 bg-white text-black placeholder:text-black/40"
     : "border-white/10 bg-[#111111] text-white placeholder:text-white/40";
-  const PasswordIcon = isLogin ? AuthPasswordIcon : AuthLockIcon;
   const fieldIconClass = isLight ? "text-black" : "text-white";
 
   return (
@@ -411,7 +409,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
               {SOCIAL_AUTH.map((social) => (
                 <a
                   key={social.provider}
-                  href={socialLoginUrl(social.provider)}
+                  href={socialLoginUrl(social.provider, returnTo)}
                   onClick={(event) => {
                     if (loading || success) { event.preventDefault(); return; }
                     rememberSocialReturn(social.provider, returnTo);
@@ -456,7 +454,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
 
                 <AuthField label="Correo electrónico">
                   <span className="relative block">
-                    <AuthMailIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={18} />
+                    <AuthMailIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} size={16} />
                     <input
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
@@ -565,7 +563,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
 
                 <AuthField label="Contraseña">
                   <span className="relative block">
-                    <PasswordIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} />
+                    <AuthLockIcon className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${fieldIconClass}`} />
                     <input
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}

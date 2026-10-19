@@ -1,15 +1,15 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, BookOpen, Heart, Loader2, Send, User, X } from 'lucide-react';
-import { readLocalImage, useExperienceUser, useLocalExperience } from '../hooks/useLocalExperience';
-import { communityImage, communitySeeds, formatCount, handleOf, suggestedReaders, timeAgo, type CommunityComment, type CommunityMangaTag, type CommunityPost } from '../data/communityPosts';
+import { readLocalImage, useExperienceUser } from '../hooks/useLocalExperience';
+import { communityImage, formatCount, handleOf, timeAgo, type CommunityComment, type CommunityMangaTag, type CommunityPost } from '../data/communityPosts';
 import { CommunityIcon } from '../components/community/CommunityIcons';
 import { CommunityProCard, CommunityStoreCard } from '../components/community/CommunityPromotions';
 import { CommunityMangaPicker } from '../components/community/CommunityMangaPicker';
 import PulseHeart from '../components/common/PulseHeart';
 import { useHideOnScrollDown } from '../hooks/useHideOnScrollDown';
-import { openSubscriptionModal } from '../utils/subscriptionModal';
 import '../styles/community.css';
+import { useCommunityFeed } from '../hooks/useCommunityFeed';
 
 type ExperienceUser = ReturnType<typeof useExperienceUser>;
 type Tab = 'recent' | 'popular' | 'following' | 'saved';
@@ -38,9 +38,7 @@ function Community() {
   const author = params.get('autor') || '';
   const query = params.get('q') || '';
   const tab: Tab = ['popular', 'following', 'saved'].includes(params.get('tab') || '') ? params.get('tab') as Tab : 'recent';
-  const [posts, savePosts] = useLocalExperience<CommunityPost[]>(`mm-community-${user.id}`, communitySeeds);
-  const [follows, saveFollows] = useLocalExperience<string[]>(`mm-community-follows-${user.id}`, []);
-  const [error, setError] = useState('');
+  const { posts, follows, error, setError, loading, hasMore, loadMore, publish, update, toggleFollow } = useCommunityFeed(user.id, postId);
   const [notice, setNotice] = useState('');
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -48,15 +46,12 @@ function Community() {
   const [exploring, setExploring] = useState(false);
   const selected = posts.find((post) => post.id === postId);
 
-  const write = (next: CommunityPost[]) => {
-    try { savePosts(next); setError(''); return true; }
-    catch (caught) { setError((caught as Error).message); return false; }
-  };
-  const update = (next: CommunityPost) => write(posts.map((post) => post.id === next.id ? next : post));
-  const toggleFollow = (id: string) => {
-    try { saveFollows(follows.includes(id) ? follows.filter((entry) => entry !== id) : [...follows, id]); setError(''); }
-    catch (caught) { setError((caught as Error).message); }
-  };
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 3500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   const setFilter = (next: Record<string, string>) => {
     if (postId) navigate(`/comunidad?${new URLSearchParams(next)}`);
     else setParams(next);
@@ -80,9 +75,8 @@ function Community() {
   };
   const share = async (post: CommunityPost) => {
     const url = `${window.location.origin}/comunidad/publicacion/${encodeURIComponent(post.id)}`;
-    // Las publicaciones propias aún son locales: compartir su contenido evita enlaces inaccesibles para otros lectores.
-    const shareText = post.demo ? url : `${post.content}${post.manga ? `\n${post.manga.title}\n${window.location.origin}/manga/${post.manga.id}` : ''}\n${window.location.origin}/comunidad`;
-    try { await navigator.clipboard.writeText(shareText); setNotice(post.demo ? 'Enlace de la publicación copiado.' : 'Texto copiado para compartir.'); }
+    const shareText = url;
+    try { await navigator.clipboard.writeText(shareText); setNotice('Enlace de la publicación copiado al portapapeles.'); }
     catch { setNotice(`Puedes copiar y compartir: ${shareText}`); }
   };
   const needle = query.trim().toLocaleLowerCase('es');
@@ -92,84 +86,89 @@ function Community() {
     && (!needle || `${post.content} ${post.name} ${post.manga?.title || ''}`.toLocaleLowerCase('es').includes(needle)))
     .sort((a, b) => tab === 'popular' ? (b.likes + b.comments.length * 2) - (a.likes + a.comments.length * 2)
       : (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0));
-  const readers = <Readers follows={follows} onFollow={toggleFollow} onSelect={(id) => setFilter({ autor: id })} />;
+  const suggestions = [...new Map(posts.filter((post) => post.userId !== user.id).map((post) => [post.userId, { userId: post.userId, name: post.name, avatar: post.avatar }])).values()];
+  const readers = <Readers suggestions={suggestions} follows={follows} onFollow={toggleFollow} onSelect={(id) => setFilter({ autor: id })} />;
 
   return <main className={`community-page${postId ? ' is-thread' : ''}`}>
     <h1 className="sr-only">{postId ? 'Publicación de la comunidad' : 'Comunidad MangaMukai'}</h1>
     <div className="community-shell">
       <aside id="community-navigation" className="community-nav" aria-label="Navegación de comunidad">
         <nav className="community-nav-links">
-          <button type="button" className={!postId && tab === 'recent' && !author && !needle ? 'is-active' : ''} onClick={() => { setFilter({}); setExploring(false); }}><CommunityIcon name="home" size={34} />Inicio</button>
-          <button type="button" onClick={() => { setFilter({}); setExploring(true); window.setTimeout(() => searchRef.current?.focus(), 0); }}><CommunityIcon name="search" size={34} />Explorar</button>
-          <Link to="/mensajes"><CommunityIcon name="messages" size={34} />Mensajes</Link>
-          <button type="button" className={tab === 'saved' ? 'is-active' : ''} onClick={() => setFilter({ tab: 'saved' })}><CommunityIcon name="bookmark" size={34} />Guardados</button>
-          <button type="button" onClick={openSubscriptionModal}><CommunityIcon name="pro" size={34} />MukaiPro</button>
-          <Link to={user.signedIn ? '/perfil' : '/auth/login'}><CommunityIcon name="profile" size={34} />Ver Perfil</Link>
+          <button type="button" className={!postId && tab === 'recent' && !author && !needle && !exploring ? 'is-active' : ''} onClick={() => { setFilter({}); setExploring(false); }}><CommunityIcon name="home" size={30} />Inicio</button>
+          <button type="button" className={exploring || Boolean(needle) ? 'is-active' : ''} onClick={() => { setExploring((prev) => !prev); window.setTimeout(() => searchRef.current?.focus(), 0); }}><CommunityIcon name="search" size={30} />Explorar</button>
+          <Link to="/mensajes"><CommunityIcon name="messages" size={30} />Mensajes</Link>
+          <button type="button" className={tab === 'saved' ? 'is-active' : ''} onClick={() => setFilter({ tab: 'saved' })}><CommunityIcon name="bookmark" size={30} />Guardados</button>
+          <button type="button" onClick={() => navigate('/pro')}><CommunityIcon name="pro" size={30} />MukaiPro</button>
+          <Link to={user.signedIn ? '/profile' : '/auth/login'}><CommunityIcon name="profile" size={30} />Ver Perfil</Link>
         </nav>
-        <button type="button" className="community-publish" onClick={compose}>Publicación</button>
-        <Link to={user.signedIn ? '/perfil' : '/auth/login'} className="community-account"><Avatar src={user.avatar} /><span><strong>{user.name}</strong><small>{handleOf(user.name)}</small></span></Link>
+        <button type="button" className="community-publish" onClick={compose}>Publicar</button>
+        <Link to={user.signedIn ? '/profile' : '/auth/login'} className="community-account"><Avatar src={user.avatar} /><span><strong>{user.name}</strong><small>{handleOf(user.name)}</small></span></Link>
       </aside>
 
       <div className={`community-main${postId ? '' : ' community-main--feed'}`}>
-        {error && <p role="alert" className="community-error">{error}</p>}
+        {loading && <span role="status" aria-label="Cargando comunidad" />}{error && <p role="alert" className="community-error">{error}</p>}
         {notice && <div role="status" className="community-status">{notice}<button type="button" onClick={() => setNotice('')} aria-label="Cerrar aviso"><X size={16} /></button></div>}
         {postId ? selected ? <Thread post={selected} user={user} onBack={goBack} onUpdate={update} onAuthor={showAuthor} onTag={search} onShare={share} replyRef={replyRef} onError={setError} />
-          : <section className="community-empty"><button type="button" className="community-back" onClick={goBack}><ArrowLeft size={20} />Regresar</button><h2>Publicación no disponible</h2><p>Esta publicación no está guardada en este navegador.</p></section>
+          : <section className="community-empty"><button type="button" className="community-back" onClick={goBack}><ArrowLeft size={20} />Regresar</button><h2>Publicación no disponible</h2><p>No se pudo encontrar esta publicación en la comunidad.</p></section>
           : <>
             <div className="community-tabs" role="group" aria-label="Filtrar publicaciones">
-              {([{ id: 'recent', name: 'recent', label: 'Recientes' }, { id: 'popular', name: 'popular', label: 'Populares' }, { id: 'following', name: 'following', label: 'Siguiendo' }] as const).map(({ id, name, label }) => <button key={id} type="button" aria-pressed={tab === id} className={tab === id ? 'is-active' : ''} onClick={() => setFilter(id === 'recent' ? {} : { tab: id })}><CommunityIcon name={name} size={19} />{label}</button>)}
+              {([{ id: 'recent', name: 'recent', label: 'Recientes' }, { id: 'popular', name: 'popular', label: 'Populares' }, { id: 'following', name: 'following', label: 'Siguiendo' }] as const).map(({ id, name, label }) => <button key={id} type="button" aria-label={label} aria-pressed={tab === id} className={tab === id ? 'is-active' : ''} onClick={() => setFilter(id === 'recent' ? {} : { tab: id })}><CommunityIcon name={name} size={19} /><span>{label}</span></button>)}
             </div>
-            <div className={`community-search${exploring || query ? ' is-visible' : ''}`} role="search"><CommunityIcon name="search" size={20} /><input ref={searchRef} type="search" value={query} onChange={(event) => { const next = new URLSearchParams(params); if (event.target.value) next.set('q', event.target.value); else next.delete('q'); setParams(next); }} aria-label="Buscar en la comunidad" placeholder="Buscar publicaciones…" />{query && <button type="button" onClick={() => { const next = new URLSearchParams(params); next.delete('q'); setParams(next); searchRef.current?.focus(); }} aria-label="Limpiar búsqueda"><X size={18} /></button>}</div>
-            <Composer user={user} textareaRef={composerRef} onError={setError} onPost={(post) => {
-              if (!write([post, ...posts])) return false;
+            <div className={`community-search${exploring || query ? ' is-visible' : ''}`} role="search"><CommunityIcon name="search" size={19} /><input ref={searchRef} type="search" value={query} onChange={(event) => { const next = new URLSearchParams(params); if (event.target.value) next.set('q', event.target.value); else next.delete('q'); setParams(next); }} aria-label="Buscar en la comunidad" placeholder="Buscar publicaciones, lectores o #etiquetas…" />{query && <button type="button" onClick={() => { const next = new URLSearchParams(params); next.delete('q'); setParams(next); searchRef.current?.focus(); }} aria-label="Limpiar búsqueda"><X size={17} /></button>}</div>
+            <Composer user={user} textareaRef={composerRef} onError={setError} onPost={async (post) => {
+              if (!await publish(post)) return false;
               setFilter({}); setExploring(false); return true;
             }} />
-            {(author || tab === 'saved' || query) && <div className="community-filter-summary"><span>{author ? `Publicaciones de ${posts.find((post) => post.userId === author)?.name || 'este lector'}` : tab === 'saved' ? 'Publicaciones guardadas' : `Resultados para «${query}»`}</span><button type="button" onClick={() => setFilter({})}>Ver todas</button></div>}
+            {(author || tab === 'saved' || query) && <div className="community-filter-summary"><span>{author ? `Publicaciones de ${posts.find((post) => post.userId === author)?.name || 'este lector'}` : tab === 'saved' ? `Publicaciones guardadas (${feed.length})` : `Resultados para «${query}» (${feed.length})`}</span><button type="button" onClick={() => { setFilter({}); setExploring(false); }}>Ver todas</button></div>}
             <section className="community-feed" aria-label="Publicaciones de la comunidad">
               {feed.map((post, index) => <Fragment key={post.id}>
                 <PostCard post={post} user={user} onUpdate={update} onAuthor={showAuthor} onTag={search} onOpen={openPost} onShare={share} />
                 {index === 1 && <div className="community-mobile-insert"><CommunityStoreCard /></div>}
                 {index === 3 && <div className="community-mobile-insert">{readers}</div>}
               </Fragment>)}
-              {!feed.length && <div className="community-empty"><CommunityIcon name={tab === 'saved' ? 'bookmark' : 'following'} size={30} /><h2>{tab === 'saved' ? 'Aún no tienes guardados' : tab === 'following' ? 'Empieza a seguir lectores' : 'No encontramos publicaciones'}</h2><p>{tab === 'following' ? 'Sigue a un lector para ver sus publicaciones aquí.' : 'Comparte una historia o explora las publicaciones de la comunidad.'}</p><button type="button" onClick={() => setFilter({})}>Ver publicaciones</button></div>}
+              {!loading && !error && !feed.length && <div className="community-empty"><CommunityIcon name={tab === 'saved' ? 'bookmark' : 'following'} size={32} /><h2>{tab === 'saved' ? 'Aún no tienes guardados' : tab === 'following' ? 'Empieza a seguir lectores' : 'No encontramos publicaciones'}</h2><p>{tab === 'following' ? 'Sigue a otros lectores para ver sus publicaciones y recomendaciones aquí.' : tab === 'saved' ? 'Guarda tus publicaciones y reseñas favoritas para leerlas más tarde.' : 'Comparte una historia o explora las conversaciones de la comunidad.'}</p>{(tab !== 'recent' || author || query) && <button type="button" onClick={() => { setFilter({}); setExploring(false); }}>Ver todas las publicaciones</button>}</div>}
               {feed.length < 2 && <div className="community-mobile-insert"><CommunityStoreCard /></div>}
               {feed.length < 4 && <div className="community-mobile-insert">{readers}</div>}
+              {hasMore && <div className="community-load-more"><button type="button" className="community-submit" onClick={() => void loadMore()}>Cargar más publicaciones</button></div>}
             </section>
           </>}
       </div>
-      <aside className="community-sidebar" aria-label="MukaiPro, lectores y tienda"><CommunityProCard /><Readers expandable follows={follows} onFollow={toggleFollow} onSelect={(id) => setFilter({ autor: id })} /><CommunityStoreCard /></aside>
+      <aside className="community-sidebar" aria-label="MukaiPro, lectores y tienda"><CommunityProCard /><Readers expandable suggestions={suggestions} follows={follows} onFollow={toggleFollow} onSelect={(id) => setFilter({ autor: id })} /><CommunityStoreCard /></aside>
     </div>
-    {!postId && <Link to="/mensajes" className={`community-message-fab${mobileBarHidden ? ' is-lowered' : ''}`}><CommunityIcon name="messages" size={23} /><span>Mensajes</span></Link>}
+    {!postId && <Link to="/mensajes" className={`community-message-fab${mobileBarHidden ? ' is-lowered' : ''}`}><CommunityIcon name="messages" size={22} /><span>Mensajes</span></Link>}
   </main>;
 }
 
-function Readers({ follows, onFollow, onSelect, expandable = false }: { follows: string[]; onFollow: (id: string) => void; onSelect: (id: string) => void; expandable?: boolean }) {
+function Readers({ suggestions, follows, onFollow, onSelect, expandable = false }: { suggestions: Array<{ userId: string; name: string; avatar: string }>; follows: string[]; onFollow: (id: string) => void; onSelect: (id: string) => void; expandable?: boolean }) {
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const pages = Math.ceil(suggestedReaders.length / 3);
-  const visibleReaders = expandable ? suggestedReaders.slice(0, expanded ? undefined : 3) : suggestedReaders.slice(page * 3, page * 3 + 3);
+  const pages = Math.ceil(suggestions.length / 3);
+  const visibleReaders = expandable ? suggestions.slice(0, expanded ? undefined : 3) : suggestions.slice(page * 3, page * 3 + 3);
   return <section className="community-readers" aria-label="Lectores sugeridos">
-    <h2>Lectores Sugeridos</h2>
+    <div className="community-readers-header">
+      <h2>Lectores Sugeridos</h2>
+      {pages > 1 && expandable && <button type="button" className="community-more-readers" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Ver menos' : 'Ver todos'}</button>}
+    </div>
     <div className="community-reader-list">{visibleReaders.map((reader) => <div className="community-reader" key={reader.userId}>
       <button type="button" onClick={() => onSelect(reader.userId)} aria-label={`Ver publicaciones de ${reader.name}`}><Avatar src={reader.avatar} /></button>
       <button type="button" className="community-reader-name" onClick={() => onSelect(reader.userId)}><strong>{reader.name}</strong><small>{handleOf(reader.name)}</small></button>
       <button type="button" className="community-follow" aria-pressed={follows.includes(reader.userId)} aria-label={`${follows.includes(reader.userId) ? 'Dejar de seguir a' : 'Seguir a'} ${reader.name}`} onClick={() => onFollow(reader.userId)}>{follows.includes(reader.userId) ? 'Siguiendo' : 'Seguir'}</button>
     </div>)}</div>
-    {pages > 1 && (expandable ? <button type="button" className="community-more-readers" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Mostrar menos' : 'Mostrar más'}</button> : <div className="community-reader-pages" aria-label="Páginas de lectores">{Array.from({ length: pages }, (_, index) => <button key={index} type="button" className={page === index ? 'is-active' : ''} aria-label={`Lectores, página ${index + 1}`} aria-pressed={page === index} onClick={() => setPage(index)} />)}</div>)}
+    {pages > 1 && !expandable && <div className="community-reader-pages" aria-label="Páginas de lectores">{Array.from({ length: pages }, (_, index) => <button key={index} type="button" className={page === index ? 'is-active' : ''} aria-label={`Lectores, página ${index + 1}`} aria-pressed={page === index} onClick={() => setPage(index)} />)}</div>}
   </section>;
 }
 
-function AttachmentTools({ onImage, onGif, onManga, onEmoji, disabled = false }: { onImage: () => void; onGif: () => void; onManga?: () => void; onEmoji: () => void; disabled?: boolean }) {
+function AttachmentTools({ onImage, onGif, onManga, onEmoji, activeManga = false, activeEmoji = false, disabled = false }: { onImage: () => void; onGif: () => void; onManga?: () => void; onEmoji: () => void; activeManga?: boolean; activeEmoji?: boolean; disabled?: boolean }) {
   return <div className="community-attachments">
-    <button type="button" disabled={disabled} onClick={onImage} aria-label="Añadir imagen" title="Añadir imagen"><CommunityIcon name="image" size={26} /></button>
-    <button type="button" disabled={disabled} onClick={onGif} aria-label="Añadir GIF" title="Añadir GIF"><CommunityIcon name="gif" size={26} /></button>
-    {onManga && <button type="button" onClick={onManga} aria-label="Etiquetar manga o capítulo" title="Etiquetar manga o capítulo"><CommunityIcon name="manga" size={27} /></button>}
-    <button type="button" onClick={onEmoji} aria-label="Añadir emoji" title="Añadir emoji"><CommunityIcon name="emoji" size={23} /></button>
+    <button type="button" disabled={disabled} onClick={onImage} aria-label="Añadir imagen" title="Añadir imagen"><CommunityIcon name="image" size={22} /></button>
+    <button type="button" disabled={disabled} onClick={onGif} aria-label="Añadir GIF" title="Añadir GIF"><CommunityIcon name="gif" size={22} /></button>
+    {onManga && <button type="button" className={activeManga ? 'is-active' : ''} onClick={onManga} aria-label="Recomendar manga o capítulo" title="Recomendar manga o capítulo"><CommunityIcon name="manga" size={23} /></button>}
+    <button type="button" className={activeEmoji ? 'is-active' : ''} onClick={onEmoji} aria-label="Añadir emoji" title="Añadir emoji"><CommunityIcon name="emoji" size={21} /></button>
   </div>;
 }
 
 function EmojiChoices({ onPick }: { onPick: (emoji: string) => void }) {
-  return <div className="community-emoji-picker" role="group" aria-label="Elegir emoji">{['🌸', '❤️', '😂', '😍', '✨', '🔥', '😭', '📚'].map((emoji) => <button type="button" key={emoji} onClick={() => onPick(emoji)} aria-label={`Insertar ${emoji}`}>{emoji}</button>)}</div>;
+  return <div className="community-emoji-picker" role="group" aria-label="Elegir emoji">{['🌸', '❤️', '😂', '😍', '✨', '🔥', '😭', '📚', '👏', '🤯'].map((emoji) => <button type="button" key={emoji} onClick={() => onPick(emoji)} aria-label={`Insertar ${emoji}`}>{emoji}</button>)}</div>;
 }
 
 async function readAttachment(file: File) {
@@ -184,10 +183,10 @@ async function readAttachment(file: File) {
 }
 
 function AttachmentPreview({ image, onRemove }: { image: string; onRemove: () => void }) {
-  return <div className="community-attachment-preview"><img src={image} alt="Imagen adjunta" /><button type="button" onClick={onRemove} aria-label="Quitar imagen"><X size={18} /></button></div>;
+  return <div className="community-attachment-preview"><img src={image} alt="Imagen adjunta" /><button type="button" onClick={onRemove} aria-label="Quitar imagen"><X size={16} /></button></div>;
 }
 
-function Composer({ user, textareaRef, onPost, onError }: { user: ExperienceUser; textareaRef: RefObject<HTMLTextAreaElement | null>; onPost: (post: CommunityPost) => boolean; onError: (message: string) => void }) {
+function Composer({ user, textareaRef, onPost, onError }: { user: ExperienceUser; textareaRef: RefObject<HTMLTextAreaElement | null>; onPost: (post: CommunityPost) => Promise<boolean>; onError: (message: string) => void }) {
   const [text, setText] = useState('');
   const [image, setImage] = useState('');
   const [manga, setManga] = useState<CommunityMangaTag | null>(null);
@@ -197,24 +196,45 @@ function Composer({ user, textareaRef, onPost, onError }: { user: ExperienceUser
   const fileRef = useRef<HTMLInputElement>(null);
   const selectFile = (gif = false) => { if (fileRef.current) { fileRef.current.accept = gif ? 'image/gif' : 'image/jpeg,image/png,image/webp'; fileRef.current.click(); } };
   const canPost = !!(text.trim() || image || manga) && !reading;
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
     if (!canPost) return;
-    if (onPost({ id: crypto.randomUUID(), userId: user.id, name: user.name, avatar: user.avatar, content: text.trim(), image, manga: manga || undefined, likes: 0, comments: [], createdAt: new Date().toISOString(), views: 0 })) {
+    setReading(true);
+    if (await onPost({ id: crypto.randomUUID(), userId: user.id, name: user.name, avatar: user.avatar, content: text.trim(), image, manga: manga || undefined, likes: 0, comments: [], createdAt: new Date().toISOString(), views: 0 })) {
       setText(''); setImage(''); setManga(null); setPicking(false); setEmoji(false);
       if (textareaRef.current) textareaRef.current.style.height = '';
     }
+    setReading(false);
   };
   return <form className="community-composer" onSubmit={submit}>
     <Avatar src={user.avatar} />
     <div className="community-composer-body">
-      <textarea ref={textareaRef} aria-label="Nueva publicación" placeholder="¿Qué estás pensando?" rows={1} maxLength={MAX_LENGTH} value={text} onChange={(event) => { setText(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${event.target.scrollHeight}px`; }} />
+      <textarea
+        ref={textareaRef}
+        aria-label="Nueva publicación"
+        placeholder="¿Qué estás leyendo o pensando hoy?"
+        rows={1}
+        maxLength={MAX_LENGTH}
+        value={text}
+        onKeyDown={(event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            void submit();
+          }
+        }}
+        onChange={(event) => { setText(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${event.target.scrollHeight}px`; }}
+      />
       {image && <AttachmentPreview image={image} onRemove={() => setImage('')} />}
-      {manga && <div className="community-draft-manga"><MangaAttachment manga={manga} /><button type="button" onClick={() => setManga(null)} aria-label="Quitar recomendación"><X size={18} /></button><button type="button" onClick={() => setManga({ ...manga, showCover: !manga.showCover })}>{manga.showCover ? 'Ocultar portada' : 'Mostrar portada'}</button></div>}
+      {manga && <div className="community-draft-manga"><MangaAttachment manga={manga} /><div className="community-draft-manga-actions"><button type="button" onClick={() => setManga({ ...manga, showCover: !manga.showCover })}>{manga.showCover ? 'Ocultar portada' : 'Mostrar portada'}</button><button type="button" onClick={() => setManga(null)} aria-label="Quitar recomendación"><X size={15} />Quitar</button></div></div>}
       {picking && <CommunityMangaPicker onPick={(tag) => { setManga(tag); setPicking(false); }} onClose={() => setPicking(false)} />}
       {emoji && <EmojiChoices onPick={(value) => { setText((text) => `${text}${value}`.slice(0, MAX_LENGTH)); setEmoji(false); textareaRef.current?.focus(); }} />}
-      <div className="community-compose-tools"><AttachmentTools onImage={() => selectFile()} onGif={() => selectFile(true)} onManga={() => setPicking(!picking)} onEmoji={() => setEmoji(!emoji)} disabled={reading} /><button type="submit" disabled={!canPost} className="community-submit">{reading ? <Loader2 size={18} className="animate-spin" /> : 'Publicar'}</button></div>
-      {text.length > 900 && <small className="community-character-count">{text.length}/{MAX_LENGTH}</small>}
+      <div className="community-compose-tools">
+        <AttachmentTools onImage={() => selectFile()} onGif={() => selectFile(true)} onManga={() => { setPicking(!picking); setEmoji(false); }} onEmoji={() => { setEmoji(!emoji); setPicking(false); }} activeManga={picking || Boolean(manga)} activeEmoji={emoji} disabled={reading} />
+        <div className="community-compose-submit-wrap">
+          {text.length > 0 && <small className={`community-character-count${text.length > 900 ? ' is-near-limit' : ''}`}>{text.length}/{MAX_LENGTH}</small>}
+          <button type="submit" disabled={!canPost} className="community-submit">{reading ? <Loader2 size={17} className="animate-spin" /> : 'Publicar'}</button>
+        </div>
+      </div>
       <input ref={fileRef} hidden type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={async (event) => {
         const input = event.currentTarget; const file = input.files?.[0]; if (!file) return;
         setReading(true);
@@ -234,22 +254,23 @@ function PostText({ content, onTag, detailPath }: { content: string; onTag: (tag
 
 function MangaAttachment({ manga }: { manga: CommunityMangaTag }) {
   return <Link to={manga.chapterId ? `/read/${manga.chapterId}` : `/manga/${manga.id}`} className="community-manga-attachment">
-    {manga.showCover && manga.cover ? <img src={manga.cover} alt="" loading="lazy" /> : <BookOpen size={24} />}
-    <span><small>Manga recomendado</small><strong>{manga.title}</strong>{manga.chapterLabel && <small>{manga.chapterLabel}</small>}</span><ArrowUpRight size={16} />
+    {manga.showCover && manga.cover ? <img src={manga.cover} alt="" loading="lazy" /> : <span className="community-manga-attachment__icon"><BookOpen size={20} /></span>}
+    <span><strong>{manga.title}</strong>{manga.chapterLabel && <small>{manga.chapterLabel}</small>}</span>
+    <span className="community-manga-attachment__arrow"><ArrowUpRight size={16} /></span>
   </Link>;
 }
 
-function PostActions({ post, onUpdate, onComment, onShare, detail = false }: { post: CommunityPost; onUpdate: (post: CommunityPost) => boolean; onComment: () => void; onShare: (post: CommunityPost) => void; detail?: boolean }) {
+function PostActions({ post, onUpdate, onComment, onShare, detail = false }: { post: CommunityPost; onUpdate: (post: CommunityPost) => Promise<boolean>; onComment: () => void; onShare: (post: CommunityPost) => void; detail?: boolean }) {
   return <div className="community-post-actions">
-    <button type="button" className="community-action" onClick={onComment} aria-label="Comentar"><CommunityIcon name="comment" size={24} /><span>{formatCount(post.comments.length)}</span></button>
+    <button type="button" className="community-action" onClick={onComment} aria-label="Comentar"><CommunityIcon name="comment" size={21} /><span>{formatCount(post.commentCount ?? post.comments.length)}</span></button>
     <PulseHeart
       liked={!!post.liked}
       count={post.likes}
-      onChange={(liked, count) => onUpdate({ ...post, liked, likes: Math.max(0, count) })}
+      onChange={(liked, count) => { void onUpdate({ ...post, liked, likes: Math.max(0, count) }); }}
       showCount
       icon="heart"
       idleOutline
-      size={22}
+      size={20}
       corner={32}
       likedColor="var(--community-accent)"
       idleColor="var(--community-muted)"
@@ -263,14 +284,14 @@ function PostActions({ post, onUpdate, onComment, onShare, detail = false }: { p
       label="Me gusta"
       className="community-pulse-like"
     />
-    {!detail && <span className="community-views" aria-label={`${post.views || 0} visualizaciones`}><CommunityIcon name="views" size={18} />{formatCount(post.views || 0)}</span>}
+    {!detail && <span className="community-views" aria-label={`${post.views || 0} visualizaciones`}><CommunityIcon name="views" size={17} /><span>{formatCount(post.views || 0)}</span></span>}
     <span className="community-action-spacer" />
-    <button type="button" className={`community-action${post.saved ? ' is-active' : ''}`} aria-label="Guardar" aria-pressed={!!post.saved} onClick={() => onUpdate({ ...post, saved: !post.saved })}><CommunityIcon name="bookmark" size={26} />{detail && <span>{post.saved ? 1 : 0}</span>}</button>
-    <button type="button" className="community-action" aria-label="Compartir publicación" onClick={() => onShare(post)}><CommunityIcon name="share" size={24} /></button>
+    <button type="button" className={`community-action${post.saved ? ' is-active' : ''}`} aria-label="Guardar" aria-pressed={!!post.saved} onClick={() => onUpdate({ ...post, saved: !post.saved })}><CommunityIcon name="bookmark" size={22} />{detail && <span>{post.saved ? 'Guardado' : 'Guardar'}</span>}</button>
+    <button type="button" className="community-action" aria-label="Compartir publicación" onClick={() => onShare(post)}><CommunityIcon name="share" size={21} /></button>
   </div>;
 }
 
-type PostProps = { post: CommunityPost; user: ExperienceUser; onUpdate: (post: CommunityPost) => boolean; onAuthor: (post: CommunityPost) => void; onTag: (tag: string) => void; onShare: (post: CommunityPost) => void };
+type PostProps = { post: CommunityPost; user: ExperienceUser; onUpdate: (post: CommunityPost) => Promise<boolean>; onAuthor: (post: CommunityPost) => void; onTag: (tag: string) => void; onShare: (post: CommunityPost) => void };
 
 function PostCard({ post, user, onUpdate, onAuthor, onTag, onOpen, onShare }: PostProps & { onOpen: (post: CommunityPost, focusReply?: boolean) => void }) {
   const own = post.userId === user.id;
@@ -278,7 +299,14 @@ function PostCard({ post, user, onUpdate, onAuthor, onTag, onOpen, onShare }: Po
   return <article className="community-post">
     <button type="button" className="community-post-author-avatar" onClick={() => onAuthor(post)} aria-label={`Publicaciones de ${name}`}><Avatar src={own ? user.avatar : post.avatar} /></button>
     <div className="community-post-body">
-      <div className="community-post-heading"><button type="button" onClick={() => onAuthor(post)}><strong>{name}</strong><small>{handleOf(name)}</small></button><time dateTime={post.createdAt}>{timeAgo(post.createdAt)}</time></div>
+      <div className="community-post-heading">
+        <button type="button" onClick={() => onAuthor(post)}>
+          <strong>{name}</strong>
+          <small>{handleOf(name)}</small>
+        </button>
+        <span className="community-post-dot" aria-hidden="true">·</span>
+        <time dateTime={post.createdAt}>{timeAgo(post.createdAt)}</time>
+      </div>
       <PostText content={post.content} onTag={onTag} detailPath={`/comunidad/publicacion/${encodeURIComponent(post.id)}`} />
       {post.image && <button type="button" className="community-image-link" onClick={() => onOpen(post)} aria-label="Ver publicación e imagen"><img src={communityImage(post.image)} alt="Imagen de la publicación" className="community-post-image" loading="lazy" /></button>}
       {post.manga && <MangaAttachment manga={post.manga} />}
@@ -293,27 +321,40 @@ function Thread({ post, user, onBack, onUpdate, onAuthor, onTag, onShare, replyR
   const date = post.createdAt && Number.isFinite(Date.parse(post.createdAt)) ? new Date(post.createdAt) : null;
   const likeReply = (index: number) => onUpdate({ ...post, comments: post.comments.map((entry, position) => position === index ? { ...entry, liked: !entry.liked, likes: Math.max(0, (entry.likes || 0) + (entry.liked ? -1 : 1)) } : entry) });
   return <section className="community-thread">
-    <button type="button" className="community-back" onClick={onBack}><ArrowLeft size={21} />Regresar</button>
+    <div className="community-thread-topbar">
+      <button type="button" className="community-back" onClick={onBack}><ArrowLeft size={20} /><span>Hilo de la comunidad</span></button>
+    </div>
     <article className="community-thread-post">
       <button type="button" className="community-thread-author" onClick={() => onAuthor(post)}><Avatar src={avatar} /><span><strong>{name}</strong><small>{handleOf(name)}</small></span></button>
       <PostText content={post.content} onTag={onTag} />
       {post.image && <img src={communityImage(post.image)} alt="Imagen de la publicación" className="community-post-image" />}
       {post.manga && <MangaAttachment manga={post.manga} />}
-      <div className="community-thread-meta">{date && <time dateTime={post.createdAt}>{date.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' })} · {date.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' })}</time>}<span className="community-views"><CommunityIcon name="views" size={21} /><strong>{formatCount(post.views || 0)}</strong> Visualizaciones</span></div>
+      <div className="community-thread-meta">{date && <time dateTime={post.createdAt}>{date.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' })} · {date.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' })}</time>}<span className="community-views"><CommunityIcon name="views" size={18} /><strong>{formatCount(post.views || 0)}</strong> Visualizaciones</span></div>
       <PostActions post={post} onUpdate={onUpdate} onComment={() => replyRef.current?.focus()} onShare={onShare} detail />
     </article>
     <section className="community-replies" aria-label="Respuestas a la publicación">
-      {post.comments.map((entry, index) => <article className="community-reply" key={entry.id || index}>
+      <h3 className="community-replies-title">Respuestas <span>({post.comments.length})</span></h3>
+      {post.comments.length === 0 ? (
+        <p className="community-replies-empty">Sé el primero en responder a esta publicación.</p>
+      ) : post.comments.map((entry, index) => <article className="community-reply" key={entry.id || index}>
         <Avatar src={entry.avatar || (entry.name === user.name ? user.avatar : undefined)} />
-        <div className="community-reply-content"><strong>{entry.name}</strong><small>{handleOf(entry.name)}</small><p>{entry.text}</p>{entry.image && <img src={entry.image} alt="Imagen de la respuesta" className="community-post-image" />}</div>
-        <button type="button" className={`community-action${entry.liked ? ' is-active' : ''}`} onClick={() => likeReply(index)} aria-pressed={!!entry.liked} aria-label="Me gusta la respuesta"><Heart size={17} fill={entry.liked ? 'currentColor' : 'none'} />{entry.likes || ''}</button>
+        <div className="community-reply-content">
+          <div className="community-reply-header">
+            <strong>{entry.name}</strong>
+            <small>{handleOf(entry.name)}</small>
+            {entry.createdAt && <time dateTime={entry.createdAt}>· {timeAgo(entry.createdAt)}</time>}
+          </div>
+          <p>{entry.text}</p>
+          {entry.image && <img src={entry.image} alt="Imagen de la respuesta" className="community-post-image" />}
+        </div>
+        <button type="button" className={`community-action${entry.liked ? ' is-active' : ''}`} onClick={() => likeReply(index)} aria-pressed={!!entry.liked} aria-label="Me gusta la respuesta"><Heart size={16} fill={entry.liked ? 'currentColor' : 'none'} />{entry.likes ? <span>{entry.likes}</span> : null}</button>
       </article>)}
     </section>
     <ReplyComposer key={post.id} user={user} textareaRef={replyRef} onError={onError} onReply={(reply) => onUpdate({ ...post, comments: [...post.comments, reply] })} />
   </section>;
 }
 
-function ReplyComposer({ user, textareaRef, onReply, onError }: { user: ExperienceUser; textareaRef: RefObject<HTMLTextAreaElement | null>; onReply: (reply: CommunityComment) => boolean; onError: (error: string) => void }) {
+function ReplyComposer({ user, textareaRef, onReply, onError }: { user: ExperienceUser; textareaRef: RefObject<HTMLTextAreaElement | null>; onReply: (reply: CommunityComment) => Promise<boolean>; onError: (error: string) => void }) {
   const [text, setText] = useState('');
   const [image, setImage] = useState('');
   const [emoji, setEmoji] = useState(false);
@@ -321,19 +362,36 @@ function ReplyComposer({ user, textareaRef, onReply, onError }: { user: Experien
   const [expanded, setExpanded] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const selectFile = (gif = false) => { if (fileRef.current) { fileRef.current.accept = gif ? 'image/gif' : 'image/jpeg,image/png,image/webp'; fileRef.current.click(); } };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
     if ((!text.trim() && !image) || reading) return;
-    if (onReply({ id: crypto.randomUUID(), userId: user.id, name: user.name, avatar: user.avatar, text: text.trim(), image, likes: 0, createdAt: new Date().toISOString() })) { setText(''); setImage(''); setEmoji(false); if (textareaRef.current) textareaRef.current.style.height = ''; textareaRef.current?.focus(); }
+    setReading(true);
+    if (await onReply({ id: crypto.randomUUID(), userId: user.id, name: user.name, avatar: user.avatar, text: text.trim(), image, likes: 0, createdAt: new Date().toISOString() })) { setText(''); setImage(''); setEmoji(false); setExpanded(false); if (textareaRef.current) textareaRef.current.style.height = ''; }
+    setReading(false);
   };
   return <form className={`community-reply-bar${expanded ? ' is-expanded' : ''}`} onSubmit={submit}>
     <Avatar src={user.avatar} />
     <div className="community-reply-content">
       {image && <AttachmentPreview image={image} onRemove={() => setImage('')} />}
       {emoji && <EmojiChoices onPick={(value) => { setText((text) => `${text}${value}`.slice(0, 500)); setEmoji(false); textareaRef.current?.focus(); }} />}
-      <textarea ref={textareaRef} rows={expanded ? 2 : 1} maxLength={500} aria-label="Tu respuesta" placeholder="Respuesta" value={text} onFocus={() => setExpanded(true)} onChange={(event) => { setText(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${event.target.scrollHeight}px`; }} />
+      <textarea
+        ref={textareaRef}
+        rows={expanded ? 2 : 1}
+        maxLength={500}
+        aria-label="Tu respuesta"
+        placeholder="Escribe una respuesta…"
+        value={text}
+        onFocus={() => setExpanded(true)}
+        onKeyDown={(event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            void submit();
+          }
+        }}
+        onChange={(event) => { setText(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${event.target.scrollHeight}px`; }}
+      />
     </div>
-    <div className="community-reply-tools"><AttachmentTools onImage={() => selectFile()} onGif={() => selectFile(true)} onEmoji={() => setEmoji(!emoji)} disabled={reading} />{(text.trim() || image || reading) && <button className="community-send" type="submit" disabled={reading} aria-label="Publicar respuesta">{reading ? <Loader2 size={21} className="animate-spin" /> : <Send size={21} />}</button>}</div>
+    <div className="community-reply-tools"><AttachmentTools onImage={() => selectFile()} onGif={() => selectFile(true)} onEmoji={() => setEmoji(!emoji)} activeEmoji={emoji} disabled={reading} />{(text.trim() || image || reading) && <button className="community-send" type="submit" disabled={reading} aria-label="Publicar respuesta">{reading ? <Loader2 size={18} className="animate-spin" /> : <Send size={17} />}</button>}</div>
     <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png,image/webp,image/gif" onChange={async (event) => {
       const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setReading(true);
       try { setImage(await readAttachment(file)); onError(''); } catch (caught) { onError((caught as Error).message); }
