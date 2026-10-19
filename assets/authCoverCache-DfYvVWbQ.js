@@ -1,0 +1,1 @@
+let n=null;const h=()=>n,u=(e,r=Number.POSITIVE_INFINITY)=>{const a=new Set,t=[];for(const o of e){const s=o.portada?.trim();if(!(!s||a.has(s))&&(a.add(s),t.push({src:s,title:o.titulo||"Manga Mukai"}),t.length>=r))break}return t.length>(n?.length??0)&&(n=t),t},c=e=>{e.length>0&&(n=e)};export{c as a,h as g,u as s};

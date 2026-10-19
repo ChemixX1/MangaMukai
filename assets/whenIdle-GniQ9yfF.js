@@ -1,0 +1,1 @@
+const t=(e,l=2e3)=>{if(typeof window>"u")return()=>{};if(typeof window.requestIdleCallback=="function"){const o=window.requestIdleCallback(e,{timeout:l});return()=>window.cancelIdleCallback(o)}const n=globalThis.setTimeout(e,200);return()=>globalThis.clearTimeout(n)};export{t as w};
