@@ -1,5 +1,5 @@
 import { HERO_TRANSITION_SECONDS, HERO_COVER_EASE } from '../home/heroMotion';
-import { HERO_TAG_CLASS, HERO_TAG_ROW } from '../home/heroTagStyles';
+import { HERO_TAG_CLASS, HERO_TAG_ROW, HERO_TITLE_CLASS } from '../home/heroTagStyles';
 import { toTitleCase } from '../../utils/titleCase';
 import { CollectionHeroActions } from './CollectionHeroActions';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -135,7 +135,7 @@ export function AdultHeroCoverflow({
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="bg-[#FF6B00] px-3 py-1.5 font-montserrat text-[10px] font-semibold uppercase tracking-normal text-white">Mangas para mujeres +19</span>
             </div>
-            <h2 className="line-clamp-3 text-[clamp(1.2rem,1.9vw,1.95rem)] font-black italic leading-[1.1] tracking-[-0.04em]">{title}</h2>
+            <h2 className={HERO_TITLE_CLASS}>{title}</h2>
 
             <div className={`manga-tag-row mt-5 flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${HERO_TAG_ROW}`}>
               {tags.map((tag) => <span key={tag} className={HERO_TAG_CLASS} style={{ backgroundColor: '#ff6b00', borderColor: '#ff6b00' }}>{tag}</span>)}

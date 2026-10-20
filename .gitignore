@@ -13,11 +13,9 @@ dist-pages
 dist-ssr
 *.local
 
-# Environment and local backups
 .env
 *_quarantine_/
 
-# Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -28,7 +26,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Backend and Data dumps
+# Backend and  dumps
 .env
 *.php
 *.json
@@ -45,6 +43,6 @@ dist-ssr
 !tsconfig.node.json
 !.vscode/extensions.json
 
-# Clave compartida de la herramienta local de moderacion (se genera sola; se publica con el deploy, nunca a git)
+# Clave compartida de la herramienta local de moderacion (se genera sola; se publica con el deploy
 server/wp-content/mu-plugins/mangamukai-moderation-key.php
 backend/wp-content/mu-plugins/mangamukai-moderation-key.php

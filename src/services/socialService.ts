@@ -315,6 +315,34 @@ export const markConversationRead = async (userId: number): Promise<void> => {
 let notificationsCache: SocialNotification[] | null = null;
 export const getCachedNotifications = () => notificationsCache;
 
+// Local preview only: never send deletion requests to the production proxy.
+const localNotificationPreview = () => import.meta.env.DEV && typeof window !== 'undefined'
+  && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+const previewDeletionKey = () => `mm_notification_preview_deleted:${getStoredUser()?.id ?? 'guest'}`;
+const previewDeleted = new Map<string, number>();
+const previewCutoff = () => {
+  const key = previewDeletionKey();
+  try { return Math.max(previewDeleted.get(key) ?? 0, Number(localStorage.getItem(key)) || 0); }
+  catch { return previewDeleted.get(key) ?? 0; }
+};
+
+export const deleteNotifications = async (throughId: number): Promise<void> => {
+  if (localNotificationPreview()) {
+    const cutoff = Math.max(previewCutoff(), throughId);
+    const key = previewDeletionKey();
+    previewDeleted.set(key, cutoff);
+    try { localStorage.setItem(key, String(cutoff)); } catch { /* Keep the session preview usable. */ }
+    notificationsCache = notificationsCache?.filter(item => item.id > cutoff) ?? null;
+    return;
+  }
+  const response = await fetch(`${MANGAMUKAI_API}/social/notifications/delete`, {
+    method: 'POST', credentials: 'include', headers: authHeaders(true),
+    body: JSON.stringify({ through_id: throughId }),
+  });
+  await ensureResponse(response);
+  notificationsCache = notificationsCache?.filter(item => item.id > throughId) ?? null;
+};
+
 export const getNotifications = async (): Promise<{ notifications: SocialNotification[]; unread: number }> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/notifications?limit=30`, {
     cache: 'no-store',
@@ -322,8 +350,10 @@ export const getNotifications = async (): Promise<{ notifications: SocialNotific
     headers: authHeaders(),
   });
   const payload = await ensureResponse(response);
-  notificationsCache = payload.notifications || [];
-  return { notifications: notificationsCache, unread: Number(payload.unread_count || 0) };
+  const localPreview = localNotificationPreview();
+  const cutoff = localPreview ? previewCutoff() : 0;
+  notificationsCache = (payload.notifications || []).filter(item => item.id > cutoff);
+  return { notifications: notificationsCache, unread: localPreview ? notificationsCache.filter(item => !item.read).length : Number(payload.unread_count || 0) };
 };
 
 export const markNotificationsRead = async (id?: number): Promise<void> => {

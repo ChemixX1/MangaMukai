@@ -9,7 +9,7 @@ cuentas se conectan con WordPress.
 
 Para usar, modificar o publicar el código y el diseño propios del proyecto,
 solicita permiso al dueño y espera su autorización por escrito. Puedes hacerlo
-desde [Contacto](https://mangamukai.com/contacto). Las condiciones completas
+desde el siguiente correo electrónico: Jose.1manuel2k@gmail.co. Las condiciones completas
 están en [LICENSE]. Los recursos de terceros conservan sus licencias.
 
 ## Desarrollo

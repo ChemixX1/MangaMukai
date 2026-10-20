@@ -264,19 +264,21 @@ export const CoinMarketPage = () => {
     <main className={`coin-market-page coin-recharge${isPaymentPage ? ' coin-recharge--payment' : ''}`}>
       <div className="coin-recharge__content">
         {!isPaymentPage && <header className="coin-recharge__header">
-          <h1 className="coin-recharge__title">Recargar <span>Monedas</span></h1>
+          <h1 className="coin-recharge__title"><span className="coin-recharge__title-desktop">Recargar Monedas</span><span className="coin-recharge__title-mobile">Recarga</span></h1>
         </header>}
         <div className="coin-recharge__layout">
           {!isPaymentPage && <section className="coin-recharge__packs" aria-label="Paquetes de monedas">
             {COIN_PACKS.map((option) => (
-              <button key={option.id} className="coin-pack" type="button" aria-pressed={pack.id === option.id} disabled={pending} onClick={() => selectPack(option.id)}>
+              <button key={option.id} className="coin-pack" data-coins={option.coins} type="button" aria-pressed={pack.id === option.id} disabled={pending} onClick={() => selectPack(option.id)}>
                 <span className="coin-pack__name">
                   <span className="coin-pack__amount">{option.coins.toLocaleString('es-PE')}</span>
                   <span className="coin-pack__unit">Monedas</span>
                 </span>
                 <img className="coin-pack__art" src={option.image} alt="" width="168" height="120" decoding="async" loading="eager" />
-                <span className="coin-pack__price">$ {option.price.toFixed(2)}</span>
-                {option.sale && <img className="coin-pack__sale" src={saleIcon} alt="Oferta" />}
+                <span className="coin-pack__price">
+                  $ {option.price.toFixed(2)}
+                  {option.sale && <img className="coin-pack__sale" src={saleIcon} alt="Oferta" />}
+                </span>
               </button>
             ))}
           </section>}

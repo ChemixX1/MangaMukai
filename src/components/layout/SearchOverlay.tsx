@@ -27,7 +27,7 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
   const text = isLight ? 'text-black' : 'text-white';
 
   return (
-    <SlidePanel open={open} from="right" isLight={isLight} label="Buscar manga" onClose={onClose} scrollable={false}>
+    <SlidePanel open={open} from="right" isLight={isLight} label="Buscar manga" onClose={onClose} scrollable={false} animateOnOpen>
       <div className={`search-layout ${isLight ? 'search-light' : 'search-dark'}`}>
         <aside className="search-banner" aria-hidden="true"><img src={searchBanners.left} alt="" /></aside>
         <div ref={centerRef} className="search-center">

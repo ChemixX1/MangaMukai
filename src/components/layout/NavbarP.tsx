@@ -49,7 +49,6 @@ export function NavbarP({ model }: NavbarViewProps) {
           >
 
             <AlarmIcon size={18.48} className={`-translate-x-[0.35px] translate-y-[0.4px] ${isTimerActive ? 'animate-pulse' : ''}`} />
-            {isTimerActive && <span className="absolute -right-1 -top-1 h-2 w-2 animate-ping rounded-full border border-[#02040a] bg-[#ff4a7d]" />}
           </button>
           <button
             type="button"

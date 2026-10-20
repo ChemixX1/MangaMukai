@@ -8,7 +8,6 @@ import { CollectionCoverPreview } from '../components/social/CollectionCoverPrev
 import { SlidePanel } from '../components/layout/SlidePanel';
 import { OPEN_TIMER_EVENT } from '../components/layout/useNavbarState';
 import { MoonIcon, SunIcon } from '../components/ui';
-import { SOCIAL_LINKS } from '../config/social';
 import { wordpressUrl } from '../config/api';
 import { useTheme } from '../hooks/useTheme';
 import { AUTH_CHANGED_EVENT, clearAuth, getStoredToken, getStoredUser, type MMUser } from '../services/authService';
@@ -46,8 +45,7 @@ type Tab = 'collection' | 'posts' | 'saved' | 'likes' | 'history';
 type LibraryFilter = 'objects' | 'covers' | 'purchased' | 'series' | 'chapters';
 type MenuSection = 'main' | 'security' | 'information' | 'account';
 const footerInfoLinks = [
-  { label: 'Sobre Nosotros', to: '/nosotros' },
-  { label: 'Recibe ayuda', href: SOCIAL_LINKS.discord },
+  { label: 'Recibe ayuda', href: 'https://wa.me/51926615198' },
   { label: 'Política de Privacidad', to: '/privacidad' },
   { label: 'Términos de Servicio', to: '/terminos' },
   { label: 'Normas de la Comunidad', to: '/normas-comunidad' },

@@ -1,4 +1,5 @@
 import { toTitleCase } from '../../utils/titleCase';
+import { HERO_TAG_CLASS, HERO_TAG_ROW, HERO_TITLE_CLASS } from '../home/heroTagStyles';
 import { CollectionHeroActions } from './CollectionHeroActions';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -162,14 +163,14 @@ export function BlackWhiteHero() {
           ) : (
             <AnimatePresence mode="wait">
               <motion.div key={active.id} className="w-full max-w-[660px]" initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 18 }} transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}>
-                <div className="mb-4 flex flex-wrap items-center justify-center gap-1.5 lg:justify-start">
-                  <span className={`border px-2 py-1 text-[8px] font-black uppercase tracking-[0.14em] ${isLightMode ? 'border-black bg-black text-white' : 'border-white bg-white text-black'}`}>Manga B&N</span>
+                <div className={`mb-4 flex overflow-x-auto justify-center lg:justify-start ${HERO_TAG_ROW}`}>
+                  <span className={HERO_TAG_CLASS} style={{ backgroundColor: isLightMode ? '#000' : '#fff', borderColor: isLightMode ? '#000' : '#fff', color: isLightMode ? '#fff' : '#000' }}>Manga B&N</span>
                   {genres.map((genre) => (
-                    <span key={genre} className={`border px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] ${isLightMode ? 'border-black/25 bg-white/25 text-black' : 'border-white/25 bg-black/25 text-white'}`}>{genre}</span>
+                    <span key={genre} className={HERO_TAG_CLASS} style={{ backgroundColor: isLightMode ? '#ffffff40' : '#00000040', borderColor: isLightMode ? '#00000040' : '#ffffff40', color: isLightMode ? '#000' : '#fff' }}>{genre}</span>
                   ))}
                 </div>
 
-                <h2 className="mb-6 line-clamp-3 text-center text-[clamp(1.2rem,1.9vw,1.95rem)] font-black italic leading-[1.1] tracking-[-0.045em] lg:text-left">
+                <h2 className={`mb-6 ${HERO_TITLE_CLASS}`}>
                   {title}
                 </h2>
 

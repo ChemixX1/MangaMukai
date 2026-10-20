@@ -62,6 +62,10 @@ test('navigation updates titles and canonical URLs and clears private robots met
     applyRouteSeo(route);
     assert.equal(meta('robots'), 'noindex,follow', route);
   }
+  applyRouteSeo('/recargar/');
+  assert.equal(document.title, 'Recargar Monedas | MangaMukai');
+  assert.equal(meta('robots'), 'noindex,follow');
+  assert.equal(tags.get('link[rel="canonical"]').attributes.href, 'https://mangamukai.com/recargar');
   applyRouteSeo('/manga-bn');
   assert.equal(document.title, config.routes['/manga-bn'].title);
   applyRouteSeo('/manga-19');

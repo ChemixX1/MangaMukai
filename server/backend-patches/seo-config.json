@@ -42,6 +42,13 @@
       "description": "Productos y colecciones de MangaMukai.",
       "heading": "Tienda"
     },
+    "/recargar": {
+      "kind": "private",
+      "title": "Recargar Monedas | MangaMukai",
+      "description": "Elige tu paquete de monedas para MangaMukai.",
+      "heading": "Recargar Monedas",
+      "noindex": true
+    },
     "/pro": {
       "kind": "page",
       "title": "Mukai Pro | MangaMukai",

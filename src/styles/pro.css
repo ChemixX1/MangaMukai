@@ -79,7 +79,7 @@
 @media (hover: hover) and (pointer: fine) {
   .pro-card--selectable:hover {
     z-index: 2;
-    transform: translateY(-7px) scale(1.025);
+    transform: scale(1.025);
   }
   .pro-card--selectable:active { transform: translateY(-2px) scale(1.01); }
 }
@@ -322,14 +322,17 @@
 
 @media (max-width: 767px) {
   .pro-page { padding-top: max(88px, calc(50svh - 300px)); }
-  .pro-cycle-selector { max-width: 310px; padding: 4px; gap: 4px; margin-bottom: 16px; }
-  .pro-cycle-selector button { min-height: 34px; gap: 5px; font-size: 11px; }
+  .pro-cycle-selector { max-width: 270px; padding: 3px; gap: 3px; margin-bottom: 14px; }
+  .pro-cycle-selector button { min-height: 30px; gap: 4px; font-size: 10px; }
   .pro-cycle-selector button > span { padding: 2px 4px; font-size: 9px; }
-  .pro-grid { grid-template-columns: minmax(0, 440px); padding-inline: 6px; }
-  .pro-card { padding: 24px 20px 22px; border-radius: 23px; }
+  .pro-grid { grid-template-columns: minmax(0, 340px); padding-inline: 6px; }
+  .pro-card { padding: 20px 18px 18px; border-radius: 20px; }
+  .pro-card__features { margin: 20px 0; gap: 12px; }
+  .pro-card__feature { gap: 10px; }
+  .pro-card__feature-text { font-size: 12px; }
 
   .pro-grid > .pro-card:not(.pro-card--mobile-visible) { display: none; }
-  .pro-grid > .pro-card--mobile-visible { min-height: 430px; }
+  .pro-grid > .pro-card--mobile-visible { min-height: 380px; }
 
   .pro-backdrop-word {
     top: -28px;

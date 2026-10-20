@@ -4,7 +4,6 @@ import { HeroCarousel } from '../../components/home/HomeHero';
 import { LatestSection } from '../../components/home/HomeLatest';
 import type { HomeLayoutProps } from '../../components/home/homeModels';
 import { TrendingSection } from '../../components/home/HomeTrending';
-import { HomeExplore } from '../../components/home/HomeExplore';
 import { Footer } from '../../components/layout/Footer';
 
 export default function HomeContent({ womenHero, menHero, isReady }: HomeLayoutProps) {
@@ -23,7 +22,6 @@ export default function HomeContent({ womenHero, menHero, isReady }: HomeLayoutP
       <TrendingSection audience="men" className="home-block home-block-youth lg:mt-[71px]" />
       <LatestSection audience="men" className="home-block home-block-youth-latest mt-[50px] lg:mt-[68px]" />
 
-      <HomeExplore />
       <Footer homeDesign className="mt-[94px] lg:mt-[125px]" />
     </div>
   );

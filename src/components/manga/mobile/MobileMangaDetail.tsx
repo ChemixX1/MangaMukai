@@ -1,8 +1,8 @@
-import { BookmarkIcon } from '../../ui/icons';
+import { SaveButton } from '../../ui/SaveButton';
 import { GooeySelector } from '../../ui/GooeySelector';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 import { MangaCommunityLinks } from '../MangaCommunityLinks';
 import { MangaSeriesLikeButton } from '../MangaSeriesLikeButton';
@@ -83,7 +83,7 @@ export const MobileMangaDetail = ({
   likes: number;
   online: number;
   interactionBusy: 'bookmark' | 'like' | '';
-  onBookmark: () => void;
+  onBookmark: () => Promise<boolean>;
   onLike: () => void;
   reactionCounts: Record<MangaReactionId, number>;
   selectedReaction: MangaReactionId | null;
@@ -182,16 +182,14 @@ export const MobileMangaDetail = ({
         >
           Leer Capítulo 1
         </button>
-        <button
-          type="button"
-          onClick={onBookmark}
+        <SaveButton
+          mangaId={manga.id}
+          onSave={onBookmark}
           disabled={interactionBusy === 'bookmark'}
-          aria-pressed={isBookmarked}
+          saved={isBookmarked}
+          iconClassName="size-5"
           className={`mt-0.5 flex h-12 w-36 min-w-0 shrink items-center justify-center gap-2 whitespace-nowrap rounded-md border bg-black font-montserrat text-sm font-extrabold uppercase transition-transform active:scale-95 max-[400px]:gap-1.5 max-[400px]:text-xs ${'border-neutral-400 text-white'}`}
-        >
-          {interactionBusy === 'bookmark' ? <Loader2 size={20} className="animate-spin" /> : <BookmarkIcon size={20} filled={isBookmarked} />}
-          {isBookmarked ? 'Guardado' : 'Guardar'}
-        </button>
+        />
       </div>
 
         <h1 className="manga-detail-mobile-title">

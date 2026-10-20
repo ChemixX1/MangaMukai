@@ -105,7 +105,11 @@
   font-size: 10px; font-weight: 700; box-shadow: 0 2px 8px #d9770640;
   transition: transform .2s ease, box-shadow .2s ease;
 }
-.mobile-profile-pro-badge:hover, .mobile-profile-promo:hover { transform: translateY(-2px); box-shadow: 0 7px 15px #0003; }
+.mobile-profile-pro-badge:hover { transform: translateY(-2px); box-shadow: 0 7px 15px #0003; }
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .mobile-profile-promo, .mobile-profile-promo:hover { filter: none; box-shadow: none; }
+  .mobile-profile-promo:hover { transform: scale(1.035); }
+}
 .mobile-profile-pro-badge img { width: 17px; height: 17px; }
 .mobile-profile-pro-badge:active, .mobile-profile-promo:active { transform: scale(.98); }
 .mobile-profile-stats { display: grid; grid-template-columns: 1fr 1fr .62fr; gap: 5px; margin-top: 17px; }

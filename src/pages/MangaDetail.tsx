@@ -1,12 +1,13 @@
 import { hasHotTag } from '../utils/womenBlackWhite';
-import { BookmarkIcon } from '../components/ui/icons';
+import { buildMangaRecommendations } from '../utils/mangaRecommendations';
+import { SaveButton } from '../components/ui/SaveButton';
 import { GooeySelector } from '../components/ui/GooeySelector';
 import { createQueuedLike } from '../utils/queuedLike';
 import { readGuestMangaLike } from '../utils/guestMangaLikes';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, ChevronDown, Loader2 } from 'lucide-react';
+import { BookOpen, ChevronDown } from 'lucide-react';
 
 import {
   getChaptersBySeries,
@@ -348,10 +349,8 @@ export const MangaDetail = () => {
 
         setLoading(false);
         setSecondaryReady(true);
-        const relatedRequest = getRelatedMangas(mangaPostId, 18).then(data => {
-          if (active) setRelated(data);
-        }).catch(() => {}).finally(() => { if (active) setRelatedLoading(false); });
-        const catalogRequest = getUltimosCapitulos();
+        const relatedRequest = getRelatedMangas(mangaPostId, 18).catch(() => []);
+        const catalogRequest = getUltimosCapitulos().catch(() => []);
         void catalogRequest.then(catalog => {
           if (!active) return;
           const catalogManga = catalog.find(item => String(item.eroSeri || item.id) === String(mangaPostId));
@@ -365,11 +364,10 @@ export const MangaDetail = () => {
               : current);
           }
         });
-        void Promise.all([catalogRequest, relatedRequest]).then(([catalog]) => {
+        void Promise.all([catalogRequest, relatedRequest]).then(([catalog, recommendations]) => {
           if (!active) return;
-          const counts = new Map(catalog.map(item => [String(item.eroSeri || item.id), item.chapterCount]));
-          setRelated(current => current.map(item => ({ ...item, chapterCount: counts.get(String(item.id)) ?? item.chapterCount })));
-        });
+          setRelated(buildMangaRecommendations(mangaData, catalog, recommendations));
+        }).finally(() => { if (active) setRelatedLoading(false); });
         const chaptersRequest = getChaptersBySeries(mangaPostId).then(data => {
           if (active) setChapters(data);
         }).catch(() => { if (active) setChaptersError('No se pudieron cargar los capítulos.'); })
@@ -432,10 +430,10 @@ export const MangaDetail = () => {
   };
 
   const handleBookmark = async () => {
-    if (!manga || interactionBusy) return;
+    if (!manga || interactionBusy) return false;
     if (!getStoredToken()) {
       goToLogin();
-      return;
+      return false;
     }
 
     setInteractionBusy('bookmark');
@@ -445,6 +443,7 @@ export const MangaDetail = () => {
       setEngagement((current) => ({ ...current, bookmarks: outcome.total }));
     }
     setInteractionBusy('');
+    return outcome.status === 'ok';
   };
 
   const handleLike = () => {
@@ -554,7 +553,7 @@ export const MangaDetail = () => {
         likes={engagement.likes}
         online={engagement.online}
         interactionBusy={interactionBusy}
-        onBookmark={() => void handleBookmark()}
+        onBookmark={handleBookmark}
         onLike={() => void handleLike()}
         reactionCounts={reactionCounts}
         selectedReaction={selectedReaction}
@@ -611,16 +610,14 @@ export const MangaDetail = () => {
                 <button type="button" onClick={handleReadFirst} disabled={!firstChapter} className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-mukai-magenta px-2 font-montserrat text-[13px] font-extrabold text-white transition-transform hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45">
                   Leer Capítulo 1
                 </button>
-                <button
-                  type="button"
-                  onClick={handleBookmark}
+                <SaveButton
+                  mangaId={manga.id}
+                  onSave={handleBookmark}
                   disabled={interactionBusy !== ''}
-                  aria-pressed={isBookmarked}
+                  saved={isBookmarked}
+                  iconClassName="size-[21px]"
                   className={`flex h-12 w-28 shrink-0 items-center justify-center gap-2 rounded-md border bg-surface font-montserrat text-[13px] font-extrabold uppercase transition-transform active:scale-95 ${'border-neutral-400 text-white'}`}
-                >
-                  {interactionBusy === 'bookmark' ? <Loader2 size={21} className="animate-spin" /> : <BookmarkIcon size={21} filled={isBookmarked} />}
-                  {isBookmarked ? 'Guardado' : 'Guardar'}
-                </button>
+                />
               </div>
 
               <MangaSeasonSelector key={manga.id} cover={manga.portada} title={toTitleCase(manga.titulo)} likeAction={

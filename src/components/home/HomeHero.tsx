@@ -1,5 +1,5 @@
 import { HERO_AUTOPLAY_MS, HERO_TRANSITION_SECONDS, HERO_COVER_EASE } from './heroMotion';
-import { HERO_TAG_CLASS, HERO_TAG_ROW } from './heroTagStyles';
+import { HERO_TAG_CLASS, HERO_TAG_ROW, HERO_TITLE_CLASS } from './heroTagStyles';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type TouchEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -609,7 +609,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
           <>
 
             <div className="home-hero-title flex h-16 items-start justify-center lg:absolute lg:left-[7px] lg:top-[127px] lg:h-[60px] lg:w-[548px] lg:justify-start">
-              <h2 className="line-clamp-2 text-center font-montserrat text-xl font-black uppercase leading-7 text-ink lg:text-left lg:text-[28px] lg:normal-case lg:leading-[30px]">
+              <h2 className={`${HERO_TITLE_CLASS} text-ink`}>
                 {activeItem.title}
               </h2>
             </div>

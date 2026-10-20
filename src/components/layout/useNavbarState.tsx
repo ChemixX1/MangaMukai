@@ -208,6 +208,7 @@ export const useNavbarState = () => {
           if (prev !== null && prev <= 1) {
             clearInterval(timerRef.current!);
             setIsTimerActive(false);
+            setIsTimerModalOpen(false);
             setIsAlarmAlertOpen(true);
             return 0;
           }
