@@ -16,12 +16,16 @@ const emptySnapshot = (): HomeSnapshot => ({
   isReady: false, isOutage: false,
 });
 
-/** Deduplica montajes y publica cada lista sin esperar a sus vecinas ni a imágenes. */
-export const createHomeDataLoader = (fetchers: Record<HomeList, () => Promise<MangaCapitulo[]>>, priorityWindowMs = 1200) => {
+export const createHomeDataLoader = (
+  fetchers: Record<HomeList, () => Promise<MangaCapitulo[]>>,
+  priorityWindowMs = 1200,
+  cacheTtlMs = 60 * 1000,
+) => {
   let snapshot = emptySnapshot();
   let pending: Promise<void> | null = null;
+  let expiresAt = 0;
   const listeners = new Set<(data: HomeSnapshot) => void>();
-  // Dar ventaja al bloque superior sin que una consulta lenta bloquee toda la página.
+
   const waitForPriority = (requests: Promise<void>[]) => new Promise<void>(resolve => {
     const timer = setTimeout(resolve, priorityWindowMs);
     void Promise.all(requests).then(() => { clearTimeout(timer); resolve(); });
@@ -34,7 +38,8 @@ export const createHomeDataLoader = (fetchers: Record<HomeList, () => Promise<Ma
     let items: MangaCapitulo[];
     try { items = await fetchers[key](); } catch { items = []; }
     const loaded = { ...snapshot.loaded, [key]: true };
-    const next = { ...snapshot, [key]: items, loaded };
+    // A refresh keeps already visible content when the service is temporarily unavailable.
+    const next = { ...snapshot, [key]: items.length > 0 ? items : snapshot[key], loaded };
     next.isReady = HOME_LISTS.every(list => loaded[list]);
     next.isOutage = next.isReady && HOME_LISTS.every(list => next[list].length === 0);
     publish(next);
@@ -47,7 +52,7 @@ export const createHomeDataLoader = (fetchers: Record<HomeList, () => Promise<Ma
     },
     load(): Promise<void> {
       if (pending) return pending;
-      if (snapshot.isReady && !snapshot.isOutage) return Promise.resolve();
+      if (snapshot.isReady && !snapshot.isOutage && expiresAt > Date.now()) return Promise.resolve();
       if (snapshot.isOutage) publish(emptySnapshot());
       pending = (async () => {
         const priority = [loadList('popularHistorical'), loadList('popularWeekly')];
@@ -57,6 +62,7 @@ export const createHomeDataLoader = (fetchers: Record<HomeList, () => Promise<Ma
           loadList('latestMen'), loadList('newReleases'),
         ];
         await Promise.all([...priority, ...lower]);
+        expiresAt = Date.now() + cacheTtlMs;
       })().finally(() => { pending = null; });
       return pending;
     },

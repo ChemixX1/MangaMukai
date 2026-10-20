@@ -59,8 +59,6 @@ export const AuthEyeOffIcon = ({ size = 24, ...props }: IconProps) => (
 </svg>
 );
 
-
-/** Mismo trazo redondeado y proporciones que el ojo oculto de la referencia. */
 export const AuthEyeIcon = ({ size = 24, ...props }: IconProps) => (
   <svg aria-hidden="true" focusable="false" {...props} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6.402 10.425C7.996 8.61 9.862 7.703 12 7.703S16.004 8.61 17.598 10.425C18.295 11.219 18.645 11.616 18.645 12.37S18.295 13.521 17.598 14.315C16.004 16.13 14.138 17.037 12 17.037S7.996 16.13 6.402 14.315C5.705 13.521 5.355 13.124 5.355 12.37S5.705 11.219 6.402 10.425Z" />

@@ -1,5 +1,5 @@
-// Transition engine adapted from the GooeyNav source supplied by the user.
-// Only paints the selector; the existing buttons own layout and interaction.
+
+
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 type Rgba = number[];
@@ -166,7 +166,6 @@ const parse = (value: string): Rgba => {
   return [1, 1, 1, 1];
 };
 
-
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 const travelEase = (t: number) => {
@@ -228,7 +227,6 @@ const build = (gl: WebGL2RenderingContext): Pipeline | null => {
   return { program, uniforms, buffer, position: gl.getAttribLocation(program, 'aPosition') };
 };
 
-
 export const GooeySelector = ({ activeIndex, itemCount = 3, color, labelColor, activeLabelColor, cornerRadius = 9999 }: { activeIndex: number; itemCount?: number; color?: string; labelColor?: string; activeLabelColor?: string; cornerRadius?: number }) => {
   const { theme } = useTheme();
   const current = Math.min(Math.max(0, activeIndex), itemCount - 1);
@@ -263,7 +261,7 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color, labelColor, a
     const originalColors = labels.map(label => label.style.color);
     const syncLabels = () => {
       overlay.replaceChildren();
-      // Colored selectors use the real button labels; avoid a second animated text layer.
+
       overlay.style.display = settingsRef.current.customColor ? 'none' : '';
       labels.forEach((label, index) => {
         const rect = rects[index];
@@ -756,7 +754,6 @@ export const GooeySelector = ({ activeIndex, itemCount = 3, color, labelColor, a
   useEffect(() => {
     engineRef.current?.refresh();
   }, [pillColor, theme, labelColor, activeLabelColor, cornerRadius]);
-
 
   return <>
     <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0" />

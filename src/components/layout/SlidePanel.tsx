@@ -4,13 +4,6 @@ import { lockPageScroll } from '../../utils/scrollLock';
 
 const CLOSE_DURATION = 420;
 
-/**
- * Ventana que entra deslizándose desde un lado (`from`) y vuelve a esconderse
- * al cerrar. A pantalla completa (`full`) o solo hasta el centro de la página
- * (`half`, el resto queda atenuado y cierra al tocarlo). No cambia de ruta; si
- * dentro se navega a otra página, se cierra sola. El contenido solo se monta
- * mientras está abierta (o saliendo), para no dejarlo vivo.
- */
 export const SlidePanel = ({ open, from, size = 'full', scrollable = true, blurBackdrop = false, isLight, label, onClose, children }: {
   open: boolean;
   from: 'left' | 'right';
@@ -57,8 +50,7 @@ export const SlidePanel = ({ open, from, size = 'full', scrollable = true, blurB
 
   return (
     <>
-      {/* Fondo atenuado, como el panel de opciones de "Más": da profundidad y suaviza la entrada.
-          En la ventana a media pantalla es la parte visible de la página: tocarla cierra. */}
+
       <div aria-hidden="true" onClick={onClose} className={`fixed inset-0 z-[119] bg-black/40 transition-[opacity,backdrop-filter] duration-[400ms] ${open ? `opacity-100 ${blurBackdrop ? 'backdrop-blur-[5px]' : ''}` : 'pointer-events-none opacity-0 backdrop-blur-none'}`} />
       <div
         role="dialog"

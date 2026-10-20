@@ -1,5 +1,3 @@
-/* home: portada y marco de la colección B&N. */
-
 .home-page {
   --mm-accent-pink: #ff008c;
   --mm-accent-cyan: #00e1ff;
@@ -32,19 +30,13 @@
 }
 
 .home-theme-dark .home-ranking-views { background: #a21caf; }
-
-/* Velo del hero: deja ver la imagen arriba y termina en un fondo limpio. */
 .home-carousel-scrim {
   pointer-events: none;
   background: linear-gradient(180deg, rgb(240 240 240 / 0.81) 0%, #f0f0f0 100%);
 }
-
-/* En el tema oscuro, el velo de los dos heros va del fondo al 92 % arriba al 98 % a poco más de la mitad. */
 .home-theme-dark .home-carousel-scrim {
   background: linear-gradient(180deg, rgb(var(--mm-surface) / 0.92) 0%, rgb(var(--mm-surface) / 0.98) 53.59%);
 }
-
-/* Caja de la sinopsis: cristal esmerilado que difumina el fondo del hero. */
 .home-hero-glass {
   background: linear-gradient(180deg, rgb(var(--mm-panel) / 0.45), rgb(var(--mm-panel) / 0.65));
   border: 1px solid rgb(255 255 255 / 0.6);
@@ -53,15 +45,11 @@
   -webkit-backdrop-filter: blur(12px) saturate(1.5);
   backdrop-filter: blur(12px) saturate(1.5);
 }
-
-/* En el tema oscuro, negro al 25 % sin borde ni sombra. */
 .home-theme-dark .home-hero-glass {
   background: rgb(0 0 0 / 0.25);
   border: 0;
   box-shadow: none;
 }
-
-/* La perspectiva de cada hero va en su disposición de portadas (Home.tsx). */
 .home-hero-stage {
   perspective-origin: 0 0;
 }
@@ -71,8 +59,6 @@
     transform: translateY(12px);
   }
 }
-
-/* La sombra sigue a cada portada y cae hacia las líneas del podio. */
 .home-hero-cover {
   backface-visibility: hidden;
   box-shadow:
@@ -85,8 +71,6 @@
     0 14px 16px -10px rgb(0 0 0 / 0.55),
     0 5px 6px -5px rgb(0 0 0 / 0.35);
 }
-
-/* Sombra de apoyo bajo las dos portadas laterales del podio. */
 .home-hero-cover-side {
   box-shadow:
     0 12px 12px -6px rgb(0 0 0 / 0.38),
@@ -98,8 +82,6 @@
     0 12px 12px -6px rgb(0 0 0 / 0.65),
     0 5px 6px -2px rgb(0 0 0 / 0.4);
 }
-
-/* Hero juvenil: la sombra asoma también por encima de las portadas. */
 .home-hero-cover-lifted {
   box-shadow:
     0 -8px 14px -8px rgb(0 0 0 / 0.3),
@@ -118,32 +100,6 @@
   background: linear-gradient(105deg, transparent 32%, rgb(255 255 255 / 0.3) 48%, rgb(255 255 255 / 0.08) 55%, transparent 66%);
 }
 
-/* La base queda anclada mientras el contorno y el hueco central fluctúan
-   a ritmos distintos, como dos lenguas de la misma llama. */
-.trending-flame-body,
-.trending-flame-core {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-}
-
-.trending-flame-body {
-  animation: home-flame-sway 2.6s ease-in-out infinite;
-}
-
-.trending-flame-core {
-  animation: home-flame-flicker 1.7s ease-in-out infinite;
-}
-
-.home-block-youth .trending-flame-body {
-  animation-duration: 2.9s;
-  animation-delay: -1.1s;
-}
-
-.home-block-youth .trending-flame-core {
-  animation-duration: 1.9s;
-  animation-delay: -0.7s;
-}
-
 @keyframes home-flame-sway {
   0%, 100% { transform: skewX(-1.5deg) scale(1, 1); }
   18% { transform: skewX(2.5deg) scale(0.98, 1.035); }
@@ -158,8 +114,6 @@
   49% { transform: translateX(0.25px) skewX(3deg) scale(1.04, 0.96); }
   76% { transform: translateX(-0.15px) skewX(-2deg) scale(0.98, 1.04); }
 }
-
-/* Llama pequeña de «New»: titila rápido sin desplazar el pie del dibujo. */
 .home-new-flame {
   overflow: visible;
 }
@@ -182,8 +136,6 @@
   72% { transform: skewX(1.5deg) scale(0.985, 1.025); }
   88% { transform: skewX(-1deg) scale(1.01, 0.985); }
 }
-
-/* Entrada de los bloques cuando llegan los datos (portada y colección B&N). */
 @keyframes home-block-reveal {
   from {
     opacity: 0;
@@ -215,7 +167,6 @@
   animation-delay: 350ms;
 }
 
-.home-data-ready .home-block-youth-heading,
 .home-data-ready .home-block-men {
   animation-delay: 380ms;
 }
@@ -224,40 +175,8 @@
   animation-delay: 410ms;
 }
 
-.home-data-ready .home-block-youth-news {
-  animation-delay: 440ms;
-}
-
 .home-data-ready .home-block-youth-latest {
   animation-delay: 470ms;
-}
-
-.home-men-ramp {
-  clip-path: polygon(
-    0 50%,
-    72% 50%,
-    calc(72% + 20px) 0,
-    100% 0,
-    100% 50%,
-    calc(72% + 20px) 50%,
-    72% 100%,
-    0 100%
-  );
-}
-
-@media (min-width: 768px) {
-  .home-men-ramp {
-    clip-path: polygon(
-      0 50%,
-      52% 50%,
-      calc(52% + 20px) 0,
-      100% 0,
-      100% 50%,
-      calc(52% + 20px) 50%,
-      52% 100%,
-      0 100%
-    );
-  }
 }
 
 @property --home-scrim-background1 {
@@ -314,8 +233,7 @@
     animation: none;
   }
 
-  .home-page .trending-flame-body,
-  .home-page .trending-flame-core,
+
   .home-page .home-new-flame > path {
     animation: none;
   }
@@ -335,9 +253,6 @@
   font-size: 0 !important;
   text-indent: -9999px !important;
 }
-
-/* Medidas de las referencias: escritorio 1440 px; composición móvil 440 px.
-   Las posiciones del export prevalecen sobre sus clases de ancho redondeadas. */
 .home-page { font-synthesis: none; --home-ranking-shade: 255 255 255; --home-ranking-edge: 240 240 240; }
 .home-theme-dark .home-page { --home-ranking-shade: 0 0 0; --home-ranking-edge: var(--mm-surface); }
 .home-page > * { flex-shrink: 0; }
@@ -347,17 +262,12 @@
 .home-hero-actions button[aria-pressed] { background: #000; color: #fff; }
 .home-hero-tags .font-anta { min-width: 40px; }
 .home-recent-icon { width: 100%; height: 100%; flex: none; }
-
-/* El cometa avanza de derecha a izquierda y descubre el propio contorno.
-   Todos los trazos comparten tiempo y curva para que la cabeza guíe el dibujo. */
 .home-hero-podium { --podium-duration: 1250ms; --podium-ease: cubic-bezier(.3, .05, .3, 1); }
 .home-podium-stroke { stroke-dasharray: 1; stroke-dashoffset: 0; animation: home-podium-draw var(--podium-duration) var(--podium-ease) both; }
 .home-podium-face { animation: home-podium-fill var(--podium-duration) ease-out both; }
 .home-podium-glow { animation: home-podium-glow var(--podium-duration) ease-in-out both; }
 .home-podium-comet { filter: drop-shadow(0 0 2px currentColor) drop-shadow(0 0 5px currentColor); animation: home-podium-comet-light var(--podium-duration) linear both; }
 .home-podium-comet-segment { stroke-dasharray: .0065 2; animation: home-podium-comet-travel var(--podium-duration) var(--podium-ease) both; }
-/* En claro, las superficies se funden juntas: la máscara móvil recortaba
-   bruscamente las sombras negras sobre el fondo blanco. */
 .home-theme-light .home-podium-surfaces { mask: none; animation: home-podium-fill var(--podium-duration) ease-in-out both; }
 .home-theme-light .home-podium-surfaces .home-podium-face,
 .home-theme-light .home-podium-surfaces .home-podium-glow { animation: none; }
@@ -658,7 +568,6 @@
 
 .home-trending-skeleton { padding-left: 38px; }
 @media (max-width: 1023px) { .home-trending-skeleton { padding-left: 17px; } }
-
-/* Los bloques prioritarios mantienen visible su estructura al recibir los datos. */
 .home-page.home-data-ready .home-block-hero,
 .home-page.home-data-ready .home-block-popular { animation: none; }
+#tendencia-ahora, #mangas-juveniles { scroll-margin-top: 100px; }

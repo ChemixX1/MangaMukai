@@ -15,7 +15,6 @@ export const subscribeSearchCatalog = (listener: (items: MangaCapitulo[]) => voi
 export const getCachedSearchCatalog = () =>
   cached && cached.expiresAt > Date.now() ? cached.items : null;
 
-/** El catálogo se muestra primero; los rankings actualizan sus vistas en segundo plano. */
 export const loadSearchCatalog = (): Promise<MangaCapitulo[]> => {
   const items = getCachedSearchCatalog();
   if (items) return Promise.resolve(items);

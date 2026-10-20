@@ -90,11 +90,10 @@ const Chapter = ({ item, history = false }: { item: LibraryChapter; history?: bo
 
 const ProfileLoading = () => <div className="profile-loading-grid" role="status" aria-label="Cargando contenido del perfil">{[0, 1, 2].map(index => <span key={index} className="profile-loading-block" aria-hidden="true" />)}</div>;
 
-/** Keep the final image geometry while decoding, including cached images and errors. */
 const ProfileImage = ({ src, className = '', onSettled }: { src: string; className?: string; onSettled: (src: string) => void }) => {
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    // A failed or stalled image must not block the rest of the profile indefinitely.
+
     const timer = window.setTimeout(() => onSettled(src), 8000);
     return () => window.clearTimeout(timer);
   }, [src, onSettled]);

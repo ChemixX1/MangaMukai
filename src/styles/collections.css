@@ -1,5 +1,3 @@
-/* collections: estilos compartidos entre tamaños de pantalla. */
-
 .manga-bn-page .manga-bn-interactive-cover,
 .manga-bn-page .home-main .home-block:not(.home-block-news):not(.home-block-youth-news) img[alt]:not([alt=""]) {
   transition-property: transform, filter !important;
@@ -233,13 +231,9 @@
   --home-ranking-shade: 0 0 0;
   --home-ranking-edge: var(--mm-surface);
 }
-
-/* En Manga Hot, la etiqueta de tipo de Tendencia usa contenedor naranja */
 .collection-landing .home-ranking-type {
   background-color: #ff6b00 !important;
 }
-
-/* Destello diagonal estilo Home sobre las portadas de Lo Más Reciente en colecciones */
 .collection-latest-cover::after {
   content: '';
   position: absolute;
@@ -270,16 +264,8 @@
   --bn-ink-bg: #3f3f46;
   --bn-on-ink: #f4f4f5;
 }
-
-@media (min-width: 1024px) and (hover: hover) {
-  .collection-trending-track:hover { animation-play-state: paused; }
-}
-
-/* El footer define su propio acento: conserva la paleta HOT. */
 .collection-landing .home-design-footer { --mm-accent-pink: #ff6b00; }
 .collection-landing .text-mukai-magenta { color: #ff6b00; }
-
-/* Acciones idénticas en ambos heroes; el acento pertenece a cada colección. */
 .collection-hero-actions { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 410px; }
 .collection-hero-action { display: inline-flex; flex: 1; min-width: 0; min-height: 48px; align-items: center; justify-content: center; gap: 8px; padding: 12px 14px; border: 1px solid transparent; border-radius: 7px; font-family: Montserrat, sans-serif; font-size: 12px; font-weight: 800; text-transform: uppercase; white-space: nowrap; transition: transform 180ms ease, filter 180ms ease, border-color 180ms ease; }
 .collection-hero-action svg { flex-shrink: 0; }
@@ -294,8 +280,6 @@
 @media (prefers-reduced-motion: reduce) { .collection-hero-action { transition: none; } }
 
 .manga-bn-page .home-theme-backdrop-base { background-color: rgb(var(--mm-surface)) !important; }
-
-/* HOT: el texto depende de la selección, independientemente de la animación. */
 .collection-landing [aria-label="Periodo del ranking"] > button[aria-selected="false"] { color: #000 !important; }
 .dark .collection-landing [aria-label="Periodo del ranking"] > button[aria-selected="false"] { color: #fff !important; }
 .collection-landing [aria-label="Periodo del ranking"] > button[aria-selected="true"] { color: #fff !important; }

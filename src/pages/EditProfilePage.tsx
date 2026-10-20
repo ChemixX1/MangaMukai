@@ -27,7 +27,7 @@ const fallbackProfile = (user: MMUser): WordPressProfile => ({
   phone: '',
   show_birth_date: false,
   show_phone: false,
-  // El avatar de la sesión puede ser el Gravatar genérico: se trata como "sin foto" para no parpadear.
+
   avatar_url: isPlaceholderAvatar(user.avatar || '') ? '' : (user.avatar || ''),
   banner_url: '',
   banner_color: 'bg-[#FF4D88]',
@@ -36,11 +36,6 @@ const fallbackProfile = (user: MMUser): WordPressProfile => ({
   social_links: emptySocialLinks(),
 });
 
-/**
- * Edición rápida del perfil (desde el lápiz de "Más"): foto, portada, nombre y
- * descripción, más la barra de progreso de rango. Se abre al instante y no
- * bloquea mientras carga los datos. Sin navbar ni barra inferior en móvil.
- */
 const EditProfilePage = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -115,18 +110,18 @@ const EditProfilePage = () => {
 
   const progress = readerRankProgress(chaptersRead);
   const muted = isLight ? 'text-black/45' : 'text-white/45';
-  // Campos un punto más oscuros que el fondo; etiquetas en negro/blanco puro.
+
   const input = isLight
     ? 'border-transparent bg-[#d9d9de] text-black placeholder:text-black/45'
     : 'border-transparent bg-[#151519] text-white placeholder:text-white/40';
   const label = `font-[Montserrat] text-[12px] font-medium uppercase tracking-wide ${isLight ? 'text-black' : 'text-white'}`;
-  // Mismo color sólido en las dos cámaras (sobre la portada y sobre el fondo de la página).
+
   const cameraButton = 'flex h-9 items-center gap-1.5 rounded-lg bg-[#333338] px-3 font-[Montserrat] text-[11px] font-bold text-white transition-colors hover:bg-[#45454b] disabled:opacity-60';
 
   return (
     <main className={`min-h-screen transition-colors lg:pt-24 ${isLight ? 'bg-[#f4f4f5] text-black' : 'bg-black text-white'}`}>
       <div className="mx-auto w-full max-w-2xl px-4 pb-10">
-        {/* Cabecera propia (en móvil no hay navbar en esta página). */}
+
         <div className="flex h-14 items-center gap-2 pt-[env(safe-area-inset-top)]">
           <button
             type="button"
@@ -139,11 +134,11 @@ const EditProfilePage = () => {
           <h1 className="font-[Montserrat] text-[18px] font-bold">Editar perfil</h1>
         </div>
 
-        {/* Portada (con la imagen de "Más" por defecto) y foto, cada una con su cámara. */}
+
         <section aria-label="Imágenes del perfil" className="mt-2">
           <div className="relative h-40 overflow-hidden rounded-2xl bg-black">
             <img src={profile.banner_url || defaultBanner} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_30%]" />
-            {/* Mismo velo que en "Más" para que la portada se vea igual en las dos páginas. */}
+
             <div className={`absolute inset-0 bg-gradient-to-b from-black/10 via-transparent ${isLight ? 'to-[#f4f4f5]/70' : 'to-black/70'}`} aria-hidden="true" />
             <button type="button" onClick={() => bannerRef.current?.click()} disabled={uploading === 'banner'} className={`absolute right-3 top-3 ${cameraButton}`}>
               {uploading === 'banner' ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />} Portada
@@ -163,7 +158,7 @@ const EditProfilePage = () => {
           </div>
         </section>
 
-        {/* Nombre y descripción */}
+
         <section aria-label="Datos del perfil" className="mt-6">
           <label className="block">
             <span className={label}>Nombre</span>
@@ -201,7 +196,7 @@ const EditProfilePage = () => {
           )}
         </section>
 
-        {/* Progreso de rango, tipo barra de nivel */}
+
         <section aria-label="Progreso de rango" className="mt-7">
           <div className="flex items-baseline justify-between">
             <p className="font-[Montserrat] text-[14px] font-semibold">{progress.name}</p>

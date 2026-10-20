@@ -14,9 +14,8 @@ const DESKTOP_LINKS = [
   { to: '/tienda', label: 'Tienda Mukai' },
 ];
 
-
 export function NavbarP({ model }: NavbarViewProps) {
-  const { theme, currentUser, isNotificationsOpen, openNotifications, closeNotificationsOverlay, unreadNotifications, isHeaderHidden, headerUsesDarkText, openSearch, isTimerModalOpen, setIsTimerModalOpen, isTimerActive, prefetchAuth, handleThemeToggle, goToRecharge, handleLogoClick, desktopIconClass } = model;
+  const { theme, currentUser, isNotificationsOpen, openNotifications, prefetchNotifications, closeNotificationsOverlay, unreadNotifications, isHeaderHidden, headerUsesDarkText, openSearch, prefetchSearch, isTimerModalOpen, setIsTimerModalOpen, isTimerActive, handleThemeToggle, goToRecharge, handleLogoClick, desktopIconClass } = model;
   const premium = Boolean(currentUser?.isPremium || currentUser?.is_premium);
   return (<header
       className="fixed site-navbar-surface site-navbar-desktop left-0 top-0 z-[100] h-[73px] w-full transition-transform duration-300"
@@ -25,7 +24,7 @@ export function NavbarP({ model }: NavbarViewProps) {
       style={{ transform: isHeaderHidden ? 'translateY(-100%)' : 'translateY(0)' }}
     >
       <div className="mx-auto flex h-full w-full max-w-[1440px] items-center px-5 xl:pl-[36px] xl:pr-[57px]">
-        <Link to="/" onPointerEnter={() => prefetchRoute('/')} onFocus={() => prefetchRoute('/')} onTouchStart={() => prefetchRoute('/')} onClick={handleLogoClick} aria-label="Volver al inicio de MangaMukai" className="relative -top-px shrink-0 xl:w-[276px]">
+        <Link to="/" onClick={handleLogoClick} aria-label="Volver al inicio de MangaMukai" className="relative -top-px shrink-0 xl:w-[276px]">
           <span className="block select-none whitespace-nowrap font-montserrat text-[24px] font-black uppercase italic leading-5 text-ink xl:text-[30px]">
             MANGA<span className="text-mukai-magenta">MUKAI</span>
           </span>
@@ -33,12 +32,12 @@ export function NavbarP({ model }: NavbarViewProps) {
 
         <nav aria-label="Secciones" className="ml-6 flex items-center gap-3 whitespace-nowrap xl:ml-0 xl:gap-8">
           {DESKTOP_LINKS.map(({ to, label }) => (
-            <Link key={to} to={to} onPointerEnter={() => prefetchRoute(to)} onFocus={() => prefetchRoute(to)} onTouchStart={() => prefetchRoute(to)} className="whitespace-nowrap font-koho text-[14px] font-semibold tracking-wide text-ink transition-transform duration-200 hover:scale-105 motion-reduce:transition-none xl:text-[16px]">{label}</Link>
+            <Link key={to} to={to} className="whitespace-nowrap font-koho text-[14px] font-semibold tracking-wide text-ink transition-transform duration-200 hover:scale-105 motion-reduce:transition-none xl:text-[16px]">{label}</Link>
           ))}
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center">
-          <button type="button" onClick={openSearch} aria-label="Buscar mangas" title="Buscar mangas" className={desktopIconClass}>
+          <button type="button" onClick={openSearch} onPointerEnter={prefetchSearch} onFocus={prefetchSearch} aria-label="Buscar mangas" title="Buscar mangas" className={desktopIconClass}>
             <SearchLensIcon size={20.16} />
           </button>
           <button
@@ -48,7 +47,7 @@ export function NavbarP({ model }: NavbarViewProps) {
             title="Abrir temporizador"
             className={`${desktopIconClass} ml-3 xl:ml-4 ${isTimerActive ? '!text-[#ff4a7d]' : ''}`}
           >
-            {/* Más pequeña que la lupa y el tema para verse del mismo tamaño; el desplazamiento compensa el margen interno de su SVG. */}
+
             <AlarmIcon size={18.48} className={`-translate-x-[0.35px] translate-y-[0.4px] ${isTimerActive ? 'animate-pulse' : ''}`} />
             {isTimerActive && <span className="absolute -right-1 -top-1 h-2 w-2 animate-ping rounded-full border border-[#02040a] bg-[#ff4a7d]" />}
           </button>
@@ -89,7 +88,7 @@ export function NavbarP({ model }: NavbarViewProps) {
                     {premium && <PremiumElectricBorder />}
                   </Link>
                   <span aria-hidden="true" className={`h-5 w-px shrink-0 ${headerUsesDarkText ? 'bg-black/15' : 'bg-white/20'}`} />
-                  <button type="button" onClick={openNotifications} aria-label="Abrir notificaciones" aria-haspopup="dialog" aria-expanded={isNotificationsOpen} className={desktopIconClass}>
+                  <button type="button" onClick={openNotifications} onPointerEnter={prefetchNotifications} onFocus={prefetchNotifications} aria-label="Abrir notificaciones" aria-haspopup="dialog" aria-expanded={isNotificationsOpen} className={desktopIconClass}>
                     <BellGlyph size={20.16} />
                     {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-0 top-0 h-2 w-2 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
                   </button>
@@ -97,8 +96,8 @@ export function NavbarP({ model }: NavbarViewProps) {
               </div>
             ) : (
               <div className="flex items-center gap-[11px]">
-                <Link to="/auth/login" onPointerEnter={prefetchAuth} onFocus={prefetchAuth} className="flex h-8 w-[99px] items-center justify-center rounded-md bg-mukai-magenta font-montserrat text-xs font-semibold text-white shadow-[0_2px_4px_rgba(0,0,0,0.31)] transition hover:brightness-110">Iniciar Sesión</Link>
-                <Link to="/auth/register" onPointerEnter={prefetchAuth} onFocus={prefetchAuth} className="flex h-8 w-[99px] items-center justify-center rounded-md border border-[#828282] font-montserrat text-xs font-semibold text-ink shadow-[0_2px_4px_rgba(0,0,0,0.31)] transition-colors hover:border-ink">Crear cuenta</Link>
+                <Link to="/auth/login" className="flex h-8 w-[99px] items-center justify-center rounded-md bg-mukai-magenta font-montserrat text-xs font-semibold text-white shadow-[0_2px_4px_rgba(0,0,0,0.31)] transition hover:brightness-110">Iniciar Sesión</Link>
+                <Link to="/auth/register" className="flex h-8 w-[99px] items-center justify-center rounded-md border border-[#828282] font-montserrat text-xs font-semibold text-ink shadow-[0_2px_4px_rgba(0,0,0,0.31)] transition-colors hover:border-ink">Crear cuenta</Link>
               </div>
             )}
           </div>

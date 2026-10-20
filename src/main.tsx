@@ -9,7 +9,6 @@ import './styles/manga.css'
 import './styles/collections.css'
 import App from './App.tsx'
 
-// Siempre iniciar desde el top al refrescar
 if ('scrollRestoration' in history) {
   history.scrollRestoration = 'manual';
 }

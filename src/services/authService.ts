@@ -34,7 +34,6 @@ const emitAuthChanged = () => {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 };
 
-/** Una renovación del JWT conserva la cuenta y sus recursos ya descargados. */
 export const getAuthCacheKey = (): string => {
   const token = getStoredToken();
   if (!token) return '';
@@ -84,7 +83,7 @@ export const clearAuth = async () => {
   try {
     await fetch(`${WP_AUTH}/logout`, { method: 'POST', credentials: 'include' });
   } catch {
-    // Silent: local auth was already cleared.
+
   }
 };
 
@@ -109,7 +108,7 @@ const rememberUnlockedChapter = (chapterId: string | number) => {
     ids.add(String(chapterId));
     localStorage.setItem(key, JSON.stringify([...ids]));
   } catch {
-    // Non-critical cache.
+
   }
 };
 
@@ -133,7 +132,6 @@ const clearIfUnauthorized = (res: Response): boolean => {
   return false;
 };
 
-/** Refreshes the current user from WordPress, including coins. */
 export const refreshUser = async (): Promise<MMUser | null> => {
   const token = getStoredToken();
   if (!token) return null;
@@ -153,10 +151,9 @@ export const refreshUser = async (): Promise<MMUser | null> => {
       const latest = getStoredUser();
       const user = {
         ...data.user,
-        // El plugin legado responde /me con username = user_login; el nombre visible
-        // (el que se edita en /perfil y muestra el navbar) es display_name.
+
         username: data.user.display_name || data.user.username,
-        // A profile upload that finished during this request must win the race.
+
         ...(latest?.avatar !== initialAvatar ? { avatar: latest?.avatar } : {}),
         isPremium: !!(data.user.isPremium || data.user.is_premium),
         premiumExpiry: data.user.premiumExpiry ?? data.user.premium_expiry ?? null,
@@ -165,13 +162,12 @@ export const refreshUser = async (): Promise<MMUser | null> => {
       return user;
     }
 
-    // Clear session if WordPress returns success: false or a JWT error code
     if (data && (data.success === false || data.code?.includes('jwt') || data.data?.status === 403 || data.data?.status === 401)) {
       clearStoredAuth('expired');
       return null;
     }
   } catch {
-    // Network hiccups should not log the user out.
+
   }
 
   return null;
@@ -200,8 +196,7 @@ export const startSubscriptionPayment = async (
     }
 
     const data = await readJson<any>(res);
-    // Legacy checkout only knows monthly/yearly; do not send a tiered purchase
-    // to an unverified legacy plan with a different price or benefits.
+
     if (tier && data?.success && data.url && data.tier !== tier) {
       return { success: false, message: 'PayPal aún no confirma este plan de suscripción. Elige otro método de pago o inténtalo más tarde.' };
     }
@@ -248,7 +243,7 @@ export const activateSubscription = async (orderId: string): Promise<boolean> =>
       return true;
     }
   } catch {
-    // PayPal IPN can arrive a few seconds later; the success page polls.
+
   }
 
   return false;
@@ -285,7 +280,7 @@ export const confirmCoinPurchase = async (
       };
     }
   } catch {
-    // Keep the success page graceful if confirmation is still pending.
+
   }
 
   return { success: false, completed: false };
@@ -297,7 +292,6 @@ interface BuyChapterResponse {
   message?: string;
 }
 
-/** Buys/unlocks a chapter with myCRED. */
 export const buyChapter = async (
   chapterId: string | number
 ): Promise<{ success: boolean; coins: number; message: string }> => {
@@ -349,7 +343,6 @@ interface UnlockedChaptersResponse {
   unlocked?: Array<string | number>;
 }
 
-/** Gets the IDs of chapters unlocked by the current user. */
 export const getUnlockedChapters = async (): Promise<Set<string>> => {
   const token = getStoredToken();
   if (!token) return new Set<string>();

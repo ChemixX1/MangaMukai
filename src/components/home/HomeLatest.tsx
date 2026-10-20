@@ -13,10 +13,9 @@ import { filterYouthMen } from '../../utils/youthFilter';
 
 import { toLatestMangas, type Audience, type LatestChapter, type LatestManga } from './homeModels';
 
-/** Tres filas de seis columnas en PC y de dos en móvil; tablet usa tres columnas. */
 const LATEST_PER_PAGE = 18;
 const MOBILE_LATEST_PER_PAGE = 6;
-/** Posición de cada pestaña de tipo (la misma en los dos diseños). */
+
 const TYPE_TAB_POSITION: Record<MangaTypeTab, string> = { Manga: 'left-0', Manhua: 'left-[78px]', Manhwa: 'left-[165px]' };
 
 interface ChapterRowProps {
@@ -27,7 +26,6 @@ interface ChapterRowProps {
   className: string;
 }
 
-/** Fila de capítulo: abre el lector (o la compra si es de pago); sin capítulo lleva a la ficha. */
 const ChapterRow = ({ manga, chapter, accentColor, onOpenPaid, className }: ChapterRowProps) => {
   const rowClass = `absolute inset-x-0 flex items-center transition-colors hover:bg-ink/[.06] ${className}`;
   if (!chapter) {
@@ -61,12 +59,11 @@ const ChapterRow = ({ manga, chapter, accentColor, onOpenPaid, className }: Chap
 interface LatestCardProps {
   manga: LatestManga;
   accent: Accent;
-  /** Las primeras portadas de la rejilla no esperan al scroll. */
+
   eager: boolean;
   onOpenPaid: (manga: LatestManga, chapter: LatestChapter) => void;
 }
 
-/** Portada y título sobre un degradado, seguidos de dos filas de capítulos. */
 const LatestCard = ({ manga, accent, eager, onOpenPaid }: LatestCardProps) => {
   const accentColor = ACCENT_COLOR[accent];
   return (
@@ -87,11 +84,6 @@ const LatestCard = ({ manga, accent, eager, onOpenPaid }: LatestCardProps) => {
   );
 };
 
-/**
- * "Lo Más Reciente": titular con la agenda, pestañas Manga / Manhua / Manhwa,
- * "Ver todo" (solo en PC), la rejilla (seis columnas y dieciocho series por
- * página en PC; dos columnas y seis series en móvil) y la paginación compacta.
- */
 export const LatestSection = ({ audience, className }: { audience: Audience; className: string }) => {
   const { latestWomen, latestMen, loaded } = useHomeData();
   const isReady = audience === 'men' ? loaded.latestMen : loaded.latestWomen;

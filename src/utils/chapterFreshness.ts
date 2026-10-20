@@ -1,4 +1,4 @@
-/** «Nuevo» durante los primeros siete días; las fechas futuras no cuentan. */
+
 export const isRecentChapter = (createdAt: string, now = Date.now()): boolean => {
   const published = Date.parse(createdAt.replace(' ', 'T'));
   const age = now - published;

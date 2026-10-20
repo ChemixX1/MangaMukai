@@ -5,7 +5,6 @@ import { toTitleCase } from '../../utils/titleCase';
 
 export type Audience = 'women' | 'men';
 
-/** Siete mangas por hero (las siete barritas del diseño), con el tipo y hasta cinco géneros (tres en móvil). */
 export const HERO_SIZE = 7;
 export const HERO_TAGS = 6;
 export const MOBILE_HERO_TAGS = 4;
@@ -39,9 +38,9 @@ export interface LatestChapter {
   id: number;
   numero: string;
   isFree: boolean;
-  /** Capítulo de la última semana: en lugar de la antigüedad lleva la llama de "New". */
+
   isNew: boolean;
-  /** Antigüedad con la unidad completa ("Hoy", "3 Días", "52 Días"). */
+
   date: string;
 }
 
@@ -54,7 +53,6 @@ export interface LatestManga {
   chapters: LatestChapter[];
 }
 
-/** Serie de "Lo Más Reciente" con sus dos últimos capítulos. */
 export const toLatestMangas = (mangas: MangaCapitulo[]): LatestManga[] =>
   mangas.map((manga) => ({
     id: manga.id,

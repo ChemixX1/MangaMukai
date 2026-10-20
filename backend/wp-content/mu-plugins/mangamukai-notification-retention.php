@@ -16,7 +16,7 @@ add_action('mm_notifications_retention_cleanup', function () {
     $table = $wpdb->prefix . 'mm_notifications';
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $wpdb->esc_like($table))) !== $table) return;
     $cutoff = gmdate('Y-m-d H:i:s', time() - 15 * DAY_IN_SECONDS);
-    // Batches keep each query small; a large backlog continues on the next run.
+
     for ($batch = 0; $batch < 20; $batch++) {
         $deleted = $wpdb->query($wpdb->prepare(
             "DELETE FROM `{$table}` WHERE created_at < %s ORDER BY created_at ASC LIMIT 1000",

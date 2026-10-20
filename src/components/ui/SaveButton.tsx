@@ -10,20 +10,13 @@ const SAVE_FLASH_MS = 1000;
 
 interface SaveButtonProps {
   mangaId: number | string;
-  /** Tamaño y posición del botón (alto, ancho, cuerpo de letra, sombra). */
+
   className?: string;
-  /** Tamaño del marcapáginas (24 px si no se indica). */
+
   iconClassName?: string;
   icon?: ReactNode;
 }
 
-/**
- * "Guardar" del diseño: relleno con la tinta del tema, borde gris y el
- * marcapáginas en contorno, que se rellena cuando el manga está guardado. Al
- * guardar, el botón se pinta un instante (blanco en tema oscuro, negro en
- * claro) con el check en el color opuesto y después vuelve a su forma con
- * "Guardado". Comparte el estado con la ficha y la página de guardados.
- */
 export const SaveButton = ({ mangaId, className = 'h-12 w-36 text-sm', iconClassName, icon }: SaveButtonProps) => {
   const { isSaved, toggle } = useSavedMangas();
   const { theme } = useTheme();
@@ -44,7 +37,7 @@ export const SaveButton = ({ mangaId, className = 'h-12 w-36 text-sm', iconClass
       flashTimer.current = window.setTimeout(() => setFlashId(null), SAVE_FLASH_MS);
     }
     void toggle(mangaId).then((outcome) => {
-      // Si no llegó a guardarse (sin sesión, error), el destello no tiene sentido.
+
       if (outcome.status !== 'ok') setFlashId(null);
     });
   };

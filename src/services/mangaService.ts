@@ -1,9 +1,8 @@
-// src/services/mangaService.ts
+
 
 import type { WPManga, MangaCapitulo } from '../types/manga';
 import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from '../config/api';
-
-// CONFIGURACIÓN
+import { createPublicDataCache } from '../utils/publicDataCache';
 
 const API_URL = WORDPRESS_POSTS_API;
 const MM_API = MANGAMUKAI_API;
@@ -28,7 +27,7 @@ const readCatalogSessionCache = () => {
 
     return { data: parsed.data, expiresAt: parsed.expiresAt };
   } catch {
-    window.sessionStorage.removeItem(CATALOG_SESSION_CACHE_KEY);
+    try { window.sessionStorage.removeItem(CATALOG_SESSION_CACHE_KEY); } catch {}
     return null;
   }
 };
@@ -40,7 +39,7 @@ const persistCatalogSessionCache = (entry: { data: MangaCapitulo[]; expiresAt: n
     try {
       window.sessionStorage.setItem(CATALOG_SESSION_CACHE_KEY, JSON.stringify(entry));
     } catch {
-      // La caché es una mejora opcional; una cuota llena no debe romper el catálogo.
+
     }
   };
 
@@ -51,9 +50,7 @@ const persistCatalogSessionCache = (entry: { data: MangaCapitulo[]; expiresAt: n
   }
 };
 
-// Los IDs antiguos resultaron pertenecer a series, no a géneros. La lista queda
-// vacía hasta que WordPress exponga categorías masculinas configuradas como tal.
-const IDS_GENEROS_HOMBRE: number[] = [];
+
 
 const IMAGEN_DEFAULT = 'https://placehold.co/300x450/1a1a1a/FFF?text=Sin+Portada';
 
@@ -63,24 +60,17 @@ const CAMPOS_SOLICITADOS = [
   'myCRED_sell_content', 'mm_chapter_info', 'wpb_post_views_count', 'manga_cover', 'manga_description', 'manga_tags'
 ].join(',');
 
-/**
- * `_embed` a secas adjunta autor, términos y comentarios de cada post y multiplica
- * por ocho el peso de la respuesta (1,5 MB frente a 200 KB en 60 posts). De todo
- * eso solo se usa la portada destacada, así que se pide únicamente esa incrustación.
- */
 const EMBED_PORTADA = '_embed=wp:featuredmedia';
 
-// UTILS
-
 const obtenerPortadaReal = (item: any): string => {
-  // First, check if the true manga cover was exposed by the backend patch
+
   if (item.manga_cover) {
     return item.manga_cover;
   }
 
   if (item._embedded?.['wp:featuredmedia']?.[0]) {
     const media = item._embedded['wp:featuredmedia'][0];
-    // sizes puede estar vacío {}, usar source_url directamente
+
     return media.media_details?.sizes?.full?.source_url
       || media.media_details?.sizes?.large?.source_url
       || media.source_url
@@ -111,23 +101,19 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
   const myCred = item.myCRED_sell_content;
   const esGratis = !myCred || myCred.status === 'disabled' || myCred.price === 0;
 
-  // Usa manga_description si existe, sino el excerpt. Si ambas fallan, usa default.
-  let finalDescription = item.manga_description 
-        ? limpiarDescripcion(item.manga_description) 
+  let finalDescription = item.manga_description
+        ? limpiarDescripcion(item.manga_description)
         : limpiarDescripcion(item.excerpt?.rendered);
   if (!finalDescription) finalDescription = 'Lee esta historia en MangaMukai.';
 
-  // Parsea tags usando el arreglo de strings devuelto por WP REST.
   const tagsReales = Array.isArray(item.manga_tags) && item.manga_tags.length > 0
-        ? item.manga_tags 
-        : ["Manga", "Acción"]; // Default
-        
-  // Inferir tipo (Manga / Manhwa / Manhua)
+        ? item.manga_tags
+        : ["Manga", "Acción"];
+
   let tipoReal = 'Manga';
   if (tagsReales.some((t: any) => String(t).toLowerCase() === 'manhwa')) tipoReal = 'Manhwa';
   if (tagsReales.some((t: any) => String(t).toLowerCase() === 'manhua')) tipoReal = 'Manhua';
 
-  // Inferir género por tags
   const TAGS_MUJER  = ['shoujo','shojo','josei','romance','yaoi','bl','boys love','yuri','gl','girls love','otome'];
   const TAGS_HOMBRE = ['shounen','shonen','seinen','ecchi','harem','isekai','acción','accion','action','aventura','mecha'];
   const tagsLower   = tagsReales.map((t: any) => String(t).toLowerCase());
@@ -153,8 +139,6 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
   };
 };
 
-// Mapper para respuesta del endpoint /catalog y /manga/{id}
- 
 const mapearMangaCatalog = (item: any): MangaCapitulo => {
   const genres: string[] = Array.isArray(item.genres) ? item.genres : [];
   let genero: 'Hombre' | 'Mujer' | null = item.genero === 'Hombre' ? 'Hombre'
@@ -167,8 +151,6 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     if (!genero) genero = 'Mujer';
   }
 
-  // Poblar capitulosRecientes desde firstChapterId cuando exista
-   
   const caps: MangaCapitulo['capitulosRecientes'] = (Array.isArray(item.capitulosRecientes) && item.capitulosRecientes.length > 0)
     ? item.capitulosRecientes
     : item.firstChapterId
@@ -202,7 +184,6 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
   };
 };
 
-// 1. CATÁLOGO GENERAL — consulta directamente el post type 'manga'.
 export const getUltimosCapitulos = async (): Promise<MangaCapitulo[]> => {
   if (!catalogCache) catalogCache = readCatalogSessionCache();
   if (catalogCache && catalogCache.expiresAt > Date.now()) return catalogCache.data;
@@ -236,47 +217,20 @@ export const getUltimosCapitulos = async (): Promise<MangaCapitulo[]> => {
   return catalogRequest;
 };
 
-// 2. ÚLTIMAS ACTUALIZACIONES — MUJERES
-// 3. ÚLTIMAS ACTUALIZACIONES — HOMBRES
-export const getLatestMenMangas = async (): Promise<MangaCapitulo[]> => {
+const recentListsCache = createPublicDataCache<MangaCapitulo[]>({
+  ttlMs: 60 * 1000,
+  maxEntries: 8,
+  shouldCache: items => items.length > 0,
+});
+const mangaDetailsCache = createPublicDataCache<MangaCapitulo | null>({
+  ttlMs: 60 * 1000,
+  maxEntries: 24,
+  shouldCache: item => item !== null,
+});
+
+export const getNewReleases = (): Promise<MangaCapitulo[]> => recentListsCache.load('new-releases', async () => {
   try {
-    const res = await fetch(`${API_URL}?${EMBED_PORTADA}&per_page=60&_fields=${CAMPOS_SOLICITADOS}`);
-    if (!res.ok) throw new Error('Error API');
-    const data: WPManga[] = await res.json();
 
-    const filtrado = IDS_GENEROS_HOMBRE.length === 0
-      ? data
-      : data.filter((item: any) =>
-          (item.categories || []).some((id: number) => IDS_GENEROS_HOMBRE.includes(id)));
-
-    const seriesVistas = new Set<number>();
-    const unicos: WPManga[] = [];
-
-    for (const item of filtrado) {
-      const idSerie = item.ero_seri
-        ? Number(item.ero_seri)
-        : (item.categories?.[0] ?? item.id);
-      if (!seriesVistas.has(idSerie)) {
-        seriesVistas.add(idSerie);
-        unicos.push(item);
-      }
-      if (unicos.length >= 18) break;
-    }
-
-    return unicos.map((item) => mapearManga(item));
-  } catch (error) {
-    console.error('Error getLatestMenMangas:', error);
-    return [];
-  }
-};
-
-// 4. POPULARES — MUJERES (Hero + PopularCarousel)
-// 5. NUEVOS LANZAMIENTOS
-export const getNewReleases = async (): Promise<MangaCapitulo[]> => {
-  try {
-    // 12 posts bastan: se recortan a 5 series distintas y de ahí para abajo la
-    // respuesta pesa menos de la mitad. La API no manda cabeceras de caché, así
-    // que ni `no-store` ni el parámetro anti-caché aportaban frescura.
     const url = `${API_URL}?${EMBED_PORTADA}&per_page=12&orderby=date&order=desc&_fields=${CAMPOS_SOLICITADOS}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Error API: ${res.status}`);
@@ -301,20 +255,18 @@ export const getNewReleases = async (): Promise<MangaCapitulo[]> => {
     console.error('Error getNewReleases:', error);
     return [];
   }
-};
+});
 
-// 6. MANGA POR ID (post type 'manga' — usa endpoint propio)
-export const getMangaById = async (id: number | string): Promise<MangaCapitulo | null> => {
+export const getMangaById = (id: number | string): Promise<MangaCapitulo | null> => mangaDetailsCache.load(String(id), async () => {
   try {
     const res = await fetch(`${MM_API}/manga/${id}`);
     if (!res.ok) return null;
-     
+
     const item: any = await res.json();
     if (!item.success) return null;
     return {
       ...mapearMangaCatalog(item),
-      // El detalle puede omitir estos campos; la cifra de vistas se completa
-      // desde /catalog, donde el servidor sí la publica.
+
       tipo: typeof item.tipo === 'string' ? item.tipo.trim() : '',
       totalViews: typeof item.totalViews === 'number' ? item.totalViews : undefined,
     };
@@ -322,9 +274,8 @@ export const getMangaById = async (id: number | string): Promise<MangaCapitulo |
     console.error('Error getMangaById:', error);
     return null;
   }
-};
+});
 
-// CHAPTER INTERFACES (compartido con ChapterList)
 export interface SeriesChapter {
   id: number;
   chapter_number: number;
@@ -333,7 +284,7 @@ export interface SeriesChapter {
   is_paid: boolean;
   price_coins: number;
   free_at: string | null;
-  /** Portada subida en WordPress. Vacío = se usa la primera página del capítulo. */
+
   cover_url?: string | null;
 }
 
@@ -346,8 +297,6 @@ const pickChapterScene = (images: string[], chapterNumber: number): string | nul
   const validImages = images.filter((image): image is string => typeof image === 'string' && image.length > 0);
   if (validImages.length === 0) return null;
 
-  // Salta las aperturas cuando hay suficientes páginas y rota la escena elegida
-  // para que capítulos consecutivos no se vean idénticos.
   const firstStoryPage = validImages.length > 4 ? 3 : 0;
   const candidateCount = Math.min(8, validImages.length - firstStoryPage);
   const selectedIndex = firstStoryPage + Math.abs(Math.round(chapterNumber * 7)) % candidateCount;
@@ -435,17 +384,15 @@ export const getChapterPreviewImage = async (
   return request;
 };
 
-// 8. CAPÍTULOS POR SERIE (usa endpoint propio — consulta por ero_seri meta)
-/* Los listados piden la lista de capítulos de cada ficha visible: dos secciones
-   de la misma página y el paso de página repiten muchas series, así que la
-   respuesta se guarda y las peticiones simultáneas comparten la misma promesa. */
-const seriesChaptersCache = new Map<string, SeriesChapter[]>();
-const seriesChaptersRequests = new Map<string, Promise<SeriesChapter[] | null>>();
+const seriesChaptersCache = createPublicDataCache<SeriesChapter[] | null>({
+  ttlMs: 60 * 1000,
+  maxEntries: 12,
+  shouldCache: chapters => chapters !== null,
+});
 const chapterCountCache = new Map<string, { count: number; expiresAt: number }>();
 const CHAPTER_COUNT_CACHE_KEY = 'mangamukai:chapter-counts:v1';
 let chapterCountsRestored = false;
 
-/** Solo totales pequeños, con caducidad: reutilizables incluso al recargar el home. */
 export const getCachedSeriesChapterCount = (id: number | string): number | null => {
   if (!chapterCountsRestored) {
     chapterCountsRestored = true;
@@ -454,47 +401,32 @@ export const getCachedSeriesChapterCount = (id: number | string): number | null 
       for (const [key, value] of entries) {
         if (Number.isInteger(value?.count) && value.count >= 0 && value.expiresAt > Date.now()) chapterCountCache.set(key, value);
       }
-    } catch { /* La caché es opcional. */ }
+    } catch {                             }
   }
-  const chapters = seriesChaptersCache.get(String(id));
+  const chapters = seriesChaptersCache.peek(String(id));
   if (chapters) return new Set(chapters.map(chapter => chapter.id)).size;
   const cached = chapterCountCache.get(String(id));
   return cached && cached.expiresAt > Date.now() ? cached.count : null;
 };
 
-const loadSeriesChapters = async (eroSeri: number | string): Promise<SeriesChapter[] | null> => {
+const loadSeriesChapters = (eroSeri: number | string): Promise<SeriesChapter[] | null> => {
   const key = String(eroSeri);
-  const cached = seriesChaptersCache.get(key);
-  if (cached) return cached;
-
-  const pending = seriesChaptersRequests.get(key);
-  if (pending) return pending;
-
-  const request = fetch(`${MM_API}/series/${key}/chapters`)
+  return seriesChaptersCache.load(key, () => fetch(`${MM_API}/series/${key}/chapters`)
     .then(async (res) => {
       if (!res.ok) return null;
       const data = await res.json();
       if (!data.success || !Array.isArray(data.chapters)) return null;
-      const chapters = data.chapters as SeriesChapter[];
-      seriesChaptersCache.set(key, chapters);
-      return chapters;
+      return data.chapters as SeriesChapter[];
     })
     .catch((error) => {
       console.error('Error getChaptersBySeries:', error);
       return null;
-    })
-    .finally(() => {
-      seriesChaptersRequests.delete(key);
-    });
-
-  seriesChaptersRequests.set(key, request);
-  return request;
+    }));
 };
 
 export const getChaptersBySeries = async (eroSeri: number | string): Promise<SeriesChapter[]> =>
   (await loadSeriesChapters(eroSeri)) ?? [];
 
-/** Total publicado, incluidos extras; un error no equivale a una serie sin capítulos. */
 export const getSeriesChapterCount = async (eroSeri: number | string): Promise<number | null> => {
   const cached = getCachedSeriesChapterCount(eroSeri);
   if (cached !== null) return cached;
@@ -502,12 +434,10 @@ export const getSeriesChapterCount = async (eroSeri: number | string): Promise<n
   if (chapters === null) return null;
   const count = new Set(chapters.map((chapter) => chapter.id)).size;
   chapterCountCache.set(String(eroSeri), { count, expiresAt: Date.now() + 5 * 60 * 1000 });
-  try { sessionStorage.setItem(CHAPTER_COUNT_CACHE_KEY, JSON.stringify([...chapterCountCache])); } catch { /* Caché opcional. */ }
+  try { sessionStorage.setItem(CHAPTER_COUNT_CACHE_KEY, JSON.stringify([...chapterCountCache])); } catch {                       }
   return count;
 };
 
-// 9. CAPÍTULOS POR CATEGORÍA (fallback — pagina hasta 100 por página)
-// 10. POPULARES MUJERES POR VISITAS (semanal / mensual / histórico)
 type PopularPeriod = 'weekly' | 'monthly' | 'historical';
 type PopularAudience = 'women' | 'men';
 
@@ -579,12 +509,11 @@ export const getPopularMenByViews = async (
   forceRefresh = true
 ): Promise<MangaCapitulo[]> => getPopularByViews('men', period, forceRefresh);
 
-// 11. ÚLTIMAS ACTUALIZACIONES MUJERES con datos de capítulo
-export const getLatestWomenUpdates = async (limit = 18): Promise<MangaCapitulo[]> => {
+export const getLatestWomenUpdates = (limit = 18): Promise<MangaCapitulo[]> => recentListsCache.load(`latest-women:${limit}`, async () => {
   try {
     const res = await fetch(`${MM_API}/latest-women?limit=${limit}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-     
+
     const data: any = await res.json();
     if (!data.success || !Array.isArray(data.mangas)) return [];
     return data.mangas.map(mapearMangaCatalog);
@@ -592,13 +521,13 @@ export const getLatestWomenUpdates = async (limit = 18): Promise<MangaCapitulo[]
     console.error('Error getLatestWomenUpdates:', error);
     return [];
   }
-};
+});
 
-export const getLatestMenUpdates = async (limit = 18): Promise<MangaCapitulo[]> => {
+export const getLatestMenUpdates = (limit = 18): Promise<MangaCapitulo[]> => recentListsCache.load(`latest-men:${limit}`, async () => {
   try {
     const res = await fetch(`${MM_API}/latest-men?limit=${limit}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-     
+
     const data: any = await res.json();
     if (!data.success || !Array.isArray(data.mangas)) return [];
     return data.mangas.map(mapearMangaCatalog);
@@ -606,9 +535,8 @@ export const getLatestMenUpdates = async (limit = 18): Promise<MangaCapitulo[]> 
     console.error('Error getLatestMenUpdates:', error);
     return [];
   }
-};
+});
 
-// 13. MANGAS RELACIONADOS (por géneros + visitas)
 export interface RelatedManga {
   id: number;
   titulo: string;
@@ -620,11 +548,17 @@ export interface RelatedManga {
   chapterCount?: number;
 }
 
-export const getRelatedMangas = async (mangaId: number | string, limit = 10): Promise<RelatedManga[]> => {
+const relatedMangasCache = createPublicDataCache<RelatedManga[]>({
+  ttlMs: 5 * 60 * 1000,
+  maxEntries: 24,
+  shouldCache: items => items.length > 0,
+});
+
+export const getRelatedMangas = (mangaId: number | string, limit = 10): Promise<RelatedManga[]> => relatedMangasCache.load(`${mangaId}:${limit}`, async () => {
   try {
     const res = await fetch(`${MM_API}/related/${mangaId}?limit=${limit}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-     
+
     const data: any = await res.json();
     if (!data.success || !Array.isArray(data.mangas)) return [];
     return data.mangas as RelatedManga[];
@@ -632,24 +566,8 @@ export const getRelatedMangas = async (mangaId: number | string, limit = 10): Pr
     console.error('Error getRelatedMangas:', error);
     return [];
   }
-};
+});
 
-// 12b. VISTAS POR CAPÍTULO (tabla propia, no la suma de la serie)
-export const getChapterViews = async (ids: Array<number | string>): Promise<Record<string, number>> => {
-  const views: Record<string, number> = {};
-  const unique = [...new Set(ids.map(String).filter((id) => id && id !== '0'))];
-  for (let start = 0; start < unique.length; start += 200) {
-    try {
-      const res = await fetch(`${MM_API}/chapters/views?ids=${unique.slice(start, start + 200).join(',')}`);
-      if (!res.ok) continue;
-      const data: { success?: boolean; views?: Record<string, number> } = await res.json();
-      if (data.success && data.views) Object.assign(views, data.views);
-    } catch { /* silent — las vistas no son críticas */ }
-  }
-  return views;
-};
-
-// 12. REGISTRAR VISITA A CAPÍTULO
 export const trackChapterView = async (chapterId: number | string, mangaId: number | string): Promise<void> => {
   try {
     await fetch(`${MM_API}/track-view`, {
@@ -657,10 +575,9 @@ export const trackChapterView = async (chapterId: number | string, mangaId: numb
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chapter_id: Number(chapterId), manga_id: Number(mangaId) }),
     });
-  } catch { /* silent — no crítico */ }
+  } catch {                           }
 };
 
-// 7. BÚSQUEDA SOBRE EL CATÁLOGO DE SERIES
 export const searchMangas = async (query: string): Promise<MangaCapitulo[]> => {
   const normalize = (value: string) => value
     .normalize('NFD')

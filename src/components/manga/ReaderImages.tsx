@@ -4,7 +4,6 @@ import { READER_IMAGE_BATCH } from '../../services/readerPrefetchSession';
 type Page = { id: string; image_url: string; page_number: number };
 type SizedPage = Page & { width: number; height: number; failed: boolean };
 
-/** Append decoded batches with intrinsic dimensions so loading never collapses the strip. */
 export function ReaderImages({ images, title, onComplete }: {
   images: Page[];
   title?: string;
@@ -13,7 +12,7 @@ export function ReaderImages({ images, title, onComplete }: {
   const [pages, setPages] = useState<SizedPage[]>([]);
   const completeRef = useRef(onComplete);
   useEffect(() => { completeRef.current = onComplete; }, [onComplete]);
-  // Metadata updates can provide a fresh array with the same pages: keep the downloads alive.
+
   const manifest = JSON.stringify(images);
   useEffect(() => {
     const source: Page[] = JSON.parse(manifest);

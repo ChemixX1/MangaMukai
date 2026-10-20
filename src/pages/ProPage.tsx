@@ -14,15 +14,7 @@ import discountIcon from '../assets/subscription/discount.svg';
 import premiumProfileIcon from '../assets/subscription/premium-profile.svg';
 import '../styles/pro.css';
 
-
 const GradientASCII = lazy(loadSubscriptionBackground);
-
-export function preloadProAssets() {
-  [bonusCoins, readingIcon, communityIcon, basicProfileIcon, musicIcon, collectionsIcon, discountIcon, premiumProfileIcon].forEach(src => {
-    const image = new Image();
-    image.src = src;
-  });
-}
 
 interface PlanFeature {
   icon: ReactNode;
@@ -106,7 +98,6 @@ const PRICING_TIERS: PricingTier[] = [
   },
 ];
 
-// Ambos ciclos incluyen los mismos beneficios; el anual añade la bonificación de monedas.
 PRICING_TIERS[2].features = [...PRICING_TIERS[1].features, ...PRICING_TIERS[2].features];
 
 export default function ProPage() {
@@ -121,6 +112,7 @@ export default function ProPage() {
 
   return (
     <main className="pro-page" aria-label="Suscripción Mukai">
+      <h1 className="sr-only">Mukai Pro</h1>
       <div className="pro-gradient-background" aria-hidden="true">
         <div className="pro-gradient-canvas">
           <Suspense fallback={null}>
@@ -151,7 +143,7 @@ export default function ProPage() {
         </div>
       </div>
       <div className="pro-shell is-ready">
-        {/* Marca de agua tipográfica gigante detrás de las tarjetas */}
+
         <div className="pro-stage">
           <span className="pro-backdrop-word" aria-hidden="true">
             Mukai Pro
@@ -216,7 +208,6 @@ export default function ProPage() {
               );
             })}
           </section>
-
 
         </div>
       </div>

@@ -1,18 +1,11 @@
-/**
- * Ficha de presentación de cada personaje (pantalla previa a la conversación):
- * frase gancho (sin punto: coma o &; se muestra con cada inicial en mayúscula),
- * etiquetas, sinopsis, el papel que
- * interpreta el lector, la vista previa de la escena y el manga referencial del
- * catálogo. Textos y series provisionales, a la par de las fichas de chatCharacters.
- */
 
-/** Vista previa en forma de chat: narrador, tu primer turno y la respuesta del personaje. */
+
 export interface CharacterPreview {
-  /** Presentación de la escena (bocadillo del narrador), por párrafos. */
+
   scene: string[];
-  /** Tu turno: lo que dices y, en cursiva, lo que haces. */
+
   user: { line: string; narration?: string };
-  /** Su respuesta: en cursiva lo que hace y después lo que dice. */
+
   character: { narration?: string; line: string };
 }
 
@@ -20,12 +13,12 @@ export interface CharacterIntro {
   tagline: string;
   tags: string[];
   synopsis: string[];
-  /** Papel del lector (la tarjeta muestra su nombre de usuario o "Usuario"). */
+
   role: string;
   preview: CharacterPreview;
-  /** Id de la serie del catálogo que se muestra como "Manga Referencial" (provisional). */
+
   relatedMangaId?: number;
-  /** Color del contenedor del personaje: fondo del botón "Iniciar conversación" y acentos. */
+
   accent: string;
 }
 

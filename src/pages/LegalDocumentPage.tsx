@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 
 import { LEGAL_DOCUMENTS, findLegalDocument } from '../data/legalDocuments';
 
-/** "Cómo gestionarlas" -> "como-gestionarlas", para enlazar apartados con #. */
 const sectionId = (heading: string) =>
   heading
     .normalize('NFD')
@@ -16,15 +15,10 @@ interface LegalDocumentPageProps {
   slug: string;
 }
 
-/**
- * Página de un documento legal: fondo blanco y una hoja tipo documento
- * mecanografiado, en Montserrat negro y párrafos ordenados. Sin adornos.
- */
 export const LegalDocumentPage = ({ slug }: LegalDocumentPageProps) => {
   const document = findLegalDocument(slug);
   const { hash } = useLocation();
 
-  // El enrutador vuelve arriba en cada ruta; con #apartado se baja hasta él.
   useEffect(() => {
     if (!hash) return;
     const frame = window.requestAnimationFrame(() => {
@@ -38,7 +32,7 @@ export const LegalDocumentPage = ({ slug }: LegalDocumentPageProps) => {
   return (
     <main className="legal-document min-h-screen bg-white px-4 pb-16 pt-6 text-black lg:px-8 lg:pb-24 lg:pt-28">
       <article className="legal-sheet mx-auto w-full max-w-[760px] border border-zinc-300 bg-[#fdfcf9] px-6 py-10 sm:px-10 sm:py-14 md:px-14 md:py-16">
-        {/* Cabecera del documento */}
+
         <header className="border-b border-zinc-800 pb-6">
           <p className="font-[Montserrat] text-[12px] font-semibold text-zinc-500">MangaMukai</p>
           <h1 className="mt-3 font-[Montserrat] text-[26px] font-bold uppercase leading-tight sm:text-[30px]">{document.title}</h1>
@@ -61,7 +55,7 @@ export const LegalDocumentPage = ({ slug }: LegalDocumentPageProps) => {
           </section>
         ))}
 
-        {/* Documentos relacionados */}
+
         <footer className="mt-12 border-t border-zinc-800 pt-6">
           <p className="font-[Montserrat] text-[12px] font-semibold text-zinc-500">Otros documentos</p>
           <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">

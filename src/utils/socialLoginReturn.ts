@@ -12,7 +12,7 @@ export const rememberSocialReturn = (provider: string, returnTo: string) => {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ provider, returnTo: safeAuthReturn(returnTo), createdAt: Date.now() }));
   } catch {
-    // Google can still sign in when the browser disallows optional session storage.
+
   }
 };
 
@@ -29,5 +29,5 @@ export const readSocialReturn = (provider: string | null): string | null => {
 };
 
 export const clearSocialReturn = () => {
-  try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* Optional storage. */ }
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch {                         }
 };

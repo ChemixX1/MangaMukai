@@ -8,7 +8,7 @@ export interface ReaderBundle {
   number: number;
   images: string[];
   error: string | null;
-  /** Capítulo de pago no comprado: el servidor no manda páginas (402/401). */
+
   locked: boolean;
   price: number;
   requiresLogin: boolean;
@@ -25,7 +25,6 @@ export interface ReaderSibling {
 const cancelled = () => new DOMException('Reader session stopped', 'AbortError');
 export const READER_IMAGE_BATCH = 5;
 
-/** Una visita a la ficha y sus capítulos comparte la misma precarga cancelable. */
 export class ReaderPrefetchSession {
   mangaId = '';
   readonly detailRoutes = new Set<string>();
@@ -61,7 +60,7 @@ export class ReaderPrefetchSession {
   pause() {
     this.generation++;
     if (this.schedule) clearTimeout(this.schedule);
-    // Las imágenes del capítulo abierto pasan a pertenecer al DOM del lector.
+
     for (const controller of this.imageJobs.keys()) controller.abort();
     for (const [id, job] of this.pending) if (id !== this.focused) job.controller.abort();
   }
@@ -98,7 +97,7 @@ export class ReaderPrefetchSession {
       if (this.mangaId && bundle.mangaId !== this.mangaId) throw cancelled();
       this.mangaId = bundle.mangaId;
       this.cache.set(id, bundle);
-      // Keep metadata bounded; already downloaded images remain in the browser's HTTP cache.
+
       if (this.cache.size > 48) for (const key of this.cache.keys()) { if (key !== this.focused && key !== id) { this.cache.delete(key); break; } }
       return bundle;
     }).finally(() => { if (this.pending.get(id)?.controller === controller) this.pending.delete(id); });
@@ -153,7 +152,7 @@ export class ReaderPrefetchSession {
     const order: ReaderSibling[] = [];
     if (index < 0) order.push(...chapters);
     if (index >= 0) {
-      // Tras terminar el capítulo, descarga completos solo sus dos vecinos.
+
       if (chapters[index+1]) order.push(chapters[index+1]);
       if (chapters[index-1]) order.push(chapters[index-1]);
     }
@@ -162,7 +161,7 @@ export class ReaderPrefetchSession {
       for (const chapter of order) {
         if (generation !== this.generation || this.disposed || document.hidden) return;
         const id = String(chapter.id);
-        // Preloading never buys a chapter and never bypasses its server-side access check.
+
         const released = !!chapter.free_at && new Date(chapter.free_at).getTime() <= Date.now();
         if (id === this.focused || (chapter.is_paid && !released && !unlocked.has(id))) continue;
         const cached = this.peek(id);
@@ -214,7 +213,6 @@ export function chapterReaderSession(id: string) {
   return shared;
 }
 
-/** Se ejecuta fuera de Suspense: salir cancela incluso si la siguiente ruta sigue descargándose. */
 export function syncReaderPrefetchRoute(pathname: string) {
   ensureOwner();
   if (!shared) return;

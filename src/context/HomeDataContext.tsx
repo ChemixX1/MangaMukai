@@ -4,7 +4,7 @@ import { seedSharedAuthCovers } from '../utils/authCoverCache';
 import { createHomeDataLoader, type HomeSnapshot } from '../utils/progressiveHomeData';
 import { loadSearchCatalog } from '../services/searchCatalog';
 import { scheduleSubscriptionBackground } from '../utils/subscriptionBackground';
-import { whenIdle } from '../utils/whenIdle';
+import { blockBackgroundTasks, scheduleBackgroundTask } from '../utils/backgroundTasks';
 
 interface HomeData extends HomeSnapshot {
   retry: () => void;
@@ -26,13 +26,17 @@ export const useHomeData = () => useContext(HomeDataContext);
 
 export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
   const [data, setData] = useState(loader.getSnapshot);
-  const retry = useCallback(() => { void loader.load(); }, []);
+  const retry = useCallback(() => {
+    const release = blockBackgroundTasks();
+    void loader.load().finally(release);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = loader.subscribe(setData);
     setData(loader.getSnapshot());
-    void loader.load();
-    return unsubscribe;
+    const release = blockBackgroundTasks();
+    void loader.load().finally(release);
+    return () => { unsubscribe(); release(); };
   }, []);
 
   useEffect(() => {
@@ -42,7 +46,7 @@ export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
   }, [data.isOutage, retry]);
 
   useEffect(() => {
-    // Guarda referencias para autenticación; no descarga imágenes ni bloquea el home.
+
     seedSharedAuthCovers([
       ...data.popularHistorical,
       ...data.popularWeekly,
@@ -55,21 +59,15 @@ export const HomeDataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!data.isReady || data.isOutage) return;
-    // Solo datos: las imágenes del buscador se solicitan cuando se abre.
-    return whenIdle(() => { void loadSearchCatalog().catch(() => {}); });
+
+    return scheduleBackgroundTask('search:catalog', () => loadSearchCatalog());
   }, [data.isReady, data.isOutage]);
 
   const allListsLoaded = Object.values(data.loaded).every(Boolean);
   useEffect(() => {
-    if (!allListsLoaded) return;
-    let cancelled = false;
-    let cancelWarm: (() => void) | undefined;
-    // Let the existing search catalog preload finish before scheduling decoration.
-    void loadSearchCatalog().catch(() => {}).then(() => {
-      if (!cancelled) cancelWarm = scheduleSubscriptionBackground();
-    });
-    return () => { cancelled = true; cancelWarm?.(); };
-  }, [allListsLoaded]);
+    if (!allListsLoaded || data.isOutage) return;
+    return scheduleSubscriptionBackground();
+  }, [allListsLoaded, data.isOutage]);
 
   return <HomeDataContext.Provider value={{ ...data, retry }}>{children}</HomeDataContext.Provider>;
 };

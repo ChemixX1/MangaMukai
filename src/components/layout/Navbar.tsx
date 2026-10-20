@@ -1,16 +1,20 @@
 import { X } from 'lucide-react';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AlarmAlert, TimerModal } from '../modals';
 import { NavbarM } from './NavbarM';
 import { NavbarP } from './NavbarP';
 import { useNavbarState } from './useNavbarState';
-export { OPEN_TIMER_EVENT } from './useNavbarState';
+
 const SearchOverlay = lazy(() => import('./SearchOverlay').then(({ SearchOverlay }) => ({ default: SearchOverlay })));
 const NotificationsOverlay = lazy(() => import('./NotificationsOverlay').then(({ NotificationsOverlay }) => ({ default: NotificationsOverlay })));
 const CartOverlay = lazy(() => import('./CartOverlay').then(({ CartOverlay }) => ({ default: CartOverlay })));
 
 export function Navbar() {
   const model = useNavbarState();
+  const [searchMounted, setSearchMounted] = useState(false);
+  const [notificationsMounted, setNotificationsMounted] = useState(false);
+  useEffect(() => { if (model.isSearchOpen) setSearchMounted(true); }, [model.isSearchOpen]);
+  useEffect(() => { if (model.isNotificationsOpen) setNotificationsMounted(true); }, [model.isNotificationsOpen]);
   const { isLightMode, currentUser, sessionNotice, setSessionNotice, isMobile, isStoreMode, isMessagesRoute, isSearchOpen, closeSearchOverlay, isNotificationsOpen, closeNotificationsOverlay, isCartOpen, closeCartOverlay, isTimerModalOpen, setIsTimerModalOpen, isAlarmAlertOpen, setIsAlarmAlertOpen, timeLeft, isTimerActive, startTimer, stopTimer, openAuthPage } = model;
   return (
     <>
@@ -38,9 +42,12 @@ export function Navbar() {
       )}
 
       <Suspense fallback={null}>
-        <SearchOverlay open={isSearchOpen} isLight={isLightMode} onClose={closeSearchOverlay} />
-        <NotificationsOverlay desktop={!isMobile} open={isNotificationsOpen} isLight={isLightMode} onClose={closeNotificationsOverlay} />
-        {/* Sigue montado mientras esté abierto al salir de la Tienda, para que el panel se cierre solo con la ruta. */}
+        {(isSearchOpen || searchMounted) && <SearchOverlay open={isSearchOpen} isLight={isLightMode} onClose={closeSearchOverlay} />}
+      </Suspense>
+      <Suspense fallback={null}>
+        {(isNotificationsOpen || notificationsMounted) && <NotificationsOverlay desktop={!isMobile} open={isNotificationsOpen} isLight={isLightMode} onClose={closeNotificationsOverlay} />}
+      </Suspense>
+      <Suspense fallback={null}>
         {(isStoreMode || isCartOpen) && <CartOverlay open={isCartOpen} isLight={isLightMode} onClose={closeCartOverlay} />}
       </Suspense>
 

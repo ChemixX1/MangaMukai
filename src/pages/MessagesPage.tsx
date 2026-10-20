@@ -40,7 +40,6 @@ const timeAgo = (value: string) => {
 
 const formatTime = (date: Date) => new Intl.DateTimeFormat('es-PE', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
 
-/** "Hoy 1:25 p. m." / "Ayer 9:10 a. m." / "12 de mayo 8:00 p. m." */
 const formatSeparator = (value: string) => {
   const date = new Date(value);
   const today = new Date();
@@ -63,10 +62,6 @@ const Avatar = ({ user, size = 'h-12 w-12', text = 'text-base' }: { user: Pick<F
   ? <img src={user.avatar_url} alt="" className={`${size} shrink-0 rounded-full object-cover`} />
   : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#FF4D88] font-black text-white ${text}`}>{user.username.charAt(0).toUpperCase()}</span>;
 
-/**
- * Página de mensajes: lista de chats a la izquierda (o a pantalla completa en móvil) y conversación a la derecha.
- * Se abre desde el botón "Mensajes" de la Comunidad y va sin navbar: ocupa toda la altura y vuelve con su propia flecha.
- */
 export const MessagesPage = () => {
   const navigate = useNavigate();
   const { userId = '' } = useParams();
@@ -127,7 +122,6 @@ export const MessagesPage = () => {
     return () => window.clearInterval(timer);
   }, [loadConversations]);
 
-  /* Perfil del interlocutor: cabecera del chat (estado) y bloque "Se unió". */
   useEffect(() => {
     activeIdRef.current = activeId;
     setPartner(null);
@@ -146,7 +140,7 @@ export const MessagesPage = () => {
       setMessages((current) => [...new Map([...current, ...result.messages].map((message) => [message.id, message])).values()].sort((a, b) => a.id - b.id));
       if (before || !hasLoaded.current) setHasMore(result.hasMore);
       hasLoaded.current = true;
-      // Solo se marca como leído cuando hay mensajes nuevos del otro lado; así el sondeo no dispara escrituras.
+
       const pendingRead = result.messages.some((message) => message.sender_id === target && !message.read_at);
       if (pendingRead && !document.hidden) void markConversationRead(target).then(() => { notifyNavbar(); void loadConversations(); }).catch(() => undefined);
       setChatError('');
@@ -211,7 +205,6 @@ export const MessagesPage = () => {
   const pill = isLight ? 'bg-[#eff3f4] text-black' : 'bg-white/10 text-white';
   const hover = isLight ? 'hover:bg-black/5' : 'hover:bg-white/[0.06]';
 
-  /* Separadores de fecha: uno por día o cuando pasan más de 30 min entre mensajes. */
   const rows: Array<{ type: 'separator'; key: string; label: string } | { type: 'message'; message: ChatMessage }> = [];
   messages.forEach((message, index) => {
     const previous = messages[index - 1];
@@ -225,7 +218,7 @@ export const MessagesPage = () => {
 
   return (
     <main className={`messages-page pt-[env(safe-area-inset-top)] transition-colors ${surface}`}>
-      {/* Sin navbar: toda la altura menos la barra inferior en móvil; en escritorio, la pantalla completa. */}
+
       <div className={`mx-auto flex h-[calc(100dvh-64px-env(safe-area-inset-bottom)-env(safe-area-inset-top))] w-full max-w-6xl lg:grid lg:h-[100dvh] lg:grid-cols-[360px_minmax(0,1fr)] lg:border-x ${divider}`}>
         <section className={`relative flex min-h-0 w-full min-w-0 flex-col lg:border-r ${divider} ${activeId ? 'hidden lg:flex' : 'flex'}`} aria-label="Chats">
           <header className={`flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3 ${divider}`}>
@@ -250,7 +243,7 @@ export const MessagesPage = () => {
           {listError && <p role="alert" className="px-4 pt-3 text-xs text-red-500">{listError} <button type="button" onClick={() => void loadConversations()} className="underline">Reintentar</button></p>}
 
           <div className="min-h-0 flex-1 overflow-y-auto pb-24 pt-2 lg:pb-4">
-            {/* Mientras carga no se pinta nada; el aviso solo cuando ya se sabe que no hay chats. */}
+
             {!listLoading && !listError && conversations.length === 0 && (
               <div className="px-8 py-16 text-center">
                 <MessageCircle size={34} className="mx-auto mb-3" style={{ color: CHAT_ACCENT }} />
@@ -289,7 +282,7 @@ export const MessagesPage = () => {
           </div>
         </section>
 
-        {/* w-full: como hijo flex sin ancho se encogía al contenido y el chat quedaba pegado a la izquierda en móvil. */}
+
         <section className={`min-h-0 w-full min-w-0 flex-col ${activeId ? 'flex' : 'hidden lg:flex'}`} aria-label={headerUser ? `Chat con ${headerUser.username}` : 'Conversación'}>
           {!activeId ? (
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
@@ -313,7 +306,7 @@ export const MessagesPage = () => {
               </header>
 
               <div ref={scrollRef} onScroll={() => { const element = scrollRef.current; if (element) stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; }} className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-6">
-                {/* Bloque de presentación, como en los DM de X: foto, "Se unió", seguidores y Ver perfil. */}
+
                 {!hasMore && (
                   <div className="mb-8 flex flex-col items-center text-center">
                     {partner ? (
@@ -355,7 +348,7 @@ export const MessagesPage = () => {
               </div>
 
               {chatError && <p className="bg-red-500/10 px-4 py-2 text-xs text-red-500">{chatError}</p>}
-              {/* Rejilla [campo | botón] con el mismo margen a ambos lados y hueco para la barra del sistema. */}
+
               <form onSubmit={submit} className={`grid shrink-0 grid-cols-[minmax(0,1fr)_44px] items-end gap-2 border-t px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 ${divider}`}>
                 <label className={`flex min-h-11 w-full items-center rounded-[24px] border px-4 ${isLight ? 'border-black/15 bg-white' : 'border-white/20 bg-black'}`}>
                   <textarea

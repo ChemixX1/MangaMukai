@@ -1,5 +1,3 @@
-/* theme: estilos compartidos entre tamaños de pantalla. */
-
 :root {
   background-color: rgb(var(--mm-surface));
   color-scheme: light;
@@ -26,7 +24,6 @@
   --mm-type-manhua: #a21caf;
   --mm-type-novel: #2563eb;
   --mm-free: #22e05a;
-  /* Diseño de PC: tarjetas de Telegram y Discord y línea de la cabecera. */
   --mm-pc-card: #fcfcfc;
   --mm-pc-card-line: #e8e8e8;
   --mm-pc-nav-line: #beb7b7;

@@ -58,7 +58,7 @@ export const MangaRecommendations = ({ items, currentId, title = 'Series similar
           if (event.button !== 0) return;
           takeControl(event.currentTarget);
           suppressClick.current = false;
-          // Touch keeps native scrolling and momentum; mouse/pen use dragging.
+
           if (event.pointerType === 'touch') return;
           drag.current = { id: event.pointerId, y: event.clientY, scrollTop: event.currentTarget.scrollTop, moved: false };
         }}

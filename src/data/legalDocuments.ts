@@ -1,7 +1,5 @@
-/**
- * Documentos legales del sitio (privacidad, términos, normas de la comunidad y
- * cookies). Cada uno se sirve en su propia ruta con LegalDocumentPage.
- */
+
+
 export interface LegalSection {
   heading: string;
   paragraphs: string[];
@@ -11,7 +9,7 @@ export interface LegalDocument {
   slug: string;
   path: string;
   title: string;
-  /** Resumen para el <meta name="description">. */
+
   description: string;
   updatedAt: string;
   intro: string;

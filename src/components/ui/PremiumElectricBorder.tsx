@@ -4,7 +4,6 @@ import '../../styles/premium-electric-border.css';
 
 const ElectricLogo = lazy(() => import('./ElectricLogo'));
 
-/** Decorative overlay; the parent owns the avatar and premium eligibility. */
 export function PremiumElectricBorder() {
   return <span className="premium-electric-border" aria-hidden="true">
     <Suspense fallback={null}>

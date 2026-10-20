@@ -83,3 +83,72 @@ test('a stalled hero does not prevent the remaining sections from loading', asyn
   await pending;
   assert.equal(loader.getSnapshot().isReady, true);
 });
+
+test('returning after expiry refreshes progressively while the previous snapshot stays visible', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const requests = [];
+  let refresh = false;
+  const deferred = Object.fromEntries(HOME_LISTS.map(key => [key, Promise.withResolvers()]));
+  const loader = createHomeDataLoader(Object.fromEntries(HOME_LISTS.map(key => [key, () => {
+    requests.push(key);
+    return refresh ? deferred[key].promise : Promise.resolve(manga);
+  }])), 1200, 60_000);
+  await loader.load();
+  const previous = loader.getSnapshot();
+  t.mock.timers.tick(59_999);
+  await loader.load();
+  assert.equal(requests.length, 7);
+  assert.equal(loader.getSnapshot(), previous);
+
+  t.mock.timers.tick(1);
+  refresh = true;
+  requests.length = 0;
+  const pending = loader.load();
+  assert.equal(loader.load(), pending, 'remounts share the refresh request');
+  assert.equal(loader.getSnapshot(), previous, 'expiry does not blank the existing snapshot');
+  assert.deepEqual(requests, ['popularHistorical', 'popularWeekly']);
+  const updated = [{ id: 2, titulo: 'Nuevo manga', portada: '/new-cover.webp' }];
+  deferred.popularHistorical.resolve(updated);
+  await tick();
+  assert.equal(loader.getSnapshot().popularHistorical, updated);
+  assert.equal(loader.getSnapshot().latestWomen, manga);
+  assert.equal(loader.getSnapshot().isReady, true);
+  deferred.popularWeekly.resolve(updated);
+  await tick();
+  assert.equal(requests.length, 7);
+  for (const key of HOME_LISTS.slice(2)) deferred[key].resolve(updated);
+  await pending;
+  assert.equal(loader.getSnapshot().latestWomen, updated);
+  await loader.load();
+  assert.equal(requests.length, 7, 'successful refresh starts a new freshness window');
+});
+
+test('failed or empty refresh responses preserve visible sections and recover on a later revisit', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  let fail = false;
+  let current = manga;
+  const loader = createHomeDataLoader(Object.fromEntries(HOME_LISTS.map(key => [key, async () => {
+    if (fail) {
+      if (key === 'popularHistorical') throw new Error('offline');
+      return [];
+    }
+    return current;
+  }])), 1200, 60_000);
+  await loader.load();
+  t.mock.timers.tick(60_000);
+  fail = true;
+  const updates = [];
+  const unsubscribe = loader.subscribe(snapshot => updates.push(snapshot));
+  await loader.load();
+  for (const snapshot of updates) {
+    assert.equal(snapshot.isReady, true);
+    assert.equal(snapshot.isOutage, false);
+    for (const key of HOME_LISTS) assert.equal(snapshot[key], manga);
+  }
+  t.mock.timers.tick(60_000);
+  fail = false;
+  current = [{ id: 3, titulo: 'Recuperado', portada: '/recovered.webp' }];
+  await loader.load();
+  for (const key of HOME_LISTS) assert.equal(loader.getSnapshot()[key], current);
+  unsubscribe();
+});

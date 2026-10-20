@@ -13,7 +13,7 @@ export const PaymentSuccess = () => {
   const [status, setStatus] = useState<Status>("verifying");
   const [attempt, setAttempt] = useState(0);
 
-  const MAX_ATTEMPTS = 20;    // 20 × 1500ms = 30 s máximo
+  const MAX_ATTEMPTS = 20;
   const POLL_MS      = 1500;
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export const PaymentSuccess = () => {
           if (activated) {
             window.clearInterval(timer);
             await refreshUser();
-            // Mukai Music queda desbloqueado en el acto, sin recargar la web.
+
             await refreshMusicLibrary();
             setStatus("success");
             return;
@@ -55,7 +55,7 @@ export const PaymentSuccess = () => {
           }
         }
       } catch {
-        // network hiccup — keep polling
+
       }
 
       if (attempts >= MAX_ATTEMPTS) {
@@ -73,7 +73,7 @@ export const PaymentSuccess = () => {
     <div className="min-h-screen w-full bg-[#09090b] flex items-center justify-center p-4">
       <AnimatePresence mode="wait">
 
-        {/* VERIFICANDO */}
+
         {status === "verifying" && (
           <motion.div
             key="verifying"
@@ -91,7 +91,7 @@ export const PaymentSuccess = () => {
             <p className="text-zinc-400 text-sm font-medium mb-6">
               Confirmando tu pago con PayPal...
             </p>
-            {/* barra de progreso */}
+
             <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-gradient-to-r from-yellow-500 to-yellow-400 rounded-full"
@@ -106,7 +106,7 @@ export const PaymentSuccess = () => {
           </motion.div>
         )}
 
-        {/* ÉXITO */}
+
         {status === "success" && (
           <motion.div
             key="success"
@@ -137,7 +137,7 @@ export const PaymentSuccess = () => {
           </motion.div>
         )}
 
-        {/* TIMEOUT */}
+
         {status === "timeout" && (
           <motion.div
             key="timeout"

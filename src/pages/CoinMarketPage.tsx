@@ -119,7 +119,7 @@ export const CoinMarketPage = () => {
   const checkoutHeading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    // Warm every package as soon as the recharge page opens, before checkout.
+
     void Promise.allSettled(COIN_PACKS.map(getCoinQuote));
   }, []);
 

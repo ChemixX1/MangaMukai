@@ -6,11 +6,6 @@ import { SlidePanel } from './SlidePanel';
 
 const money = (value: number) => `$${value.toFixed(2)} USD`;
 
-/**
- * Carrito del navbar (móvil): una ventana que entra por la derecha hasta el
- * centro de la página con los productos seleccionados en la Tienda. La bolsa
- * es local (guardada en este navegador), como en la propia tienda.
- */
 export const CartOverlay = ({ open, isLight, onClose }: { open: boolean; isLight: boolean; onClose: () => void }) => {
   const { cart, count, setQuantity } = useShopCart();
   const items = products.filter((product) => cart[product.id] > 0);
@@ -53,7 +48,7 @@ export const CartOverlay = ({ open, isLight, onClose }: { open: boolean; isLight
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <h3 className={`line-clamp-2 font-[Montserrat] text-[11.5px] font-bold leading-tight ${text}`}>{product.title}</h3>
                     <p className={`font-[Montserrat] text-[11px] font-semibold ${muted}`}>{money(product.price)}</p>
-                    {/* Cantidad: − n + (máximo 10 unidades, igual que en la tienda). Al llegar a 0 sale del carrito. */}
+
                     <div className="mt-auto flex items-center gap-1.5">
                       <button type="button" onClick={() => setQuantity(product.id, quantity - 1)} aria-label={`Quitar una unidad de ${product.title}`} className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${control}`}>
                         <Minus size={13} strokeWidth={2.5} />

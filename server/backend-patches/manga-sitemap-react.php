@@ -1,7 +1,4 @@
 <?php
-/**
- * Image sitemap for canonical React manga URLs.
- */
 
 $wp_root = dirname(__FILE__, 2);
 if (!file_exists($wp_root . '/wp-load.php')) {
@@ -10,8 +7,11 @@ if (!file_exists($wp_root . '/wp-load.php')) {
 }
 
 require_once $wp_root . '/wp-load.php';
+require_once __DIR__ . '/seo-common.php';
+$page = max(1, absint($_GET['page'] ?? 1));
+$per_page = 5000;
 
-$cache_file = sys_get_temp_dir() . '/mm_manga_image_sitemap_v2.xml';
+$cache_file = sys_get_temp_dir() . '/mm_manga_image_sitemap_' . filemtime(__FILE__) . '_' . filemtime(__DIR__ . '/seo-config.json') . '_' . $page . '.xml';
 $cache_ttl = HOUR_IN_SECONDS;
 
 if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) {
@@ -23,31 +23,36 @@ if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) 
 }
 
 global $wpdb;
-$mangas = $wpdb->get_results(
-    "SELECT ID, post_modified_gmt
-     FROM {$wpdb->posts}
-     WHERE post_type = 'manga' AND post_status = 'publish'
-     ORDER BY post_modified_gmt DESC
-     LIMIT 50000"
-);
+$mangas = $wpdb->get_results($wpdb->prepare(
+    "SELECT m.ID, GREATEST(m.post_modified_gmt, COALESCE(c.modified, m.post_modified_gmt)) AS modified
+     FROM {$wpdb->posts} m
+     LEFT JOIN (
+         SELECT CAST(pm.meta_value AS UNSIGNED) AS manga_id, MAX(p.post_modified_gmt) AS modified
+         FROM {$wpdb->posts} p
+         INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = 'ero_seri'
+         WHERE p.post_type = 'post' AND p.post_status = 'publish'
+         GROUP BY CAST(pm.meta_value AS UNSIGNED)
+     ) c ON c.manga_id = m.ID
+     WHERE m.post_type = 'manga' AND m.post_status = 'publish'
+     ORDER BY m.ID ASC LIMIT %d OFFSET %d",
+    $per_page, ($page - 1) * $per_page
+));
+if ($page > 1 && !$mangas) { http_response_code(404); exit; }
 
 $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . "\n";
 $xml .= '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">' . "\n";
 
-// Rutas fijas de la aplicacion React. Sin esto solo se envian fichas de manga y
-// la portada y las colecciones dependen de que Google las descubra por enlaces.
-$newest = $mangas ? mysql2date(DATE_W3C, $mangas[0]->post_modified_gmt, false) : gmdate(DATE_W3C);
-foreach (['/', '/manga-19', '/manga-bn', '/nosotros', '/contacto', '/legal', '/privacidad', '/terminos', '/normas-comunidad', '/cookies'] as $static_path) {
+// Static pages have no trustworthy content timestamp: omit lastmod.
+if ($page === 1) foreach (array_keys(mm_seo_config()['routes']) as $static_path) {
     $xml .= "  <url>\n";
     $xml .= '    <loc>' . esc_xml('https://mangamukai.com' . $static_path) . "</loc>\n";
-    $xml .= '    <lastmod>' . esc_xml($newest) . "</lastmod>\n";
     $xml .= "  </url>\n";
 }
 
 foreach ($mangas as $manga) {
     $url = 'https://mangamukai.com/manga/' . $manga->ID;
-    $modified = mysql2date(DATE_W3C, $manga->post_modified_gmt, false);
+    $modified = mm_seo_date($manga->modified);
     $cover_id = get_post_thumbnail_id($manga->ID);
     $custom_cover = get_post_meta($manga->ID, 'manga_cover', true);
     $legacy_cover = get_post_meta($manga->ID, 'ero_cover', true);
@@ -64,9 +69,11 @@ foreach ($mangas as $manga) {
         $cover_url = $custom_cover;
     }
 
+    if (!$cover_url && is_string($legacy_cover) && filter_var($legacy_cover, FILTER_VALIDATE_URL)) $cover_url = $legacy_cover;
+
     $xml .= "  <url>\n";
     $xml .= '    <loc>' . esc_xml($url) . "</loc>\n";
-    $xml .= '    <lastmod>' . esc_xml($modified) . "</lastmod>\n";
+    if ($modified) $xml .= '    <lastmod>' . esc_xml($modified) . "</lastmod>\n";
 
     if ($cover_url) {
         $xml .= "    <image:image>\n";

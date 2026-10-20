@@ -10,7 +10,6 @@ import { OutlinedName } from './OutlinedName';
 import { PreviewChat } from './PreviewChat';
 import { RelatedManga } from './RelatedManga';
 
-/** Personajes sin ficha propia (los clásicos): se arma una con lo que ya tienen. */
 const resolveIntro = (character: ChatCharacter): CharacterIntro =>
   characterIntros[character.id] ?? {
     tagline: character.description,
@@ -29,12 +28,6 @@ interface MobileCharacterIntroProps {
   character: ChatCharacter;
 }
 
-/**
- * Pantalla previa a la conversación (/chat/:id): en móvil muestra la foto en la
- * parte superior y el contenido debajo con el botón fijo abajo; en PC presenta
- * una distribución en dos columnas con la tarjeta del personaje a la izquierda y
- * la ficha completa a la derecha.
- */
 export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) => {
   const user = useExperienceUser();
   const card = CHARACTER_CARDS.find((item) => item.id === character.id);
@@ -43,7 +36,7 @@ export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) =
   return (
     <div className="character-intro-page focus-scope tap-transparent min-h-screen overflow-x-hidden bg-surface text-ink">
       <div className="lg:mx-auto lg:grid lg:max-w-[1160px] lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-10 lg:px-8 lg:pb-20 lg:pt-28">
-        {/* Columna izquierda en PC / Cabecera a todo el ancho en móvil */}
+
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -89,7 +82,7 @@ export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) =
               />
             )}
             <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-surface via-surface/60 via-45% to-transparent lg:from-black/75 lg:via-black/30" />
-            {/* Nombre en la parte inferior de la portada, con el mismo contorno que en las tarjetas. */}
+
             <OutlinedName
               id={`intro-${character.id}`}
               text={character.name}
@@ -98,7 +91,7 @@ export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) =
               fontSize={34}
               className="absolute inset-x-0 bottom-8 lg:drop-shadow-[0_4px_10px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:scale-105"
             />
-            {/* Flecha de volver en móvil: cuadrado pegado a la esquina superior izquierda. */}
+
             <Link
               to="/chat"
               aria-label="Volver a Character Chat"
@@ -118,7 +111,7 @@ export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) =
           </Link>
         </motion.div>
 
-        {/* Columna derecha en PC / Cuerpo en móvil */}
+
         <motion.main
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -128,7 +121,7 @@ export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) =
         >
           <h1 className="-mx-3 text-balance text-center font-montserrat text-[20px] font-semibold leading-7 tracking-tight lg:mx-0 lg:text-left lg:text-3xl lg:leading-9">{intro.tagline}</h1>
 
-          {/* Etiquetas pequeñas */}
+
           <ul className="mt-4 flex flex-wrap justify-center gap-2 leading-normal lg:justify-start" aria-label="Etiquetas">
             {intro.tags.map((tag) => (
               <li
@@ -144,7 +137,7 @@ export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) =
             {intro.synopsis.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
           </div>
 
-          {/* Tu papel: tarjeta con la foto y el nombre del lector */}
+
           <section
             className="group mt-7 rounded-2xl bg-[#f0f0f0] px-4 py-4 shadow-[0_8px_22px_-6px_rgba(0,0,0,0.12)] ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_-6px_rgba(0,0,0,0.18)] dark:bg-zinc-900 dark:ring-white/10 dark:shadow-[0_10px_26px_-6px_rgba(0,0,0,0.55)] lg:flex lg:items-center lg:gap-5 lg:p-5"
             aria-label="Tu papel"
@@ -177,7 +170,7 @@ export const MobileCharacterIntro = ({ character }: MobileCharacterIntroProps) =
         </motion.main>
       </div>
 
-      {/* Botón fijo abajo en móvil, con el color del contenedor del personaje. */}
+
       <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-surface from-55% to-transparent pt-6 lg:hidden" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <div className="mx-auto w-full max-w-[441px] px-6">
           <Link

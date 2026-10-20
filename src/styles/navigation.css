@@ -1,48 +1,7 @@
-/* navigation: estilos compartidos entre tamaños de pantalla. */
-
 @media (max-width: 1023px) {
   .mobile-tabbar-space:not(:has(.reader-page, .conversation-page, .character-intro-page, .profile-page)) {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
-}
-
-.navbar-primary-link {
-  font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive;
-  font-weight: 700;
-  font-style: normal;
-}
-
-.profile-user-popover,
-.profile-user-popover button,
-.profile-user-popover a,
-.profile-user-menu-option {
-  font-family: "Montserrat", sans-serif;
-  font-weight: 600;
-}
-
-.navbar-adult-link,
-.navbar-adult-option {
-  align-items: center;
-  line-height: 1;
-  font-variant-numeric: lining-nums tabular-nums;
-  font-feature-settings: "lnum" 1, "tnum" 1;
-}
-
-.navbar-adult-label {
-  display: inline-flex;
-  align-items: baseline;
-  line-height: 1;
-}
-
-.navbar-adult-number {
-  margin-left: 0.22em;
-  font-variant-numeric: lining-nums tabular-nums;
-  font-feature-settings: "lnum" 1, "tnum" 1;
-}
-
-.navbar-adult-option .navbar-fire-stack {
-  align-self: center;
-  vertical-align: 0;
 }
 
 @keyframes navbar-fire-outer-flicker {
@@ -91,72 +50,6 @@
   }
 }
 
-.navbar-fire-stack {
-  position: relative;
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: flex-end;
-  justify-content: center;
-  overflow: visible;
-  vertical-align: -0.16em;
-}
-
-.navbar-fire-outer,
-.navbar-fire-core {
-  position: absolute;
-  bottom: 0;
-  transform-origin: 50% 100%;
-  will-change: transform, opacity, filter;
-}
-
-.navbar-fire-outer {
-  inset-inline: 0;
-  color: #ff8a1f;
-  fill: #ff3b00;
-  animation: navbar-fire-outer-flicker 1.14s cubic-bezier(.45, .05, .55, .95) infinite;
-}
-
-.navbar-fire-core {
-  left: 50%;
-  bottom: 1px;
-  color: #fff6a5;
-  fill: #ffd21a;
-  animation: navbar-fire-core-flicker 0.86s ease-in-out -0.22s infinite;
-}
-
-.navbar-fire-ember {
-  --ember-drift: 2px;
-  position: absolute;
-  bottom: 58%;
-  left: 58%;
-  width: 2px;
-  height: 2px;
-  border-radius: 999px;
-  background: #ffd84a;
-  box-shadow: 0 0 4px rgba(255, 110, 0, 0.9);
-  animation: navbar-fire-ember-rise 1.35s ease-out infinite;
-}
-
-.navbar-fire-ember-two {
-  --ember-drift: -3px;
-  left: 38%;
-  width: 1.5px;
-  height: 1.5px;
-  animation-delay: -0.72s;
-  animation-duration: 1.64s;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .navbar-fire-outer,
-  .navbar-fire-core,
-  .navbar-fire-ember {
-    animation: none;
-  }
-  .navbar-fire-ember {
-    display: none;
-  }
-}
-
 .site-navbar-surface {
   isolation: isolate;
   border-bottom: 1px solid rgba(15, 23, 42, 0.1);
@@ -184,7 +77,6 @@ html.dark .site-navbar-surface {
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.38);
 }
 
-
 .site-navbar-surface.site-navbar-mobile {
   border-bottom-width: 0;
 }
@@ -192,7 +84,6 @@ html.dark .site-navbar-surface {
 html.dark .site-navbar-surface.site-navbar-mobile {
   box-shadow: 0 1px 8px rgb(255 255 255 / 0.25);
 }
-
 
 .site-navbar-surface.site-navbar-desktop,
 html.dark .site-navbar-surface.site-navbar-desktop {
@@ -211,29 +102,10 @@ html.dark .site-navbar-surface.site-navbar-desktop {
   }
 }
 
-.navbar-search-pill::before,
-.navbar-search-pill > input {
-  animation: navbar-search-fade-in 0.32s ease-out 0.08s both;
-}
-
-.navbar-search-close {
-  animation: navbar-search-fade-in 0.28s ease-out 0.16s both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .navbar-search-pill::before,
-  .navbar-search-pill > input,
-  .navbar-search-close {
-    animation: none;
-  }
-}
-
 .bn-monochrome .site-navbar-surface,
 .bn-monochrome [role="dialog"][aria-label="Menú principal"] {
   filter: grayscale(1);
 }
-
-/* La geometría de la portada es compartida por todas las rutas y temas. */
 @media (min-width: 1024px) {
   .site-navbar-desktop nav a { font-family: 'KoHo', Montserrat, sans-serif; font-size: 15px; font-weight: 600; }
 }

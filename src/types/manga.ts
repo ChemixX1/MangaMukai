@@ -1,4 +1,4 @@
-// src/types/manga.ts
+
 
 export interface WPManga {
   id: number;
@@ -13,8 +13,7 @@ export interface WPManga {
   excerpt: {
     rendered: string;
   };
-  
-  // Campos personalizados reales de WordPress
+
   ero_seri?: string | number;
   ero_chapter?: string | number;
   ero_chaptertitle?: string;
@@ -22,8 +21,7 @@ export interface WPManga {
   wpb_post_views_count?: number;
 
   categories: number[];
-  
-  // ✅ DEFINICIÓN COMPLETA DE IMÁGENES (Para evitar el @ts-ignore)
+
   _embedded?: {
     'wp:featuredmedia'?: Array<{
       source_url: string;
@@ -39,8 +37,7 @@ export interface WPManga {
       };
     }>;
   };
-  
-  // Soporte SEO
+
   aioseo_head_json?: {
       og_image?: Array<{ url: string }>;
   };

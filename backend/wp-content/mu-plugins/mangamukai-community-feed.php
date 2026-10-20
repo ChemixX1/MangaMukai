@@ -75,7 +75,6 @@ add_action('rest_api_init', static function () {
     ]);
 });
 
-// Enrich the existing API responses without replacing its authentication or writes.
 add_filter('rest_post_dispatch', static function ($response, $server, $request) {
     if (is_wp_error($response) || $response->get_status() >= 400 || !mm_community_feed_ready()) return $response;
     $route = $request->get_route();
@@ -88,8 +87,7 @@ add_filter('rest_post_dispatch', static function ($response, $server, $request) 
             $tag = $request['community_manga'];
             update_option('mm_community_manga_' . (int) $data['post']['id'], [
                 'id' => (string) absint($tag['id'] ?? 0), 'title' => sanitize_text_field($tag['title'] ?? ''),
-                'cover' => esc_url_raw($tag['cover'] ?? ''), 'showCover' => !empty($tag['showCover']),
-                'chapterId' => absint($tag['chapterId'] ?? 0), 'chapterLabel' => sanitize_text_field($tag['chapterLabel'] ?? ''),
+                'cover' => esc_url_raw($tag['cover'] ?? ''),
             ], false);
         }
         if (preg_match('#/social/posts/\d+/comments$#', $route) && !empty($data['comment']['id']) && absint($request['image_id'])) {

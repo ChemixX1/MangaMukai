@@ -12,19 +12,10 @@ interface HomePageFrameProps {
   youthSection: ReactNode;
   youthLatestSection: ReactNode;
   pageClassName?: string;
-  /**
-   * H1 de la página. Los títulos visibles del hero son nombres de manga que
-   * rotan, así que el encabezado real de la página va aquí para que buscadores y
-   * lectores de pantalla sepan de qué trata.
-   */
+
   pageHeading: string;
 }
 
-/**
- * Composición de la colección B&N con las mismas secciones y orden que el Home:
- * Hero -> Tendencia Ahora -> Lo Más Reciente -> Anuncios -> Juveniles ->
- * Tendencia Ahora (Juvenil) -> Lo Más Reciente (Juvenil) -> Footer.
- */
 export function HomePageFrame({
   hero,
   popularSection,

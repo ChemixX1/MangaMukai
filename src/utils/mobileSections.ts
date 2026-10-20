@@ -1,8 +1,5 @@
-/**
- * Páginas de "Recursos" (panel lateral de Más) que en móvil se abren a pantalla
- * completa: sin navbar y sin barra inferior, solo una flecha
- * de volver y el título de la sección.
- */
+
+
 export const MOBILE_SECTIONS: Record<string, { title: string; dark: boolean }> = {
   '/nosotros': { title: 'Sobre nosotros', dark: false },
   '/contacto': { title: 'Contacto', dark: false },

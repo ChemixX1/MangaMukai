@@ -8,13 +8,13 @@ import { scheduleSubscriptionBackground } from './utils/subscriptionBackground';
 import './styles/pro.css';
 import { syncReaderPrefetchAuth, syncReaderPrefetchRoute } from './services/readerPrefetchSession';
 import { AUTH_CHANGED_EVENT } from './services/authService';
+import { NavigationPreload } from './components/common/NavigationPreload';
+import { blockBackgroundTasks } from './utils/backgroundTasks';
 
 const Router = import.meta.env.VITE_GITHUB_PAGES === 'true' ? HashRouter : BrowserRouter;
 
-// Se abre al instante desde el lápiz de "Más": va en el bundle principal, sin chunk que esperar.
-import EditProfilePage from './pages/EditProfilePage';
-
-import ProPage from './pages/ProPage';
+const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
+const ProPage = lazy(() => import('./pages/ProPage'));
 const Home = lazy(() => import('./pages/Home'));
 const MangaBlackWhite = lazy(() => import('./pages/MangaBlackWhite'));
 const MangaAdult = lazy(() => import('./pages/MangaAdult'));
@@ -38,48 +38,58 @@ const ShopPage = lazy(() => import('./pages/ShopPage'));
 const LegalDocumentPage = lazy(() => import('./pages/LegalDocumentPage').then(({ LegalDocumentPage: Page }) => ({ default: Page })));
 
 const ScrollToTop = () => {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   useEffect(() => {
+    if (hash) {
+      let anchor = hash.slice(1);
+      try { anchor = decodeURIComponent(anchor); } catch {}
+      const scrollToAnchor = () => {
+        const target = document.getElementById(anchor);
+        if (!target) return false;
+        target.scrollIntoView({ block: 'start' });
+        return true;
+      };
+      if (scrollToAnchor()) return;
+      const observer = new MutationObserver(() => {
+        if (scrollToAnchor()) observer.disconnect();
+      });
+      observer.observe(document.getElementById('root') ?? document.body, { childList: true, subtree: true });
+      const timeout = window.setTimeout(() => observer.disconnect(), 10000);
+      return () => { observer.disconnect(); window.clearTimeout(timeout); };
+    }
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [pathname]);
+  }, [pathname, hash]);
   return null;
 };
 
-/**
- * Head SEO base de cada ruta (título, descripción, robots y canonical). Las
- * páginas con datos propios (manga, capítulo, perfil público) lo afinan después
- * con useDocumentTitle.
- */
 const RouteSeo = () => {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   useLayoutEffect(() => { syncReaderPrefetchRoute(pathname); }, [pathname]);
   useEffect(() => {
     const changed = () => syncReaderPrefetchAuth();
     window.addEventListener(AUTH_CHANGED_EVENT, changed);
     return () => window.removeEventListener(AUTH_CHANGED_EVENT, changed);
   }, []);
-  useEffect(() => {
-    applyRouteSeo(pathname, search);
-  }, [pathname, search]);
+  useLayoutEffect(() => {
+    applyRouteSeo(pathname);
+  }, [pathname]);
   return null;
 };
 
-// Colores de página por CSS (`dark:`), no por estado: si App se suscribiera al
-// tema, cada cambio re-renderizaría la ruta completa (la portada entera).
 const pageColors = 'bg-white text-black dark:bg-black dark:text-white';
 
 function RouteLoadingFallback() {
   const { pathname } = useLocation();
+  useEffect(() => blockBackgroundTasks(), []);
   if (pathname === '/pro') return <main className="pro-page" aria-busy="true" />;
   return <div className={`min-h-screen ${pageColors}`} role="status" aria-label="Cargando página" />;
 }
 
-
 function SubscriptionBackgroundPreload() {
   const { pathname } = useLocation();
   useEffect(() => {
-    // Home owns its readiness signal; /pro loads the background on demand.
-    if (pathname === '/' || pathname === '/pro') return;
+
+    if (pathname === '/' || pathname === '/pro' || /^\/(read|manga)\//.test(pathname)) return;
     return scheduleSubscriptionBackground();
   }, [pathname]);
   return null;
@@ -90,15 +100,14 @@ function AppInner() {
     migrateOldDataToWordPress().catch(console.error);
   }, []);
 
-
-
   return (
     <Router>
-      {/* Pantalla "Volveremos pronto" manual (mantenimiento.json o ?mantenimiento=1). */}
+
       <MaintenanceGate />
       <ScrollToTop />
       <SubscriptionBackgroundPreload />
       <RouteSeo />
+      <NavigationPreload />
       <Navbar />
       <MobileTabBar />
       <MobileSectionHeader />

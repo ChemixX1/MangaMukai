@@ -142,8 +142,7 @@
 .mobile-profile-dark .mobile-profile-filters button.active { background: white; color: black; }
 .mobile-profile .mobile-profile-filters .mobile-profile-purchased-filter { background: linear-gradient(110deg, #eab94e, #ffe08a); color: #513507; }
 .mobile-profile .mobile-profile-filters .mobile-profile-purchased-filter.active { background: linear-gradient(110deg, #d69a20, #f7c94f); color: #332000; box-shadow: inset 0 0 0 2px #996515; }
-.mobile-profile-collection-grid, .mobile-profile-cover-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 19px; }
-.mobile-profile-collection-slot { aspect-ratio: 112 / 176; border: 5px solid #a21caf; border-radius: 20px; background: #d4d4d8; }
+ .mobile-profile-cover-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 19px; }
 .profile-collection-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
 .profile-collection-loading { display: block; aspect-ratio: 3 / 4; border-radius: 12px; background: currentColor; opacity: .08; }
 .profile-collection-preview, .profile-cover-dialog {
@@ -290,7 +289,6 @@
   .mobile-profile-tabs button:not(.active) span { display: inline; }
   .mobile-profile-panel { padding: 22px 25px 32px; }
   .mobile-profile-posts { gap: 0; margin-top: 0; }
-  .mobile-profile-collection-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 720px; gap: 16px; }
   .profile-collection-preview-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 190px)); gap: 22px; }
   .profile-collection-preview-title { font-size: 14px; }
   .mobile-profile-cover-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
@@ -310,8 +308,6 @@
   .public-profile-pro::before { animation: none; }
   .mobile-profile * { transition-duration: 0.01ms !important; }
 }
-
-/* Same quiet pulse as the home hero, with the final profile geometry reserved. */
 .profile-loading-surface, .profile-loading-block, .profile-loading-text,
 .profile-promos-loading .mobile-profile-promo { background-color: rgb(var(--mm-ink) / .1); }
 .profile-priority-image { opacity: 0; transition: opacity .18s ease-out; }

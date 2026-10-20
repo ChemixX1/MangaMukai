@@ -3,14 +3,12 @@ interface IconProps {
   className?: string;
 }
 
-/** Llama naranja del título "Inicia un Nuevo Chat". */
 export const FlameIcon = ({ size = 26, className }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 26 26" fill="none" aria-hidden="true" className={className}>
     <path d="M13 26C18.3852 26 22.75 22.75 22.75 17.0625C22.75 14.625 21.9375 10.5625 18.6875 7.3125C19.0938 9.75 16.6562 10.5625 16.6562 10.5625C17.875 6.5 14.625 0.8125 9.75 0C10.3301 3.25 10.5625 6.5 6.5 9.75C4.46875 11.375 3.25 14.1846 3.25 17.0625C3.25 22.75 7.61475 26 13 26ZM13 24.375C10.3074 24.375 8.125 22.75 8.125 19.9062C8.125 18.6875 8.53125 16.6562 10.1562 15.0312C9.95312 16.25 11.375 17.0625 11.375 17.0625C10.7656 15.0312 12.1875 11.7812 14.625 11.375C14.3341 13 14.2188 14.625 16.25 16.25C17.2656 17.0625 17.875 18.4665 17.875 19.9062C17.875 22.75 15.6926 24.375 13 24.375Z" fill="#FB5937" />
   </svg>
 );
 
-/** Pila de monedas del saldo. */
 export const CoinStackIcon = ({ size = 33, className }: IconProps) => (
   <svg width={size} height={Math.round((size * 31) / 33)} viewBox="0 0 33 31" fill="none" aria-hidden="true" className={className}>
     <path d="M16.5 28.7857C22.3575 28.7857 27.1071 26.5548 27.1071 23.8036V20.4821H5.89285V23.8036C5.89285 26.5548 10.6425 28.7857 16.5 28.7857Z" fill="url(#mcc-coin-0)" />
@@ -30,7 +28,6 @@ export const CoinStackIcon = ({ size = 33, className }: IconProps) => (
   </svg>
 );
 
-/** Bocadillo del título "Chats Recientes" (trazo en el color del texto). */
 export const ChatBubbleIcon = ({ size = 24, className }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
     <path d="M14 19C17.771 19 19.657 19 20.828 17.828C21.999 16.656 22 14.771 22 11C22 7.229 22 5.343 20.828 4.172C19.656 3.001 17.771 3 14 3H10C6.229 3 4.343 3 3.172 4.172C2.001 5.344 2 7.229 2 11C2 14.771 2 16.657 3.172 17.828C3.825 18.482 4.7 18.771 6 18.898" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

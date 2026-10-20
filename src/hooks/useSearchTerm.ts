@@ -1,10 +1,5 @@
 import { useSyncExternalStore } from 'react';
 
-/**
- * Término del buscador compartido entre el navbar (donde vive el campo en
- * móvil) y la Biblioteca (que filtra el catálogo con él). Es un mini store
- * externo para no depender de la URL en cada pulsación.
- */
 let searchTerm = '';
 const listeners = new Set<() => void>();
 
@@ -13,7 +8,7 @@ const subscribe = (listener: () => void) => {
   return () => { listeners.delete(listener); };
 };
 
-export const getSearchTerm = () => searchTerm;
+ const getSearchTerm = () => searchTerm;
 
 export const setSearchTerm = (value: string) => {
   if (value === searchTerm) return;
@@ -23,7 +18,6 @@ export const setSearchTerm = (value: string) => {
 
 export const useSearchTerm = () => useSyncExternalStore(subscribe, getSearchTerm, () => '');
 
-/** Pestañas bajo el buscador: todo el catálogo, solo la colección B&N o solo la HOT. */
 export type SearchFilter = 'todos' | 'bn' | 'hot';
 export const SEARCH_FILTERS: Array<{ id: SearchFilter; label: string }> = [
   { id: 'todos', label: 'Todos' },
@@ -33,7 +27,7 @@ export const SEARCH_FILTERS: Array<{ id: SearchFilter; label: string }> = [
 
 let searchFilter: SearchFilter = 'todos';
 
-export const getSearchFilter = () => searchFilter;
+ const getSearchFilter = () => searchFilter;
 
 export const setSearchFilter = (value: SearchFilter) => {
   if (value === searchFilter) return;

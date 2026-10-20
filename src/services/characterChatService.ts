@@ -1,7 +1,6 @@
 import { MANGAMUKAI_API } from '../config/api';
 import { getStoredToken } from './authService';
 
-/** Mensajes gratuitos por usuario (la cifra real la dicta el servidor; esta es la de respaldo). */
 export const FREE_MESSAGE_LIMIT = 10;
 
 export interface CharacterQuota {
@@ -12,8 +11,7 @@ export interface CharacterQuota {
 
 export type CharacterMessageMode = 'demo' | 'ai';
 
-/** El servidor rechazó el mensaje porque ya no quedan gratuitos. */
-export class CharacterQuotaError extends Error {
+ class CharacterQuotaError extends Error {
   quota: CharacterQuota;
   constructor(quota: CharacterQuota) {
     super(`Has usado tus ${quota.limit} mensajes gratuitos. Recarga monedas para seguir hablando con los personajes.`);
@@ -45,11 +43,6 @@ const toQuota = (data: QuotaPayload | null): CharacterQuota => ({
   remaining: typeof data?.remaining === 'number' ? data.remaining : FREE_MESSAGE_LIMIT,
 });
 
-/**
- * Mensajes gratuitos que quedan (GET /character-chat/quota, mu-plugin
- * mangamukai-character-chat.php). Con sesión cuenta por usuario; sin sesión,
- * por la huella del invitado. `null` si el servidor no responde.
- */
 export const getCharacterQuota = async (): Promise<CharacterQuota | null> => {
   try {
     const response = await fetch(`${MANGAMUKAI_API}/character-chat/quota`, { headers: headers() });
@@ -61,11 +54,6 @@ export const getCharacterQuota = async (): Promise<CharacterQuota | null> => {
   }
 };
 
-/**
- * Registra un mensaje de la conversación en el servidor. Los del usuario
- * consumen la cuota (lanza CharacterQuotaError al agotarse); los del personaje
- * solo quedan anotados. Devuelve la cuota tras registrar.
- */
 export const registerCharacterMessage = async (
   characterId: string,
   role: 'user' | 'assistant',

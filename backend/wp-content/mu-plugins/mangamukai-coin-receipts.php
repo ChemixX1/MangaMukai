@@ -24,8 +24,6 @@ add_action('init', function () {
     ]);
 });
 
-// Delegate identity verification to the installed MangaMukai auth endpoint.
-// No user ID or email supplied by the client is accepted as identity.
 function mm_coin_receipt_permission($request) {
     $auth = new WP_REST_Request('GET', '/mangamukai/v1/me');
     $auth->set_header('Authorization', $request->get_header('Authorization'));
@@ -81,7 +79,7 @@ function mm_coin_quote_create($request) {
         }
         set_transient('mm_coin_usd_pen', $rate, HOUR_IN_SECONDS);
     }
-    // Round upward to the next price ending in .90, without floating-point boundary noise.
+
     $price = (ceil(round($packs[$pack][1] * $rate['rate'] * 100, 6) / 100 - 0.90) * 100 + 90) / 100;
     $quote = ['pack' => $pack, 'price_pen' => $price, 'rate' => (float) $rate['rate'], 'date' => $rate['date'], 'expires' => time() + DAY_IN_SECONDS];
     $payload = base64_encode(wp_json_encode($quote));
@@ -144,7 +142,7 @@ function mm_coin_receipt_create($request) {
     if (is_wp_error($id) || !$id) {
         return new WP_Error('receipt_save', 'No se pudo guardar el comprobante. Inténtalo nuevamente.', ['status' => 500]);
     }
-    // Store the image privately in post metadata, never in public uploads/media.
+
     $saved = add_post_meta($id, '_receipt_data', [
         'pack' => $pack, 'product' => $product, 'method' => $method, 'coins' => $packs[$pack][0], 'price_usd' => $packs[$pack][1],
         'price_pen' => $quote['price_pen'], 'exchange_rate' => $quote['rate'], 'exchange_date' => $quote['date'],
@@ -156,7 +154,7 @@ function mm_coin_receipt_create($request) {
         return new WP_Error('receipt_save', 'No se pudo guardar la imagen. Inténtalo nuevamente.', ['status' => 500]);
     }
     set_transient('mm_receipt_rate_' . $user_id, 1, MINUTE_IN_SECONDS);
-    // Receipt submission does not credit coins or assert that a payment is valid.
+
     return new WP_REST_Response(['success' => true, 'receipt_id' => $id], 201);
 }
 

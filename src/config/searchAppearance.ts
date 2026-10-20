@@ -7,7 +7,6 @@ import asset5 from '../assets/search/Comedia.png';
 import asset6 from '../assets/search/Romance Obsesivo.png';
 import asset7 from '../assets/search/Venganza.png';
 
-// Recursos locales del buscador, centralizados para su futura gestión en el CMS.
 export const searchBanners = { left: asset1, right: asset0 };
 export const searchGenres = [
   { genre: 'Drama', cover: asset2, color: '#ef4444' },

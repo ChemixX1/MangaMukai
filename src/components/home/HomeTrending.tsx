@@ -15,29 +15,26 @@ import { formatChapterCount } from '../../utils/trendingRanking';
 import type { MangaCapitulo } from '../../types/manga';
 import { type Audience } from './homeModels';
 
-/** Nueve portadas: el puesto siempre es de una cifra, como el número grande de las tarjetas. */
 const TRENDING_SIZE = 9;
-/** Medidas de las tarjetas del ranking en las referencias de PC y móvil. */
+
 const TRENDING_CARD = {
   desktop: { width: 230, gap: 17, inset: 38 },
   mobile: { width: 198, gap: 13, inset: 17 },
 } as const;
-/** Velocidad de crucero de la cinta en px/s. */
+
 const TRENDING_SPEED = 52;
 
-/** Ancho de cada pestaña del periodo (la elegida se rellena de tinta). */
 const PERIOD_WIDTHS: Record<RankingPeriod, number> = { Semanal: 124, Mensual: 117, Histórico: 110 };
 
 interface TrendingCardProps {
   manga: RankedManga;
   rank: number;
   accent: Accent;
-  /** Copia de relleno del bucle: fuera del orden de tabulación. */
+
   isCopy: boolean;
   isMobile: boolean;
 }
 
-/** La posición queda dentro de la portada; ambos rankings comparten el diseño. */
 const TrendingCard = ({ manga, rank, accent, isCopy, isMobile }: TrendingCardProps) => {
   const accentColor = ACCENT_COLOR[accent];
   const title = toTitleCase(manga.title);
@@ -68,12 +65,6 @@ const TrendingCard = ({ manga, rank, accent, isCopy, isMobile }: TrendingCardPro
   );
 };
 
-/**
- * Pestañas del periodo: píldora de borde gris (en el tema oscuro, fondo negro
- * puro y la línea clara del tema) con la opción elegida rellena de tinta. En móvil mide 44 px, sin
- * sombra, con tres pestañas iguales y la elegida dentro del borde; en PC, 48 px
- * con sombra.
- */
 const PeriodTabs = ({ value, onChange, className, selectorColor }: { selectorColor?: string; value: RankingPeriod; onChange: (period: RankingPeriod) => void; className: string }) => (
   <div role="tablist" aria-label="Periodo del ranking" className={`flex h-11 shrink-0 rounded-3xl border border-[#878383] dark:border-[color:var(--mm-tab-line)] dark:bg-black lg:h-12 lg:shadow-[0_4px_4px_rgba(0,0,0,1)] ${className}`}>
     <GooeySelector activeIndex={RANKING_PERIODS.indexOf(value)} color={selectorColor} />
@@ -96,11 +87,6 @@ const PeriodTabs = ({ value, onChange, className, selectorColor }: { selectorCol
   </div>
 );
 
-/**
- * "Tendencia Ahora": titular con la llama, pestañas del periodo y una cinta
- * infinita de nueve tarjetas que avanza sola, se puede arrastrar (ratón o dedo)
- * y se funde con el fondo en los dos bordes.
- */
 export const TrendingSection = ({
   audience,
   className = '',
@@ -134,9 +120,9 @@ export const TrendingSection = ({
   });
 
   return (
-    <section className={`relative w-full ${className}`} aria-busy={loading}>
+    <section id={!filterMangas ? (audience === 'men' ? 'mangas-juveniles' : 'tendencia-ahora') : undefined} className={`relative w-full ${className}`} aria-busy={loading}>
       <div className="relative mx-auto w-full max-w-[1440px]">
-        {/* Móvil: la llama y el titular arriba y las pestañas debajo, a 43 px de cada borde. PC: las pestañas a la derecha. */}
+
         <div className="home-trending-heading relative h-[111px] lg:h-[103px]">
           <div className="absolute left-[43px] top-0 flex items-start lg:left-[62px]">
             <span aria-hidden="true" className="flex shrink-0" style={{ color: accentColor }}>
@@ -187,7 +173,7 @@ export const TrendingSection = ({
             )
           )}
 
-          {/* Fundido con el fondo en los dos bordes. */}
+
           <div aria-hidden="true" className="home-trending-edge home-trending-edge-left" />
           <div aria-hidden="true" className="home-trending-edge home-trending-edge-right" />
         </div>

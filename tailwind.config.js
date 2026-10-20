@@ -1,28 +1,20 @@
 import plugin from 'tailwindcss/plugin';
 
-/**
- * Sistema de diseño de MangaMukai, compartido por la versión móvil y la de
- * escritorio. Los colores de superficie cambian con el tema (clase `dark` en
- * <html>, o `theme-dark` para forzar el oscuro en una sección); sus valores
- * viven en `src/index.css`.
- *
- * @type {import('tailwindcss').Config}
- */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
-        // Titulares de sección ("Tendencia Ahora", "Lo Más Reciente").
+
         dela: ['"Dela Gothic One"', 'Montserrat', 'sans-serif'],
-        // Texto de interfaz: títulos de manga, botones, etiquetas de tipo.
+
         montserrat: ['Montserrat', 'sans-serif'],
-        // Sinopsis.
+
         inter: ['Inter', 'sans-serif'],
-        // Datos: capítulo, fecha, géneros, contadores.
+
         anta: ['Anta', 'sans-serif'],
-        // Datos técnicos: vistas, "GRATIS" / "PAGO".
+
         audiowide: ['Audiowide', 'sans-serif'],
         orbitron: ['Orbitron', 'sans-serif'],
         poppins: ['Poppins', 'sans-serif'],
@@ -31,29 +23,29 @@ export default {
         russo: ['"Russo One"', 'Montserrat', 'sans-serif'],
         koho: ['KoHo', 'Montserrat', 'sans-serif'],
         raleway: ['Raleway', 'sans-serif'],
-        // Cartel de reclutamiento de la portada.
+
         rammetto: ['"Rammetto One"', 'Montserrat', 'sans-serif'],
-        // Etiqueta de tipo del hero de la portada (fuente del sistema en Windows).
+
         segoe: ['"Segoe UI"', 'Montserrat', 'sans-serif'],
       },
       colors: {
-        // Superficies y tinta del tema.
+
         surface: 'rgb(var(--mm-surface) / <alpha-value>)',
         ink: 'rgb(var(--mm-ink) / <alpha-value>)',
         panel: 'rgb(var(--mm-panel) / <alpha-value>)',
         media: 'rgb(var(--mm-media) / <alpha-value>)',
         muted: 'rgb(var(--mm-ink) / var(--mm-muted-alpha))',
         line: 'rgb(115 115 115 / var(--mm-line-alpha))',
-        // Acentos de marca.
+
         mukai: {
-          pink: '#db2777', // sección femenina
-          cyan: '#22d3ee', // sección juvenil
-          magenta: '#ff008c', // ficha de manga
+          pink: '#db2777',
+          cyan: '#22d3ee',
+          magenta: '#ff008c',
           purple: '#b000ad',
           gold: '#ffcd0f',
           orange: '#fb923c',
-          free: 'var(--mm-free)', // punto de "GRATIS" (variable: B&N lo pasa a gris)
-          // Tienda: la revista de colección.
+          free: 'var(--mm-free)',
+
           rose: '#ff4d88',
           sky: '#38d9f5',
           lemon: '#ffe45c',
@@ -61,17 +53,17 @@ export default {
         },
       },
       keyframes: {
-        // Punto verde de "GRATIS": parpadeo suave, sin brillo.
+
         blink: {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.2' },
         },
-        // Punto del tipo de obra: pulso suave sin apagarse por completo.
+
         'dot-blink': {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.45' },
         },
-        // Llama de "NUEVO": se aviva desde la base con un leve vaivén.
+
         flame: {
           '0%': { transform: 'scale(1, 1) rotate(0deg)' },
           '12%': { transform: 'scale(1.06, 1.16) rotate(-4deg)' },
@@ -82,7 +74,7 @@ export default {
           '82%': { transform: 'scale(0.97, 0.88) rotate(2deg)' },
           '100%': { transform: 'scale(1, 1) rotate(0deg)' },
         },
-        // Llama de "Inicia un Nuevo Chat": balanceo lento + lengüeteo rápido.
+
         'flame-sway': {
           '0%, 100%': { transform: 'rotate(0deg)' },
           '30%': { transform: 'rotate(-5deg)' },
@@ -96,12 +88,12 @@ export default {
           '57%': { transform: 'scale(0.97, 1.07) skewX(4deg) translateY(-1px)' },
           '78%': { transform: 'scale(1.03, 0.96) skewX(-3deg) translateY(0)' },
         },
-        // Aro de las reacciones: se dibuja dando una vuelta.
+
         'ring-trace': {
           from: { strokeDasharray: '0 239' },
           to: { strokeDasharray: '239 0' },
         },
-        // Reacción de comentario: se pinta de abajo arriba.
+
         paint: {
           from: { clipPath: 'inset(100% 0 0 0)' },
           to: { clipPath: 'inset(0 0 0 0)' },
@@ -110,7 +102,7 @@ export default {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
-        // Cintas infinitas: la secuencia va duplicada y la pista se desplaza media longitud.
+
         'marquee-x': {
           from: { transform: 'translate3d(0, 0, 0)' },
           to: { transform: 'translate3d(-50%, 0, 0)' },
@@ -119,7 +111,7 @@ export default {
           from: { transform: 'translate3d(0, 0, 0)' },
           to: { transform: 'translate3d(0, -50%, 0)' },
         },
-        // Láser que recorre los bordes de la tira de categorías.
+
         scan: {
           from: { transform: 'translateX(-100%)' },
           to: { transform: 'translateX(100%)' },
@@ -143,16 +135,14 @@ export default {
   plugins: [
     plugin(({ addUtilities }) => {
       addUtilities({
-        // Desplazamiento sin barra visible (carruseles y filtros horizontales).
+
         '.no-scrollbar': {
           '-ms-overflow-style': 'none',
           'scrollbar-width': 'none',
           '&::-webkit-scrollbar': { display: 'none' },
         },
         '.tap-transparent': { '-webkit-tap-highlight-color': 'transparent' },
-        // Anillo de foco visible para todo lo pulsable de una sección: del color del
-        // texto salvo que la sección fije `--focus-color`. Con especificidad mínima
-        // (`:where`) para que cualquier utilidad del propio elemento lo sustituya.
+
         '.focus-scope': {
           ':where(&) :where(button, a, input):focus-visible': {
             outline: '2px solid var(--focus-color, currentColor)',

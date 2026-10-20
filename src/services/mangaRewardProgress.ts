@@ -1,4 +1,4 @@
-/** Preview progress only: this module never grants coins, discounts or items. */
+
 export const REWARD_PROGRESS_EVENT = 'mm_reward_progress';
 const STORAGE_PREFIX = 'mm_reward_completed_v1:';
 const REWARD_TARGET = 10;
@@ -27,7 +27,6 @@ const uniqueIds = (values: Iterable<ChapterId>): Set<string> => {
   return ids;
 };
 
-/** Only completions confirmed on this browser are available; no historical count is inferred. */
 export const getCompletedRewardChapterIds = (userId: ChapterId, mangaId: ChapterId): Set<string> => {
   const key = storageKey(userId, mangaId);
   if (!key) return new Set();
@@ -39,7 +38,6 @@ export const getCompletedRewardChapterIds = (userId: ChapterId, mangaId: Chapter
   }
 };
 
-/** Combine every manga saved for this account, including existing browser history. */
 export const getAccountCompletedRewardChapterIds = (userId: ChapterId): Set<string> => {
   const user = normalizeId(userId);
   const completed = new Set<string>();
@@ -53,16 +51,15 @@ export const getAccountCompletedRewardChapterIds = (userId: ChapterId): Set<stri
         if (!Array.isArray(scope) || scope.length !== 2 || scope[0] !== user || typeof scope[1] !== 'string') continue;
         for (const chapter of getCompletedRewardChapterIds(user, scope[1])) completed.add(chapter);
       } catch {
-        // A malformed entry must not hide progress from other manga.
+
       }
     }
   } catch {
-    // Browser storage may be unavailable.
+
   }
   return completed;
 };
 
-/** Called only after the existing reading-progress endpoint confirms completion. */
 export const recordCompletedRewardChapter = (userId: ChapterId, mangaId: ChapterId, chapterId: ChapterId): void => {
   const key = storageKey(userId, mangaId);
   const chapter = normalizeId(chapterId);
@@ -74,11 +71,10 @@ export const recordCompletedRewardChapter = (userId: ChapterId, mangaId: Chapter
     localStorage.setItem(key, JSON.stringify([...completed]));
     window.dispatchEvent(new Event(REWARD_PROGRESS_EVENT));
   } catch {
-    // A denied/full browser cache must not fail an otherwise successful reading request.
+
   }
 };
 
-/** Same-tab updates use our event; localStorage changes notify other tabs natively. */
 export const subscribeMangaRewardProgress = (onChange: () => void): (() => void) => {
   const onStorage = (event: StorageEvent) => {
     if (event.key === null || event.key.startsWith(STORAGE_PREFIX)) onChange();
@@ -91,7 +87,6 @@ export const subscribeMangaRewardProgress = (onChange: () => void): (() => void)
   };
 };
 
-/** One purchase = 1 point; one finished chapter = 0.5, including purchased chapters. */
 export const calculateMangaRewardProgress = (purchasedIds: Iterable<ChapterId>, completedIds: Iterable<ChapterId>) => {
   const purchasedCount = uniqueIds(purchasedIds).size;
   const completedCount = uniqueIds(completedIds).size;

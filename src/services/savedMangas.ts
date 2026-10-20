@@ -3,14 +3,6 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { AUTH_CHANGED_EVENT, getStoredToken } from './authService';
 import { getInteractions, toggleBookmarkWithTotal } from './interactionsService';
 
-/**
- * Lista de mangas guardados del usuario, compartida por toda la web.
- *
- * Todos los botones "Guardar" (home, B&N, +19, ficha) y la página de guardados
- * leen y escriben aquí, así que un manga guardado en un sitio aparece guardado
- * en todos los demás sin recargar. La fuente de verdad es el endpoint
- * /bookmark de WordPress; el estado local solo adelanta el resultado.
- */
 export interface SavedMangasState {
   ids: readonly string[];
   loaded: boolean;
@@ -41,9 +33,8 @@ const getSnapshot = () => state;
 const withId = (ids: readonly string[], id: string) => (ids.includes(id) ? ids : [...ids, id]);
 const withoutId = (ids: readonly string[], id: string) => ids.filter((item) => item !== id);
 
-
 let inflight: Promise<void> | null = null;
-/** Token con el que se cargó la lista; si cambia, se vuelve a pedir. */
+
 let loadedToken: string | null = null;
 
 const fetchSaved = (): Promise<void> => {
@@ -69,14 +60,12 @@ const fetchSaved = (): Promise<void> => {
   return inflight;
 };
 
-/** Carga la lista una sola vez por sesión. */
-export const ensureSavedMangas = (): Promise<void> => {
+ const ensureSavedMangas = (): Promise<void> => {
   if (inflight) return inflight;
   if (loadedToken === (getStoredToken() ?? '')) return Promise.resolve();
   return fetchSaved();
 };
 
-/** Sustituye la lista con la que acaba de devolver /interactions (la ficha ya la pide). */
 export const seedSavedMangas = (ids: ReadonlyArray<string | number>) => {
   loadedToken = getStoredToken() ?? '';
   setState({ ids: ids.map(String), loaded: true });
@@ -88,16 +77,12 @@ if (typeof window !== 'undefined') {
   });
 }
 
-
 export type ToggleSavedOutcome =
   | { status: 'login' }
   | { status: 'busy' }
   | { status: 'error' }
   | { status: 'ok'; action: 'added' | 'removed'; total: number };
 
-export const isMangaSaved = (mangaId: string | number) => state.ids.includes(String(mangaId));
-
-/** Guarda o quita un manga: adelanta el cambio y lo confirma con el servidor. */
 export const toggleSavedManga = async (mangaId: string | number): Promise<ToggleSavedOutcome> => {
   const id = String(mangaId);
   if (!getStoredToken()) return { status: 'login' };
@@ -124,7 +109,6 @@ export const toggleSavedManga = async (mangaId: string | number): Promise<Toggle
   });
   return { status: 'ok', action: result.action, total: result.total };
 };
-
 
 export const useSavedMangasState = (enabled = true): SavedMangasState => {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

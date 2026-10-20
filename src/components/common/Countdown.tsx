@@ -19,13 +19,12 @@ export const Countdown = ({ targetDate }: { targetDate: string }) => {
       const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
 
-      // Formato bonito: "2d 5h" o "05h 30m"
       if (days > 0) setTimeLeft(`${days}d ${hours}h`);
       else setTimeLeft(`${hours}h ${minutes}m`);
     };
 
     calculateTime();
-    const timer = setInterval(calculateTime, 60000); // Actualiza cada minuto
+    const timer = setInterval(calculateTime, 60000);
 
     return () => clearInterval(timer);
   }, [targetDate]);

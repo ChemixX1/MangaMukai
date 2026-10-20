@@ -1,0 +1,94 @@
+{
+  "siteName": "MangaMukai",
+  "siteUrl": "https://mangamukai.com",
+  "routes": {
+    "/": {
+      "kind": "home",
+      "title": "Leer manga en español: novedades y lectura juvenil | MangaMukai",
+      "description": "Lee manga, manhwa y manhua en español. Descubre novedades, tendencias y lectura juvenil, y explora las colecciones de MangaMukai.",
+      "heading": "Tendencia Ahora y Mangas Juveniles",
+      "intro": "Manga, manhwa y manhua en español: tendencias, lectura juvenil y últimos capítulos disponibles."
+    },
+    "/manga-19": {
+      "kind": "collection",
+      "title": "Manga HOT en español: lectura para adultos | MangaMukai",
+      "description": "Manga HOT y lectura para adultos en español: romance, drama y fantasía de la colección +19. Descubre historias y sus últimos capítulos en MangaMukai.",
+      "heading": "Mangas para adultos",
+      "intro": "Selección madura de manga y manhwa en español. Contenido para mayores de 18 años.",
+      "adult": true
+    },
+    "/manga-bn": {
+      "kind": "collection",
+      "title": "Manga en blanco y negro: lectura clásica | MangaMukai",
+      "description": "Explora manga en blanco y negro y de estilo clásico en español. Descubre historias, consulta sus capítulos y sigue las novedades en MangaMukai.",
+      "heading": "Mangas Blanco & Negro",
+      "intro": "Historias clásicas, acción y tinta pura para lectores de manga tradicional."
+    },
+    "/comunidad": {
+      "kind": "page",
+      "title": "Comunidad Mukai | MangaMukai",
+      "description": "Comparte tus mangas favoritos, publica recomendaciones y conversa con otros lectores en Comunidad Mukai.",
+      "heading": "Comunidad Mukai"
+    },
+    "/chat": {
+      "kind": "page",
+      "title": "Character Chat | MangaMukai",
+      "description": "Conversa con tus personajes favoritos, crea tu propia historia y vive una aventura en Character Chat de MangaMukai.",
+      "heading": "Character Chat"
+    },
+    "/tienda": {
+      "kind": "page",
+      "title": "Tienda | MangaMukai",
+      "description": "Productos y colecciones de MangaMukai.",
+      "heading": "Tienda"
+    },
+    "/pro": {
+      "kind": "page",
+      "title": "Mukai Pro | MangaMukai",
+      "description": "Descubre los beneficios de Mukai Pro y elige tu plan mensual o anual.",
+      "heading": "Mukai Pro"
+    },
+    "/nosotros": {
+      "kind": "page",
+      "title": "Sobre MangaMukai | MangaMukai",
+      "description": "Conoce al equipo de MangaMukai, cómo trabajamos las traducciones y qué encontrarás en nuestro catálogo de manga en español.",
+      "heading": "Sobre MangaMukai"
+    },
+    "/contacto": {
+      "kind": "page",
+      "title": "Contacto | MangaMukai",
+      "description": "Escríbenos para sugerencias, reportes de capítulos, colaboraciones o dudas sobre tu cuenta de MangaMukai.",
+      "heading": "Contacto"
+    },
+    "/legal": {
+      "kind": "page",
+      "title": "Términos y privacidad | MangaMukai",
+      "description": "Términos de uso, política de privacidad y tratamiento de datos de los lectores de MangaMukai.",
+      "heading": "Términos y privacidad"
+    },
+    "/privacidad": {
+      "kind": "page",
+      "title": "Política de privacidad | MangaMukai",
+      "description": "Qué datos recoge MangaMukai, para qué los usa, con quién los comparte y cómo puedes ejercer tus derechos.",
+      "heading": "Política de privacidad"
+    },
+    "/terminos": {
+      "kind": "page",
+      "title": "Términos de servicio | MangaMukai",
+      "description": "Condiciones de uso de MangaMukai: cuentas, Mukai Coins, contenido +19, conducta permitida y responsabilidad.",
+      "heading": "Términos de servicio"
+    },
+    "/normas-comunidad": {
+      "kind": "page",
+      "title": "Normas de la comunidad | MangaMukai",
+      "description": "Reglas de convivencia de la comunidad y la mensajería de MangaMukai, y cómo se modera.",
+      "heading": "Normas de la comunidad"
+    },
+    "/cookies": {
+      "kind": "page",
+      "title": "Política de cookies | MangaMukai",
+      "description": "Qué cookies y almacenamiento local usa MangaMukai, para qué sirven y cómo puedes gestionarlos.",
+      "heading": "Política de cookies"
+    }
+  }
+}

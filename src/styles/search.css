@@ -43,7 +43,6 @@
 .search-release-grid { gap: 9px; margin-top: 19px; }
 .search-release-grid .cover-display-title { font-size: 16px; }
 @media (min-width: 1024px) {
-  /* Contenido compacto dentro de la columna central. */
   .search-layout { grid-template-columns: minmax(0, 1fr) minmax(0, calc(5% + 685.9px)) minmax(0, 1fr); }
   .search-header-inner { max-width: 560px; }
   .search-library .search-library-inner { width: calc(100% - 84px); max-width: 560px; }

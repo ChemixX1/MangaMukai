@@ -11,7 +11,6 @@ import detailWowImage from '../../assets/manga/reactions/detail/wow.png';
 import detailAngryImage from '../../assets/manga/reactions/detail/angry.png';
 import detailLoveImage from '../../assets/manga/reactions/detail/love.png';
 
-/** Reacciones a la serie, en el orden del diseño (móvil y escritorio). */
 export const MANGA_REACTIONS = [
   { id: 'like', label: 'Me gusta', image: likeImage },
   { id: 'love', label: 'Me encanta', image: loveImage },
@@ -23,8 +22,6 @@ export const MANGA_REACTIONS = [
 
 export type MangaReactionId = (typeof MANGA_REACTIONS)[number]['id'];
 
-// Las imágenes de reactions/detail son exclusivas de la ficha del manga.
-
 const DETAIL_REACTION_IMAGES: Partial<Record<MangaReactionId, string>> = {
   like: detailLikeImage,
   haha: detailHahaImage,
@@ -34,7 +31,6 @@ const DETAIL_REACTION_IMAGES: Partial<Record<MangaReactionId, string>> = {
   love: detailLoveImage,
 };
 
-/** Los SVG se cargan como imágenes para aislar sus degradados entre instancias. */
 export const ReactionIcon = ({ id, className = 'h-[23px] w-[23px]' }: {
   id: MangaReactionId;
   className?: string;
@@ -56,7 +52,6 @@ export const createReactionCounts = (): Record<MangaReactionId, number> =>
 
 const RING_GRADIENT_ID = 'reaction-ring-gradient';
 
-/** Degradado rosa→morado del aro; se pinta una vez por página. */
 export const ReactionRingGradient = () => (
   <svg width="0" height="0" className="absolute" aria-hidden="true">
     <defs>
@@ -72,17 +67,13 @@ interface ReactionButtonProps {
   reaction: (typeof MANGA_REACTIONS)[number];
   count: number;
   selected: boolean;
-  /** El aro se está dibujando (la reacción recién pulsada). */
+
   tracing: boolean;
   onReact: () => void;
-  /** Tamaño del círculo; por defecto ocupa el ancho de su celda. */
+
   className?: string;
 }
 
-/**
- * Emoji de la reacción en su círculo con el contador debajo. El aro gris de
- * base se vuelve rosa al elegirla y, al tocarla, se dibuja dando una vuelta.
- */
 export const ReactionButton = ({ reaction, count, selected, tracing, onReact, className = 'aspect-square w-full' }: ReactionButtonProps) => (
   <>
     <button

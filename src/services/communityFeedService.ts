@@ -73,6 +73,6 @@ export async function updateCommunityPost(current: CommunityPost, next: Communit
     const changed = next.comments.find((reply) => current.comments.some((old) => old.id === reply.id && !!old.liked !== !!reply.liked));
     if (changed) await requestCommunity('', { post_id: Number(current.id), comment_id: Number(changed.id), active: !!changed.liked });
   }
-  // A failed refresh must not turn a confirmed write into a failed submission.
+
   return getCommunityThread(current.id).catch(() => confirmed);
 }

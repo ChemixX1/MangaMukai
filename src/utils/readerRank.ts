@@ -1,7 +1,7 @@
-/** El rango Mukai tiene cinco niveles; todos empiezan en el nivel 1. */
+
 const LEVEL_THRESHOLDS = [0, 10, 50, 200, 500] as const;
 const safeChapters = (chaptersRead: number) => Math.max(0, Math.floor(Number(chaptersRead) || 0));
-export const readerLevel = (chaptersRead: number) => LEVEL_THRESHOLDS.reduce((level, threshold, index) => safeChapters(chaptersRead) >= threshold ? index + 1 : level, 1);
+ const readerLevel = (chaptersRead: number) => LEVEL_THRESHOLDS.reduce((level, threshold, index) => safeChapters(chaptersRead) >= threshold ? index + 1 : level, 1);
 export const readerRankName = (chaptersRead: number) => `Nivel ${readerLevel(chaptersRead)}`;
 
 export interface ReaderRankProgress {

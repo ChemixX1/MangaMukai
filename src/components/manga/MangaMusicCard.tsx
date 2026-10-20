@@ -31,7 +31,7 @@ const formatTime = (time: number) => {
 
 export const MangaMusicCard = ({ compactHeight = false, isLight = false }: MangaMusicCardProps) => {
   const navigate = useNavigate();
-  // Estado compartido: la misma lista y el mismo audio en la ficha y en el lector.
+
   const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, volume } = useMusicPlayer();
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [seekPreview, setSeekPreview] = useState<{ trackId: number | null; time: number } | null>(null);
@@ -55,8 +55,6 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
 
   const heightClass = compactHeight ? 'min-h-[200px] lg:min-h-[220px]' : 'min-h-[220px] lg:min-h-[240px]';
 
-  // Sin acceso a la música, solo el cartel de Mukai Music (como en móvil): el
-  // reproductor ni se monta, así no se ve ni se puede enfocar por detrás.
   if (isLocked) {
     return (
       <aside aria-label="Mukai Music" className="manga-music-locked-card w-full shrink-0 overflow-hidden rounded-2xl">
@@ -69,7 +67,7 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
     <aside className={`manga-music-player group relative isolate flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border shadow-sm ${heightClass} ${isLight ? 'bg-white text-black' : 'bg-[#0a0a0d] text-white'} ${audioError ? 'border-red-500/50' : isLight ? 'border-black/15' : 'border-white/20'}`}>
       {loading && <div className={`absolute inset-0 z-50 flex items-center justify-center ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`}><HugeiconsIcon icon={Loading03Icon} size={22} className={`animate-spin ${isLight ? 'text-black/50' : 'text-white/50'}`} /></div>}
 
-      {/* Degradado opaco para que el fondo de la página no altere el blanco. */}
+
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -inset-px z-0 rounded-2xl"

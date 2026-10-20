@@ -18,9 +18,9 @@ interface PurchaseModalProps {
   userBalance: number;
   loading: boolean;
   freeAt: string | null;
-  /** Sustituye "Cancelar" por "Regresar" con la casita (el lector vuelve a la ficha del manga). */
+
   onBack?: () => void;
-  /** Sin sesión: el botón de acción pasa a "Iniciar sesión" (llama a onRecharge). */
+
   loginRequired?: boolean;
   purchaseComplete?: boolean;
   onReadChapter?: () => void;
@@ -65,7 +65,7 @@ export const PurchaseModal = ({
           }}
         />
 
-        <motion.div 
+        <motion.div
           initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -90,17 +90,17 @@ export const PurchaseModal = ({
             </div>
           ) : (
           <div className="relative overflow-hidden">
-            
-            {/* Header con gradiente - Padding reducido en móvil */}
+
+
             <div className="relative px-6 pb-5 pt-44 text-center overflow-hidden md:px-10 md:pt-52">
-              {/* Decorative elements */}
+
               <div className="absolute top-0 left-0 w-full h-full opacity-10 z-[1]">
                 <div className="absolute top-4 left-8 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
                 <div className="absolute top-8 right-12 w-1 h-1 bg-purple-400 rounded-full animate-pulse delay-300" />
               </div>
 
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 disabled={loading}
                 aria-label="Cerrar modal"
                 className="absolute top-3 right-3 md:top-4 md:right-4 w-8 h-8 rounded-full bg-white/50 hover:bg-white/80 flex items-center justify-center text-black hover:text-black transition-all duration-300 group z-20"
@@ -118,9 +118,9 @@ export const PurchaseModal = ({
                 Desbloquear capítulo {chapterNumber}
               </motion.h3>
 
-              {/* CONTADOR PEQUEÑO */}
+
               {isFutureFree && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="relative z-10 flex justify-center mb-2"
@@ -136,34 +136,34 @@ export const PurchaseModal = ({
 
             </div>
 
-            {/* Body - Padding ajustado */}
+
             <div className="px-6 pb-8 pt-3 md:px-10 md:pb-10 space-y-6 md:space-y-7">
-              
-              <motion.div 
+
+              <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1 }}
                 className="relative py-2"
               >
                 <div className="flex justify-between items-center gap-4 px-4 md:gap-6 md:px-6">
-                  {/* Costo */}
+
                   <div className="flex-1 text-left">
                     <p className="text-xs md:text-sm text-black uppercase font-bold tracking-widest mb-0">
                       Costo
                     </p>
                     <div className="flex items-center gap-2">
                       <img src={navbarCoins} alt="" aria-hidden="true" className="h-10 w-12 shrink-0 object-contain md:h-12 md:w-14" />
-                      {/* Texto responsive */}
+
                       <span className="text-xl md:text-2xl font-bold tabular-nums text-black">
                         {price}
                       </span>
                     </div>
                   </div>
 
-                  {/* Divider - Altura reducida en móvil */}
+
                   <div className="w-px h-10 md:h-16 bg-gradient-to-b from-transparent via-zinc-900/15 to-transparent" />
 
-                  {/* Saldo */}
+
                   <div className="flex-1 text-right">
                     <p className="text-xs md:text-sm text-black uppercase font-bold tracking-widest mb-0">
                       Tu Saldo
@@ -174,11 +174,11 @@ export const PurchaseModal = ({
                   </div>
                 </div>
 
-                {/* Progress bar */}
+
                 {canAfford && (
                   <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-white/5">
                     <div className="h-1 md:h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <motion.div 
+                      <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${Math.min((userBalance / price) * 100, 100)}%` }}
                         transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
@@ -189,7 +189,7 @@ export const PurchaseModal = ({
                 )}
               </motion.div>
 
-              {/* Error Message */}
+
               {loginRequired ? (
                 <motion.div
                   initial={{ opacity: 0, x: -10 }}
@@ -207,7 +207,7 @@ export const PurchaseModal = ({
                   </div>
                 </motion.div>
               ) : !canAfford && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
@@ -229,9 +229,9 @@ export const PurchaseModal = ({
                 </motion.div>
               )}
 
-              {/* Action Buttons */}
+
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <motion.button 
+                <motion.button
                   whileHover={reduceMotion || loading ? undefined : { scale: 1.045, y: -2 }}
                   whileTap={reduceMotion || loading ? undefined : { scale: 0.96, y: 0 }}
                   transition={{ type: 'spring', stiffness: 380, damping: 24 }}
@@ -241,7 +241,7 @@ export const PurchaseModal = ({
                 >
                   {onBack ? <><Home size={15} /> Regresar</> : 'Cancelar'}
                 </motion.button>
-                
+
                 {canAfford ? (
                   <motion.button
                     whileHover={reduceMotion || loading ? undefined : { scale: 1.045, y: -2 }}

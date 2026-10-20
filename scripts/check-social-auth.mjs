@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import https from 'node:https';
 
-// Read-only, anonymous deployment checks. Never follows redirects to providers.
 const origin = process.env.CHECK_ORIGIN || 'https://mangamukai.com';
 const site = new URL(origin);
 assert.equal(site.protocol, 'https:', 'CHECK_ORIGIN must use HTTPS');
@@ -35,7 +34,7 @@ function redirectUrl(value, base) {
   try {
     return new URL(value, base);
   } catch {
-    // Do not include the Location header: it can contain OAuth state or codes.
+
     throw new Error('OAuth start returned an invalid redirect URL');
   }
 }
@@ -94,7 +93,7 @@ async function checkProviderStart(provider) {
     }
     const next = redirectUrl(result.headers.location, current);
     if (next.origin !== site.origin) {
-      // Inspect the provider URL, without following it or logging sensitive parameters.
+
       verifyProviderRedirect(provider, next);
       console.log(`PASS ${provider}: HTTPS authorization redirect, required OAuth parameters, WordPress callback, and secure React return cookie`);
       return true;
@@ -120,12 +119,12 @@ const cors = await request('/?mm_social_session=1', 'OPTIONS', { Origin: 'http:/
 assert.equal(cors.status, 204);
 assert.equal(cors.headers['access-control-allow-origin'], 'http://localhost:5173');
 console.log('PASS anonymous session denied, GET denied, local preflight supported');
-// Provider failures must land on the React auth page, never on a WordPress error page.
+
 const failure = await request('/auth/login?social_error=user_denied&social_provider=google');
 assert.equal(failure.status, 200);
 assert.ok((failure.headers['content-type'] || '').includes('text/html'), 'social failure page must be the React shell');
 console.log('PASS social failures return to the React auth page');
-// Logs and backups in the web root leaked session tokens once; they must stay blocked.
+
 for (const path of ['/wp-content/mu-plugins/debug_auth.log', '/error_log', '/wp-content/mu-plugins/manga-auth-api.php.bak-20260426105133', '/node_modules/react/package.json', '/src/config/api.ts']) {
   const blocked = await request(path);
   assert.ok([403, 404].includes(blocked.status), path + ' is publicly readable (HTTP ' + blocked.status + ')');

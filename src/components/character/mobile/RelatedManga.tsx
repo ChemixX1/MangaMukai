@@ -10,11 +10,6 @@ interface RelatedMangaProps {
   mangaId: number;
 }
 
-/**
- * "Manga Referencial": la serie del catálogo ligada al personaje, con su
- * portada entera (2:3), título y tipo; lleva a la ficha del manga. Mientras
- * carga se ve el hueco de la tarjeta; si no existe, no se pinta nada.
- */
 export const RelatedManga = ({ mangaId }: RelatedMangaProps) => {
   const [manga, setManga] = useState<MangaCapitulo | null | undefined>(undefined);
 
@@ -31,7 +26,7 @@ export const RelatedManga = ({ mangaId }: RelatedMangaProps) => {
     <div className="mt-3 flex min-h-[118px] items-center gap-3 rounded-xl bg-[#f0f0f0] p-2 pr-3 shadow-[0_8px_22px_-6px_rgba(0,0,0,0.14)] ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_-6px_rgba(0,0,0,0.2)] dark:bg-zinc-900 dark:ring-white/10 dark:shadow-[0_10px_26px_-6px_rgba(0,0,0,0.55)]">
       {manga && (
         <Link to={`/manga/${manga.id}`} className="group flex min-w-0 flex-1 items-center gap-3">
-          {/* Portada entera, en su proporción (2:3), sin recortarla en cuadrado. */}
+
           <span className="h-[102px] w-[68px] shrink-0 overflow-hidden rounded-md bg-zinc-200 shadow-md dark:bg-zinc-300">
             <img src={manga.portada} alt={`Portada de ${cleanTitle(manga.titulo)}`} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" />
           </span>

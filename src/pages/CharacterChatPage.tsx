@@ -9,18 +9,10 @@ import { useExperienceUser, useLocalExperience } from '../hooks/useLocalExperien
 import { registerCharacterMessage } from '../services/characterChatService';
 import '../styles/experiences.css';
 
-const CHAT_ACCENTS: Record<string, string> = {
-  gojo: '#2563eb',
-  levi: '#475569',
-  luffy: '#ea580c',
-  anya: '#db2777',
-};
-
 function Avatar({ src, name }: { src?: string; name: string }) {
   return <span className="exp-avatar">{src ? <img src={src} alt={name} /> : <UserRound size={21} />}</span>;
 }
 
-/** /chat muestra los personajes; /chat/:id, su ficha; /chat/:id/conversacion, el chat. */
 export default function CharacterChatPage() {
   const { characterId } = useParams();
   const inConversation = useMatch('/chat/:characterId/conversacion') !== null;
@@ -43,7 +35,7 @@ function Conversation({ character }: { character: ChatCharacter }) {
   const bottom = useRef<HTMLDivElement>(null);
   const request = useRef<AbortController | null>(null);
   const resetDialog = useRef<HTMLDialogElement>(null);
-  const accent = characterIntros[character.id]?.accent ?? CHAT_ACCENTS[character.id] ?? '#db2777';
+  const accent = characterIntros[character.id]?.accent ?? '#db2777';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,7 +56,7 @@ function Conversation({ character }: { character: ChatCharacter }) {
     const next: CharacterMessage[] = [...messages, { id: crypto.randomUUID(), role: 'user', content: input }];
     const serverMode = aiAvailable ? 'ai' : 'demo';
     try {
-      // El servidor anota cada mensaje y aplica la cuota de gratuitos: si se agotó, no hay respuesta.
+
       await registerCharacterMessage(character.id, 'user', input, serverMode);
       if (controller.signal.aborted) return;
       let content: string;

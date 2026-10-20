@@ -1,6 +1,6 @@
 import { toTitleCase } from '../../utils/titleCase';
 import { CollectionHeroActions } from './CollectionHeroActions';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -55,6 +55,9 @@ export function BlackWhiteHero() {
   const [catalog, setCatalog] = useState<MangaCapitulo[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const heroRef = useRef<HTMLElement>(null);
+  const [isInView, setIsInView] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(() => !document.hidden);
   const { isSaved, toggle: toggleSaved } = useSavedMangas();
   const isLightMode = theme === 'light';
 
@@ -79,7 +82,7 @@ export function BlackWhiteHero() {
       ...newReleases,
       ...catalog,
     ]);
-    // Solo los más vistos con público Mujer dentro de la colección B&N.
+
     return filterWomenBlackWhite(allMangas).sort(byTotalViews).slice(0, 9);
   }, [catalog, latestMen, latestWomen, newReleases, popularHistorical, popularMenHistorical]);
 
@@ -88,10 +91,25 @@ export function BlackWhiteHero() {
   }, [items.length]);
 
   useEffect(() => {
-    if (isPaused || items.length < 2) return;
+    const onVisibility = () => setIsPageVisible(!document.hidden);
+    onVisibility();
+    document.addEventListener('visibilitychange', onVisibility);
+    const observer = typeof IntersectionObserver === 'undefined'
+      ? null
+      : new IntersectionObserver(([entry]) => setIsInView(entry.isIntersecting));
+    if (observer && heroRef.current) observer.observe(heroRef.current);
+    else setIsInView(true);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      observer?.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isPaused || items.length < 2 || !isInView || !isPageVisible) return;
     const timer = window.setInterval(nextSlide, 6500);
     return () => window.clearInterval(timer);
-  }, [isPaused, items.length, nextSlide]);
+  }, [isPaused, items.length, nextSlide, isInView, isPageVisible]);
 
   useEffect(() => {
     if (activeIndex >= items.length) setActiveIndex(0);
@@ -109,11 +127,12 @@ export function BlackWhiteHero() {
     || 'Historias clásicas, acción y tinta pura en una colección pensada para lectores de manga tradicional.';
   const genres = collectionTags(active, 'bn');
   const latestChapter = active?.capitulosRecientes?.[0]?.numero;
-  // Guardado real: mismo estado que la ficha y la página de guardados.
+
   const isBookmarked = active ? isSaved(active.id) : false;
 
   return (
     <section
+      ref={heroRef}
       className={`bn-hero relative min-h-[985px] w-full overflow-hidden transition-colors duration-700 lg:h-[690px] lg:min-h-0 ${isLightMode ? 'bg-surface text-black' : 'bg-surface text-white'}`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -192,7 +211,7 @@ export function BlackWhiteHero() {
                   <img src={active.portada} alt={`Portada del manga ${title}`} className="manga-bn-interactive-cover h-full w-full object-cover" />
                   <div className="absolute inset-x-0 bottom-0 h-[34%] bg-gradient-to-t from-black via-black/45 to-transparent" />
                   <span className="absolute left-4 top-4 rounded-full bg-white/80 px-4 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-black backdrop-blur-md">Destacado</span>
-                  {/* La portada destacada abre la ficha del manga. */}
+
                   <button
                     type="button"
                     onClick={() => navigate(`/manga/${active.id}`)}

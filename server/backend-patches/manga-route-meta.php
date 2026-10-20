@@ -1,14 +1,4 @@
 <?php
-/**
- * Sirve la aplicacion React con un <head> SEO propio para cada ruta.
- *
- * /manga/{id} tiene su propio handler (manga-social-meta.php). Este cubre el
- * resto: portada, colecciones, paginas informativas, capitulos y las rutas
- * privadas que deben quedar fuera del indice.
- *
- * Importante: si cambian titulos o descripciones aqui, hay que reflejarlo en
- * src/config/seoRoutes.ts para que la navegacion cliente diga lo mismo.
- */
 
 $wp_root = dirname(__FILE__, 2);
 $index_file = $wp_root . '/index.html';
@@ -18,18 +8,16 @@ if (!file_exists($index_file)) {
     exit;
 }
 
-$site_url = 'https://mangamukai.com';
+require_once __DIR__ . '/seo-common.php';
+$config = mm_seo_config();
+$site_url = $config['siteUrl'];
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $path = '/' . trim((string) $path, '/');
 $path = $path === '/' ? '/' : rtrim($path, '/');
 
-/**
- * Cache en disco. La clave incluye la fecha del index.html para que un deploy
- * nuevo (con otros hashes de JS) invalide todas las rutas cacheadas.
- */
-$shell_stamp = (string) filemtime($index_file);
+$shell_stamp = filemtime($index_file) . '|' . filemtime(__FILE__) . '|' . filemtime(__DIR__ . '/seo-config.json') . '|' . filemtime(__DIR__ . '/seo-common.php');
 $cache_file = sys_get_temp_dir() . '/mm_route_' . md5($path . '|' . $shell_stamp) . '.html';
-$cache_ttl = 900; // 15 minutos
+$cache_ttl = 900;
 
 if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) {
     header('Content-Type: text/html; charset=UTF-8');
@@ -41,15 +29,11 @@ if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) 
 }
 
 if (!file_exists($wp_root . '/wp-load.php')) {
-    header('Content-Type: text/html; charset=UTF-8');
-    readfile($index_file);
+    http_response_code(503);
+    header('Retry-After: 300');
     exit;
 }
 
-// wp-load.php, los plugins y el tema se incluyen en el ambito global de este
-// script, asi que cualquier variable suya con el mismo nombre pisa a las de
-// aqui. Con $path clobbereado, isset($static_routes[$path]) lanzaba
-// "Illegal offset type" y toda ruta React caia con error 500.
 $mm_route_ctx = [
     'wp_root'    => $wp_root,
     'index_file' => $index_file,
@@ -66,11 +50,6 @@ $site_url   = $mm_route_ctx['site_url'];
 $path       = $mm_route_ctx['path'];
 $cache_file = $mm_route_ctx['cache_file'];
 
-/* -------------------------------------------------------------------------
- * Utilidades
- * ---------------------------------------------------------------------- */
-
-/** Portada del manga con los tres origenes que usa el resto del sitio. */
 function mm_route_cover($post_id) {
     $cover_id = get_post_thumbnail_id($post_id);
     $custom = get_post_meta($post_id, 'manga_cover', true);
@@ -86,7 +65,6 @@ function mm_route_cover($post_id) {
     return $url ? set_url_scheme($url, 'https') : '';
 }
 
-/** Ultimos mangas publicados con portada y generos, para listas e ItemList. */
 function mm_route_latest_mangas($limit = 24, $pattern = '') {
     global $wpdb;
 
@@ -111,7 +89,7 @@ function mm_route_latest_mangas($limit = 24, $pattern = '') {
                 if ($found && !is_wp_error($found)) $terms = array_merge($terms, wp_list_pluck($found, 'name'));
             }
             $terms[] = (string) get_post_meta($row->ID, 'ero_type', true);
-            if (!preg_match($pattern, implode(' ', array_filter($terms)))) continue;
+            if (!array_filter($terms, static function ($term) use ($pattern) { return preg_match($pattern, trim($term)); })) continue;
         }
 
         $cover = mm_route_cover($row->ID);
@@ -129,7 +107,6 @@ function mm_route_latest_mangas($limit = 24, $pattern = '') {
     return $items;
 }
 
-/** ItemList de mangas: cada entrada lleva su portada para Google Imagenes. */
 function mm_route_item_list($items, $list_url, $list_name) {
     $elements = [];
     foreach ($items as $position => $item) {
@@ -151,7 +128,41 @@ function mm_route_item_list($items, $list_url, $list_name) {
     ];
 }
 
-/** Rejilla estatica para lectores sin JS y para descubrir portadas al rastrear. */
+function mm_route_explore_links() {
+    $links = [
+        ['url' => '/#tendencia-ahora', 'title' => 'Tendencia Ahora'],
+        ['url' => '/#mangas-juveniles', 'title' => 'Mangas Juveniles'],
+        ['url' => '/manga-bn', 'title' => 'Mangas Blanco & Negro'],
+        ['url' => '/manga-19', 'title' => 'Mangas para adultos'],
+    ];
+    $ranked = [];
+    foreach (['popular-women', 'popular-men'] as $endpoint) {
+        $request = new WP_REST_Request('GET', '/mangamukai/v1/' . $endpoint);
+        $request->set_param('period', 'historical');
+        $response = rest_do_request($request);
+        if ($response->is_error() || $response->get_status() !== 200) continue;
+        $data = $response->get_data();
+        if (empty($data['success']) || empty($data['mangas']) || !is_array($data['mangas'])) continue;
+        foreach ($data['mangas'] as $manga) {
+            $id = absint($manga['id'] ?? 0);
+            $views = (float) ($manga['totalViews'] ?? 0);
+            if (!$id || $views <= 0 || empty($manga['titulo'])) continue;
+            if (!isset($ranked[$id]) || $views > $ranked[$id]['views']) {
+                $ranked[$id] = ['id' => $id, 'views' => $views, 'title' => wp_strip_all_tags($manga['titulo'])];
+            }
+        }
+    }
+    usort($ranked, static function ($a, $b) {
+        return ($b['views'] <=> $a['views']) ?: ($a['id'] <=> $b['id']);
+    });
+    foreach (array_slice($ranked, 0, 2) as $manga) {
+        $links[] = ['url' => '/manga/' . $manga['id'], 'title' => $manga['title']];
+    }
+    $links[] = ['url' => '/comunidad', 'title' => 'Comunidad Mukai'];
+    $links[] = ['url' => '/chat', 'title' => 'Character Chat'];
+    return $links;
+}
+
 function mm_route_noscript_grid($heading, $intro, $items) {
     $html = '<noscript><main><h1>' . esc_html($heading) . '</h1><p>' . esc_html($intro) . '</p><ul>';
     foreach ($items as $item) {
@@ -175,91 +186,21 @@ function mm_route_breadcrumbs($trail) {
     return ['@type' => 'BreadcrumbList', 'itemListElement' => $elements];
 }
 
-/* -------------------------------------------------------------------------
- * Definicion de rutas
- * ---------------------------------------------------------------------- */
+$adult_pattern = '/^(?:manga\s*)?hot$/iu';
+$mono_pattern = '/^(?:manga\s*)?(?:b\s*[&\/-]?\s*n|blanco\s*y?\s*negro|monocrom\w*)$/iu';
 
-$adult_pattern = '/\+19|adult|ecchi|hentai|hot|er[oó]tico|maduro|harem|yuri/i';
-$mono_pattern = '/b\/?n|blanco|negro|shounen|seinen|acci[oó]n|manga juvenil/i';
+$static_routes = $config['routes'];
+$static_routes['/']['list'] = ['pattern' => '', 'limit' => 30];
+$static_routes['/manga-19']['list'] = ['pattern' => $adult_pattern, 'limit' => 36];
+$static_routes['/manga-bn']['list'] = ['pattern' => $mono_pattern, 'limit' => 36];
 
-$static_routes = [
-    '/' => [
-        'kind' => 'home',
-        'title' => 'MangaMukai — Leer manga online gratis en español',
-        'description' => 'Lee manga online gratis y en español en MangaMukai: manhwa, manhua, romance, acción, fantasía, seinen y contenido +19. Capítulos nuevos cada día con lector rápido.',
-        'heading' => 'Leer manga online gratis en español',
-        'intro' => 'Catálogo de manga, manhwa y manhua en español con capítulos nuevos cada día.',
-        'list' => ['pattern' => '', 'limit' => 30],
-    ],
-    '/manga-19' => [
-        'kind' => 'collection',
-        'title' => 'Mangas +19 en español — Colección para adultos | MangaMukai',
-        'description' => 'Colección +19 de MangaMukai: manga y manhwa para adultos en español, con romance, drama y fantasía madura. Solo para mayores de edad.',
-        'heading' => 'Mangas +19 en español',
-        'intro' => 'Selección madura de manga y manhwa en español. Contenido para mayores de 18 años.',
-        'list' => ['pattern' => $adult_pattern, 'limit' => 36],
-        'adult' => true,
-    ],
-    '/manga-bn' => [
-        'kind' => 'collection',
-        'title' => 'Manga en blanco y negro — Shounen, seinen y acción | MangaMukai',
-        'description' => 'Manga clásico en blanco y negro: shounen, seinen y acción en español, con capítulos nuevos y lector optimizado en MangaMukai.',
-        'heading' => 'Manga en blanco y negro',
-        'intro' => 'Historias clásicas, acción y tinta pura para lectores de manga tradicional.',
-        'list' => ['pattern' => $mono_pattern, 'limit' => 36],
-    ],
-    '/pro' => [
-        'kind' => 'page',
-        'title' => 'Mukai Pro | MangaMukai',
-        'description' => 'Descubre los beneficios de Mukai Pro y elige tu plan mensual o anual.',
-        'heading' => 'Mukai Pro',
-    ],
-    '/nosotros' => [
-        'kind' => 'page',
-        'title' => 'Sobre MangaMukai — Quiénes somos',
-        'description' => 'Conoce al equipo de MangaMukai, cómo trabajamos las traducciones y qué encontrarás en nuestro catálogo de manga en español.',
-        'heading' => 'Sobre MangaMukai',
-    ],
-    '/contacto' => [
-        'kind' => 'page',
-        'title' => 'Contacto — MangaMukai',
-        'description' => 'Escríbenos para sugerencias, reportes de capítulos, colaboraciones o dudas sobre tu cuenta de MangaMukai.',
-        'heading' => 'Contacto',
-    ],
-    '/legal' => [
-        'kind' => 'page',
-        'title' => 'Términos de uso y privacidad — MangaMukai',
-        'description' => 'Términos de uso, política de privacidad y tratamiento de datos de los lectores de MangaMukai.',
-        'heading' => 'Términos y privacidad',
-    ],
-    '/privacidad' => [
-        'kind' => 'page',
-        'title' => 'Política de privacidad | MangaMukai',
-        'description' => 'Qué datos recoge MangaMukai, para qué los usa, con quién los comparte y cómo puedes ejercer tus derechos.',
-        'heading' => 'Política de privacidad',
-    ],
-    '/terminos' => [
-        'kind' => 'page',
-        'title' => 'Términos de servicio | MangaMukai',
-        'description' => 'Condiciones de uso de MangaMukai: cuentas, Mukai Coins, contenido +19, conducta permitida y responsabilidad.',
-        'heading' => 'Términos de servicio',
-    ],
-    '/normas-comunidad' => [
-        'kind' => 'page',
-        'title' => 'Normas de la comunidad | MangaMukai',
-        'description' => 'Reglas de convivencia de la comunidad y la mensajería de MangaMukai, y cómo se modera.',
-        'heading' => 'Normas de la comunidad',
-    ],
-    '/cookies' => [
-        'kind' => 'page',
-        'title' => 'Política de cookies | MangaMukai',
-        'description' => 'Qué cookies y almacenamiento local usa MangaMukai, para qué sirven y cómo puedes gestionarlos.',
-        'heading' => 'Política de cookies',
-    ],
-];
-
-// Rutas privadas o transaccionales: se sirven, pero fuera del indice.
 $private_routes = [
+    '/mensajes' => 'Mensajes',
+    '/notificaciones' => 'Notificaciones',
+    '/transacciones' => 'Transacciones',
+    '/perfil/editar' => 'Editar perfil',
+    '/tienda/pago' => 'Pago',
+    '/pro/pago' => 'Pago',
     '/profile' => 'Profile',
     '/recargar' => 'Recargar monedas',
     '/recargar/pago' => 'Recargar monedas',
@@ -275,11 +216,11 @@ if (isset($static_routes[$path])) {
     $route = $static_routes[$path];
 } elseif (isset($private_routes[$path])) {
     $route = ['kind' => 'private', 'title' => $private_routes[$path] . ' | MangaMukai', 'description' => 'Área privada de MangaMukai.'];
-} elseif (preg_match('~^/(auth|usuarios)/~', $path)) {
+} elseif (preg_match('~^/(auth|usuarios|mensajes|chat)/|^/comunidad/publicacion/~', $path)) {
     $route = ['kind' => 'private', 'title' => 'MangaMukai', 'description' => 'Área privada de MangaMukai.'];
 } elseif (preg_match('~^/read/(\d+)$~', $path, $matches)) {
     $chapter_post = get_post((int) $matches[1]);
-    if ($chapter_post && $chapter_post->post_status === 'publish') {
+    if ($chapter_post && $chapter_post->post_type === 'post' && $chapter_post->post_status === 'publish') {
         $manga_id = absint(get_post_meta($chapter_post->ID, 'ero_seri', true));
         $manga = $manga_id ? get_post($manga_id) : null;
         if ($manga && $manga->post_type === 'manga' && $manga->post_status === 'publish') {
@@ -292,19 +233,11 @@ if (isset($static_routes[$path])) {
         }
     }
     if (!$route) {
-        $route = ['kind' => 'private', 'title' => 'Capítulo no disponible | MangaMukai', 'description' => 'Este capítulo ya no está disponible en MangaMukai.'];
+        mm_seo_not_found($index_file, 'Capítulo no disponible');
     }
 }
 
-if (!$route) {
-    header('Content-Type: text/html; charset=UTF-8');
-    readfile($index_file);
-    exit;
-}
-
-/* -------------------------------------------------------------------------
- * Construccion del head
- * ---------------------------------------------------------------------- */
+if (!$route) mm_seo_not_found($index_file);
 
 $canonical = $site_url . ($path === '/' ? '/' : $path);
 $robots = 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
@@ -312,7 +245,7 @@ $og_type = 'website';
 $items = [];
 $noscript = '';
 $graph = [];
-$extra_meta = '';
+$adult = !empty($route['adult']);
 
 $organization = [
     '@type' => 'Organization',
@@ -361,9 +294,10 @@ if ($route['kind'] === 'chapter') {
     $cover = mm_route_cover($chapter['manga']->ID);
     $share_image = $cover ?: $share_image;
     $og_type = 'article';
+    $adult = mm_seo_is_adult(mm_seo_tags($chapter['manga']->ID));
 
-    $title = $manga_title . ' ' . $label . ' — Leer online en español | MangaMukai';
-    $description = 'Lee ' . $manga_title . ' ' . $label . ' online y en español, gratis y en alta calidad en MangaMukai.';
+    $title = $manga_title . ' — ' . $label . ' | MangaMukai';
+    $description = 'Lee ' . $manga_title . ' — ' . $label . ' en español en MangaMukai. Consulta su disponibilidad y sigue los capítulos de la historia.';
 
     $graph[] = [
         '@type' => 'PublicationIssue',
@@ -372,8 +306,8 @@ if ($route['kind'] === 'chapter') {
         'issueNumber' => $number !== '' ? $number : null,
         'url' => $canonical,
         'inLanguage' => 'es',
-        'datePublished' => mysql2date(DATE_W3C, $chapter['post']->post_date_gmt ?: $chapter['post']->post_date),
-        'dateModified' => mysql2date(DATE_W3C, $chapter['post']->post_modified_gmt ?: $chapter['post']->post_modified),
+        'datePublished' => mm_seo_date($chapter['post']->post_date_gmt),
+        'dateModified' => mm_seo_date($chapter['post']->post_modified_gmt),
         'image' => $cover ?: null,
         'isPartOf' => [
             '@type' => 'Book',
@@ -395,6 +329,11 @@ if ($route['kind'] === 'chapter') {
 }
 
 if ($route['kind'] === 'home') {
+    $explore = '<noscript><nav aria-label="Explora MangaMukai"><h2>Explora MangaMukai</h2><ul>';
+    foreach (mm_route_explore_links() as $link) {
+        $explore .= '<li><a href="' . esc_url($site_url . $link['url']) . '">' . esc_html($link['title']) . '</a></li>';
+    }
+    $noscript .= $explore . '</ul><p>En Character Chat puedes conversar con tus personajes favoritos, crear tu propia historia y vivir una aventura.</p></nav></noscript>';
     $graph[] = [
         '@type' => 'CollectionPage',
         '@id' => $canonical . '#webpage',
@@ -421,11 +360,7 @@ if ($route['kind'] === 'home') {
         ['name' => $route['heading'], 'url' => $canonical],
     ]);
     if ($items) $graph[] = mm_route_item_list($items, $canonical, $route['heading']);
-    if (!empty($route['adult'])) {
-        // Etiqueta el bloque adulto sin arrastrar al resto del dominio en SafeSearch.
-        $extra_meta .= '    <meta name="rating" content="adult" />' . "\n";
-        $extra_meta .= '    <meta name="RATING" content="RTA-5042-1996-1400-1577-RTA" />' . "\n";
-    }
+    if ($adult) $graph[0]['isFamilyFriendly'] = false;
 } elseif ($route['kind'] === 'page') {
     $graph[] = [
         '@type' => 'WebPage',
@@ -443,65 +378,19 @@ if ($route['kind'] === 'home') {
     $noscript = '<noscript><main><h1>' . esc_html($route['heading']) . '</h1><p>' . esc_html($description) . '</p></main></noscript>';
 }
 
-// Identidad del sitio en todas las rutas: los nodos de abajo la referencian
-// por @id y el shell ya no aporta su JSON-LD generico cuando hay grafo.
 if ($graph) {
     array_unshift($graph, $organization, $website);
 }
 
-$jsonld = $graph
-    ? wp_json_encode(
-        ['@context' => 'https://schema.org', '@graph' => array_map('mm_route_strip_nulls', $graph)],
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP
-    )
-    : '';
-
-$escape = static function ($value) {
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-};
-
-$seo_head = "\n" .
-    '    <title>' . $escape($title) . "</title>\n" .
-    '    <meta name="description" content="' . $escape($description) . "\" />\n" .
-    '    <meta name="robots" content="' . $escape($robots) . "\" />\n" .
-    '    <meta name="googlebot" content="' . $escape($robots) . "\" />\n" .
-    '    <meta name="googlebot-image" content="' . ($route['kind'] === 'private' ? 'noindex' : 'index,follow') . "\" />\n" .
-    '    <link rel="canonical" href="' . $escape($canonical) . "\" />\n" .
-    $extra_meta .
-    '    <meta property="og:type" content="' . $escape($og_type) . "\" />\n" .
-    '    <meta property="og:site_name" content="MangaMukai" />' . "\n" .
-    '    <meta property="og:locale" content="es_ES" />' . "\n" .
-    '    <meta property="og:title" content="' . $escape($title) . "\" />\n" .
-    '    <meta property="og:description" content="' . $escape($description) . "\" />\n" .
-    '    <meta property="og:url" content="' . $escape($canonical) . "\" />\n" .
-    '    <meta property="og:image" content="' . $escape($share_image) . "\" />\n" .
-    '    <meta property="og:image:alt" content="' . $escape($title) . "\" />\n" .
-    '    <meta name="twitter:card" content="summary_large_image" />' . "\n" .
-    '    <meta name="twitter:site" content="@MangaMukai" />' . "\n" .
-    '    <meta name="twitter:title" content="' . $escape($title) . "\" />\n" .
-    '    <meta name="twitter:description" content="' . $escape($description) . "\" />\n" .
-    '    <meta name="twitter:image" content="' . $escape($share_image) . "\" />\n" .
-    ($jsonld ? '    <script type="application/ld+json">' . $jsonld . "</script>\n" : '');
-
-if ($items) {
-    // La primera portada es el LCP probable de las rejillas.
-    $seo_head .= '    <link rel="preload" as="image" href="' . $escape($items[0]['cover']) . "\" fetchpriority=\"high\" />\n";
-}
-
-$html = file_get_contents($index_file);
-$html = preg_replace('~<title\b[^>]*>.*?</title>\s*~is', '', $html);
-$html = preg_replace('~<meta\b[^>]*(?:name|property)=["\'](?:description|robots|googlebot|googlebot-image|twitter:[^"\']+|og:[^"\']+)["\'][^>]*>\s*~i', '', $html);
-$html = preg_replace('~<link\b[^>]*rel=["\']canonical["\'][^>]*>\s*~i', '', $html);
-// El shell trae un JSON-LD generico de Organization/WebSite: se sustituye por el
-// grafo de esta ruta para no publicar dos veces los mismos @id.
-if ($jsonld) {
-    $html = preg_replace('~<script\b[^>]*type=["\']application/ld\+json["\'][^>]*>.*?</script>\s*~is', '', $html);
-}
-$html = str_replace('</head>', $seo_head . '  </head>', $html);
-
-if ($noscript) {
-    $html = str_replace('<div id="root"></div>', '<div id="root"></div>' . $noscript, $html);
-}
+$html = mm_seo_render($index_file, [
+    'title' => $title,
+    'description' => $description,
+    'canonical' => $canonical,
+    'image' => $share_image,
+    'type' => $og_type,
+    'adult' => $adult,
+    'noindex' => $route['kind'] === 'private',
+], array_map('mm_route_strip_nulls', $graph), $noscript);
 
 @file_put_contents($cache_file, $html, LOCK_EX);
 
@@ -511,7 +400,6 @@ header('Cache-Control: no-cache, must-revalidate');
 header('X-MM-Route-Cache: miss');
 echo $html;
 
-/** Quita claves nulas del grafo JSON-LD (issueNumber, image, etc.). */
 function mm_route_strip_nulls($node) {
     if (!is_array($node)) return $node;
     $clean = [];

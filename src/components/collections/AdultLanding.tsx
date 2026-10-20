@@ -33,10 +33,6 @@ const uniqueMangas = (items: MangaCapitulo[]) => {
   });
 };
 
-/**
- * Colección +19 (/manga-19): mismas secciones, titulares, filtros y efectos
- * que el Home, manteniendo los estilos de portada propios de la colección.
- */
 export function AdultLanding() {
   const { theme: colorMode } = useTheme();
   const {
@@ -61,9 +57,6 @@ export function AdultLanding() {
   const [loading, setLoading] = useState(true);
   const [popularMenMonthly, setPopularMenMonthly] = useState<MangaCapitulo[]>([]);
 
-  /* El ranking mensual no está en el contexto del home; se pide aquí (queda en
-     caché y lo comparte el carrusel de tendencias) solo para sumar sus vistas.
-     Como únicamente completa contadores, espera a que el navegador esté libre. */
   useEffect(() => {
     let mounted = true;
     const cancelIdle = whenIdle(() => {
@@ -77,9 +70,6 @@ export function AdultLanding() {
     };
   }, []);
 
-  /* `false` es imprescindible: con el valor por defecto (`true`) esta llamada
-     pedía `refresh=1` y obligaba al backend a recalcular el ranking histórico
-     que el contexto del home ya estaba trayendo. Así comparte esa misma promesa. */
   useEffect(() => {
     let mounted = true;
     Promise.all([getUltimosCapitulos(), getPopularWomenByViews('historical', false)])
@@ -93,9 +83,6 @@ export function AdultLanding() {
     return () => { mounted = false; };
   }, []);
 
-  /* Cada bloque exige la etiqueta HOT literal: Mujer arriba, Hombre en juveniles
-     y abajo. Los rankings de vistas casi no traen mangas HOT, así que cada pool
-     suma la biblioteca completa (`mangas`) y el filtro decide. */
   const latestWomenWithChapters = useMemo(
     () => filterWomenHot(uniqueMangas([...latestWomen, ...popularWeekly, ...popularHistorical, ...newReleases, ...mangas])),
     [latestWomen, popularWeekly, popularHistorical, newReleases, mangas],
@@ -104,9 +91,7 @@ export function AdultLanding() {
     () => filterMenHot(uniqueMangas([...latestMen, ...popularMenWeekly, ...popularMenHistorical, ...newReleases, ...mangas])),
     [latestMen, popularMenWeekly, popularMenHistorical, newReleases, mangas],
   );
-  /* Vistas por serie: las últimas actualizaciones y el catálogo llegan sin
-     `totalViews`, así que el contador de juveniles se completa con la cifra
-     que traen los rankings para esa misma serie. */
+
   const viewsIndex = useMemo(
     () => buildViewsIndex(popularMenWeekly, popularMenMonthly, popularMenHistorical, popularWeekly, popularHistorical, newReleases, latestMen, latestWomen, mangas),
     [popularMenWeekly, popularMenMonthly, popularMenHistorical, popularWeekly, popularHistorical, newReleases, latestMen, latestWomen, mangas],
@@ -116,7 +101,6 @@ export function AdultLanding() {
     [latestMen, popularMenWeekly, popularMenHistorical, mangas, viewsIndex],
   );
 
-  /* Hero: solo los más vistos con público Mujer y etiqueta HOT. Sin HOT no entra. */
   const heroItems = useMemo(() => {
     const pool = uniqueMangas([...popularHistorical, ...popularWeekly, ...latestWomen, ...newReleases, ...mangas]);
     return filterWomenHot(pool).sort(byTotalViews).slice(0, 8);
@@ -156,8 +140,6 @@ export function AdultLanding() {
   }, [activeCover]);
   const heroCoverKey = heroItems.map((manga) => manga.portada).filter(Boolean).join('|');
 
-  // Se adelanta la descarga de las portadas del hero para que aparezcan ya
-  // decodificadas cuando llegan los listados.
   useEffect(() => {
     if (loading || !homeReady) return;
     void preloadImages(heroCoverKey.split('|').slice(0, 3));
@@ -178,9 +160,8 @@ export function AdultLanding() {
 
   return (
     <main className={`collection-landing min-h-screen overflow-hidden transition-colors duration-700 ${isDataReady ? 'home-data-ready' : 'home-data-pending'} ${isLightMode ? 'home-theme-light bg-surface text-slate-950' : 'home-theme-dark bg-surface text-white'}`}>
-      {/* El título grande del hero es el manga destacado y va rotando: el H1 real
-          de la colección se declara aquí para buscadores y lectores de pantalla. */}
-      <h1 className="sr-only">Mangas +19 en español para adultos</h1>
+
+      <h1 className="sr-only">Mangas para adultos</h1>
       <section ref={heroRef} onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)} onTouchCancel={() => setIsPaused(false)} className="home-block home-block-hero relative min-h-[960px] overflow-hidden lg:min-h-[850px]">
         <div className={`absolute inset-0 bg-surface`} aria-hidden="true">
           <AnimatePresence initial={false}>

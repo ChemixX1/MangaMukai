@@ -25,9 +25,7 @@ const uniqueMangas = (items: MangaCapitulo[]) => {
 };
 
 function MangaBlackWhiteContent() {
-  // Las series B&N suelen entrar antes que su primer capítulo: `includeUpcoming`
-  // y la fusión con el catálogo general las listan igual (portada y título)
-  // para que "Lo Más Reciente" siempre muestre todas las obras de la colección.
+
   const {
     latestWomen,
     latestMen,
@@ -57,8 +55,6 @@ function MangaBlackWhiteContent() {
     };
   }, []);
 
-  // Marca en el body para teñir de gris también la cabecera, que vive fuera de
-  // esta página. Se retira al salir de la colección.
   useEffect(() => {
     document.body.classList.add('bn-monochrome');
     return () => document.body.classList.remove('bn-monochrome');
@@ -123,7 +119,7 @@ function MangaBlackWhiteContent() {
         />
       )}
       pageClassName="manga-bn-page"
-      pageHeading="Manga en blanco y negro: shounen, seinen y acción"
+      pageHeading="Mangas Blanco & Negro"
     />
   );
 }

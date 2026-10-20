@@ -1,6 +1,5 @@
 import type { SocialNotification } from '../services/socialService';
 
-/** Ruta a la que lleva cada notificación. */
 export const notificationRoute = (notification: SocialNotification): string => {
   const { type, payload, actor } = notification;
   if (type === 'chapter_new' || type === 'manga_new' || type === 'manga_update') return payload.manga_id ? `/manga/${payload.manga_id}` : '/';

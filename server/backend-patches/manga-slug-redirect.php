@@ -1,7 +1,4 @@
 <?php
-/**
- * Redirects legacy WordPress manga slugs to the canonical React manga URL.
- */
 
 $wp_root = dirname(__FILE__, 2);
 $index_file = $wp_root . '/index.html';
@@ -22,6 +19,5 @@ if ($post && $post->post_status === 'publish') {
     exit;
 }
 
-header('Content-Type: text/html; charset=UTF-8');
-header('Cache-Control: no-cache, no-store, must-revalidate');
-readfile($index_file);
+require_once __DIR__ . '/seo-common.php';
+mm_seo_not_found($index_file);

@@ -59,9 +59,7 @@ const MetaRow = ({ icon, label, value, dotColor }: { icon: React.ReactNode; labe
   </div>
 );
 
-/** Pestañas del diseño: texto blanco sobre selección negra. */
 const tabClass = (active = false) => `manga-detail-tab ${active ? 'is-active' : ''}`;
-
 
 export const MobileMangaDetail = ({
   manga, chapters, related, initialComments, commentsLoading, commentsError, chaptersLoading, chaptersError, relatedLoading, secondaryReady,
@@ -109,7 +107,7 @@ export const MobileMangaDetail = ({
 
   const genres = (manga.genres || []).slice(0, 6);
   const badge = collectionBadge(manga);
-  // El catálogo del servidor usa cuatro tipos: Manga, Manhwa, Manhua y Comic.
+
   const typeColor = (() => {
     const type = (manga.tipo || '').toLocaleLowerCase('es');
     if (type.includes('manhua')) return '#22C55E';
@@ -169,12 +167,12 @@ export const MobileMangaDetail = ({
           <MangaDetailSocials />
         </div>
       </div>
-      {/* La portada y las acciones comparten los mismos bordes laterales. */}
+
       <header className="manga-detail-mobile-cover relative aspect-[440/630]">
         <HoloCard image={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} foilEnabled={false} tiltMax={8} tiltDamping={26} hoverScale={1.015} radius={14} idle={false} />
       </header>
 
-      {/* Acciones */}
+
       <div className="manga-detail-mobile-actions flex min-h-[50px] items-start justify-center">
         <button
           type="button"
@@ -200,7 +198,7 @@ export const MobileMangaDetail = ({
           {toTitleCase(manga.titulo)}
         </h1>
         {manga.tituloOriginal?.trim() && <p className="manga-detail-original-title">{manga.tituloOriginal.trim()}</p>}
-      {/* Géneros */}
+
       {genres.length > 0 && (
         <div role="list" aria-label="Géneros" className="manga-detail-genres">
           {genres.map((genre) => (
@@ -211,12 +209,11 @@ export const MobileMangaDetail = ({
         </div>
       )}
 
-
       <MangaRewardProgress purchasedIds={purchasedIds} userId={userInfo.id} loading={chaptersLoading} />
       <MangaSeasonSelector key={manga.id} cover={manga.portada} title={toTitleCase(manga.titulo)} likeAction={
         <MangaSeriesLikeButton liked={isLiked} likes={likes} busy={interactionBusy === 'like'} disabled={interactionBusy === 'like'} onClick={onLike} />
       } />
-      {/* Etiquetas de la colección */}
+
       <div className="manga-detail-badges">
         <span className="manga-detail-views" aria-label={manga.totalViews === undefined ? 'Vistas no disponibles' : `${new Intl.NumberFormat('es-PE').format(manga.totalViews)} vistas`}><DetailViewsIcon size={18} />{manga.totalViews === undefined ? '--' : new Intl.NumberFormat('es-PE', { notation: 'compact' }).format(manga.totalViews)}</span>
         <span className="manga-mobile-new-badge flex items-center justify-center rounded-lg bg-mukai-magenta font-montserrat text-xs font-bold leading-4 text-white"><DetailNewIcon size={16} />Estreno</span>
@@ -232,7 +229,7 @@ export const MobileMangaDetail = ({
         )}
       </div>
 
-      {/* Ficha técnica */}
+
       <div className="manga-detail-mobile-metadata mx-auto mt-7 w-[74.5455%] max-[400px]:w-[calc(100%-48px)]">
         <MetaRow icon={<TypeIcon size={26} />} label="Tipo" value={manga.tipo?.trim() || '--'} dotColor={manga.tipo?.trim() ? typeColor : undefined} />
         {manga.author && <MetaRow icon={<StudioIcon size={25} />} label="Autor" value={manga.author} />}
@@ -245,10 +242,10 @@ export const MobileMangaDetail = ({
         <div className="h-full overflow-hidden rounded-2xl">{secondaryReady && <MukaiMusicPromo />}</div>
       </section>
 
-      {/* Pestañas */}
+
       <nav aria-label="Secciones del manga" className="mx-auto mt-[46px] w-[88.6364%]">
         <div className="manga-detail-tabs">
-          {/* Selección que se desplaza entre las pestañas. */}
+
           <GooeySelector activeIndex={sectionIndex} />
           <button type="button" onClick={() => { setTab('chapters'); setSectionIndex(0); }} aria-current={sectionIndex === 0} className={tabClass(sectionIndex === 0)}>
             <ChaptersTabIcon size={13} />

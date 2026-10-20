@@ -1,10 +1,7 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { seoHtml } from './scripts/seo-html.mjs'
 
-// El equipo de desarrollo no resuelve mangamukai.com por DNS, y llamar al backend
-// directamente desde localhost daria NetworkError/CORS. En desarrollo, Vite reenvia
-// las rutas de datos (/wp-json) al backend por su IP directa, enviando el Host
-// correcto, de modo que el navegador trabaja siempre contra su mismo origen.
 const BACKEND_IP = 'https://50.31.188.151'
 const BACKEND_HOST = 'mangamukai.com'
 
@@ -15,15 +12,15 @@ const backendProxy = {
   headers: { host: BACKEND_HOST },
 }
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), {
+    name: 'mangamukai-seo',
+    transformIndexHtml: (html: string) => seoHtml(html, { ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env }),
+  }],
   server: {
     proxy: {
       '/wp-json': backendProxy,
-      // Canje de sesion social OAuth (flujo cookieless con social_code) por el
-      // mismo origen. El backend exige el header Origin de localhost para aceptar
-      // el code, por eso lo forzamos aqui.
+
       '/mm-social-session': {
         target: BACKEND_IP,
         changeOrigin: false,
@@ -33,4 +30,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

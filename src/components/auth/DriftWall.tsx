@@ -154,7 +154,7 @@ const DriftWall = ({
   }, [columnItems, speed, direction, variance]);
 
   useLayoutEffect(() => {
-    // Un cambio de tamaño conserva el avance de cada columna.
+
     offsetsRef.current = columnMeta.map((meta, c) => {
       const previousHeight = copyHeightsRef.current[c];
       const progress = previousHeight

@@ -11,30 +11,15 @@ import { loadSearchSections, type SearchCollection, type SearchSectionStage } fr
 import { displayViews } from "../utils/seriesViews";
 import { toTitleCase } from "../utils/titleCase";
 import { hasBlackWhiteTag, hasHotTag } from "../utils/womenBlackWhite";
+import { filterCatalog } from "../utils/catalogSearch";
 import type { MangaCapitulo } from "../types/manga";
 
 const RESULTS_PAGE_SIZE = 30;
 const TOP_SEARCHED_COUNT = 4;
-/* "Nuevos lanzamientos": uno grande y tres debajo. */
+
 const NEW_RELEASES_COUNT = 4;
 const DAY_MS = 86_400_000;
 
-const normalizeSearchValue = (value: string) => value
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .toLocaleLowerCase("es")
-  .trim();
-
-const filterCatalog = (catalog: MangaCapitulo[], term: string) => {
-  const terms = normalizeSearchValue(term).split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return [];
-  return catalog.filter((manga) => {
-    const haystack = normalizeSearchValue([manga.titulo, manga.tipo, ...(manga.genres || [])].filter(Boolean).join(" "));
-    return terms.every((word) => haystack.includes(word));
-  });
-};
-
-/** Pestaña activa bajo el buscador: todo, solo B&N o solo HOT. */
 const matchesFilter = (manga: MangaCapitulo, filter: SearchFilter) =>
   filter === "todos" ? true : filter === "bn" ? hasBlackWhiteTag(manga) : hasHotTag(manga);
 
@@ -44,10 +29,8 @@ const formatViews = (views = 0) => {
   return String(views);
 };
 
-// Las fechas llegan como "2026-09-09 13:52:03"; Safari solo entiende la forma con "T".
 const parseDate = (value?: string) => (value ? Date.parse(value.replace(" ", "T")) : Number.NaN);
 
-/** NEW si la serie es reciente; UP si tuvo capítulo esta semana. */
 const getFreshness = (manga: MangaCapitulo): "NEW" | "UP" | null => {
   const now = Date.now();
   const published = parseDate(manga.publishedAt);
@@ -67,18 +50,11 @@ const FreshnessBadge = ({ manga, className = "" }: { manga: MangaCapitulo; class
   );
 };
 
-/** Fecha de lanzamiento de la serie (o de su última subida si no la trae). */
 const releaseTime = (manga: MangaCapitulo) => {
   const published = parseDate(manga.publishedAt);
   return Number.isNaN(published) ? parseDate(manga.rawFecha) || 0 : published;
 };
 
-/**
- * Biblioteca (móvil primero): el campo de búsqueda vive en el navbar; aquí van
- * los cuatro más buscados, las tarjetas por género, los últimos lanzamientos y,
- * al escribir, los resultados sobre el catálogo. Se pinta dentro
- * de la ventana del buscador (SearchOverlay), que ya trae el campo y las pestañas.
- */
 export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode }) => {
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -92,11 +68,10 @@ export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode 
   const [stages, setStages] = useState<Record<SearchCollection, SearchSectionStage>>({ todos: 0, bn: 0, hot: 0 });
   const [visibleResults, setVisibleResults] = useState(RESULTS_PAGE_SIZE);
 
-
   useEffect(() => {
     let cancelled = false;
     const unsubscribe = subscribeSearchCatalog(items => { if (!cancelled) setAllCatalog(items); });
-    // Publica el catálogo sin esperar a los rankings secundarios.
+
     loadSearchCatalog()
       .then((catalogData) => {
         if (cancelled) return;
@@ -110,17 +85,14 @@ export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode 
   useEffect(() => { setVisibleResults(RESULTS_PAGE_SIZE); }, [deferredSearchTerm, searchFilter]);
 
   const catalog = useMemo(() => allCatalog.filter((manga) => matchesFilter(manga, searchFilter)), [allCatalog, searchFilter]);
-  // "+ Buscados": las cuatro series con más vistas de la pestaña activa, de mayor a menor
-  // (con la cifra que se muestra, para que el orden coincida con lo que se lee).
+
   const topSearched = useMemo(() => [...catalog].sort((a, b) => displayViews(b) - displayViews(a)).slice(0, TOP_SEARCHED_COUNT), [catalog]);
-  // "Nuevos lanzamientos": las series publicadas más recientemente, de la más nueva a la más antigua.
+
   const newReleases = useMemo(() => [...catalog].sort((a, b) => releaseTime(b) - releaseTime(a)).slice(0, NEW_RELEASES_COUNT), [catalog]);
 
   const genreTiles = searchGenres;
   const results = useMemo(() => filterCatalog(catalog, deferredSearchTerm), [catalog, deferredSearchTerm]);
   const isSearching = deferredSearchTerm.trim().length > 0;
-
-  // Al pasar de explorar a resultados (o volver) se empieza desde arriba.
 
   useEffect(() => {
     if (loading) return;
@@ -167,8 +139,7 @@ export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode 
           </section>
         ) : (
           <>
-            {/* "+ Buscados": cuatro filas ordenadas por vistas, con portada pequeña,
-                título, etiqueta rosa con el tipo y contador negro con el ojo. */}
+
             <section aria-label="Más buscados" aria-busy={loading || stage < 1}>
               <div className="search-top-heading mb-3 flex items-center justify-between gap-3">
                 <h2 className="font-[Montserrat] text-lg font-bold leading-tight">+ Buscados</h2>
@@ -188,7 +159,7 @@ export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode 
                           <h3 className="line-clamp-2 font-[Montserrat] text-[13px] font-normal leading-snug">{toTitleCase(manga.titulo)}</h3>
                           <div className="mt-1.5 flex items-center gap-1.5">
                             <span style={{ backgroundColor: hasHotTag(manga) ? "#FB5937" : hasBlackWhiteTag(manga) ? "#4C4C4C" : "#DB2777" }} className="search-type rounded-md bg-[#FF4D88] px-2 py-1 font-[Montserrat] text-[10px] font-bold uppercase leading-none tracking-wide text-white">{manga.tipo || "Manga"}</span>
-                            {/* Vistas reales (suma de capítulos por serie) y, mientras no lleguen a 1K, la cifra provisional de displayViews. */}
+
                             <span className={`search-views flex items-center gap-1 rounded-md px-2 py-1 font-[Montserrat] text-[10px] font-bold leading-none text-white ${isLight ? "bg-black" : "border border-white/10 bg-[#1c1c21]"}`}>
                               <SearchEyeIcon />
                               <span className="tabular-nums">{formatViews(displayViews(manga))}</span>
@@ -203,7 +174,7 @@ export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode 
               )}
             </section>
 
-            {/* Tarjetas por género: portada de un manga del género con un tinte de color y la etiqueta abajo. */}
+
             <section aria-busy={loading || stage < 2} aria-label="Explorar por género" className="search-genres mt-7">
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Explorar por género</h2>
               <div className="grid grid-cols-2 gap-2.5">
@@ -229,7 +200,7 @@ export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode 
               </div>
             </section>
 
-            {/* "Nuevos lanzamientos": el más reciente en grande y los tres siguientes debajo. */}
+
             <section aria-busy={loading || stage < 3} aria-label="Nuevos lanzamientos" className="search-releases mt-7">
               <h2 className="mb-3 font-[Montserrat] text-lg font-bold leading-tight">Nuevos lanzamientos</h2>
               {loading || stage < 3 ? (
@@ -266,7 +237,6 @@ export const Biblioteca = ({ collectionAction }: { collectionAction?: ReactNode 
   );
 };
 
-/** Tarjeta vertical: portada con el título encima. `tall` la alarga (fila de lanzamientos). */
 const MangaCard = ({ manga, isLight, tall = false }: { manga: MangaCapitulo; isLight: boolean; tall?: boolean }) => (
   <Link to={`/manga/${manga.id}`} className={`group block overflow-hidden rounded-xl ${isLight ? "bg-zinc-100" : "bg-[#141416]"}`}>
     <div className={`relative overflow-hidden bg-zinc-900 ${tall ? "aspect-[3/5]" : "aspect-[3/4]"}`}>

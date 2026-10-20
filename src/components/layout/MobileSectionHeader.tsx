@@ -2,10 +2,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { MOBILE_SECTIONS } from '../../utils/mobileSections';
 
-/**
- * Cabecera compacta (solo móvil) de las páginas de Recursos: flecha de volver
- * y título de la sección. Sustituye al navbar en esas rutas.
- */
 export const MobileSectionHeader = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();

@@ -3,10 +3,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { toggleSavedManga, useSavedMangasState, type ToggleSavedOutcome } from '../services/savedMangas';
 
-/**
- * Botón "Guardar" de cualquier listado: estado compartido con el resto de la
- * web y con la página de guardados. Sin sesión, lleva al login y vuelve aquí.
- */
 export const useSavedMangas = () => {
   const navigate = useNavigate();
   const { ids, loaded, busyIds } = useSavedMangasState();

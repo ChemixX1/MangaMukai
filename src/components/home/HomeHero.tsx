@@ -12,42 +12,30 @@ import { preloadImages } from '../../utils/preloadImages';
 
 import { HERO_TAGS, MOBILE_HERO_TAGS, type HeroItem } from './homeModels';
 
-/** Las ocultas esperan más al fondo y de canto, para entrar girando. */
 const HIDDEN_COVER_DEPTH = { z: -260, rotateY: 62 } as const;
 
 interface HeroBaseGeometry {
-  /** Trazado respecto al centro de la portada activa y su tramo horizontal. */
+
   path: string;
   from: number;
   to: number;
-  /** Sombra que proyecta y resplandor del color en el suelo. */
+
   shadow: string;
   glow: { cy: number; rx: number; ry: number };
-  /** Repisas en fuga y cara frontal del pedestal, con los altos de sus degradados. */
+
   faces: { deck: string; front: string; deckTop: number; deckBottom: number; frontTop: number; bottom: number };
-  /** Lienzo del SVG. */
+
   box: { x: number; y: number; width: number; height: number };
-  /** Grosor de trazos, canto, brillo, sombra y desenfoque (trazo de 5 px a escala 1). */
+
   weight: number;
 }
 
-/** Opacidad a lo largo del trazado (desplazamiento, fracción del máximo): se desvanece hacia los extremos. */
 const PODIUM_PROFILE = [[0, 0], [0.3, 0.82], [0.5, 1], [0.7, 0.82], [1, 0]] as const;
 
-/** Canto del trazado: la línea se repite hacia abajo para darle grosor. */
 const PODIUM_EDGE_DEPTH = 2.5;
 
-/** Segmentos de una estela que se afina y pierde luz detrás de su cabeza. */
 const PODIUM_COMET_SEGMENTS = 24;
 
-/**
- * Podio del hero principal (el juvenil no lleva base): el pedestal bajo la
- * activa y una repisa bajo cada vecina, en un solo trazo. Las portadas laterales
- * giran ligeramente hacia la activa; sus repisas permanecen horizontales,
- * adelantadas para que se vean. Los lados del pedestal se unen con
- * ellas por detrás de la portada activa. Se desvanecen hacia los extremos; en móvil terminan
- * a 200 px del centro para que el desvanecimiento se vea dentro de la pantalla.
- */
 const HERO_BASES = {
   podium: {
     path: 'M-358.44 161H-132L-150.46 193H150.46L132 161H366.56',
@@ -79,39 +67,30 @@ interface CoverLayoutConfig {
   slots: { first: number; last: number };
   prev: number;
   next: number;
-  /** Borde blanco de la activa y de las demás. */
+
   activeBorder: boolean;
   sideBorder: boolean;
-  /** Tipo y vistas sobre las portadas. */
+
   badges: boolean;
   perspective: number;
   sideDepth: { z: number; rotateY: number };
   base: HeroBase | null;
   coverClass: string;
-  /** Sombra del bloque en PC: abajo en el principal, arriba y abajo en el juvenil. */
+
   sectionClass: string;
-  /** Alto de la franja de portadas (en PC no ocupa sitio) y posición del ancla. */
+
   stageClass: string;
   anchorClass: string;
-  /** Márgenes móviles de géneros, sinopsis y barritas: cada hero del diseño lleva los suyos. */
+
   spacing: { tags: string; synopsis: string; bars: string };
 }
 
 type CoverLayout = 'stacked' | 'row';
 
-/** En PC la información va en posiciones absolutas, sin márgenes. */
 const DESKTOP_SPACING = { tags: '', synopsis: '', bars: '' };
 
-/**
- * Portadas del hero en el marco de 1440 px: el punto de anclaje es el centro
- * de la portada activa y se ven las que están entre `slots.first` y
- * `slots.last` de ella. Las siguientes van a `next`, hundidas `sideDepth.z` y
- * giradas hacia la activa; las anteriores, a `prev`. Cada una lleva su tipo en
- * la esquina inferior izquierda y sus vistas en la derecha.
- */
 const COVER_LAYOUTS: Record<CoverLayout, CoverLayoutConfig> = {
-  // Principal: la activa en el centro, grande y con borde blanco sobre el podio, y una vecina
-  // más pequeña y sin borde a cada lado; las ocultas esperan detrás de ellas.
+
   stacked: {
     active: { width: 269.58, height: 386 },
     side: { width: 220.13, height: 305.92 },
@@ -130,9 +109,7 @@ const COVER_LAYOUTS: Record<CoverLayout, CoverLayoutConfig> = {
     anchorClass: 'lg:left-[calc(100%-300px)] lg:top-[266px] xl:left-[calc(50%+339.44px)]',
     spacing: DESKTOP_SPACING,
   },
-  // Juvenil: la activa primero, sin base, y las dos siguientes en fila con un giro suave hacia ella,
-  // del mismo alto, con borde y sombra también por arriba; la última queda cortada por el borde.
-  // La anterior se retira hacia atrás por detrás de la activa (`prev`).
+
   row: {
     active: { width: 269.58, height: 386 },
     side: { width: 277, height: 386 },
@@ -153,12 +130,6 @@ const COVER_LAYOUTS: Record<CoverLayout, CoverLayoutConfig> = {
   },
 };
 
-/**
- * Las mismas en el marco de 440 px del diseño móvil, sin escalar. Principal:
- * la activa de 165 × 234 centrada sobre su podio y las vecinas de 135 × 185.
- * Juvenil: la activa de 166 × 245, 9 px a la izquierda del centro, y la
- * siguiente asomando por el borde; sin borde, etiquetas ni línea.
- */
 const MOBILE_COVER_LAYOUTS: Record<CoverLayout, CoverLayoutConfig> = {
   stacked: {
     active: { width: 165, height: 234 },
@@ -198,11 +169,6 @@ const MOBILE_COVER_LAYOUTS: Record<CoverLayout, CoverLayoutConfig> = {
   },
 };
 
-/**
- * Etiquetas sobre la portada: el tipo abajo a la izquierda y las vistas abajo
- * a la derecha. En móvil miden 14 px de alto con letra de 9 px, y la activa las
- * lleva algo más adentro que las vecinas (medidas desde dentro de su borde).
- */
 const COVER_BADGE_CLASS = 'absolute flex items-center font-montserrat italic leading-none';
 const COVER_BADGES = {
   desktop: {
@@ -223,13 +189,6 @@ const COVER_BADGES = {
 
 const SWIPE_THRESHOLD = 40;
 
-/** Etiqueta de género en el color de la sección, con Anta en blanco: 20 px de alto y letra de 10 px en móvil, 24 y 14 px en PC. */
-
-/**
- * Géneros en una sola fila (centrada en móvil): se muestran los que caben
- * enteros, hasta `limit`, sin cortar ninguno. Una copia invisible mide cada
- * etiqueta y se recalcula al cambiar el ancho o al terminar de cargar las fuentes.
- */
 const FittingTagRow = ({ tags, color, limit }: { tags: string[]; color: string; limit: number }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -244,7 +203,7 @@ const FittingTagRow = ({ tags, color, limit }: { tags: string[]; color: string; 
     let animationFrame = 0;
     const updateVisibleTags = () => {
       const availableWidth = container.clientWidth;
-      // En PC estrecho el bloque va escalado: las cajas se miden en pantalla y se pasan al ancho sin escalar.
+
       const scale = container.getBoundingClientRect().width / (availableWidth || 1) || 1;
       const gap = Number.parseFloat(window.getComputedStyle(measureRow).columnGap) || 0;
       let occupiedWidth = 0;
@@ -294,18 +253,12 @@ interface PodiumGradientProps {
   peak: number;
 }
 
-/** Degradado horizontal que recorre el trazado con el perfil de opacidad del podio. */
 const PodiumGradient = ({ id, geometry, color, peak }: PodiumGradientProps) => (
   <linearGradient id={id} gradientUnits="userSpaceOnUse" x1={geometry.from} y1={0} x2={geometry.to} y2={0}>
     {PODIUM_PROFILE.map(([offset, share]) => <stop key={offset} offset={offset} stopColor={color} stopOpacity={peak * share} />)}
   </linearGradient>
 );
 
-/**
- * Podio en volumen: repisas en fuga, cara frontal del pedestal con luz de abajo
- * arriba, el trazado con canto sombreado y brillo en el filo, y la sombra y el
- * resplandor que proyecta sobre el suelo.
- */
 const HeroPodium = ({ color, shape, animationKey }: { color: string; shape: HeroBase; animationKey: string | number }) => {
   const podiumId = `hero-podium-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const ref = (name: string) => `url(#${podiumId}-${name})`;
@@ -352,7 +305,7 @@ const HeroPodium = ({ color, shape, animationKey }: { color: string; shape: Hero
         </filter>
       </defs>
 
-      {/* Suelo: resplandor del color y sombra de la base. */}
+
       <g className="home-podium-surfaces" mask={ref('reveal')}>
         <ellipse className="home-podium-glow" cx={0} cy={glow.cy} rx={glow.rx} ry={glow.ry} fill={ref('glow')} />
         <g filter={ref('blur')}>
@@ -360,19 +313,19 @@ const HeroPodium = ({ color, shape, animationKey }: { color: string; shape: Hero
           <path d={shadow} stroke="#000" strokeOpacity={0.16} strokeWidth={7 * weight} />
         </g>
 
-        {/* Las caras aparecen detrás del cometa, siguiendo el mismo contorno. */}
+
         <path className="home-podium-face" d={faces.deck} fill={ref('deck')} mask={ref('fade-mask')} />
         <path className="home-podium-face" d={faces.front} fill={ref('front')} />
       </g>
 
-      {/* Trazado con grosor: canto oscuro debajo, línea y brillo en el filo. */}
+
       <g transform={`translate(0 ${PODIUM_EDGE_DEPTH * weight})`}>
         <path className="home-podium-stroke" pathLength={1} d={path} stroke={ref('line')} strokeWidth={5 * weight} />
         <path className="home-podium-stroke" pathLength={1} d={path} stroke={ref('shade')} strokeWidth={5 * weight} />
       </g>
       <path className="home-podium-stroke" pathLength={1} d={path} stroke={ref('line')} strokeWidth={5 * weight} />
       <path className="home-podium-stroke" pathLength={1} d={path} stroke={ref('shine')} strokeWidth={1.25 * weight} transform={`translate(0 ${-1.4 * weight})`} />
-      {/* El brillo conserva el color del podio y se desvanece antes de llegar a los extremos. */}
+
       <g mask={ref('fade-mask')}>
         <g key={animationKey} className="home-podium-comet" style={{ color }}>
           {Array.from({ length: PODIUM_COMET_SEGMENTS }, (_, index) => {
@@ -400,22 +353,14 @@ interface HeroCarouselProps {
   items: HeroItem[];
   loading: boolean;
   accent: Accent;
-  /** Texto accesible del carrusel. */
+
   label: string;
   coverLayout: CoverLayout;
-  /** Flechas del teclado para cambiar de manga (solo el primer hero de la página). */
+
   keyboardNavigation?: boolean;
   className?: string;
 }
 
-/**
- * Hero: la portada activa de fondo bajo un velo del tema; en PC, a la izquierda
- * el título, la sinopsis con su barra de color, los géneros y los botones, a la
- * derecha las portadas y abajo las barritas; en móvil, todo en columna bajo las
- * portadas (con los géneros antes de la sinopsis). Cambia solo cada 4 s mientras
- * está a la vista (se pausa al pasar el ratón o al tocarlo) y en móvil se
- * desliza con el dedo.
- */
 export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keyboardNavigation = false, className = '' }: HeroCarouselProps) => {
   const navigate = useNavigate();
   const prefersReducedMotion = useReducedMotion();
@@ -426,8 +371,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
   const [isPaused, setIsPaused] = useState(false);
   const [isInView, setIsInView] = useState(true);
   const [isPageVisible, setIsPageVisible] = useState(true);
-  // El fondo solo cambia cuando la nueva portada ya está descargada, y se funde
-  // sobre la anterior: nunca hay un hueco ni un salto.
+
   const [backdropSrc, setBackdropSrc] = useState('');
   const isMobile = useIsMobileViewport();
   const accentColor = ACCENT_COLOR[accent];
@@ -505,7 +449,6 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
 
   const centered = layout.slots.first < 0;
 
-  /** Distancia a la activa, dando la vuelta: centradas, la mitad espera a cada lado; en fila, todas a la derecha menos la anterior. */
   const relativeIndex = (index: number) => {
     const delta = (index - currentIndex + count) % count;
     const waitingBefore = centered ? Math.floor((count - 1) / 2) : Number(count > layout.slots.last + 1);
@@ -515,7 +458,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
   const coverOffset = (delta: number) => {
     if (delta === 0) return 0;
     if (delta < 0) return layout.prev;
-    // Fuera de la vista: centradas se funden junto a la siguiente; en fila esperan una más allá de la última.
+
     return centered ? layout.next : Math.min(delta, layout.slots.last + 1) * layout.next;
   };
 
@@ -528,7 +471,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Fondo: la portada activa bajo el velo del tema, encuadrada en su parte alta (donde suelen ir las caras). */}
+
       <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
         <AnimatePresence initial={false}>
           {backdropSrc && (
@@ -538,7 +481,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
               style={{ backgroundImage: `url("${backdropSrc}")` }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              // La anterior sigue opaca hasta que la nueva la cubre: el velo no se aclara a mitad del cambio.
+
               exit={{ opacity: 0, transition: { duration: 0, delay: prefersReducedMotion ? 0 : HERO_TRANSITION_SECONDS } }}
               transition={{ duration: prefersReducedMotion ? 0 : HERO_TRANSITION_SECONDS, ease: 'easeOut' }}
             />
@@ -547,7 +490,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
         <div className="home-carousel-scrim absolute inset-0" />
       </div>
 
-      {/* Portadas: el ancla es el centro de la portada activa. */}
+
       <div
         className={`relative touch-pan-y lg:static ${layout.stageClass}`}
         onTouchStart={onTouchStart}
@@ -601,8 +544,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
                 transition={prefersReducedMotion ? { duration: 0 } : {
                   duration: HERO_TRANSITION_SECONDS,
                   ease: HERO_COVER_EASE,
-                  // Profundidad y giro van por delante del desplazamiento: la saliente se
-                  // retira antes de apartarse y la entrante gira de frente mientras llega.
+
                   z: { duration: HERO_TRANSITION_SECONDS * 0.7, ease: HERO_COVER_EASE },
                   rotateY: { duration: HERO_TRANSITION_SECONDS * 0.75, ease: HERO_COVER_EASE },
                   opacity: { duration: HERO_TRANSITION_SECONDS * 0.55, ease: 'easeOut' },
@@ -629,7 +571,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
                     </span>
                   </>
                 )}
-                {/* Luz de lado: el borde exterior, más cerca, se aclara y el que se aleja se oscurece. */}
+
                 <motion.span
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0"
@@ -638,7 +580,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
                   animate={{ opacity: tilt === 0 ? 0 : 1 }}
                   transition={{ duration: prefersReducedMotion ? 0 : HERO_TRANSITION_SECONDS }}
                 />
-                {/* Destello que cruza la portada cuando termina de girar de frente. */}
+
                 {!prefersReducedMotion && (
                   <motion.span
                     aria-hidden="true"
@@ -654,8 +596,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
         </div>
       </div>
 
-      {/* Información. Móvil: columna de 440 px como máximo bajo las portadas, con el título, los géneros,
-          la sinopsis y los botones. PC: medidas del diseño respecto a la barra de la sinopsis. */}
+
       <div className="home-hero-info relative mx-auto flex w-full max-w-[440px] flex-col px-[26px] lg:absolute lg:left-8 lg:top-0 lg:mx-0 lg:block lg:h-full lg:w-[555px] lg:max-w-none lg:origin-[0_266px] lg:scale-[0.8] lg:px-0 xl:left-[calc(50%-618px)] xl:scale-100">
         {!activeItem ? (
           <div className="flex animate-pulse flex-col lg:block">
@@ -666,7 +607,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
           </div>
         ) : (
           <>
-            {/* El título tiene sitio para dos filas y se apoya en la de abajo: con una sola fila no queda hueco sobre lo que sigue. */}
+
             <div className="home-hero-title flex h-16 items-start justify-center lg:absolute lg:left-[7px] lg:top-[127px] lg:h-[60px] lg:w-[548px] lg:justify-start">
               <h2 className="line-clamp-2 text-center font-montserrat text-xl font-black uppercase leading-7 text-ink lg:text-left lg:text-[28px] lg:normal-case lg:leading-[30px]">
                 {activeItem.title}
@@ -693,7 +634,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
               >
                 <HomeReadIcon className="size-5 lg:size-[22px]" /> Leer ahora
               </button>
-              {/* En el tema oscuro "Guardar" va en negro, como en el diseño móvil. */}
+
               <SaveButton
                 mangaId={activeItem.id}
                 icon={<HomeSaveIcon className="size-5 lg:size-[25px]" />}
@@ -705,7 +646,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
         )}
       </div>
 
-      {/* Barritas de navegación. */}
+
       {count > 1 && (
         <div
           role="tablist"

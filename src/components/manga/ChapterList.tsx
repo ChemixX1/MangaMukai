@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import navbarCoins from '../../assets/recharge/icon-2.svg';
 
 import { ChapterNewBadge, ChapterCommentedIcon } from './ChapterStateIcons';
 import { isRecentChapter } from '../../utils/chapterFreshness';
@@ -12,14 +13,12 @@ import { getChapterEngagement, getMangaComments, setEntityReaction } from '../..
 import { buyChapter, getStoredToken } from '../../services/authService';
 import {
   ChapterCommentIcon,
-  CoinStackIcon,
   PurchasedIcon,
   ShowAllIcon,
 } from './designIcons';
 
 const VISIBLE_CHAPTERS = 6;
 
-/** "Hoy", "3 días", "3 meses"… */
 const formatChapterAge = (createdAt: string): string => {
   const published = new Date(createdAt).getTime();
   if (!Number.isFinite(published)) return '';
@@ -50,10 +49,6 @@ const formatUnlockTime = (remainingMilliseconds: number): string => {
   return `${pad(minutes)}m ${pad(seconds)}s`;
 };
 
-/**
- * Cuenta atrás de los capítulos de pago que se liberan solos: "¡Gratis En!" y el
- * tiempo que falta se turnan junto al precio y desbloquean el capítulo a tiempo.
- */
 function FreeCountdown({ chapterId, targetDate, onExpire }: {
   chapterId: number;
   targetDate: string;
@@ -66,7 +61,6 @@ function FreeCountdown({ chapterId, targetDate, onExpire }: {
   const hasExpired = Number.isFinite(targetTime) && targetTime <= now;
   const countdown = formatUnlockTime(Math.max(0, targetTime - now));
 
-  // Cada aviso se programa al filo del segundo siguiente para no desfasarse del reloj.
   useEffect(() => {
     let timer = 0;
     const tick = () => {
@@ -121,7 +115,6 @@ function FreeCountdown({ chapterId, targetDate, onExpire }: {
 
 type FocusPoint = { x: number; y: number };
 
-/** Zonas donde suele haber una cara en una página suelta del capítulo. */
 const FOCUS_POINTS: readonly FocusPoint[] = [
   { x: 32, y: 28 },
   { x: 68, y: 28 },
@@ -137,7 +130,6 @@ const seededFocus = (chapter: SeriesChapter, imageUrl: string) => {
   return FOCUS_POINTS[seed % FOCUS_POINTS.length];
 };
 
-/** Elige la zona con más color y detalle de la página para encuadrar la miniatura. */
 const detectFocus = (image: HTMLImageElement, fallback: FocusPoint): FocusPoint => {
   try {
     const canvas = document.createElement('canvas');
@@ -183,12 +175,11 @@ const detectFocus = (image: HTMLImageElement, fallback: FocusPoint): FocusPoint 
     });
     return best;
   } catch {
-    // Las imágenes de otro dominio pueden bloquear la lectura del canvas: queda el encuadre fijo.
+
     return fallback;
   }
 };
 
-/** Miniatura: la portada subida del capítulo y, si no hay o falla, su primera página encuadrada. */
 function ChapterThumbnail({ chapter }: { chapter: SeriesChapter }) {
   const uploadedCover = chapter.cover_url?.trim() || '';
   const [coverFailed, setCoverFailed] = useState(false);
@@ -196,7 +187,7 @@ function ChapterThumbnail({ chapter }: { chapter: SeriesChapter }) {
   const [imageUrl, setImageUrl] = useState(useUploadedCover ? uploadedCover : '');
   const [detectedFocus, setDetectedFocus] = useState<FocusPoint | null>(null);
   const fallbackFocus = seededFocus(chapter, imageUrl);
-  // La portada subida ya viene encuadrada; el recorte solo se calcula para la página provisional.
+
   const focus = useUploadedCover ? { x: 50, y: 50 } : detectedFocus ?? fallbackFocus;
 
   useEffect(() => {
@@ -240,12 +231,6 @@ function ChapterThumbnail({ chapter }: { chapter: SeriesChapter }) {
   );
 }
 
-/**
- * Lista de capítulos de la ficha (móvil y escritorio): cinco filas y el botón
- * "Mostrar Todos". Cada fila lleva la miniatura, el número, la antigüedad y, a
- * la derecha, el precio en monedas (o el sello verde si ya es suyo), los
- * comentarios y los me gusta.
- */
 export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins, userInfo, onPurchaseSuccess, sortOrder = 'desc', loading = false, loadError = '' }: {
   mangaId: string;
   loading?: boolean;
@@ -327,7 +312,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
           if (liked) next.delete(id); else next.add(id);
           return next;
         });
-      } catch { /* El almacenamiento bloqueado no confirma un like que no se guardó. */ }
+      } catch {                                                                         }
       return;
     }
     setLikeBusy(true);
@@ -339,7 +324,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
         if (result.my_reaction === 'like') next.add(id); else next.delete(id);
         return next;
       });
-    } catch { /* Un me gusta perdido no interrumpe la lectura. */ }
+    } catch {                                                     }
     finally { setLikeBusy(false); }
   };
 
@@ -379,7 +364,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
     const load = async () => {
       const ids = visibleCommentIds.split(',');
       const mine = new Set<string>();
-      // Comprobar autoría real, sin confundir comentarios de otros con los propios.
+
       for (let start = 0; start < ids.length && !controller.signal.aborted; start += 6) {
         await Promise.all(ids.slice(start, start + 6).map(async id => {
           const comments = await getMangaComments(mangaId, id, controller.signal);
@@ -410,21 +395,24 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
           return (
             <li key={id}>
               <div className="manga-chapter-row">
-                <button type="button" onClick={() => openChapter(chapter)} className="manga-chapter-open" aria-label={`Leer capítulo ${chapter.chapter_number}`}>
+                <Link to={`/read/${chapter.id}`} onClick={(event) => {
+                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  if (locked) { event.preventDefault(); openChapter(chapter); }
+                }} className="manga-chapter-open" aria-label={`Leer capítulo ${chapter.chapter_number}`}>
                   <ChapterThumbnail chapter={chapter} />
                   <span className="manga-chapter-info">
                     <span className="manga-chapter-title">Capítulo {chapter.chapter_number}</span>
                     <span className="manga-chapter-age">{isRecentChapter(chapter.created_at) ? <ChapterNewBadge /> : formatChapterAge(chapter.created_at)}</span>
                   </span>
-                </button>
+                </Link>
 
                 <span className="manga-chapter-stats">
                   {freesLater && <FreeCountdown chapterId={chapter.id} targetDate={chapter.free_at as string} onExpire={handleTimedUnlock} />}
 
-                  {/* Precio mientras esté bloqueado; si lo compró, el sello verde. */}
+
                   {locked ? (
                     <span title={`${chapter.price_coins} monedas`} className="manga-chapter-price">
-                      <CoinStackIcon size={20} />
+                      <img src={navbarCoins} alt="" aria-hidden="true" width={23} height={20} className="shrink-0 object-contain" />
                       {chapter.price_coins}
                     </span>
                   ) : isPurchased(chapter) ? (

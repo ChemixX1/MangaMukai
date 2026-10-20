@@ -4,10 +4,9 @@ import { useLocation } from "react-router-dom";
 import { Mail, MapPin, Send, Github, Instagram, CheckCircle, AlertCircle, Loader2, Facebook, Youtube } from "lucide-react";
 import { getStoredUser } from "../services/authService";
 import { sendWordPressContactMessage } from "../services/wordpressService";
-// Importamos el Footer (ajusta la ruta "../components/" según donde esté este archivo)
-import { Footer } from "../components/layout"; 
 
-// Componentes SVG personalizados para iconos no disponibles en lucide-react
+import { Footer } from "../components/layout";
+
 const WhatsAppIcon = ({ size = 20, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
@@ -38,7 +37,6 @@ export const ContactPage = () => {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
-  // Prefill from the WordPress session when the user is logged in.
   useEffect(() => {
     const user = getStoredUser();
     if (!user) return;
@@ -72,8 +70,7 @@ export const ContactPage = () => {
       if (!result.success) throw new Error(result.message);
 
       setFeedback({ type: 'success', msg: "¡Mensaje enviado correctamente! Te responderemos pronto." });
-      
-      // Limpiamos solo el mensaje y asunto, mantenemos nombre/email si está logueado
+
       setFormState(prev => ({ ...prev, subject: "", message: "" }));
 
     } catch (error) {
@@ -91,16 +88,16 @@ export const ContactPage = () => {
   return (
     <>
       <section className="relative w-full py-24 bg-white overflow-hidden">
-        
+
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-        
+
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#FF4D88] rounded-full blur-[120px] opacity-[0.05] pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-500 rounded-full blur-[100px] opacity-[0.05] pointer-events-none"></div>
 
         <div className="max-w-[1200px] mx-auto px-6 relative z-10">
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            
+
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -111,11 +108,11 @@ export const ContactPage = () => {
                  <span className="w-8 h-[3px] bg-[#FF4D88]"></span>
                  <span className="text-[#FF4D88] text-xs font-[1000] uppercase tracking-[0.2em]">Contacto</span>
               </div>
-              
-              <h2 className="text-5xl md:text-7xl font-[1000] uppercase italic tracking-tighter text-black leading-[0.9] mb-8">
+
+              <h1 className="text-5xl md:text-7xl font-[1000] uppercase italic tracking-tighter text-black leading-[0.9] mb-8">
                 HABLEMOS <br />
                 <span className="text-zinc-300">DE FUTURO</span>
-              </h2>
+              </h1>
 
               <p className="text-zinc-500 text-lg font-medium leading-relaxed max-w-md mb-10">
                 ¿Tienes alguna sugerencia, encontraste un bug o simplemente quieres colaborar? Estamos escuchando.
@@ -177,16 +174,16 @@ export const ContactPage = () => {
             >
                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-[#FF4D88] to-transparent opacity-80"></div>
 
-               <h3 className="text-2xl font-[1000] uppercase italic tracking-tighter text-black mb-6">
+               <h2 className="text-2xl font-[1000] uppercase italic tracking-tighter text-black mb-6">
                  Envíanos un mensaje
-               </h3>
+               </h2>
 
                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                      <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Usuario</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           placeholder="Tu nombre"
                           value={formState.name}
                           onChange={(e) => setFormState({...formState, name: e.target.value})}
@@ -196,8 +193,8 @@ export const ContactPage = () => {
                      </div>
                      <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Email</label>
-                        <input 
-                          type="email" 
+                        <input
+                          type="email"
                           placeholder="tu@correo.com"
                           value={formState.email}
                           onChange={(e) => setFormState({...formState, email: e.target.value})}
@@ -209,7 +206,7 @@ export const ContactPage = () => {
 
                   <div className="flex flex-col gap-2">
                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Asunto</label>
-                     <select 
+                     <select
                        value={formState.subject}
                        onChange={(e) => setFormState({...formState, subject: e.target.value})}
                        className={`${inputClass} appearance-none cursor-pointer`}
@@ -226,7 +223,7 @@ export const ContactPage = () => {
 
                   <div className="flex flex-col gap-2">
                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-1">Mensaje</label>
-                     <textarea 
+                     <textarea
                        rows={4}
                        placeholder="¿En qué podemos ayudarte hoy?"
                        value={formState.message}
@@ -250,7 +247,7 @@ export const ContactPage = () => {
                     )}
                   </AnimatePresence>
 
-                  <button 
+                  <button
                     type="submit"
                     disabled={loading}
                     className="mt-2 w-full py-4 bg-[#FF4D88] text-white text-[11px] font-[1000] uppercase tracking-[0.25em] rounded-xl hover:bg-black transition-all flex justify-center items-center gap-3 shadow-lg shadow-[#FF4D88]/20 group disabled:opacity-70 disabled:pointer-events-none"
@@ -273,8 +270,8 @@ export const ContactPage = () => {
           </div>
         </div>
       </section>
-      
-      {/* Sección del Footer integrada al final */}
+
+
       <Footer />
     </>
   );

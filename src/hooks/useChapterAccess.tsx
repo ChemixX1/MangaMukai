@@ -7,7 +7,7 @@ import { getChaptersBySeries } from '../services/mangaService';
 
 interface OpenChapterOptions {
   chapterId: string | number;
-  /** Serie a la que pertenece: de ahí se saca el precio real del capítulo. */
+
   seriesId?: string | number | null;
   isFree: boolean;
   chapterNumber?: string | number;
@@ -20,14 +20,6 @@ interface PendingPurchase {
   freeAt: string | null;
 }
 
-/**
- * Apertura de capítulos desde cualquier listado de portadas.
- *
- * - Gratis: al lector, directo.
- * - De pago sin sesión: a iniciar sesión, y al volver se va al capítulo.
- * - De pago con sesión: si ya está comprado va al lector; si no, abre el modal
- *   de compra en la misma página y, al confirmar, entra a leer.
- */
 export const useChapterAccess = () => {
   const navigate = useNavigate();
   const [pending, setPending] = useState<PendingPurchase | null>(null);

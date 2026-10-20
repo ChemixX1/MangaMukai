@@ -1,3 +1,4 @@
+import { hasHotTag } from '../utils/womenBlackWhite';
 import { BookmarkIcon } from '../components/ui/icons';
 import { GooeySelector } from '../components/ui/GooeySelector';
 import { createQueuedLike } from '../utils/queuedLike';
@@ -84,7 +85,7 @@ const saveGuestReaction = (mangaId: string | number, reaction: MangaReactionId |
     if (reaction) window.localStorage.setItem(guestReactionKey(mangaId), reaction);
     else window.localStorage.removeItem(guestReactionKey(mangaId));
   } catch {
-    // La selección sigue funcionando durante esta visita si el navegador bloquea el almacenamiento.
+
   }
 };
 
@@ -114,7 +115,6 @@ const cleanSynopsis = (title: string, synopsis?: string) => {
   return trimmed;
 };
 
-/** El catálogo usa cuatro tipos: Manga, Manhwa, Manhua y Comic (mismos colores que en móvil). */
 const typeDotColor = (type = '') => {
   const normalized = type.toLocaleLowerCase('es');
   if (normalized.includes('manhua')) return '#22C55E';
@@ -123,7 +123,6 @@ const typeDotColor = (type = '') => {
   return '#FF008C';
 };
 
-/** Fila de la ficha técnica del diseño móvil: icono, etiqueta en negrita y valor a la derecha. */
 const MetaRow = ({ icon, label, value, dotColor }: { icon: ReactNode; label: string; value: string; dotColor?: string }) => (
   <div className="flex min-h-[37px] items-center gap-2.5 text-ink">
     <span className="flex w-[26px] shrink-0 items-center justify-center">{icon}</span>
@@ -137,9 +136,7 @@ const MetaRow = ({ icon, label, value, dotColor }: { icon: ReactNode; label: str
 
 const BADGE = 'manga-detail-badge';
 
-/** Pestañas Capítulos · Sinopsis · Comentarios: la activa sobre la píldora que se desliza. */
 const tabClass = (active = false) => `manga-detail-tab ${active ? 'is-active' : ''}`;
-
 
 export const MangaDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -169,10 +166,10 @@ export const MangaDetail = () => {
   const [selectedReaction, setSelectedReaction] = useState<MangaReactionId | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<MangaReactionId, number>>(createReactionCounts);
   const guestReactionRef = useRef<MangaReactionId | null>(null);
-  // Solo la ultima peticion de reaccion puede reconciliar el estado optimista.
+
   const reactionSequence = useRef(0);
   const [reactionError, setReactionError] = useState('');
-  // Reacción recién pulsada: su aro se dibuja dando una vuelta, como en móvil.
+
   const [tracingReaction, setTracingReaction] = useState<MangaReactionId | null>(null);
 
   useEffect(() => {
@@ -223,7 +220,6 @@ export const MangaDetail = () => {
     const sidebar = sidebarRef.current;
     if (loading || isMobile || !coverColumn || !sidebar) return;
 
-    // Las recomendaciones terminan a la altura de Publicación, incluso si cambia la ficha o su ancho.
     const alignSidebar = () => {
       sidebar.style.setProperty('--manga-sidebar-height', `${coverColumn.getBoundingClientRect().height}px`);
     };
@@ -288,7 +284,7 @@ export const MangaDetail = () => {
     if (!interactions || !isActive()) return;
 
     setIsBookmarked(interactions.bookmarks?.some((item) => String(item) === mangaId) || false);
-    // La lista completa ya viene en la respuesta: se comparte con los botones "Guardar" del resto de la web.
+
     seedSavedMangas(interactions.bookmarks ?? []);
     if (!likeQueueRef.current) setIsLiked(interactions.likes?.some((item) => String(item) === mangaId) || false);
     setEngagement((current) => ({
@@ -302,12 +298,12 @@ export const MangaDetail = () => {
     loadUser();
   }, [loadUser]);
 
-  // El servidor ya envía este head; aquí solo se mantiene al navegar dentro de la SPA.
   useDocumentTitle(
     manga?.titulo,
     manga
-      ? `${cleanSynopsis(manga.titulo, manga.descripcion).replace(/\s+/g, ' ').slice(0, 200) || `Lee ${manga.titulo} online en español`} · MangaMukai`
+      ? `Lee ${manga.titulo} en español en MangaMukai. ${cleanSynopsis(manga.titulo, manga.descripcion).replace(/\s+/g, ' ') || 'Consulta su sinopsis y todos los capítulos disponibles.'}`.slice(0, 200)
       : undefined,
+    { path: `/manga/${id}`, image: manga?.portada, adult: manga ? hasHotTag(manga) : undefined, noindex: manga ? false : !loading && !manga ? true : undefined },
   );
 
   useEffect(() => {
@@ -346,13 +342,10 @@ export const MangaDetail = () => {
         }
 
         setManga(mangaData);
-        // También en móvil, donde la ficha muestra el cartel: el lector reutiliza
-        // esta petición, la lista y el audio compartidos sin empezar otra carga.
+
         void ensureMusicLibrary();
         const mangaPostId = mangaData.eroSeri || mangaData.id;
 
-        // Publica la ficha y monta la música enseguida. Las series similares
-        // empiezan a cargarse antes que capítulos y comentarios.
         setLoading(false);
         setSecondaryReady(true);
         const relatedRequest = getRelatedMangas(mangaPostId, 18).then(data => {
@@ -476,7 +469,6 @@ export const MangaDetail = () => {
     void loadUser();
   }, [loadUser]);
 
-  // Optimista: el contador y el resaltado cambian en el mismo clic; la red solo confirma o revierte.
   const handleReaction = (reactionId: MangaReactionId) => {
     if (!manga) return;
 
@@ -541,7 +533,7 @@ export const MangaDetail = () => {
   const genres = manga.genres || [];
   const synopsis = cleanSynopsis(manga.titulo, manga.descripcion);
   const publishedDate = manga.publishedAt || manga.rawFecha;
-  // Distintivo de la portada según la colección a la que pertenece la ficha.
+
   const coverBadge = collectionBadge(manga);
 
   if (isMobile) {
@@ -579,10 +571,9 @@ export const MangaDetail = () => {
     );
   }
 
-
   return (
     <main className="manga-detail-desktop relative min-h-screen overflow-x-clip bg-surface text-ink">
-      {/* Fondo: la portada difuminada bajo el velo del tema. */}
+
       <div className="fixed inset-0 z-0" aria-hidden="true">
         <img src={manga.portada} alt="" className="h-full w-full origin-top scale-105 object-cover object-top blur-[2px]" />
         <div className="absolute inset-0 bg-surface/[.95]" />
@@ -593,7 +584,7 @@ export const MangaDetail = () => {
       <section className="manga-detail-stage relative z-10 pb-20 pt-32">
         <div className="manga-detail-container mx-auto w-full max-w-[1780px] px-4 lg:!max-w-[1366px] 2xl:px-6">
           <div className="manga-detail-topbar mb-2 grid items-center gap-4 xl:grid-cols-[270px_minmax(0,1fr)_300px] xl:gap-6">
-            {/* Reloj sobre la portada y redes en el extremo derecho. */}
+
             <div className="mx-auto w-full xl:col-start-1 xl:row-start-1">
               <MangaDetailClock />
             </div>
@@ -615,7 +606,7 @@ export const MangaDetail = () => {
                 <HoloCard image={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} foilEnabled={false} tiltMax={14} hoverScale={1.04} radius={0} idle={false} />
               </div>
 
-              {/* Ambos botones comparten el ancho de la portada a partes iguales. */}
+
               <div className="manga-detail-actions">
                 <button type="button" onClick={handleReadFirst} disabled={!firstChapter} className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-mukai-magenta px-2 font-montserrat text-[13px] font-extrabold text-white transition-transform hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45">
                   Leer Capítulo 1
@@ -636,7 +627,7 @@ export const MangaDetail = () => {
                 <MangaSeriesLikeButton liked={isLiked} likes={engagement.likes} busy={interactionBusy === 'like'} disabled={interactionBusy !== ''} onClick={() => void handleLike()} />
               } />
 
-              {/* Etiquetas de la colección. */}
+
               <div className="manga-detail-badges">
                 <span className="manga-detail-views" aria-label={manga.totalViews === undefined ? 'Vistas no disponibles' : `${formatCompactNumber(manga.totalViews)} vistas`}><DetailViewsIcon size={18} />{manga.totalViews === undefined ? '--' : formatCompactNumber(manga.totalViews)}</span>
                 {coverBadge === 'bn' ? (
@@ -674,7 +665,7 @@ export const MangaDetail = () => {
                 <MangaRewardProgress purchasedIds={purchasedIds} userId={userInfo.id} loading={chaptersLoading} />
               </header>
 
-              {/* Pestañas: una sola píldora que viaja entre ellas. */}
+
               <nav aria-label="Secciones del manga" className="manga-detail-section-nav">
                 <div className="manga-detail-tabs">
                   <GooeySelector activeIndex={tabIndex} />

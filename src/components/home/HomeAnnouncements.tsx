@@ -3,7 +3,6 @@ import announcementBanner from '../../assets/home/BannerAnuncio.png';
 import announcementBannerPc from '../../assets/home/anuncio-pc.webp';
 import { HomeAnnouncementIcon, HomeDiscordIcon, HomeNextIcon, HomePreviousIcon, HomeSocialEndIcon, HomeSocialStartIcon, HomeTelegramIcon } from './HomeIcons';
 
-/** Banner de 1111 px; debajo, dos enlaces de 544 px separados por 30 px. */
 export const HomeAnnouncements = () => (
   <section className="home-announcements home-block home-block-news" aria-label="Anuncios y comunidad">
     <h2><HomeAnnouncementIcon /><span>Anuncios</span></h2>

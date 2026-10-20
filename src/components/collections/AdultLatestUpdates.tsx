@@ -19,9 +19,9 @@ interface AdultLatestUpdatesProps {
   titleAccent?: string;
   sectionId?: string;
   accent?: 'pink' | 'blue';
-  /** 'neutral' pinta capítulo y fecha en negro/blanco según el tema. */
+
   rowTone?: 'accent' | 'neutral';
-  /** Mantiene los mangas que aún no tienen capítulos (solo portada y título). */
+
   includeUpcoming?: boolean;
   loading?: boolean;
 }
@@ -37,14 +37,12 @@ const cleanTitle = (value = '') => value
   .replace(/[-–]?\s*(Capitulo|Capítulo|Chapter|Volumen|Episodio)\s*\d+.*$/i, '')
   .trim();
 
-/** "AAAA-MM-DD HH:MM:SS" de WordPress no lo entiende Safari sin la "T". */
 const parseDate = (value = '') => {
   const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(value) ? value.replace(' ', 'T') : value;
   const date = new Date(normalized);
   return value && !Number.isNaN(date.getTime()) ? date : null;
 };
 
-/** Vacío cuando no hay fecha: la fila se pinta sin ella en vez de decir "Sin fecha". */
 const relativeDate = (value = '') => {
   const date = parseDate(value);
   if (!date) return '';
@@ -63,22 +61,13 @@ const relativeDate = (value = '') => {
   return `hace ${years} ${years === 1 ? 'año' : 'años'}`;
 };
 
-/**
- * Los listados marcan las series sin capítulos con un capítulo vacío
- * (`numero: '-'`, id 0); no cuenta como publicado.
- */
 const isPublishedChapter = (chapter: { id: number | string; numero: string }) =>
   Number(chapter.numero) > 0 && Number(chapter.id) > 0;
 
 const hasPublishedChapters = (manga: MangaCapitulo) => manga.capitulosRecientes.some(isPublishedChapter);
 
-/** Alta de la serie (la subida de la portada), sin mirar capítulos. */
 const seriesDateOf = (manga: MangaCapitulo) => manga.rawFecha || manga.publishedAt || '';
 
-/**
- * Fecha real de la ficha: el capítulo más nuevo o, sin capítulos, el alta de
- * la serie. `fecha` ya llega formateada ("04 sept") y no sirve para calcular.
- */
 const latestDateOf = (manga: MangaCapitulo) =>
   manga.capitulosRecientes[0]?.fecha || seriesDateOf(manga);
 
@@ -94,14 +83,12 @@ export function AdultLatestUpdates({
   const [tab, setTab] = useState<MangaTypeTab>('Manga');
   const [currentPage, setCurrentPage] = useState(1);
   const { openChapter, chapterAccessModal } = useChapterAccess();
-  // Caben unos 4 capítulos en móvil y 5 en escritorio sin desbordar la tarjeta.
+
   const [visibleChapters, setVisibleChapters] = useState(5);
 
-  // El endpoint de novedades solo trae 2 capítulos por ficha; para llenar la
-  // tarjeta se pide la lista completa de cada serie visible, una sola vez.
   const [seriesChapters, setSeriesChapters] = useState<Record<string, SeriesChapter[]>>({});
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(() => new Set());
-  // Series ya pedidas, para no repetir la consulta al cambiar de página.
+
   const requestedSeries = useRef<Set<string>>(new Set());
 
   const uiAccent: Accent = accent === 'blue' ? 'cyan' : 'pink';
@@ -179,10 +166,6 @@ export function AdultLatestUpdates({
     .map((manga) => String(manga.eroSeri || manga.id));
   const visibleSeriesKey = visibleSeriesIds.join(',');
 
-  /* Las tarjetas ya se pintan con los capítulos que trae el listado; completarlas
-     es una mejora. La página monta dos de estas secciones a la vez, así que las
-     peticiones esperan a que el navegador quede libre en lugar de salir todas
-     de golpe compitiendo con las portadas. */
   useEffect(() => {
     const ids = visibleSeriesKey ? visibleSeriesKey.split(',') : [];
     if (ids.length === 0) return;
@@ -212,7 +195,7 @@ export function AdultLatestUpdates({
   return (
     <section id={sectionId} aria-busy={loading} className={`relative w-full scroll-mt-24 py-8 sm:py-10 bg-surface`}>
       <div className="home-latest-container mx-auto w-full max-w-[1440px] px-3">
-        {/* Mismo titular, icono, botón "Ver todo" y filtros Manga/Manhua/Manhwa que el Home */}
+
         <div className="home-latest-heading relative h-[95px] lg:h-[121px]">
           <span aria-hidden="true" className="absolute left-[23px] top-0 flex lg:left-[6px] lg:h-11 lg:w-12 lg:items-center lg:justify-center" style={{ color: accentColor }}>
             <HomeRecentIcon className="home-recent-icon size-[57px]" />

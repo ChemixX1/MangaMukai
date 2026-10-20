@@ -89,7 +89,6 @@
   .bubble.flagged { outline: 2px solid var(--warn); }
   #more-messages { margin: 12px auto; display: block; }
   .empty { padding: 30px; text-align: center; color: var(--muted); }
-  /* Usuarios */
   .user-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
   .user-card { display: grid; grid-template-columns: 56px 1fr; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; cursor: pointer; align-items: start; }
   .user-card:hover { border-color: var(--accent); }
@@ -218,188 +217,189 @@
 
 <script>
 (() => {
-  const $ = (selector) => document.querySelector(selector);
-  const state = {
-    keywords: [],
-    filters: {},
-    messages: [],
-    nextBefore: null,
-    total: 0,
-    convPage: 1,
-    convPages: 0,
-    usersQuery: '',
-    usersPage: 1,
-    usersPages: 0,
-    thread: null,
-    timer: null,
-    site: '',
-  };
-
-  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const fmtDate = (iso) => iso ? new Date(iso).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '';
-  const fmtDay = (iso) => iso ? new Date(iso).toLocaleDateString('es', { dateStyle: 'medium' }) : '';
-  const initials = (name) => (name || '?').trim().charAt(0).toUpperCase();
-  const num = (value) => Number(value || 0).toLocaleString('es');
-
-  // Resalta palabras clave y el texto buscado ignorando mayúsculas y acentos.
-  function highlight(text) {
-    const terms = [...state.keywords, state.filters.q || ''].filter(Boolean);
-    if (!terms.length) return esc(text);
-    const plainChars = [...text].map((ch) => (ch.length === 1 ? (ch.normalize('NFD')[0] || ch) : ch));
-    const plain = plainChars.join('').toLowerCase();
-    const pattern = new RegExp(terms.map((t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
-    let out = '';
-    let last = 0;
-    for (const match of plain.matchAll(pattern)) {
-      if (!match[0]) continue;
-      out += esc(text.slice(last, match.index)) + '<mark>' + esc(text.slice(match.index, match.index + match[0].length)) + '</mark>';
-      last = match.index + match[0].length;
-    }
-    return out + esc(text.slice(last));
-  }
-
-  function avatarHtml(user, cls) {
-    return user && user.avatar
-      ? `<img src="${esc(user.avatar)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('i'), { textContent: ${JSON.stringify(initials(user && user.username))} }))">`
-      : `<i>${esc(initials(user && user.username))}</i>`;
-  }
-
-  function userHtml(user) {
-    if (!user) return '<span class="user">—</span>';
-    return `<span class="user">${avatarHtml(user)}<span><button type="button" class="link" data-user="${esc(user.id)}" title="Ver ficha del usuario">${esc(user.username)}</button><small>#${esc(user.id)} · ${esc(user.email || user.login || '')}</small></span></span>`;
-  }
-
-  async function api(path, params = {}) {
-    const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''));
-    const response = await fetch(`/api/${path}${query.toString() ? `?${query}` : ''}`);
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.success === false) {
-      const error = new Error(data.message || `Error HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
-    }
-    return data;
-  }
-
-  function showSetup(message) {
-    stopTimer();
-    $('#app-view').hidden = true;
-    $('#topbar-right').hidden = true;
-    $('#setup-view').hidden = false;
-    $('#setup-message').textContent = message || '';
-    $('#setup-message').classList.toggle('error', Boolean(message));
-  }
-
-  function stopTimer() {
-    if (state.timer) clearInterval(state.timer);
-    state.timer = null;
-  }
-
-  function startTimer() {
-    stopTimer();
-    const seconds = Number($('#refresh').value);
-    if (!seconds) return;
-    state.timer = setInterval(() => {
-      loadOverview();
-      if (!$('#tab-messages').hidden) loadMessages(true);
-      else if (!$('#tab-conversations').hidden) loadConversations(state.convPage);
-    }, seconds * 1000);
-  }
-
-  async function connect() {
-    const info = await api('session');
-    state.site = info.site || '';
-    $('#site').textContent = state.site;
-    $('#setup-key-file').textContent = info.keyFile || '';
-    try {
-      const overview = await api('mod/overview');
-      $('#setup-view').hidden = true;
-      $('#app-view').hidden = false;
-      $('#topbar-right').hidden = false;
-      renderOverview(overview);
-      await loadMessages(true);
-      startTimer();
-    } catch (error) {
-      showSetup(error.message);
-    }
-  }
-
-  function renderOverview(data) {
-    state.keywords = data.keywords || [];
-    const t = data.totals || {};
-    const tiles = [
-      ['Mensajes', t.messages], ['Últimas 24 h', t.last_24h], ['Últimos 7 días', t.last_7d],
-      ['Conversaciones', t.conversations], ['Usuarios que escriben', t.senders], ['Sin leer', t.unread],
-    ];
-    $('#stats').innerHTML = tiles.map(([label, value]) => `<div class="stat"><b>${num(value)}</b><span>${label}</span></div>`).join('')
-      + (data.table === false ? '<div class="stat"><span>Todavía no existe la tabla de mensajes en el sitio.</span></div>' : '');
-  }
-
-  async function loadOverview() {
-    try {
-      renderOverview(await api('mod/overview'));
-    } catch (error) {
-      if (error.status === 401 || error.status === 403 || error.status === 404) return showSetup(error.message);
-      $('#stats').innerHTML = `<div class="stat error">${esc(error.message)}</div>`;
-    }
-  }
-
-  /* ---------------- Mensajes ---------------- */
-  function readFilters() {
-    const form = new FormData($('#filters'));
-    return {
-      q: String(form.get('q') || '').trim(),
-      userText: String(form.get('user') || '').trim(),
-      since: form.get('since') || '',
-      until: form.get('until') || '',
-      flagged: form.get('flagged') ? 1 : '',
+    const $ = (selector) => document.querySelector(selector);
+    const state = {
+        keywords: [],
+        filters: {},
+        messages: [],
+        nextBefore: null,
+        total: 0,
+        convPage: 1,
+        convPages: 0,
+        usersQuery: '',
+        usersPage: 1,
+        usersPages: 0,
+        thread: null,
+        timer: null,
+        site: '',
     };
-  }
-
-  async function resolveUser(text) {
-    if (!text) return '';
-    const hashed = text.match(/#(\d+)/);
-    if (hashed) return hashed[1];
-    if (/^\d+$/.test(text)) return text;
-    const data = await api('mod/users/search', { q: text });
-    if (!data.users || !data.users.length) throw new Error(`No se encontró ningún usuario para "${text}".`);
-    return String(data.users[0].id);
-  }
-
-  async function loadMessages(reset) {
-    const summary = $('#messages-summary');
-    const tbody = $('#messages-table tbody');
-    try {
-      if (reset) {
-        const raw = readFilters();
-        state.filters = { ...raw, user: await resolveUser(raw.userText) };
-        state.messages = [];
-        state.nextBefore = null;
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">Cargando…</td></tr>';
-      }
-      const { q, user, since, until, flagged } = state.filters;
-      const data = await api('mod/messages', { q, user, since, until, flagged, before_id: state.nextBefore || '', per_page: 50 });
-      if (reset) tbody.innerHTML = '';
-      state.total = data.total || 0;
-      state.nextBefore = data.next_before_id || null;
-      state.messages.push(...(data.messages || []));
-      for (const message of data.messages || []) tbody.insertAdjacentHTML('beforeend', messageRow(message));
-      if (!state.messages.length) tbody.innerHTML = '<tr><td colspan="6" class="empty">No hay mensajes con esos filtros.</td></tr>';
-      const shown = state.messages.length;
-      summary.textContent = flagged
-        ? `${shown} mensaje(s) con señales mostrados de ${num(state.total)} que cumplen los filtros (revisados ${data.scanned || 0} en esta carga).`
-        : `${shown} de ${num(state.total)} mensaje(s). Horas en tu zona horaria.`;
-      $('#more-messages').hidden = !state.nextBefore;
-    } catch (error) {
-      summary.textContent = '';
-      tbody.innerHTML = `<tr><td colspan="6" class="empty error">${esc(error.message)}</td></tr>`;
-      $('#more-messages').hidden = true;
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const fmtDate = (iso) => iso ? new Date(iso).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    const fmtDay = (iso) => iso ? new Date(iso).toLocaleDateString('es', { dateStyle: 'medium' }) : '';
+    const initials = (name) => (name || '?').trim().charAt(0).toUpperCase();
+    const num = (value) => Number(value || 0).toLocaleString('es');
+    function highlight(text) {
+        const terms = [...state.keywords, state.filters.q || ''].filter(Boolean);
+        if (!terms.length)
+            return esc(text);
+        const plainChars = [...text].map((ch) => (ch.length === 1 ? (ch.normalize('NFD')[0] || ch) : ch));
+        const plain = plainChars.join('').toLowerCase();
+        const pattern = new RegExp(terms.map((t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+        let out = '';
+        let last = 0;
+        for (const match of plain.matchAll(pattern)) {
+            if (!match[0])
+                continue;
+            out += esc(text.slice(last, match.index)) + '<mark>' + esc(text.slice(match.index, match.index + match[0].length)) + '</mark>';
+            last = match.index + match[0].length;
+        }
+        return out + esc(text.slice(last));
     }
-  }
-
-  function messageRow(message) {
-    const flags = (message.flags || []).map((flag) => `<span class="chip">${esc(flag)}</span>`).join('');
-    return `<tr class="${message.flags && message.flags.length ? 'flagged' : ''}" data-id="${message.id}">
+    function avatarHtml(user, cls) {
+        return user && user.avatar
+            ? `<img src="${esc(user.avatar)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('i'), { textContent: ${JSON.stringify(initials(user && user.username))} }))">`
+            : `<i>${esc(initials(user && user.username))}</i>`;
+    }
+    function userHtml(user) {
+        if (!user)
+            return '<span class="user">—</span>';
+        return `<span class="user">${avatarHtml(user)}<span><button type="button" class="link" data-user="${esc(user.id)}" title="Ver ficha del usuario">${esc(user.username)}</button><small>#${esc(user.id)} · ${esc(user.email || user.login || '')}</small></span></span>`;
+    }
+    async function api(path, params = {}) {
+        const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+        const response = await fetch(`/api/${path}${query.toString() ? `?${query}` : ''}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
+            const error = new Error(data.message || `Error HTTP ${response.status}`);
+            error.status = response.status;
+            throw error;
+        }
+        return data;
+    }
+    function showSetup(message) {
+        stopTimer();
+        $('#app-view').hidden = true;
+        $('#topbar-right').hidden = true;
+        $('#setup-view').hidden = false;
+        $('#setup-message').textContent = message || '';
+        $('#setup-message').classList.toggle('error', Boolean(message));
+    }
+    function stopTimer() {
+        if (state.timer)
+            clearInterval(state.timer);
+        state.timer = null;
+    }
+    function startTimer() {
+        stopTimer();
+        const seconds = Number($('#refresh').value);
+        if (!seconds)
+            return;
+        state.timer = setInterval(() => {
+            loadOverview();
+            if (!$('#tab-messages').hidden)
+                loadMessages(true);
+            else if (!$('#tab-conversations').hidden)
+                loadConversations(state.convPage);
+        }, seconds * 1000);
+    }
+    async function connect() {
+        const info = await api('session');
+        state.site = info.site || '';
+        $('#site').textContent = state.site;
+        $('#setup-key-file').textContent = info.keyFile || '';
+        try {
+            const overview = await api('mod/overview');
+            $('#setup-view').hidden = true;
+            $('#app-view').hidden = false;
+            $('#topbar-right').hidden = false;
+            renderOverview(overview);
+            await loadMessages(true);
+            startTimer();
+        }
+        catch (error) {
+            showSetup(error.message);
+        }
+    }
+    function renderOverview(data) {
+        state.keywords = data.keywords || [];
+        const t = data.totals || {};
+        const tiles = [
+            ['Mensajes', t.messages], ['Últimas 24 h', t.last_24h], ['Últimos 7 días', t.last_7d],
+            ['Conversaciones', t.conversations], ['Usuarios que escriben', t.senders], ['Sin leer', t.unread],
+        ];
+        $('#stats').innerHTML = tiles.map(([label, value]) => `<div class="stat"><b>${num(value)}</b><span>${label}</span></div>`).join('')
+            + (data.table === false ? '<div class="stat"><span>Todavía no existe la tabla de mensajes en el sitio.</span></div>' : '');
+    }
+    async function loadOverview() {
+        try {
+            renderOverview(await api('mod/overview'));
+        }
+        catch (error) {
+            if (error.status === 401 || error.status === 403 || error.status === 404)
+                return showSetup(error.message);
+            $('#stats').innerHTML = `<div class="stat error">${esc(error.message)}</div>`;
+        }
+    }
+    function readFilters() {
+        const form = new FormData($('#filters'));
+        return {
+            q: String(form.get('q') || '').trim(),
+            userText: String(form.get('user') || '').trim(),
+            since: form.get('since') || '',
+            until: form.get('until') || '',
+            flagged: form.get('flagged') ? 1 : '',
+        };
+    }
+    async function resolveUser(text) {
+        if (!text)
+            return '';
+        const hashed = text.match(/#(\d+)/);
+        if (hashed)
+            return hashed[1];
+        if (/^\d+$/.test(text))
+            return text;
+        const data = await api('mod/users/search', { q: text });
+        if (!data.users || !data.users.length)
+            throw new Error(`No se encontró ningún usuario para "${text}".`);
+        return String(data.users[0].id);
+    }
+    async function loadMessages(reset) {
+        const summary = $('#messages-summary');
+        const tbody = $('#messages-table tbody');
+        try {
+            if (reset) {
+                const raw = readFilters();
+                state.filters = { ...raw, user: await resolveUser(raw.userText) };
+                state.messages = [];
+                state.nextBefore = null;
+                tbody.innerHTML = '<tr><td colspan="6" class="empty">Cargando…</td></tr>';
+            }
+            const { q, user, since, until, flagged } = state.filters;
+            const data = await api('mod/messages', { q, user, since, until, flagged, before_id: state.nextBefore || '', per_page: 50 });
+            if (reset)
+                tbody.innerHTML = '';
+            state.total = data.total || 0;
+            state.nextBefore = data.next_before_id || null;
+            state.messages.push(...(data.messages || []));
+            for (const message of data.messages || [])
+                tbody.insertAdjacentHTML('beforeend', messageRow(message));
+            if (!state.messages.length)
+                tbody.innerHTML = '<tr><td colspan="6" class="empty">No hay mensajes con esos filtros.</td></tr>';
+            const shown = state.messages.length;
+            summary.textContent = flagged
+                ? `${shown} mensaje(s) con señales mostrados de ${num(state.total)} que cumplen los filtros (revisados ${data.scanned || 0} en esta carga).`
+                : `${shown} de ${num(state.total)} mensaje(s). Horas en tu zona horaria.`;
+            $('#more-messages').hidden = !state.nextBefore;
+        }
+        catch (error) {
+            summary.textContent = '';
+            tbody.innerHTML = `<tr><td colspan="6" class="empty error">${esc(error.message)}</td></tr>`;
+            $('#more-messages').hidden = true;
+        }
+    }
+    function messageRow(message) {
+        const flags = (message.flags || []).map((flag) => `<span class="chip">${esc(flag)}</span>`).join('');
+        return `<tr class="${message.flags && message.flags.length ? 'flagged' : ''}" data-id="${message.id}">
       <td class="when">${esc(fmtDate(message.created_at))}${message.read_at ? '' : '<br><span class="muted">sin leer</span>'}</td>
       <td>${userHtml(message.sender)}</td>
       <td>${userHtml(message.recipient)}</td>
@@ -407,28 +407,26 @@
       <td>${flags}</td>
       <td><button type="button" class="ghost" data-thread="${message.sender.id},${message.recipient.id}">Conversación</button></td>
     </tr>`;
-  }
-
-  /* ---------------- Conversaciones ---------------- */
-  async function loadConversations(page) {
-    const list = $('#conversations');
-    list.innerHTML = '<div class="empty">Cargando…</div>';
-    try {
-      const data = await api('mod/conversations', { page, per_page: 40, user: state.filters.user || '' });
-      state.convPage = data.page || 1;
-      state.convPages = data.total_pages || 0;
-      $('#conversations-summary').textContent = `${num(data.total)} conversación(es)${state.filters.user ? ` del usuario #${state.filters.user}` : ''}.`;
-      $('#conv-page').textContent = state.convPages ? `Página ${state.convPage} de ${state.convPages}` : '';
-      $('#conv-prev').disabled = state.convPage <= 1;
-      $('#conv-next').disabled = state.convPage >= state.convPages;
-      if (!data.conversations || !data.conversations.length) {
-        list.innerHTML = '<div class="empty">No hay conversaciones.</div>';
-        return;
-      }
-      list.innerHTML = data.conversations.map((c) => {
-        const last = c.last_message;
-        const flags = last && last.flags && last.flags.length ? last.flags.map((f) => `<span class="chip">${esc(f)}</span>`).join('') : '';
-        return `<div class="conversation" data-thread="${c.user_a.id},${c.user_b.id}">
+    }
+    async function loadConversations(page) {
+        const list = $('#conversations');
+        list.innerHTML = '<div class="empty">Cargando…</div>';
+        try {
+            const data = await api('mod/conversations', { page, per_page: 40, user: state.filters.user || '' });
+            state.convPage = data.page || 1;
+            state.convPages = data.total_pages || 0;
+            $('#conversations-summary').textContent = `${num(data.total)} conversación(es)${state.filters.user ? ` del usuario #${state.filters.user}` : ''}.`;
+            $('#conv-page').textContent = state.convPages ? `Página ${state.convPage} de ${state.convPages}` : '';
+            $('#conv-prev').disabled = state.convPage <= 1;
+            $('#conv-next').disabled = state.convPage >= state.convPages;
+            if (!data.conversations || !data.conversations.length) {
+                list.innerHTML = '<div class="empty">No hay conversaciones.</div>';
+                return;
+            }
+            list.innerHTML = data.conversations.map((c) => {
+                const last = c.last_message;
+                const flags = last && last.flags && last.flags.length ? last.flags.map((f) => `<span class="chip">${esc(f)}</span>`).join('') : '';
+                return `<div class="conversation" data-thread="${c.user_a.id},${c.user_b.id}">
           <div>
             <div class="pair">${userHtml(c.user_a)}<span class="muted">↔</span>${userHtml(c.user_b)}</div>
             <div class="snippet">${last ? `${esc(last.sender.username)}: ${esc(last.body)}` : ''}</div>
@@ -436,59 +434,59 @@
           </div>
           <div class="muted" style="text-align:right;white-space:nowrap">${c.total} mensaje(s)<br>${esc(fmtDate(c.last_at))}</div>
         </div>`;
-      }).join('');
-    } catch (error) {
-      list.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+            }).join('');
+        }
+        catch (error) {
+            list.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+        }
     }
-  }
-
-  async function openThread(a, b, before) {
-    const drawer = $('#thread');
-    const box = $('#thread-messages');
-    if (!before) {
-      state.thread = { a, b, messages: [], hasMore: false, users: [] };
-      drawer.hidden = false;
-      box.innerHTML = '<div class="empty">Cargando…</div>';
-    }
-    try {
-      const data = await api(`mod/conversations/${a}/${b}`, { limit: 100, before: before || '' });
-      const older = data.messages || [];
-      state.thread.users = data.users || state.thread.users;
-      state.thread.hasMore = Boolean(data.has_more);
-      state.thread.messages = before ? [...older, ...state.thread.messages] : older;
-      const [ua, ub] = state.thread.users;
-      $('#thread-title').innerHTML = `${userHtml(ua)} <span class="muted">↔</span> ${userHtml(ub)}`;
-      box.innerHTML = state.thread.messages.map((m) => `<div class="bubble ${m.sender.id === a ? '' : 'right'} ${m.flags && m.flags.length ? 'flagged' : ''}" data-id="${m.id}">
+    async function openThread(a, b, before) {
+        const drawer = $('#thread');
+        const box = $('#thread-messages');
+        if (!before) {
+            state.thread = { a, b, messages: [], hasMore: false, users: [] };
+            drawer.hidden = false;
+            box.innerHTML = '<div class="empty">Cargando…</div>';
+        }
+        try {
+            const data = await api(`mod/conversations/${a}/${b}`, { limit: 100, before: before || '' });
+            const older = data.messages || [];
+            state.thread.users = data.users || state.thread.users;
+            state.thread.hasMore = Boolean(data.has_more);
+            state.thread.messages = before ? [...older, ...state.thread.messages] : older;
+            const [ua, ub] = state.thread.users;
+            $('#thread-title').innerHTML = `${userHtml(ua)} <span class="muted">↔</span> ${userHtml(ub)}`;
+            box.innerHTML = state.thread.messages.map((m) => `<div class="bubble ${m.sender.id === a ? '' : 'right'} ${m.flags && m.flags.length ? 'flagged' : ''}" data-id="${m.id}">
         <span class="meta">${esc(m.sender.username)} · ${esc(fmtDate(m.created_at))}${m.read_at ? '' : ' · sin leer'}${m.flags && m.flags.length ? ' · ' + m.flags.map(esc).join(', ') : ''}</span>${highlight(m.body || '')}</div>`).join('')
-        || '<div class="empty">Sin mensajes.</div>';
-      $('#thread-more').hidden = !state.thread.hasMore;
-      if (!before) box.scrollTop = box.scrollHeight;
-    } catch (error) {
-      box.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+                || '<div class="empty">Sin mensajes.</div>';
+            $('#thread-more').hidden = !state.thread.hasMore;
+            if (!before)
+                box.scrollTop = box.scrollHeight;
+        }
+        catch (error) {
+            box.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+        }
     }
-  }
-
-  /* ---------------- Usuarios ---------------- */
-  async function loadUsers(page) {
-    const grid = $('#users');
-    grid.innerHTML = '<div class="empty">Cargando…</div>';
-    try {
-      const data = await api('mod/users', { q: state.usersQuery, page, per_page: 30 });
-      state.usersPage = data.page || 1;
-      state.usersPages = data.total_pages || 0;
-      $('#users-summary').textContent = state.usersQuery
-        ? `${num(data.total)} usuario(s) para "${state.usersQuery}".`
-        : `${num(data.total)} usuario(s) registrados, los más recientes primero.`;
-      $('#users-page').textContent = state.usersPages ? `Página ${state.usersPage} de ${state.usersPages}` : '';
-      $('#users-prev').disabled = state.usersPage <= 1;
-      $('#users-next').disabled = state.usersPage >= state.usersPages;
-      if (!data.users || !data.users.length) {
-        grid.innerHTML = '<div class="empty">No hay usuarios.</div>';
-        return;
-      }
-      grid.innerHTML = data.users.map((u) => {
-        const c = u.counts || {};
-        return `<div class="user-card" data-user="${u.id}">
+    async function loadUsers(page) {
+        const grid = $('#users');
+        grid.innerHTML = '<div class="empty">Cargando…</div>';
+        try {
+            const data = await api('mod/users', { q: state.usersQuery, page, per_page: 30 });
+            state.usersPage = data.page || 1;
+            state.usersPages = data.total_pages || 0;
+            $('#users-summary').textContent = state.usersQuery
+                ? `${num(data.total)} usuario(s) para "${state.usersQuery}".`
+                : `${num(data.total)} usuario(s) registrados, los más recientes primero.`;
+            $('#users-page').textContent = state.usersPages ? `Página ${state.usersPage} de ${state.usersPages}` : '';
+            $('#users-prev').disabled = state.usersPage <= 1;
+            $('#users-next').disabled = state.usersPage >= state.usersPages;
+            if (!data.users || !data.users.length) {
+                grid.innerHTML = '<div class="empty">No hay usuarios.</div>';
+                return;
+            }
+            grid.innerHTML = data.users.map((u) => {
+                const c = u.counts || {};
+                return `<div class="user-card" data-user="${u.id}">
           ${avatarHtml(u)}
           <div>
             <b>${esc(u.username)} ${u.is_premium ? '<span class="chip ok">premium</span>' : ''}${u.is_pro ? '<span class="chip neutral">pro</span>' : ''}</b>
@@ -497,78 +495,75 @@
             <div class="counts">✉ ${num(c.messages_sent)} enviados · ${num(c.messages_received)} recibidos · ${num(c.friends)} amigos · ${num(c.posts)} publicaciones</div>
           </div>
         </div>`;
-      }).join('');
-    } catch (error) {
-      grid.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+            }).join('');
+        }
+        catch (error) {
+            grid.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+        }
     }
-  }
-
-  const SOCIAL_LABELS = { facebook: 'Facebook', twitter: 'X / Twitter', instagram: 'Instagram', discord: 'Discord', whatsapp: 'WhatsApp', telegram: 'Telegram', youtube: 'YouTube', github: 'GitHub', tiktok: 'TikTok' };
-
-  function linkOrText(value) {
-    return /^https?:\/\//i.test(value) ? `<a href="${esc(value)}" target="_blank" rel="noopener">${esc(value)}</a>` : esc(value);
-  }
-
-  async function openProfile(id) {
-    const drawer = $('#profile');
-    const body = $('#profile-body');
-    drawer.hidden = false;
-    $('#profile-title').textContent = `Usuario #${id}`;
-    body.innerHTML = '<div class="empty">Cargando ficha…</div>';
-    try {
-      const data = await api(`mod/users/${id}`);
-      const u = data.user || {};
-      const p = data.profile || {};
-      const a = data.account || {};
-      const s = data.stats || {};
-      $('#profile-title').innerHTML = `${esc(u.username)} <span class="muted">#${u.id}</span>`;
-      const heroStyle = p.banner_url ? `style="background-image:url('${esc(p.banner_url)}')"` : (p.banner_color && /^#|^rgb/.test(p.banner_color) ? `style="background:${esc(p.banner_color)}"` : '');
-      const avatar = u.avatar
-        ? `<img class="hero-avatar" src="${esc(u.avatar)}" alt="">`
-        : `<i class="hero-avatar">${esc(initials(u.username))}</i>`;
-      const badges = [
-        a.is_premium ? '<span class="chip ok">premium' + (a.premium_expiry ? ' hasta ' + esc(fmtDay(a.premium_expiry)) : '') + '</span>' : '',
-        a.is_pro ? '<span class="chip neutral">pro</span>' : '',
-        ...(a.roles || []).map((r) => `<span class="chip neutral">${esc(r)}</span>`),
-      ].join('');
-      const socialIds = Object.entries(a.social_ids || {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
-      const kv = [
-        ['Correo', u.email ? `<a href="mailto:${esc(u.email)}">${esc(u.email)}</a>` : ''],
-        ['Usuario (login)', u.login ? '@' + esc(u.login) : ''],
-        ['Nombre público', esc(p.public_name || u.username)],
-        ['Registro', esc(fmtDate(a.registered))],
-        ['Último acceso', a.last_login ? esc(fmtDate(a.last_login)) : '<span class="muted">sin dato</span>'],
-        ['Monedas', a.coins === null || a.coins === undefined ? '<span class="muted">sin dato</span>' : num(a.coins)],
-        ['Ubicación', esc(p.location)],
-        ['Fecha de nacimiento', esc(p.birth_date || p.birth_year) + (p.birth_date && !p.show_birth_date ? ' <span class="muted">(oculta en su perfil)</span>' : '')],
-        ['Teléfono', p.phone ? esc((p.country_code ? p.country_code + ' ' : '') + p.phone) + (!p.show_phone ? ' <span class="muted">(oculto en su perfil)</span>' : '') : ''],
-        ['Inicio de sesión social', socialIds ? esc(socialIds) : ''],
-        ['Web', a.website ? linkOrText(a.website) : ''],
-        ['Biografía', esc(p.bio)],
-      ].filter(([, value]) => value && value !== '');
-      const socials = Object.entries(p.social_links || {}).filter(([, v]) => v);
-      const gallery = (data.photos || []).map((ph) => `<a href="${esc(ph.url)}" target="_blank" rel="noopener" title="${esc(ph.label)}">${ph.media_type === 'video' ? `<video src="${esc(ph.url)}" muted preload="metadata"></video>` : `<img src="${esc(ph.url)}" alt="" loading="lazy">`}<span>${esc(ph.label)}${ph.created_at ? ' · ' + esc(fmtDay(ph.created_at)) : ''}</span></a>`).join('');
-      const friends = (data.friends || []).map((f) => `<button type="button" class="link" data-user="${f.id}" title="${esc(f.username)} · desde ${esc(fmtDay(f.since))}">${avatarHtml(f)}<span>${esc(f.username)}</span></button>`).join('');
-      const posts = (data.posts || []).map((post) => `<div class="post">
+    const SOCIAL_LABELS = { facebook: 'Facebook', twitter: 'X / Twitter', instagram: 'Instagram', discord: 'Discord', whatsapp: 'WhatsApp', telegram: 'Telegram', youtube: 'YouTube', github: 'GitHub', tiktok: 'TikTok' };
+    function linkOrText(value) {
+        return /^https?:\/\//i.test(value) ? `<a href="${esc(value)}" target="_blank" rel="noopener">${esc(value)}</a>` : esc(value);
+    }
+    async function openProfile(id) {
+        const drawer = $('#profile');
+        const body = $('#profile-body');
+        drawer.hidden = false;
+        $('#profile-title').textContent = `Usuario #${id}`;
+        body.innerHTML = '<div class="empty">Cargando ficha…</div>';
+        try {
+            const data = await api(`mod/users/${id}`);
+            const u = data.user || {};
+            const p = data.profile || {};
+            const a = data.account || {};
+            const s = data.stats || {};
+            $('#profile-title').innerHTML = `${esc(u.username)} <span class="muted">#${u.id}</span>`;
+            const heroStyle = p.banner_url ? `style="background-image:url('${esc(p.banner_url)}')"` : (p.banner_color && /^#|^rgb/.test(p.banner_color) ? `style="background:${esc(p.banner_color)}"` : '');
+            const avatar = u.avatar
+                ? `<img class="hero-avatar" src="${esc(u.avatar)}" alt="">`
+                : `<i class="hero-avatar">${esc(initials(u.username))}</i>`;
+            const badges = [
+                a.is_premium ? '<span class="chip ok">premium' + (a.premium_expiry ? ' hasta ' + esc(fmtDay(a.premium_expiry)) : '') + '</span>' : '',
+                a.is_pro ? '<span class="chip neutral">pro</span>' : '',
+                ...(a.roles || []).map((r) => `<span class="chip neutral">${esc(r)}</span>`),
+            ].join('');
+            const socialIds = Object.entries(a.social_ids || {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
+            const kv = [
+                ['Correo', u.email ? `<a href="mailto:${esc(u.email)}">${esc(u.email)}</a>` : ''],
+                ['Usuario (login)', u.login ? '@' + esc(u.login) : ''],
+                ['Nombre público', esc(p.public_name || u.username)],
+                ['Registro', esc(fmtDate(a.registered))],
+                ['Último acceso', a.last_login ? esc(fmtDate(a.last_login)) : '<span class="muted">sin dato</span>'],
+                ['Monedas', a.coins === null || a.coins === undefined ? '<span class="muted">sin dato</span>' : num(a.coins)],
+                ['Ubicación', esc(p.location)],
+                ['Fecha de nacimiento', esc(p.birth_date || p.birth_year) + (p.birth_date && !p.show_birth_date ? ' <span class="muted">(oculta en su perfil)</span>' : '')],
+                ['Teléfono', p.phone ? esc((p.country_code ? p.country_code + ' ' : '') + p.phone) + (!p.show_phone ? ' <span class="muted">(oculto en su perfil)</span>' : '') : ''],
+                ['Inicio de sesión social', socialIds ? esc(socialIds) : ''],
+                ['Web', a.website ? linkOrText(a.website) : ''],
+                ['Biografía', esc(p.bio)],
+            ].filter(([, value]) => value && value !== '');
+            const socials = Object.entries(p.social_links || {}).filter(([, v]) => v);
+            const gallery = (data.photos || []).map((ph) => `<a href="${esc(ph.url)}" target="_blank" rel="noopener" title="${esc(ph.label)}">${ph.media_type === 'video' ? `<video src="${esc(ph.url)}" muted preload="metadata"></video>` : `<img src="${esc(ph.url)}" alt="" loading="lazy">`}<span>${esc(ph.label)}${ph.created_at ? ' · ' + esc(fmtDay(ph.created_at)) : ''}</span></a>`).join('');
+            const friends = (data.friends || []).map((f) => `<button type="button" class="link" data-user="${f.id}" title="${esc(f.username)} · desde ${esc(fmtDay(f.since))}">${avatarHtml(f)}<span>${esc(f.username)}</span></button>`).join('');
+            const posts = (data.posts || []).map((post) => `<div class="post">
           <div>
             <div class="meta">${esc(fmtDate(post.created_at))} · ${esc(post.visibility || 'public')}${post.status && post.status !== 'published' ? ' · ' + esc(post.status) : ''}${post.shared_post_id ? ' · compartida #' + post.shared_post_id : ''}</div>
             <p>${highlight(post.content || '')}</p>
           </div>
           ${post.media_url ? `<a href="${esc(post.media_url)}" target="_blank" rel="noopener">${post.media_type === 'video' ? `<video src="${esc(post.media_url)}" muted preload="metadata"></video>` : `<img src="${esc(post.media_url)}" alt="" loading="lazy">`}</a>` : ''}
         </div>`).join('');
-      const conversations = (data.conversations || []).map((c) => `<div class="conversation" data-thread="${u.id},${c.other.id}">
+            const conversations = (data.conversations || []).map((c) => `<div class="conversation" data-thread="${u.id},${c.other.id}">
           <div>
             <div class="pair">${userHtml(c.other)}</div>
             <div class="snippet">${c.last_message ? `${esc(c.last_message.sender.username)}: ${esc(c.last_message.body)}` : ''}</div>
           </div>
           <div class="muted" style="text-align:right;white-space:nowrap">${c.last_message ? esc(fmtDate(c.last_message.created_at)) : ''}</div>
         </div>`).join('');
-      const tiles = [
-        ['Enviados', s.messages_sent], ['Recibidos', s.messages_received], ['Conversaciones', s.conversations], ['Sin leer', s.unread_received],
-        ['Amigos', s.friends], ['Solicitudes', (s.pending_sent || 0) + (s.pending_received || 0)], ['Publicaciones', s.posts], ['Con foto/vídeo', s.posts_with_media], ['Comentarios', s.comments],
-      ];
-
-      body.innerHTML = `
+            const tiles = [
+                ['Enviados', s.messages_sent], ['Recibidos', s.messages_received], ['Conversaciones', s.conversations], ['Sin leer', s.unread_received],
+                ['Amigos', s.friends], ['Solicitudes', (s.pending_sent || 0) + (s.pending_received || 0)], ['Publicaciones', s.posts], ['Con foto/vídeo', s.posts_with_media], ['Comentarios', s.comments],
+            ];
+            body.innerHTML = `
         <div class="hero" ${heroStyle}></div>
         <div class="hero-body">
           ${avatar}
@@ -596,106 +591,109 @@
           ${posts ? `<div class="posts">${posts}</div>` : '<p class="muted">Sin publicaciones.</p>'}
           <div style="height:24px"></div>
         </div>`;
-      body.scrollTop = 0;
-    } catch (error) {
-      body.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+            body.scrollTop = 0;
+        }
+        catch (error) {
+            body.innerHTML = `<div class="empty error">${esc(error.message)}</div>`;
+        }
     }
-  }
-
-  function showTab(tab) {
-    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-    $('#tab-messages').hidden = tab !== 'messages';
-    $('#tab-conversations').hidden = tab !== 'conversations';
-    $('#tab-users').hidden = tab !== 'users';
-    if (tab === 'conversations') loadConversations(1);
-    if (tab === 'users') loadUsers(1);
-  }
-
-  /* ---------------- Exportar ---------------- */
-  function exportCsv() {
-    if (!state.messages.length) return;
-    const cell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const header = ['id', 'fecha_utc', 'de_id', 'de', 'de_correo', 'para_id', 'para', 'para_correo', 'leido', 'senales', 'mensaje'];
-    const rows = state.messages.map((m) => [
-      m.id, m.created_at, m.sender.id, m.sender.username, m.sender.email, m.recipient.id, m.recipient.username, m.recipient.email,
-      m.read_at ? 'sí' : 'no', (m.flags || []).join(' | '), m.body,
-    ].map(cell).join(','));
-    const blob = new Blob(['﻿' + [header.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `mensajes-mangamukai-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 2000);
-  }
-
-  /* ---------------- Eventos ---------------- */
-  let userSearchTimer = null;
-  $('#filters input[name="user"]').addEventListener('input', (event) => {
-    const value = event.target.value.trim();
-    clearTimeout(userSearchTimer);
-    if (value.length < 2 || /^#?\d+$/.test(value)) return;
-    userSearchTimer = setTimeout(async () => {
-      try {
-        const data = await api('mod/users/search', { q: value });
-        $('#user-options').innerHTML = (data.users || []).map((u) => `<option value="#${u.id} ${esc(u.username)} (${esc(u.email)})"></option>`).join('');
-      } catch {
-        // Autocompletado opcional.
-      }
-    }, 300);
-  });
-
-  $('#retry').addEventListener('click', () => {
-    $('#setup-message').textContent = 'Comprobando…';
-    $('#setup-message').classList.remove('error');
+    function showTab(tab) {
+        document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+        $('#tab-messages').hidden = tab !== 'messages';
+        $('#tab-conversations').hidden = tab !== 'conversations';
+        $('#tab-users').hidden = tab !== 'users';
+        if (tab === 'conversations')
+            loadConversations(1);
+        if (tab === 'users')
+            loadUsers(1);
+    }
+    function exportCsv() {
+        if (!state.messages.length)
+            return;
+        const cell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const header = ['id', 'fecha_utc', 'de_id', 'de', 'de_correo', 'para_id', 'para', 'para_correo', 'leido', 'senales', 'mensaje'];
+        const rows = state.messages.map((m) => [
+            m.id, m.created_at, m.sender.id, m.sender.username, m.sender.email, m.recipient.id, m.recipient.username, m.recipient.email,
+            m.read_at ? 'sí' : 'no', (m.flags || []).join(' | '), m.body,
+        ].map(cell).join(','));
+        const blob = new Blob(['﻿' + [header.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `mensajes-mangamukai-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+    }
+    let userSearchTimer = null;
+    $('#filters input[name="user"]').addEventListener('input', (event) => {
+        const value = event.target.value.trim();
+        clearTimeout(userSearchTimer);
+        if (value.length < 2 || /^#?\d+$/.test(value))
+            return;
+        userSearchTimer = setTimeout(async () => {
+            try {
+                const data = await api('mod/users/search', { q: value });
+                $('#user-options').innerHTML = (data.users || []).map((u) => `<option value="#${u.id} ${esc(u.username)} (${esc(u.email)})"></option>`).join('');
+            }
+            catch {
+            }
+        }, 300);
+    });
+    $('#retry').addEventListener('click', () => {
+        $('#setup-message').textContent = 'Comprobando…';
+        $('#setup-message').classList.remove('error');
+        connect().catch((error) => showSetup(error.message));
+    });
+    $('#refresh').addEventListener('change', startTimer);
+    $('#filters').addEventListener('submit', (event) => { event.preventDefault(); loadMessages(true); });
+    $('#clear-filters').addEventListener('click', () => { $('#filters').reset(); loadMessages(true); });
+    $('#export').addEventListener('click', exportCsv);
+    $('#more-messages').addEventListener('click', () => loadMessages(false));
+    $('#conv-prev').addEventListener('click', () => loadConversations(state.convPage - 1));
+    $('#conv-next').addEventListener('click', () => loadConversations(state.convPage + 1));
+    $('#user-filters').addEventListener('submit', (event) => {
+        event.preventDefault();
+        state.usersQuery = String(new FormData(event.target).get('q') || '').trim();
+        loadUsers(1);
+    });
+    $('#users-recent').addEventListener('click', () => { $('#user-filters').reset(); state.usersQuery = ''; loadUsers(1); });
+    $('#users-prev').addEventListener('click', () => loadUsers(state.usersPage - 1));
+    $('#users-next').addEventListener('click', () => loadUsers(state.usersPage + 1));
+    $('#thread-close').addEventListener('click', () => { $('#thread').hidden = true; state.thread = null; });
+    $('#profile-close').addEventListener('click', () => { $('#profile').hidden = true; });
+    $('#thread-more').addEventListener('click', () => {
+        if (state.thread && state.thread.messages.length)
+            openThread(state.thread.a, state.thread.b, state.thread.messages[0].id);
+    });
+    document.addEventListener('click', (event) => {
+        const filterUser = event.target.closest('[data-filter-user]');
+        if (filterUser) {
+            $('#profile').hidden = true;
+            $('#filters input[name="user"]').value = '#' + filterUser.dataset.filterUser;
+            showTab('messages');
+            loadMessages(true);
+            return;
+        }
+        const userButton = event.target.closest('[data-user]');
+        if (userButton) {
+            openProfile(Number(userButton.dataset.user));
+            return;
+        }
+        const target = event.target.closest('[data-thread]');
+        if (!target || event.target.closest('a'))
+            return;
+        const [a, b] = target.dataset.thread.split(',').map(Number);
+        openThread(a, b);
+    });
+    document.querySelectorAll('.tabs button').forEach((button) => button.addEventListener('click', () => showTab(button.dataset.tab)));
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape')
+            return;
+        if (!$('#thread').hidden)
+            $('#thread-close').click();
+        else if (!$('#profile').hidden)
+            $('#profile-close').click();
+    });
     connect().catch((error) => showSetup(error.message));
-  });
-  $('#refresh').addEventListener('change', startTimer);
-  $('#filters').addEventListener('submit', (event) => { event.preventDefault(); loadMessages(true); });
-  $('#clear-filters').addEventListener('click', () => { $('#filters').reset(); loadMessages(true); });
-  $('#export').addEventListener('click', exportCsv);
-  $('#more-messages').addEventListener('click', () => loadMessages(false));
-  $('#conv-prev').addEventListener('click', () => loadConversations(state.convPage - 1));
-  $('#conv-next').addEventListener('click', () => loadConversations(state.convPage + 1));
-  $('#user-filters').addEventListener('submit', (event) => {
-    event.preventDefault();
-    state.usersQuery = String(new FormData(event.target).get('q') || '').trim();
-    loadUsers(1);
-  });
-  $('#users-recent').addEventListener('click', () => { $('#user-filters').reset(); state.usersQuery = ''; loadUsers(1); });
-  $('#users-prev').addEventListener('click', () => loadUsers(state.usersPage - 1));
-  $('#users-next').addEventListener('click', () => loadUsers(state.usersPage + 1));
-  $('#thread-close').addEventListener('click', () => { $('#thread').hidden = true; state.thread = null; });
-  $('#profile-close').addEventListener('click', () => { $('#profile').hidden = true; });
-  $('#thread-more').addEventListener('click', () => {
-    if (state.thread && state.thread.messages.length) openThread(state.thread.a, state.thread.b, state.thread.messages[0].id);
-  });
-  document.addEventListener('click', (event) => {
-    const filterUser = event.target.closest('[data-filter-user]');
-    if (filterUser) {
-      $('#profile').hidden = true;
-      $('#filters input[name="user"]').value = '#' + filterUser.dataset.filterUser;
-      showTab('messages');
-      loadMessages(true);
-      return;
-    }
-    const userButton = event.target.closest('[data-user]');
-    if (userButton) {
-      openProfile(Number(userButton.dataset.user));
-      return;
-    }
-    const target = event.target.closest('[data-thread]');
-    if (!target || event.target.closest('a')) return;
-    const [a, b] = target.dataset.thread.split(',').map(Number);
-    openThread(a, b);
-  });
-  document.querySelectorAll('.tabs button').forEach((button) => button.addEventListener('click', () => showTab(button.dataset.tab)));
-  document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    if (!$('#thread').hidden) $('#thread-close').click();
-    else if (!$('#profile').hidden) $('#profile-close').click();
-  });
-
-  connect().catch((error) => showSetup(error.message));
 })();
 </script>
 </body>

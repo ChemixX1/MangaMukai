@@ -12,7 +12,7 @@ export const PaymentCardIcon = () => (
 
 export type ShopFilter = 'Todo' | ShopCategory | 'Sale';
 
-export const SHOP_FILTERS: { id: ShopFilter; label: string }[] = [
+ const SHOP_FILTERS: { id: ShopFilter; label: string }[] = [
   { id: 'Todo', label: 'Todo' },
   { id: 'Manga', label: 'Manga' },
   { id: 'Art prints', label: 'Ilustraciones' },
@@ -48,7 +48,6 @@ interface ProductCardProps {
   onRemove: () => void;
 }
 
-/** Tarjeta de producto limpia: portada 3:4, título corrido, precio y controles - / +. */
 export const ProductCard = ({ product, quantity, onOpen, onAdd, onRemove }: ProductCardProps) => {
   const discount = product.originalPrice && product.originalPrice > product.price
     ? Math.round((1 - product.price / product.originalPrice) * 100)

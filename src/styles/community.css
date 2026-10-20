@@ -160,13 +160,10 @@
   flex-shrink: 0;
 }
 
-.community-mobile-tools,
 .community-mobile-insert,
 .community-message-fab {
   display: none;
 }
-
-/* Navegación lateral */
 .community-nav {
   position: sticky;
   top: 104px;
@@ -295,8 +292,6 @@
   font-size: 12px;
 }
 
-/* Compositor y pestañas */
-.community-card,
 .community-composer,
 .community-post {
   background: var(--community-card);
@@ -358,6 +353,7 @@
 }
 
 .community-compose-tools {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -365,6 +361,20 @@
   min-height: 42px;
   padding-top: 10px;
   border-top: 1px solid var(--community-border);
+}
+
+.community-manga-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  width: min(420px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--community-border);
+  border-radius: 12px;
+  background: var(--community-card);
+  color: var(--community-ink);
+  box-shadow: 0 12px 32px #0003;
 }
 
 .community-compose-submit-wrap {
@@ -678,8 +688,6 @@
   border-radius: 0;
   border-bottom: 1px solid var(--community-border);
 }
-
-/* Publicaciones */
 .community-feed {
   display: grid;
   gap: 0;
@@ -969,8 +977,6 @@
   background: var(--community-card);
   color: var(--community-accent);
 }
-
-/* Lectores sugeridos */
 .community-readers {
   min-width: 0;
   padding: 16px 18px;
@@ -1095,8 +1101,6 @@
 .community-reader-pages {
   display: none;
 }
-
-/* Conversación de una publicación */
 .community-thread {
   min-width: 0;
   min-height: calc(100dvh - 170px);
@@ -1427,8 +1431,6 @@
 .community-reply-bar .community-attachment-preview img {
   max-height: 160px;
 }
-
-/* Estados de formularios y búsquedas */
 .community-error,
 .community-status {
   margin: 12px 16px;
@@ -1584,7 +1586,7 @@
     font-size: 15px;
     line-height: 1.5;
   }
-  .community-composer-body > :is(.community-manga-picker, .community-draft-manga) {
+  .community-composer-body > .community-draft-manga {
     width: calc(100% + 54px);
     margin-left: -54px;
     margin-right: 0;
@@ -1783,7 +1785,7 @@
     padding: 20px 16px calc(136px + env(safe-area-inset-bottom));
     background: var(--community-card);
   }
-  .community-page.is-thread .community-mobile-tools,
+
   .community-page.is-thread .community-nav {
     display: none;
   }

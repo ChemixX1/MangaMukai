@@ -10,15 +10,12 @@ import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "../../services
 import { isMobileSectionRoute } from "../../utils/mobileSections";
 import { isPageScrollLocked, PAGE_SCROLL_LOCK_CHANGED_EVENT } from "../../utils/scrollLock";
 import { NavbarBellIcon } from "../ui";
+import { blockBackgroundTasks, scheduleBackgroundTask } from '../../utils/backgroundTasks';
 
-// Las ventanas del buscador (Biblioteca entera) y de notificaciones van en sus chunks y se precargan al montar.
 const loadSearchOverlay = () => import("./SearchOverlay");
 const loadNotificationsOverlay = () => import("./NotificationsOverlay");
-// La del carrito solo se monta (y se carga) en la Tienda móvil.
 
-/** La página "Más" lo emite para abrir la alarma, que vive montada aquí. */
 export const OPEN_TIMER_EVENT = 'mm_open_timer';
-
 
 const getCurrentStoredUser = () => (getStoredToken() ? getStoredUser() : null);
 
@@ -36,24 +33,20 @@ export const useNavbarState = () => {
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
 
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
-  // En la Tienda (móvil) la cabecera es la del "Mukai Store": el nombre a la
-  // izquierda en lugar de la campana, sin logo en el centro y el carrito a la derecha.
+
   const isStoreMode = isMobile && location.pathname === '/tienda';
   const headerUsesDarkText = isLightMode;
-  // En la ficha de un manga y en "Más" (móvil) la imagen ocupa toda la parte superior: la cabecera no se pinta.
-  // Character Chat (/chat, la ficha /chat/:id y la conversación) va sin cabecera en móvil: solo su flecha de volver.
+
   const hideHeaderOnMobile = location.pathname.startsWith('/comunidad/publicacion/') || /^\/usuarios\/[^/]+\/publicacion\/[^/]+$/.test(location.pathname) || /^\/manga\/[^/]+/.test(location.pathname) || /^\/chat(\/|$)/.test(location.pathname) || location.pathname === '/profile' || location.pathname === '/perfil/editar' || isMobileSectionRoute(location.pathname);
-  // El chat de mensajes (botón "Mensajes" de la Comunidad) y las notificaciones van a pantalla
-  // completa: sin cabecera en ningún tamaño. El componente sigue montado para conservar la alarma,
-  // los avisos y el evento openChat.
+
   const isMessagesRoute = location.pathname.startsWith('/mensajes') || location.pathname.startsWith('/notificaciones');
-  // Ventana del buscador (lupa): se desliza sobre la página sin cambiar de ruta.
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const closeSearchOverlay = useCallback(() => { setIsSearchOpen(false); setSearchTerm(''); }, []);
-  // Panel compartido por las campanas de móvil y escritorio.
+
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const closeNotificationsOverlay = useCallback(() => setIsNotificationsOpen(false), []);
-  // Carrito (Tienda móvil, en el sitio de la lupa): ventana lateral hasta el centro de la página.
+
   const [isCartOpen, setIsCartOpen] = useState(false);
   const closeCartOverlay = useCallback(() => setIsCartOpen(false), []);
   const { count: cartCount } = useShopCart();
@@ -73,7 +66,24 @@ export const useNavbarState = () => {
     return () => window.removeEventListener(OPEN_SEARCH_EVENT, showSearch);
   }, []);
 
-  useEffect(() => { void loadSearchOverlay(); void loadNotificationsOverlay(); }, []);
+  useEffect(() => {
+    if (/^\/(read|manga)\//.test(location.pathname)) return;
+    return scheduleBackgroundTask('panel:search', loadSearchOverlay);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!currentUser || /^\/(read|manga)\//.test(location.pathname)) return;
+    return scheduleBackgroundTask('panel:notifications', loadNotificationsOverlay);
+  }, [currentUser, location.pathname]);
+
+  useEffect(() => {
+    if (isSearchOpen || isNotificationsOpen || isCartOpen) return blockBackgroundTasks();
+  }, [isSearchOpen, isNotificationsOpen, isCartOpen]);
+
+  const prefetchSearch = () => scheduleBackgroundTask('panel:search', loadSearchOverlay, { priority: 'intent' });
+  const prefetchNotifications = () => {
+    if (currentUser) scheduleBackgroundTask('panel:notifications', loadNotificationsOverlay, { priority: 'intent' });
+  };
 
   const openSearch = () => {
     setIsNotificationsOpen(false);
@@ -91,7 +101,6 @@ export const useNavbarState = () => {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const timerRef = useRef<number | null>(null);
 
-  /** La cabecera se esconde al bajar y reaparece en cuanto se sube. */
   useEffect(() => {
     let lastY = window.scrollY;
     let travel = 0;
@@ -124,7 +133,7 @@ export const useNavbarState = () => {
         }
         return;
       }
-      // Umbral pequeño para que el rebote del scroll no la haga parpadear.
+
       if (Math.abs(delta) < 6) return;
       lastY = currentY;
       setIsHeaderHidden(currentY > 90 && delta > 0);
@@ -162,7 +171,6 @@ export const useNavbarState = () => {
     return () => { window.clearInterval(interval); window.removeEventListener(SOCIAL_REFRESH_EVENT, refresh); };
   }, [currentUser, refreshSocialCounts]);
 
-  // openChat(usuario) desde cualquier pantalla abre su conversación en la página de mensajes.
   useEffect(() => {
     const open = (event: Event) => {
       const target = (event as CustomEvent<FriendUser>).detail;
@@ -170,7 +178,7 @@ export const useNavbarState = () => {
       setIsNotificationsOpen(false);
       navigate(`/mensajes/${target.id}`);
     };
-    // La alarma se abre también desde la página "Más".
+
     const openTimer = () => { setIsNotificationsOpen(false); setIsTimerModalOpen(true); };
     window.addEventListener(OPEN_CHAT_EVENT, open);
     window.addEventListener(OPEN_TIMER_EVENT, openTimer);
@@ -199,7 +207,7 @@ export const useNavbarState = () => {
         setTimeLeft((prev) => {
           if (prev !== null && prev <= 1) {
             clearInterval(timerRef.current!);
-            setIsTimerActive(false); 
+            setIsTimerActive(false);
             setIsAlarmAlertOpen(true);
             return 0;
           }
@@ -208,12 +216,11 @@ export const useNavbarState = () => {
       }, 1000);
     }
 
-    return () => { 
-      if (timerRef.current) clearInterval(timerRef.current); 
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isTimerActive]); 
+  }, [isTimerActive]);
 
-  // Escuchar cambios de autenticación
   useEffect(() => {
     const update = () => setCurrentUser(getCurrentStoredUser());
     const updateProfile = (event: Event) => {
@@ -242,20 +249,8 @@ export const useNavbarState = () => {
     };
   }, []);
 
-  // Adelanta solo el código de acceso. Las portadas se reutilizan desde el home,
-  // sin competir con sus imágenes ni pedir otro catálogo al acercarse al enlace.
-  const authPrefetched = useRef(false);
-  const prefetchAuth = useCallback(() => {
-    if (authPrefetched.current) return;
-    authPrefetched.current = true;
-    void import('../../pages/AuthPage');
-  }, []);
-
-  // Cambio directo: la View Transition capturaba toda la página (imágenes, blur,
-  // carruseles) y con flushSync bloqueaba el hilo; en la portada se notaba mucho.
   const handleThemeToggle = () => toggleTheme();
 
-  // Refrescar monedas desde el servidor al cargar y cada 60s
   useEffect(() => {
     const doRefresh = async () => {
       const user = await refreshUser();
@@ -282,17 +277,18 @@ export const useNavbarState = () => {
     else navigate('/auth/login', { state: { returnTo: '/notificaciones' } });
   };
 
-  /* Móvil: usa el mismo panel que la campana junto al avatar de escritorio. */
   const renderMobileBell = () => (
     <button
       type="button"
       onClick={openNotifications}
+      onPointerEnter={prefetchNotifications}
+      onFocus={prefetchNotifications}
       aria-label="Notificaciones"
       title="Notificaciones"
       className={`relative flex h-11 w-11 items-center justify-center rounded-full transition-transform duration-200 hover:scale-110 motion-reduce:transition-none lg:hidden ${headerUsesDarkText ? 'text-black' : 'text-white'}`}
     >
       <NavbarBellIcon size={25.2} />
-      {/* Punto rojo en la esquina: hay notificaciones sin leer. */}
+
       {unreadNotifications > 0 && <span aria-label={`${unreadNotifications} sin leer`} className={`absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ${headerUsesDarkText ? 'ring-white' : 'ring-black'}`} />}
     </button>
   );
@@ -303,17 +299,15 @@ export const useNavbarState = () => {
     setSessionNotice(false);
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
-    // En el inicio móvil, un segundo toque al logo reinicia por completo la vista.
     if (location.pathname === '/' && window.matchMedia('(max-width: 1023px)').matches) {
       event.preventDefault();
       window.location.reload();
     }
   };
 
-
   const desktopIconClass = "relative flex h-[23.52px] w-[23.52px] shrink-0 items-center justify-center text-ink transition-transform duration-200 hover:scale-110 motion-reduce:transition-none after:absolute after:-inset-2 after:content-['']";
 
-  return { location, theme, isLightMode, isProfileRoute, currentUser, sessionNotice, setSessionNotice, unreadNotifications, isHeaderHidden, isMobile, isStoreMode, headerUsesDarkText, hideHeaderOnMobile, isMessagesRoute, isSearchOpen, closeSearchOverlay, isNotificationsOpen, openNotifications, closeNotificationsOverlay, isCartOpen, closeCartOverlay, cartCount, openSearch, openCart, isTimerModalOpen, setIsTimerModalOpen, isAlarmAlertOpen, setIsAlarmAlertOpen, timeLeft, isTimerActive, startTimer, stopTimer, prefetchAuth, handleThemeToggle, goToRecharge, openAuthPage, renderMobileBell, handleLogoClick, desktopIconClass };
+  return { location, theme, isLightMode, isProfileRoute, currentUser, sessionNotice, setSessionNotice, unreadNotifications, isHeaderHidden, isMobile, isStoreMode, headerUsesDarkText, hideHeaderOnMobile, isMessagesRoute, isSearchOpen, closeSearchOverlay, isNotificationsOpen, openNotifications, prefetchNotifications, closeNotificationsOverlay, isCartOpen, closeCartOverlay, cartCount, openSearch, prefetchSearch, openCart, isTimerModalOpen, setIsTimerModalOpen, isAlarmAlertOpen, setIsAlarmAlertOpen, timeLeft, isTimerActive, startTimer, stopTimer, handleThemeToggle, goToRecharge, openAuthPage, renderMobileBell, handleLogoClick, desktopIconClass };
 };
 
 export type NavbarViewProps = { model: ReturnType<typeof useNavbarState> };

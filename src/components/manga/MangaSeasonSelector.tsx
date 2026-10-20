@@ -18,7 +18,7 @@ export const MangaSeasonSelector = ({ cover, title, likeAction }: { cover: strin
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const labelClipId = useId();
-  // Prototipo: ambas temporadas usan la portada actual hasta conectar WordPress.
+
   const seasons = [{ number: 1, cover, tone: 'orange' }, { number: 2, cover, tone: 'gold' }];
   const selectedTone = seasons.find(season => season.number === selected)!.tone;
 

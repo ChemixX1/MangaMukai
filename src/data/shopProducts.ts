@@ -1,8 +1,5 @@
-/**
- * Catálogo local de la Tienda (demostración, sin pagos). Las imágenes son
- * portadas del catálogo de MangaMukai guardadas en `public/images/collection/`
- * con el id de su serie. Los importes y descuentos son de demostración.
- */
+
+
 export type ShopCategory = 'Manga' | 'Art prints' | 'Colecciones';
 
 export interface ShopProduct {

@@ -29,7 +29,7 @@ export function CollectionCoverPreview({ cover, title, purchased = false }: { co
 
   useEffect(() => {
     if (!closing) return;
-    // Also finish closing if the browser cancels the CSS animation.
+
     const timeout = window.setTimeout(() => setOpen(false), 260);
     return () => window.clearTimeout(timeout);
   }, [closing]);

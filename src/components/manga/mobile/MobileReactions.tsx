@@ -2,10 +2,6 @@ import { useState } from 'react';
 
 import { MANGA_REACTIONS, ReactionButton, ReactionRingGradient, type MangaReactionId } from '../reactions';
 
-/**
- * Panel de reacciones móvil: los seis emojis del diseño en dos filas (cuatro y
- * dos), cada uno en su círculo con el contador debajo.
- */
 export const MobileReactions = ({ counts, selected, error, onReact }: {
   counts: Record<MangaReactionId, number>;
   selected: MangaReactionId | null;

@@ -1,4 +1,3 @@
-/* Tienda Mukai: diseño limpio y moderno con carrusel circular, controles integrados, catálogo de 2 filas y reseñas. */
 .shop-page {
   --shop-paper: #f7f4f4;
   --shop-card: #ffffff;
@@ -33,8 +32,6 @@
   .shop-page { --shop-paper: #f4f4f5; }
   .dark .shop-page { --shop-paper: #141414; }
 }
-
-/* Carrusel circular 3D superior */
 .shop-showcase {
   margin-top: 0;
 }
@@ -45,8 +42,6 @@
   overflow: hidden;
   background: transparent;
 }
-
-/* Cabecera: texto + buscador, filtro de precios y bolsa en la misma línea */
 .shop-header {
   display: flex;
   flex-direction: column;
@@ -244,8 +239,6 @@
   background: var(--shop-ink);
   color: var(--shop-paper);
 }
-
-/* Catálogo de productos (2 filas de 4 en escritorio = 8 ítems) */
 .shop-catalog {
   scroll-margin-top: 96px;
 }
@@ -408,8 +401,6 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
-
-/* Sección Reseña de Usuarios */
 .shop-reviews {
   margin-top: 64px;
 }
@@ -482,8 +473,6 @@
   font-size: 12.5px;
   line-height: 1.7;
 }
-
-/* Estados vacíos, botones y avisos */
 .shop-button {
   display: inline-flex;
   align-items: center;
@@ -552,8 +541,6 @@
   flex-shrink: 0;
   color: var(--shop-magenta);
 }
-
-/* Modales de Producto y Bolsa */
 .shop-dialog {
   width: min(540px, calc(100% - 32px));
   max-height: calc(100dvh - 48px);
@@ -774,15 +761,11 @@
 .shop-cart-pay {
   margin-top: 4px;
 }
-
-/* Footer inferior con acento #FF008C */
 .shop-footer.home-design-footer {
   --mm-accent-pink: #ff008c;
   margin-top: 144px;
   margin-inline: -32px;
 }
-
-/* Responsive */
 @media (max-width: 1023px) {
   .shop-page {
     padding: 68px 24px 0;

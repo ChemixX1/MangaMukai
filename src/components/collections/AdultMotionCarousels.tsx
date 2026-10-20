@@ -42,7 +42,7 @@ export function AdultHeroCoverflow({
 }: AdultHeroCoverflowProps) {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
-  // Guardado real: mismo estado que la ficha y la página de guardados.
+
   const { isSaved, toggle: toggleSaved } = useSavedMangas();
   const [isCompact, setIsCompact] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches);
   const active = items[activeIndex];
@@ -127,7 +127,7 @@ export function AdultHeroCoverflow({
         </div>
       </div>
 
-      {/* La ficha se actualiza junto con la portada activa, igual que en el home. */}
+
         <div
           className={`mx-auto mt-4 grid w-full max-w-[1160px] gap-6 rounded-[24px] border p-6 backdrop-blur-xl lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)] lg:gap-9 ${isLight ? 'border-black/10 bg-white/65' : 'border-white/10 bg-black/45'}`}
         >
@@ -136,8 +136,7 @@ export function AdultHeroCoverflow({
               <span className="bg-[#FF6B00] px-3 py-1.5 font-montserrat text-[10px] font-semibold uppercase tracking-normal text-white">Mangas para mujeres +19</span>
             </div>
             <h2 className="line-clamp-3 text-[clamp(1.2rem,1.9vw,1.95rem)] font-black italic leading-[1.1] tracking-[-0.04em]">{title}</h2>
-            {/* Todas las etiquetas en una sola fila: en móvil se desplaza; en
-                escritorio también permite recorrer todas las etiquetas. */}
+
             <div className={`manga-tag-row mt-5 flex overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${HERO_TAG_ROW}`}>
               {tags.map((tag) => <span key={tag} className={HERO_TAG_CLASS} style={{ backgroundColor: '#ff6b00', borderColor: '#ff6b00' }}>{tag}</span>)}
             </div>
@@ -147,10 +146,10 @@ export function AdultHeroCoverflow({
             <span className={`absolute bottom-3 left-0 top-0 w-[3px] ${isLight ? 'bg-black' : 'bg-white'}`} aria-hidden="true" />
             <div className="mb-2.5 flex items-center gap-2.5">
               <span className="h-[1.15em] w-1 shrink-0 rounded-full bg-[#FF6B00]" aria-hidden="true" />
-              <h2 className={`text-[12px] font-black uppercase tracking-[0.18em] ${isLight ? 'text-black' : 'text-white'}`}>Sinopsis</h2>
+              <h3 className={`text-[12px] font-black uppercase tracking-[0.18em] ${isLight ? 'text-black' : 'text-white'}`}>Sinopsis</h3>
             </div>
             <p className={`line-clamp-4 text-justify text-[14px] font-medium leading-7 sm:text-[15px] ${isLight ? 'text-black/70' : 'text-white/75'}`}>{description}</p>
-            {/* En móvil los dos botones comparten fila repartiéndose el ancho. */}
+
             <div className="mt-auto pt-6">
               <CollectionHeroActions saved={isBookmarked} onRead={() => navigate(`/manga/${active.id}`)} onSave={() => { void toggleSaved(active.id); }} />
             </div>

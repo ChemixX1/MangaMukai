@@ -1,18 +1,13 @@
 import { motion } from 'framer-motion';
 
 interface CheckMarkProps {
-  /** Color del círculo. */
+
   background: string;
-  /** Color del trazo del check. */
+
   ink: string;
   size?: number;
 }
 
-/**
- * Círculo que aparece con un rebote y dibuja un check dentro (botones
- * "Guardar" del hero y "UNIRME" del footer). Se monta al confirmar y se
- * desmonta al volver al estado normal; AnimatePresence lo anima al salir.
- */
 export const CheckMark = ({ background, ink, size = 28 }: CheckMarkProps) => (
   <motion.span
     className="grid place-items-center rounded-full"

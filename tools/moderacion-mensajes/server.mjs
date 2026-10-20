@@ -1,21 +1,5 @@
 #!/usr/bin/env node
-/**
- * Supervision local de mensajes privados de MangaMukai (solo lectura).
- *
- * Conexion integrada, sin inicio de sesion: la app y el sitio comparten una clave
- * larga guardada en backend/wp-content/mu-plugins/mangamukai-moderation-key.php.
- * Ese archivo esta fuera de git, lo genera esta herramienta la primera vez y se
- * publica en el servidor con el resto de backend/ al hacer `npm run deploy`.
- *
- * El servidor local sirve la interfaz (index.html) en http://127.0.0.1:4317 y
- * reenvia las consultas a /wp-json/mangamukai/v1/moderation/* del sitio
- * (mu-plugin mangamukai-moderation-api.php) firmandolas con la clave.
- * No guarda mensajes en disco; lo unico que sale del equipo son esas consultas.
- *
- * Uso:  npm run moderacion        (o)  node tools/moderacion-mensajes/server.mjs [--port=4317] [--open]
- * Variables opcionales: MM_SITE (https://mangamukai.com), MM_SITE_IP (50.31.188.151),
- * MM_PORT, MM_MODERATION_KEY (clave directa) o MM_MODERATION_KEY_FILE (otro archivo).
- */
+
 import http from 'node:http';
 import https from 'node:https';
 import dns from 'node:dns';
@@ -92,11 +76,6 @@ if (!KEY) {
   }
 }
 
-/**
- * DNS con respaldo: el equipo de desarrollo no resuelve mangamukai.com, asi que
- * si la resolucion falla se usa la IP conocida. SNI y Host siguen siendo los del
- * dominio, por lo que el certificado TLS se valida con normalidad.
- */
 function lookup(hostname, options, callback) {
   if (typeof options === 'function') {
     callback = options;
@@ -132,7 +111,7 @@ function upstream(endpoint, query) {
         try {
           json = JSON.parse(text);
         } catch {
-          // Respuesta no JSON (por ejemplo una pagina de error del hosting).
+
         }
         resolve({ status: response.statusCode || 0, json });
       });
@@ -155,7 +134,6 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
 
 const sendJson = (res, status, data) => send(res, status, data);
 
-/** Solo acepta peticiones que nacen de la propia interfaz local. */
 function sameOrigin(req) {
   const origin = req.headers.origin;
   const allowed = [`http://${HOST}:${PORT}`, `http://localhost:${PORT}`];

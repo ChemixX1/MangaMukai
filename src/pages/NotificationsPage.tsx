@@ -14,21 +14,15 @@ import {
   type SocialNotification,
 } from '../services/socialService';
 
-/** Acento de la sección: el rosa de la marca con un mínimo de rojo. */
 const ACCENT = '#ff4a7d';
 
-/**
- * Notificaciones (sustituye al panel en móvil). Va sin navbar: solo la X de
- * cerrar y la lista. Con `embedded` se pinta dentro del panel deslizante de la
- * campana (NotificationsOverlay): la X cierra el panel en vez de navegar.
- */
 export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isLight = theme === 'light';
   const isMobile = useIsMobileViewport();
   const loadingRequest = useRef(false);
-  // Arranca con la última respuesta del navbar (si la hay) y refresca en segundo plano.
+
   const [notifications, setNotifications] = useState<SocialNotification[]>(() => getCachedNotifications() || []);
   const [loading, setLoading] = useState(() => getCachedNotifications() === null);
   const [error, setError] = useState('');
@@ -70,7 +64,6 @@ export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: bo
 
   const notifyNavbar = () => window.dispatchEvent(new Event(SOCIAL_REFRESH_EVENT));
 
-  /* Los botones de las tarjetas son enlaces: aquí solo se marca como leída. */
   const open = (notification: SocialNotification) => {
     if (notification.read) return;
     void markNotificationsRead(notification.id).then(notifyNavbar).catch(() => undefined);
@@ -110,7 +103,7 @@ export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: bo
 
         {error && <p role="alert" className="px-4 pt-3 text-xs text-red-500">{error} <button type="button" onClick={() => void load()} className="underline">Reintentar</button></p>}
 
-        {/* Mientras carga no se pinta nada; el vacío solo cuando ya se sabe que no hay novedades. */}
+
         {loading && notifications.length === 0 ? null : notifications.length === 0 ? (
           <div className="px-8 py-20 text-center">
             <Bell size={34} className={`mx-auto mb-3 ${isLight ? 'text-black/20' : 'text-white/20'}`} />
@@ -120,7 +113,7 @@ export const NotificationsPage = ({ embedded = false, onClose }: { embedded?: bo
           <ul className="space-y-3 px-4 py-4">
             {notifications.map((notification) => (
               <li key={notification.id}>
-                {/* Toda la tarjeta lleva al destino; el botón interior marca leída además. */}
+
                 <div role="link" tabIndex={0} onClick={() => openCard(notification)} onKeyDown={(event) => { if (event.key === 'Enter') openCard(notification); }} className="cursor-pointer">
                   <NotificationCard notification={notification} onOpen={(item) => { open(item); }} />
                 </div>

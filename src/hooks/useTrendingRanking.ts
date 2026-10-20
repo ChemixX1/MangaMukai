@@ -13,7 +13,6 @@ export type RankingPeriod = 'Semanal' | 'Mensual' | 'Histórico';
 export const RANKING_PERIODS: RankingPeriod[] = ['Semanal', 'Mensual', 'Histórico'];
 const REMOTE_PERIOD = { Semanal: 'weekly', Mensual: 'monthly', Histórico: 'historical' } as const;
 
-/** Tarjeta del ranking por vistas de la serie y cantidad total de capítulos. */
 export interface RankedManga {
   id: number | string;
   title: string;
@@ -23,7 +22,7 @@ export interface RankedManga {
   views: number;
 }
 
-export const toRankedMangas = (mangas: MangaCapitulo[]): RankedManga[] =>
+ const toRankedMangas = (mangas: MangaCapitulo[]): RankedManga[] =>
   mangas.map((manga) => {
     return {
       id: manga.eroSeri || manga.id,
@@ -38,22 +37,16 @@ export const toRankedMangas = (mangas: MangaCapitulo[]): RankedManga[] =>
 interface TrendingOptions {
   audience: 'women' | 'men';
   period: RankingPeriod;
-  /** Tarjetas del ranking (9 en móvil, 12 en escritorio). */
+
   size: number;
-  /** Solo mangas juveniles: tag Hombre y sin B&N / HOT. */
+
   youthOnly?: boolean;
-  /** Filtro de colección. Debe ser estable (definido a nivel de módulo). */
+
   filterMangas?: (items: MangaCapitulo[]) => MangaCapitulo[];
-  /** Portadas que se adelantan sin bloquear la aparición de la cinta. */
+
   preloadCount?: number;
 }
 
-/**
- * "Tendencia Ahora" de móvil y escritorio: el ranking del periodo elegido,
- * completado con otras series cuando faltan portadas. En semanal y mensual,
- * las series de relleno tienen cero vistas del período: no se mezclan con
- * sus totales históricos. El recuento de capítulos usa la lista completa.
- */
 export const useTrendingRanking = ({ audience, period, size, youthOnly = false, filterMangas, preloadCount = 0 }: TrendingOptions) => {
   const { popularWeekly, popularMenWeekly, popularHistorical, popularMenHistorical, latestWomen, latestMen, loaded, isReady } = useHomeData();
   const [items, setItems] = useState<RankedManga[]>([]);
@@ -99,10 +92,10 @@ export const useTrendingRanking = ({ audience, period, size, youthOnly = false, 
         void preloadImages(next.slice(0, preloadCount).map((manga) => manga.portada));
       }
       if (cancelled) return;
-      // Un periodo vacío no borra lo que ya había en pantalla.
+
       if (ranked.length > 0) setItems(ranked);
       setLoading(false);
-      // Los totales secundarios no compiten con hero, ranking ni sus portadas.
+
       if (isReady) cancelCounts = whenIdle(() => {
         const queue = ranked.filter(manga => manga.chapterCount === null);
         const worker = async () => {

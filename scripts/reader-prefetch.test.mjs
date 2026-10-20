@@ -52,7 +52,7 @@ test('refreshing the token for the same account preserves loaded pages and in-fl
   api.syncReaderPrefetchAuth();
   assert.equal(session.peek('1'), data);
   assert.ok(images.every(image => !image.aborted));
-  // Un cambio real de permisos sí descarta la caché de acceso.
+
   setUser({ id: 7, isPremium: true });
   api.syncReaderPrefetchAuth();
   await rejected;

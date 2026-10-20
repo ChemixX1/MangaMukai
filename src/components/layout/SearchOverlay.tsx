@@ -7,10 +7,6 @@ import '../../styles/search.css';
 import { SEARCH_FILTERS, setSearchFilter, setSearchTerm, useSearchFilter, useSearchTerm } from '../../hooks/useSearchTerm';
 import { SlidePanel } from './SlidePanel';
 
-/**
- * Buscador de la lupa del navbar: una ventana que entra deslizándose hacia la
- * izquierda con el campo, las pestañas y toda la Biblioteca dentro.
- */
 export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLight: boolean; onClose: () => void }) => {
   const searchTerm = useSearchTerm();
   const searchFilter = useSearchFilter();
@@ -62,7 +58,7 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
             </button>
           </div>
 
-          {/* Pestañas de colección (Inter regular): "Todos" en negro puro; las no seleccionadas, negro tirando a gris. */}
+
           <div role="tablist" aria-label="Colección" className={`search-tabs mt-6 flex items-end gap-6 border-b ${isLight ? 'border-black/10' : 'border-white/10'}`}>
             {SEARCH_FILTERS.map(({ id, label }) => {
               const active = searchFilter === id;

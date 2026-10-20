@@ -28,7 +28,6 @@ export interface ToggleInteractionResult {
   total: number;
 }
 
-/** Obtiene las interacciones (bookmarks, likes, historial) del usuario actual, y lectores online */
 export const getInteractions = async (mangaId?: string): Promise<UserInteractions | null> => {
   const token = getStoredToken();
   const headers: HeadersInit = {};
@@ -48,11 +47,10 @@ export const getInteractions = async (mangaId?: string): Promise<UserInteraction
       }
       return data as UserInteractions;
     }
-  } catch { /* silent */ }
+  } catch {              }
   return null;
 };
 
-/** Alterna el estado de guardado (bookmark) de un manga */
 export const toggleBookmarkWithTotal = async (mangaId: string): Promise<ToggleInteractionResult | null> => {
   const token = getStoredToken();
   if (!token) return null;
@@ -75,11 +73,10 @@ export const toggleBookmarkWithTotal = async (mangaId: string): Promise<ToggleIn
         total: Number(data.total_bookmarks ?? 0),
       };
     }
-  } catch { /* silent */ }
+  } catch {              }
   return null;
 };
 
-/** Guarda en el servidor para cuentas, o en este navegador para invitados. */
 export const toggleMangaLike = async (mangaId: string, guestPublicTotal = 0): Promise<ToggleInteractionResult | null> => {
   const token = getStoredToken();
   if (!token) return toggleGuestMangaLike(mangaId, guestPublicTotal);
@@ -101,6 +98,6 @@ export const toggleMangaLike = async (mangaId: string, guestPublicTotal = 0): Pr
         total: Number(data.total_likes ?? 0),
       };
     }
-  } catch { /* silent */ }
+  } catch {              }
   return null;
 };

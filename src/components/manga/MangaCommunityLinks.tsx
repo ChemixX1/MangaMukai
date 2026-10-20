@@ -1,7 +1,6 @@
 import { SOCIAL_LINKS } from '../../config/social';
 import { HomeDiscordIcon, HomeSocialEndIcon, HomeSocialStartIcon, HomeTelegramIcon } from '../home/HomeIcons';
 
-/** Solo los dos enlaces de comunidad, contenidos en la columna de la ficha. */
 export const MangaCommunityLinks = () => (
   <nav aria-label="Comunidad de MangaMukai" className="manga-community-links">
     <a href={SOCIAL_LINKS.telegram} target="_blank" rel="noopener noreferrer" className="manga-community-telegram">

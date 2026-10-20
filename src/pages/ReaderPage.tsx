@@ -36,7 +36,7 @@ interface NavigationData {
   nextChapterNum: number | null;
   nextIsPaid: boolean;
   nextPrice: number;
-  isNextUnlocked: boolean; 
+  isNextUnlocked: boolean;
 }
 
 export const ReaderPage = () => {
@@ -47,7 +47,6 @@ export const ReaderPage = () => {
   const isLight = theme === 'light';
   const pageSurface = 'bg-surface text-ink';
 
-  
   const [images, setImages] = useState<ChapterImage[]>([]);
   const [imageOwner, setImageOwner] = useState('');
   const [navData, setNavData] = useState<NavigationData | null>(null);
@@ -61,11 +60,9 @@ export const ReaderPage = () => {
   const [chapterOptions, setChapterOptions] = useState<ReaderChapterOption[]>([]);
   const [chapterComments, setChapterComments] = useState<MangaComment[]>([]);
 
-  // Estados de Usuario
   const [userCoins, setUserCoins] = useState(0);
   const [userId, setUserId] = useState<string>("");
 
-  // El título del capítulo suele traer ya el número; solo se añade si falta.
   const readerTitle = navData
     ? (new RegExp(`cap[ií]tulo\\s*0*${navData.chapterNum}(\\D|$)`, 'i').test(navData.title)
         ? navData.title
@@ -73,7 +70,8 @@ export const ReaderPage = () => {
     : undefined;
   useDocumentTitle(
     readerTitle,
-    readerTitle ? `Lee ${readerTitle} online y en español, gratis y en alta calidad en MangaMukai.` : undefined,
+    readerTitle ? `Lee ${readerTitle} en español en MangaMukai. Consulta su disponibilidad y sigue los capítulos de la historia.` : undefined,
+    { path: `/read/${chapterId}`, noindex: navData ? false : !loading && !!error ? true : undefined },
   );
 
   const sessionRef = useRef<ReaderPrefetchSession | null>(null);
@@ -84,7 +82,6 @@ export const ReaderPage = () => {
   const chapterRef = useRef(chapterId);
   const [authGeneration, setAuthGeneration] = useState(0);
 
-  // 1. FETCH USUARIO Y MONEDAS (WordPress)
   const fetchUserProfile = useCallback(async () => {
     const token = getStoredToken();
     if (!token) return;
@@ -158,15 +155,14 @@ export const ReaderPage = () => {
     setLock(cached?.locked ? { price: cached.price, requiresLogin: cached.requiresLogin, freeAt: null } : null);
     setImages(cached?.images.map((url, index) => ({ id: String(index), image_url: url, page_number: index + 1 })) || []);
     setChapterComments([]);
-    // El cambio de ruta ya posiciona el lector en App. Revalidar el acceso
-    // nunca debe iniciar otro desplazamiento (ni uno suave durante la lectura).
+
     let active = true;
     const commentsController = new AbortController();
     void (async () => {
       try {
         const data = await session.load(chapterId);
         if (!active) return;
-        // Publica las URLs inmediatamente: ni imágenes, permisos ni navegación bloquean la lectura.
+
         setImages(data.images.map((url, index) => ({ id: String(index), image_url: url, page_number: index + 1 })));
         setError(data.error);
         setLock(data.locked ? { price: data.price, requiresLogin: data.requiresLogin, freeAt: null } : null);
@@ -186,7 +182,7 @@ export const ReaderPage = () => {
         const next = index >= 0 ? chapters[index + 1] : null;
         setNavData({ prevId: previous ? String(previous.id) : null, nextId: next ? String(next.id) : null, mangaId: data.mangaId, title: data.title, chapterNum: data.number, nextChapterNum: next?.chapter_number || null, nextIsPaid: !!next?.is_paid && !(next.free_at && new Date(next.free_at) <= new Date()), nextPrice: next?.price_coins || 0, isNextUnlocked: !next?.is_paid || unlocked.has(String(next.id)) });
         setError(data.error);
-        // Sin sesión el servidor no manda el precio (401): se toma del listado de capítulos.
+
         const currentChapter = chapters.find(chapter => String(chapter.id) === chapterId);
         setLock(data.locked ? { price: data.price || currentChapter?.price_coins || 0, requiresLogin: data.requiresLogin, freeAt: currentChapter?.free_at ?? null } : null);
         if (data.locked) {
@@ -200,10 +196,10 @@ export const ReaderPage = () => {
         }
         if (data.mangaId && !data.error && !data.locked) {
           void trackChapterView(chapterId, data.mangaId);
-          // Cuenta la serie como leída en el perfil (solo con sesión).
+
           if (getStoredToken()) {
             void recordMangaRead(data.mangaId, chapterId).catch(() => undefined);
-            // Capítulo abierto (aún sin terminar): aparece en Actividad hasta llegar al final.
+
             void recordChapterProgress(chapterId, data.mangaId, false).catch(() => undefined);
           }
         }
@@ -217,7 +213,6 @@ export const ReaderPage = () => {
     return () => { active = false; commentsController.abort(); };
   }, [chapterId, authGeneration]);
 
-  // Al ver el pie "Fin del capítulo" se da el capítulo por terminado (sale de Actividad).
   const chapterEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const target = chapterEndRef.current;
@@ -240,12 +235,10 @@ export const ReaderPage = () => {
     return () => window.clearTimeout(timer);
   }, [loading, imagesComplete, lock, location.hash, chapterId]);
 
-
   const handleNextClick = () => {
     if (navData?.nextId) navigate(`/read/${navData.nextId}`);
   };
 
-  // Compra del capítulo actual (bloqueado) sin salir del lector.
   const handleUnlockCurrent = async () => {
     if (!chapterId || !lock || purchaseInFlight.current) return;
     if (!userId || lock.requiresLogin) {
@@ -271,7 +264,7 @@ export const ReaderPage = () => {
         sessionRef.current?.invalidate(chapterId);
         setLock(null);
         setLoading(true);
-        // Vuelve a pedir el capítulo: el servidor ya lo entrega comprado.
+
         setAuthGeneration((value) => value + 1);
       } else if (result.message.includes('saldo') || result.message.includes('insuficiente')) {
         goToRecharge();
@@ -290,7 +283,7 @@ export const ReaderPage = () => {
     <div className={`reader-page min-h-screen flex flex-col items-center justify-center gap-6 px-4 ${pageSurface}`}>
       <Lock className="w-16 h-16 text-yellow-400" />
       <div className="text-center">
-        <h2 className="text-xl font-black mb-2">Capítulo no disponible</h2>
+        <h1 className="text-xl font-black mb-2">Capítulo no disponible</h1>
         <p className="text-zinc-400 text-sm max-w-xs">{error}</p>
       </div>
       <div className="flex gap-3">
@@ -328,7 +321,8 @@ export const ReaderPage = () => {
         loginRequired={!getStoredToken() || lock.requiresLogin}
       />}
 
-      {/* CONTENEDOR PRINCIPAL */}
+
+      {!lock && <h1 className="sr-only">{readerTitle || 'Lector de manga'}</h1>}
       <div className="reader-content w-full max-w-[1100px] mx-auto flex flex-col items-center gap-6 pt-28 px-0 lg:px-4 pb-20 relative">
         <div className="reader-topbar">
           <div className="reader-mobile-controls">
@@ -344,7 +338,7 @@ export const ReaderPage = () => {
           <MangaDetailSocials />
         </div>
 
-        {/* IZQUIERDA: REPRODUCTOR - ESTATICO (NO STICKY) */}
+
         <aside className="reader-music-section w-full max-w-[540px] px-4 lg:px-0 h-fit z-40 shrink-0 space-y-9">
              <MangaMusicCard cover="" isLight={isLight} compactHeight />
              <nav aria-label="Navegación del capítulo" className="reader-top-navigation mx-auto w-full max-w-[420px] space-y-5">
@@ -353,7 +347,7 @@ export const ReaderPage = () => {
              </nav>
         </aside>
 
-        {/* CENTRAL: LECTOR */}
+
         <main className="w-full max-w-none lg:max-w-[800px] mx-auto border-0 min-h-[50vh] flex flex-col gap-0 items-center relative z-10">
           {lock ? (
             <section className="reader-locked-chapter" aria-label="Capítulo bloqueado">
@@ -377,19 +371,19 @@ export const ReaderPage = () => {
               <div className="h-96 flex flex-col items-center justify-center text-zinc-500 gap-4"><p>Sin páginas.</p></div>
           ) : null}
 
-          {/* Footer Navegación */}
+
           {!loading && (imagesComplete || lock) && <>
           <div className={`w-full p-6 md:p-10 flex flex-col gap-8 border-t ${isLight ? 'border-black/10' : 'border-zinc-900'}`}>
              {!lock && <div ref={chapterEndRef} className="reader-chapter-end text-center space-y-3">
               <p className="reader-chapter-end__label">Fin del capítulo {navData?.chapterNum}</p>
             </div>}
-            
+
             <nav aria-label="Navegación al final del capítulo" className="reader-bottom-navigation space-y-5">
               {chapterNavigation(false)}
               <ReaderChapterSelect value={chapterId} number={navData?.chapterNum} options={chapterOptions} isLight={isLight} onChange={id => navigate(`/read/${id}`)} />
             </nav>
           </div>
-          {/* El propio bloque lleva el ancla #comentarios. */}
+
           <div className="w-full px-4 pb-24 pt-4 md:px-8">
             <MangaCommunityLinks />
             {chapterId && <ReaderReactions key={`${chapterId}:${authGeneration}`} chapterId={chapterId} />}

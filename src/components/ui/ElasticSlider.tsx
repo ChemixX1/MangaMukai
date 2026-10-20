@@ -497,7 +497,7 @@ function ElasticSlider({
     const m = motion.current;
     return () => {
       cancelAnimationFrame(m.raf);
-      // StrictMode replays effects: a cancelled frame must not block kick().
+
       m.raf = 0;
     };
   }, []);

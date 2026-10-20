@@ -18,7 +18,7 @@ import '../../styles/manga-rewards.css';
 interface MangaRewardProgressProps {
   purchasedIds: Set<string>;
   userId: string;
-  /** Confirmed claims for this account; reaching a level does not imply a claim. */
+
   claimedLevels?: ReadonlySet<number>;
   loading?: boolean;
   forceDark?: boolean;
@@ -72,7 +72,7 @@ const revealSparkles = [
 });
 
 function RewardRoad({ points, target, loading, claimedLevels, onSelect }: { points: number; target: number; loading: boolean; claimedLevels?: ReadonlySet<number>; onSelect: (level: number, reached: boolean) => void }) {
-  // Keep the current level in view, revealing one new reward as the reader advances.
+
   const firstLevel = Math.max(1, Math.floor(points / target));
   const startPoints = (firstLevel - 1) * target;
   const percent = Math.min(100, Math.max(0, (points - startPoints) / (target * 3) * 100));
@@ -149,7 +149,7 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
     const unlock = lockPageScroll();
     dialog.showModal();
     dialog.querySelector<HTMLButtonElement>('.manga-reward-close')?.focus({ preventScroll: true });
-    // Native dialog focus and scroll locking can move the underlying page.
+
     window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
     return () => {
       dialog.close();

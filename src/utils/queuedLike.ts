@@ -1,6 +1,5 @@
 type LikeState = { liked: boolean; count: number };
 
-// La interfaz sigue el último clic; el servidor recibe los toggles en orden.
 export const createQueuedLike = (
   initial: LikeState,
   toggle: () => Promise<{ action: string; total: number } | null>,

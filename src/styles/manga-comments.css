@@ -1,4 +1,3 @@
-/* Shared comment threads for the manga detail and chapter reader. */
 .manga-comments.manga-comments-reference {
   --comment-muted: rgb(var(--mm-ink) / .55);
   --comment-control: #e5e5e5;

@@ -1,132 +1,7 @@
 import { useEffect } from 'react';
+import { normalizeSeoPath, routeSeo, SEO_ROUTES, SITE_NAME, SITE_URL, type RouteSeo } from '../config/seo';
 
-export const SITE_NAME = 'MangaMukai';
-export const SITE_URL = 'https://mangamukai.com';
-export const DEFAULT_TITLE = 'MangaMukai — Leer manga online gratis en español';
-export const DEFAULT_DESCRIPTION =
-  'Lee manga online gratis y en español en MangaMukai: manhwa, manhua, romance, acción, fantasía, seinen y contenido +19. Capítulos nuevos cada día con lector rápido.';
-
-/** "Biblioteca" -> "Biblioteca | MangaMukai". Sin sección devuelve el título de portada. */
-export const buildTitle = (section?: string | null): string => {
-  const clean = (section ?? '').trim();
-  return clean ? `${clean} | ${SITE_NAME}` : DEFAULT_TITLE;
-};
-
-interface RouteSeo {
-  /** Sección para el título; null usa el título de portada. */
-  section: string | null;
-  description: string;
-  /** Rutas privadas o transaccionales que no deben indexarse. */
-  noindex?: boolean;
-}
-
-/**
- * Metadatos por ruta. Es el espejo cliente de la tabla de
- * server/backend-patches/manga-route-meta.php: si cambia uno, cambia el otro,
- * porque Google compara el HTML servido con el que queda tras renderizar.
- */
-export const routeSeo = (pathname: string): RouteSeo => {
-  const path = pathname.replace(/\/+$/, '') || '/';
-
-  switch (path) {
-    case '/':
-      return { section: null, description: DEFAULT_DESCRIPTION };
-    case '/manga-19':
-      return {
-        section: 'Mangas +19 en español — Colección para adultos',
-        description: 'Colección +19 de MangaMukai: manga y manhwa para adultos en español, con romance, drama y fantasía madura. Solo para mayores de edad.',
-      };
-    case '/manga-bn':
-      return {
-        section: 'Manga en blanco y negro — Shounen, seinen y acción',
-        description: 'Manga clásico en blanco y negro: shounen, seinen y acción en español, con capítulos nuevos y lector optimizado en MangaMukai.',
-      };
-    case '/pro':
-      return { section: 'Mukai Pro', description: 'Descubre los beneficios de Mukai Pro y elige tu plan mensual o anual.' };
-    case '/nosotros':
-      return {
-        section: 'Sobre MangaMukai',
-        description: 'Conoce al equipo de MangaMukai, cómo trabajamos las traducciones y qué encontrarás en nuestro catálogo de manga en español.',
-      };
-    case '/contacto':
-      return {
-        section: 'Contacto',
-        description: 'Escríbenos para sugerencias, reportes de capítulos, colaboraciones o dudas sobre tu cuenta de MangaMukai.',
-      };
-    case '/legal':
-      return {
-        section: 'Términos y privacidad',
-        description: 'Términos de uso, política de privacidad y tratamiento de datos de los lectores de MangaMukai.',
-      };
-    case '/privacidad':
-      return {
-        section: 'Política de privacidad',
-        description: 'Qué datos recoge MangaMukai, para qué los usa, con quién los comparte y cómo puedes ejercer tus derechos.',
-      };
-    case '/terminos':
-      return {
-        section: 'Términos de servicio',
-        description: 'Condiciones de uso de MangaMukai: cuentas, Mukai Coins, contenido +19, conducta permitida y responsabilidad.',
-      };
-    case '/normas-comunidad':
-      return {
-        section: 'Normas de la comunidad',
-        description: 'Reglas de convivencia de la comunidad y la mensajería de MangaMukai, y cómo se modera.',
-      };
-    case '/cookies':
-      return {
-        section: 'Política de cookies',
-        description: 'Qué cookies y almacenamiento local usa MangaMukai, para qué sirven y cómo puedes gestionarlos.',
-      };
-    case '/comunidad':
-      return { section: 'Comunidad', description: 'Comparte lecturas, recomendaciones y fan art con otros lectores de MangaMukai.' };
-    case '/mensajes':
-      return { section: 'Mensajes', description: 'Área privada de MangaMukai.', noindex: true };
-    case '/notificaciones':
-      return { section: 'Notificaciones', description: 'Área privada de MangaMukai.', noindex: true };
-    case '/chat':
-      return { section: 'Mukai Chat', description: 'Conversa con personajes de manga en MangaMukai.' };
-    case '/tienda':
-      return { section: 'Tienda', description: 'Productos y colecciones de MangaMukai.' };
-    case '/profile':
-      return { section: 'Profile', description: 'Área privada de MangaMukai.', noindex: true };
-    case '/transacciones':
-      return { section: 'Transacciones', description: 'Historial privado de tu cuenta en MangaMukai.', noindex: true };
-    case '/recargar':
-    case '/recargar/pago':
-      return { section: 'Recargar monedas', description: 'Área privada de MangaMukai.', noindex: true };
-    case '/pago-exitoso':
-      return { section: 'Pago completado', description: 'Área privada de MangaMukai.', noindex: true };
-    case '/auth/login':
-    case '/login':
-      return { section: 'Iniciar sesión', description: 'Área privada de MangaMukai.', noindex: true };
-    case '/auth/register':
-      return { section: 'Crear cuenta', description: 'Área privada de MangaMukai.', noindex: true };
-    default:
-      break;
-  }
-
-  if (path.startsWith('/auth/') || path.startsWith('/usuarios/')) {
-    return { section: 'Perfil de usuario', description: 'Área privada de MangaMukai.', noindex: true };
-  }
-  if (path.startsWith('/mensajes/')) {
-    return { section: 'Mensajes', description: 'Área privada de MangaMukai.', noindex: true };
-  }
-  if (path.startsWith('/comunidad/publicacion/')) {
-    return { section: 'Publicación · Comunidad', description: 'Lee la publicación y participa en la conversación de MangaMukai.', noindex: true };
-  }
-  if (path.startsWith('/chat/')) {
-    return { section: 'Mukai Chat', description: 'Conversa con personajes de manga en MangaMukai.' };
-  }
-  if (path.startsWith('/manga/')) {
-    return { section: 'Ficha del manga', description: DEFAULT_DESCRIPTION };
-  }
-  if (path.startsWith('/read/')) {
-    return { section: 'Lector', description: 'Lee capítulos de manga online y en español, gratis y en alta calidad en MangaMukai.' };
-  }
-
-  return { section: null, description: DEFAULT_DESCRIPTION };
-};
+const buildTitle = (section?: string | null) => section?.trim() ? `${section.trim()} | ${SITE_NAME}` : SEO_ROUTES['/'].title;
 
 const upsertMeta = (attribute: 'name' | 'property', key: string, content: string) => {
   let tag = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
@@ -150,50 +25,110 @@ const upsertCanonical = (href: string) => {
 
 const INDEXABLE = 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
 
-/**
- * Alinea el head con la ruta actual durante la navegación cliente. El servidor
- * ya envía estos mismos valores en la primera carga; esto evita que un cambio de
- * página deje el título, la descripción o el canonical de la anterior.
- */
-export const applyRouteSeo = (pathname: string, search = '') => {
-  const seo = routeSeo(pathname);
-  const title = buildTitle(seo.section);
-  const canonical = `${SITE_URL}${pathname === '/' ? '/' : pathname.replace(/\/+$/, '')}`;
+let activePath = '';
+let activeSeo: RouteSeo = SEO_ROUTES['/'];
+let activeImage = `${SITE_URL}/favicon.svg`;
 
-  document.title = title;
-  upsertMeta('name', 'description', seo.description);
-  upsertMeta('name', 'robots', seo.noindex ? 'noindex,follow' : INDEXABLE);
-  upsertMeta('name', 'googlebot', seo.noindex ? 'noindex,follow' : INDEXABLE);
-  upsertCanonical(canonical);
-  upsertMeta('property', 'og:title', title);
-  upsertMeta('property', 'og:description', seo.description);
-  upsertMeta('property', 'og:url', canonical);
-  upsertMeta('name', 'twitter:title', title);
-  upsertMeta('name', 'twitter:description', seo.description);
-
-  // `search` no entra en el canonical a propósito: los filtros de la biblioteca
-  // no son URLs distintas para Google.
-  void search;
+const clearMeta = (selector: string) => {
+  document.head.querySelectorAll(selector).forEach(tag => tag.remove());
 };
 
-/**
- * Título (y descripción opcional) de una página con datos propios: manga,
- * capítulo o perfil. Con `undefined` no toca nada, así se conserva lo que puso
- * la ruta mientras el dato carga.
- */
-export const useDocumentTitle = (section?: string | null, description?: string | null) => {
-  useEffect(() => {
-    if (section === undefined) return;
-    const title = buildTitle(section);
-    document.title = title;
-    upsertMeta('property', 'og:title', title);
-    upsertMeta('name', 'twitter:title', title);
-  }, [section]);
-
-  useEffect(() => {
-    if (!description) return;
-    upsertMeta('name', 'description', description);
-    upsertMeta('property', 'og:description', description);
-    upsertMeta('name', 'twitter:description', description);
-  }, [description]);
+const applyIndexing = () => {
+  upsertMeta('name', 'robots', activeSeo.noindex ? 'noindex,follow' : INDEXABLE);
+  upsertMeta('name', 'googlebot', activeSeo.noindex ? 'noindex,follow' : INDEXABLE);
+  upsertMeta('name', 'googlebot-image', activeSeo.noindex ? 'noindex' : 'index,follow');
+  clearMeta('meta[name="rating" i]');
+  if (activeSeo.adult) upsertMeta('name', 'rating', 'adult');
 };
+
+const updateSchema = () => {
+  clearMeta('script[type="application/ld+json"]');
+  if (activeSeo.noindex) return;
+  const canonical = `${SITE_URL}${activePath}`;
+  const script = document.createElement('script');
+  script.id = 'mm-page-schema';
+  script.type = 'application/ld+json';
+  script.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: SITE_NAME, url: `${SITE_URL}/`, logo: `${SITE_URL}/favicon.svg` },
+      { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: SITE_NAME, url: `${SITE_URL}/`, inLanguage: 'es', publisher: { '@id': `${SITE_URL}/#organization` } },
+      {
+        '@type': ['home', 'collection'].includes(activeSeo.kind) ? 'CollectionPage' : 'WebPage',
+        '@id': `${canonical}#webpage`, url: canonical, name: activeSeo.title, description: activeSeo.description,
+        inLanguage: 'es', isPartOf: { '@id': `${SITE_URL}/#website` }, image: activeImage,
+        ...(activeSeo.adult ? { isFamilyFriendly: false } : {}),
+        ...(activeSeo.kind === 'manga' ? { mainEntity: { '@type': 'Book', '@id': `${canonical}#book`, name: activeSeo.title.replace(` | ${SITE_NAME}`, ''), url: canonical, image: activeImage, inLanguage: 'es' } } : {}),
+      },
+    ],
+  });
+  document.head.appendChild(script);
+};
+
+const updateTitleAndDescription = () => {
+  document.title = activeSeo.title;
+  upsertMeta('name', 'description', activeSeo.description);
+  for (const prefix of ['og', 'twitter']) {
+    const attribute = prefix === 'og' ? 'property' : 'name';
+    upsertMeta(attribute, `${prefix}:title`, activeSeo.title);
+    upsertMeta(attribute, `${prefix}:description`, activeSeo.description);
+    upsertMeta(attribute, `${prefix}:image`, activeImage);
+    upsertMeta(attribute, `${prefix}:image:alt`, activeSeo.title);
+  }
+};
+
+export const applyRouteSeo = (pathname: string) => {
+  const path = normalizeSeoPath(pathname);
+  if (path === activePath) return;
+  const seo = routeSeo(path);
+  // Keep the richer server response (Book, chapter dates, lists) on initial load.
+  const serverCanonical = document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
+  const serverSchema = document.getElementById('mm-page-schema');
+  const serverNoindex = document.head.querySelector('meta[name="robots"]')?.getAttribute('content')?.includes('noindex');
+  const preserveServer = !activePath && (serverSchema || serverNoindex) && serverCanonical === `${SITE_URL}${path}`;
+  activePath = path;
+  activeSeo = { ...seo };
+  activeImage = `${SITE_URL}/favicon.svg`;
+  if (preserveServer) {
+    activeSeo.title = document.title;
+    activeSeo.description = document.head.querySelector('meta[name="description"]')?.getAttribute('content') || seo.description;
+    activeSeo.adult = document.head.querySelector('meta[name="rating" i]')?.getAttribute('content') === 'adult';
+    activeSeo.noindex = seo.noindex || serverNoindex;
+    activeImage = document.head.querySelector('meta[property="og:image"]')?.getAttribute('content') || activeImage;
+  }
+  // Route-specific image properties must never leak into another page.
+  clearMeta('meta[property^="og:image:"],link[rel="image_src"]');
+  upsertCanonical(`${SITE_URL}${path}`);
+  upsertMeta('property', 'og:url', `${SITE_URL}${path}`);
+  upsertMeta('property', 'og:type', seo.kind === 'manga' ? 'book' : seo.kind === 'chapter' ? 'article' : 'website');
+  upsertMeta('name', 'twitter:card', 'summary_large_image');
+  applyIndexing();
+  updateTitleAndDescription();
+  if (!preserveServer) updateSchema();
+};
+
+interface DocumentSeoOptions {
+  path?: string;
+  image?: string;
+  adult?: boolean;
+  noindex?: boolean;
+}
+
+export const useDocumentTitle = (section?: string | null, description?: string | null, options: DocumentSeoOptions = {}) => {
+  const { path, image, adult, noindex } = options;
+  useEffect(() => {
+    if (path && normalizeSeoPath(path) !== activePath) return;
+    if (section === undefined && !description && !image && noindex === undefined) return;
+    const title = section === undefined ? activeSeo.title : buildTitle(section);
+    const nextDescription = description || activeSeo.description;
+    const changed = title !== activeSeo.title || nextDescription !== activeSeo.description
+      || (image && image !== activeImage) || (adult !== undefined && adult !== activeSeo.adult)
+      || (noindex !== undefined && noindex !== activeSeo.noindex);
+    activeSeo = { ...activeSeo, title, description: nextDescription, ...(adult === undefined ? {} : { adult }), ...(noindex === undefined ? {} : { noindex }) };
+    if (image) activeImage = image;
+    applyIndexing();
+    updateTitleAndDescription();
+    if (changed) updateSchema();
+  }, [section, description, path, image, adult, noindex]);
+};
+

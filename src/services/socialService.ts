@@ -5,10 +5,9 @@ import type { ProfileSocialLinks } from './wordpressService';
 import type { ProfilePost } from './profilePostService';
 
 export const OPEN_CHAT_EVENT = 'mm_open_chat';
-/** La página de mensajes lo emite al leer un chat para que el navbar refresque sus contadores. */
+
 export const SOCIAL_REFRESH_EVENT = 'mm_social_refresh';
 
-/** Acento del chat (rosa rojizo), compartido por la página de mensajes y sus badges. */
 export const CHAT_ACCENT = '#f43f5e';
 
 export interface FriendUser {
@@ -16,7 +15,7 @@ export interface FriendUser {
   username: string;
   avatar_url: string;
   is_pro: boolean;
-  /** Activo en los últimos minutos (lo marca el servidor con cada petición social). */
+
   is_online?: boolean;
   last_active?: string | null;
   created_at?: string;
@@ -27,7 +26,7 @@ export type FollowStatus = 'guest' | 'self' | 'none' | 'following';
 export interface FollowEntry {
   user: FriendUser;
   created_at: string;
-  /** Si quien consulta ya sigue a este usuario (para el botón Seguir de las listas). */
+
   viewer_follows: boolean;
 }
 
@@ -51,7 +50,7 @@ export interface PublicProfile extends FriendUser {
   followers_count: number;
   following_count: number;
   mangas_read_count: number;
-  /** Capítulos distintos abiertos (suma por serie). Llega tras el despliegue del plugin de amigos. */
+
   chapters_read_count?: number;
 }
 
@@ -93,14 +92,14 @@ export interface SocialNotificationPayload {
   reaction?: string;
   title?: string;
   excerpt?: string;
-  /** chapter_new */
+
   chapter_id?: number;
   chapter_number?: number;
   chapter_title?: string;
   image?: string;
   is_paid?: boolean;
   price?: number;
-  /** chapter_new / manga_new / manga_update: portada de la serie. */
+
   cover?: string;
 }
 
@@ -140,7 +139,7 @@ export interface LibraryManga {
 }
 
 export interface SocialLibrary {
-  /** Series con el último capítulo abierto (la más reciente primero). */
+
   reading: LibraryReading[];
   liked_chapters: LibraryLikedChapter[];
   liked_mangas: LibraryManga[];
@@ -225,7 +224,6 @@ export const unfollowUser = async (userId: number): Promise<number> => {
   return Number(payload.followers_count || 0);
 };
 
-/** Listas de seguidores/seguidos; sin `userId` devuelve las del usuario con sesión. */
 export const getFollows = async (userId?: number): Promise<FollowLists> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/follows${userId ? `?user_id=${userId}` : ''}`, {
     credentials: 'include',
@@ -236,7 +234,6 @@ export const getFollows = async (userId?: number): Promise<FollowLists> => {
   return { followers: payload.followers || [], following: payload.following || [] };
 };
 
-/** Biblioteca personal del lector: leyendo, capítulos y mangas con me gusta (pestañas de "Más"). */
 export const getSocialLibrary = async (): Promise<SocialLibrary> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/library`, {
     credentials: 'include',
@@ -251,10 +248,6 @@ export const getSocialLibrary = async (): Promise<SocialLibrary> => {
   };
 };
 
-/**
- * Progreso de un capítulo en el lector: al abrirlo (completed=false) y al llegar
- * al final (completed=true). Alimenta la pestaña Actividad de "Más".
- */
 export const recordChapterProgress = async (chapterId: number | string, mangaId: number | string, completed: boolean): Promise<void> => {
   const userId = getStoredToken() ? getStoredUser()?.id : undefined;
   const response = await fetch(`${MANGAMUKAI_API}/social/reading-progress`, {
@@ -267,7 +260,6 @@ export const recordChapterProgress = async (chapterId: number | string, mangaId:
   if (completed && userId !== undefined) recordCompletedRewardChapter(userId, mangaId, chapterId);
 };
 
-/** Anota la serie como leída al abrir un capítulo; devuelve el total de series leídas. */
 export const recordMangaRead = async (mangaId: number | string, chapterId?: number | string): Promise<number> => {
   const response = await fetch(`${MANGAMUKAI_API}/social/reads`, {
     method: 'POST',
@@ -320,8 +312,6 @@ export const markConversationRead = async (userId: number): Promise<void> => {
   await ensureResponse(response);
 };
 
-/* El navbar sondea las notificaciones cada 30 s: la última respuesta se guarda para que la
-   página/panel de notificaciones se pinte al instante y solo refresque en segundo plano. */
 let notificationsCache: SocialNotification[] | null = null;
 export const getCachedNotifications = () => notificationsCache;
 
@@ -362,7 +352,6 @@ export const syncMangaSubscriptions = async (
   await ensureResponse(response);
 };
 
-/** Abre el chat con un lector: el navbar escucha el evento y navega a /mensajes/:id. */
 export const openChat = (user: FriendUser) => {
   window.dispatchEvent(new CustomEvent<FriendUser>(OPEN_CHAT_EVENT, { detail: user }));
 };

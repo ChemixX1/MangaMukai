@@ -11,7 +11,6 @@ import { CHARACTER_CARDS } from './cards';
 import { ChatBubbleIcon, CoinStackIcon, FlameIcon } from './icons';
 import { OutlinedName } from './OutlinedName';
 
-/** Mensajes gratuitos que quedan según el servidor; mientras responde, el límite completo. */
 const useFreeMessages = (userId: string) => {
   const [remaining, setRemaining] = useState(FREE_MESSAGE_LIMIT);
   useEffect(() => {
@@ -22,7 +21,6 @@ const useFreeMessages = (userId: string) => {
   return remaining;
 };
 
-/** Saldo de monedas de la sesión (0 como invitado); se actualiza con el refresco del navbar. */
 const useCoins = () => {
   const read = () => (getStoredToken() ? getStoredUser()?.coins ?? 0 : 0);
   const [coins, setCoins] = useState(read);
@@ -42,7 +40,6 @@ interface RecentChat {
   preview: string;
 }
 
-/** Conversaciones guardadas en este navegador (misma clave que usa la conversación). */
 const readRecentChats = (userId: string): RecentChat[] =>
   chatCharacters.flatMap((character) => {
     try {
@@ -65,11 +62,10 @@ export const MobileCharacterHome = () => {
   const recentChats = useMemo(() => readRecentChats(user.id), [user.id]);
   const hasRecent = recentChats.length > 0;
 
-  // Con alguna conversación empezada, los chats recientes suben y "Inicia un Nuevo Chat" baja.
   const newChat = (
     <section aria-labelledby="character-new-chat" className={hasRecent ? 'mt-7 lg:mt-10' : 'mt-10'}>
       <h2 id="character-new-chat" className="flex items-center gap-1.5 pl-[15px] font-koho text-xl font-semibold leading-5 lg:pl-0 lg:text-2xl">
-        {/* Dos ritmos distintos (balanceo lento + lengüeteo rápido): el vaivén nunca se repite igual. */}
+
         <span className="inline-flex shrink-0 origin-bottom animate-flame-sway motion-reduce:animate-none [&>svg]:origin-bottom [&>svg]:animate-flame-lick motion-reduce:[&>svg]:animate-none"><FlameIcon size={24} /></span>
         Inicia un Nuevo Chat
       </h2>
@@ -95,13 +91,13 @@ export const MobileCharacterHome = () => {
                   decoding="async"
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 group-active:scale-105"
                 />
-                {/* Resplandor sutil del color del personaje al pasar el cursor */}
+
                 <span
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-35"
                   style={{ background: `radial-gradient(circle at 50% 80%, ${card.nameColor}, transparent 70%)` }}
                 />
-                {/* El recorte va pegado al borde inferior; lo que sobra por abajo se oculta. */}
+
                 <img
                   src={card.portrait}
                   alt=""
@@ -154,7 +150,7 @@ export const MobileCharacterHome = () => {
                 to={`/chat/${chat.id}/conversacion`}
                 className="group -mx-2 flex items-start gap-2.5 rounded-xl px-2 py-1.5 transition-all duration-300 hover:-translate-y-0.5 hover:bg-black/[0.04] hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.1)] active:scale-[0.99] dark:hover:bg-white/[0.04] lg:mx-0 lg:items-center lg:rounded-2xl lg:bg-[#f0f0f0] lg:p-4 lg:shadow-[0_8px_22px_-6px_rgba(0,0,0,0.14)] lg:ring-1 lg:ring-black/5 lg:hover:bg-[#ebebeb] lg:hover:shadow-[0_14px_28px_-6px_rgba(0,0,0,0.2)] lg:dark:bg-zinc-900 lg:dark:ring-white/10 lg:dark:shadow-[0_10px_26px_-6px_rgba(0,0,0,0.55)] lg:dark:hover:bg-zinc-800/90"
               >
-                {/* El punto verde sobresale del círculo, por eso no va dentro del recorte. */}
+
                 <span className="relative h-14 w-14 shrink-0">
                   <span className="block h-full w-full overflow-hidden rounded-full bg-zinc-200 shadow-md ring-1 ring-black/10 dark:bg-zinc-300 dark:ring-white/15">
                     <img src={chat.image} alt="" className="h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-110" />
@@ -190,7 +186,7 @@ export const MobileCharacterHome = () => {
             </div>
 
             <div className="lg:flex lg:items-center lg:gap-3.5">
-              {/* Saldo */}
+
               <motion.section
                 aria-label="Monedas"
                 initial={{ opacity: 0, y: 10 }}
@@ -211,7 +207,7 @@ export const MobileCharacterHome = () => {
                 </Link>
               </motion.section>
 
-              {/* Cuota gratuita (contenedor propio) */}
+
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

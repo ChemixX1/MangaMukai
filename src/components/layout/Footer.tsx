@@ -25,7 +25,6 @@ import {
   type FooterSocialNetwork,
 } from '../ui';
 
-/** Redes oficiales. El pie móvil muestra solo las marcadas con `compact`. */
 export const FOOTER_SOCIALS = [
   { name: 'Facebook', href: SOCIAL_LINKS.facebook, Icon: FacebookIcon, size: 24, compact: true },
   { name: 'WhatsApp', href: SOCIAL_LINKS.whatsapp, Icon: WhatsAppIcon, size: 23, compact: false },
@@ -43,19 +42,17 @@ const LEGAL_LINKS: FooterLink[] = [
   { label: 'Términos de Servicio', to: '/terminos' },
   { label: 'Normas de la Comunidad', to: '/normas-comunidad' },
   { label: 'Política de Cookies', to: '/cookies' },
-  // Lleva al apartado de la política que explica cómo gestionarlas desde el navegador.
+
   { label: 'Cookie Settings', to: '/cookies#como-gestionarlas' },
   { label: 'DMCA', to: '/legal?tab=dmca' },
 ];
 
-/** Páginas del pie (móvil y PC). */
 const FOOTER_PAGES: (FooterLink & { font: string })[] = [
   { label: 'Sobre Nosotros', to: '/nosotros', font: 'font-google' },
   { label: 'Recibe ayuda', href: SOCIAL_LINKS.discord, font: 'font-montserrat' },
   { label: 'Contacto', to: '/contacto', font: 'font-montserrat' },
 ];
 
-/** Políticas del pie en dos filas; en móvil la primera cabe en una línea incluso a 360 px (con menos separación). */
 const FOOTER_LEGAL_ROWS = [LEGAL_LINKS.slice(0, 3), LEGAL_LINKS.slice(3, 5)];
 
 const FooterAnchor = ({ link, className }: { link: FooterLink; className: string }) => (
@@ -87,10 +84,6 @@ const DeveloperCredit = ({ className }: { className: string }) => (
 type NewsletterStatus = 'idle' | 'sending' | 'done';
 const CHECK_VISIBLE_MS = 1300;
 
-/**
- * Medidas del boletín. Móvil: barra translúcida con el botón de tinta y el "+".
- * PC: barra oscura translúcida con el botón blanco, el "+" y el gato más grande.
- */
 const NEWSLETTER_VARIANTS = {
   mobile: {
     mascot: 'pointer-events-none absolute -top-[68px] right-3 z-20 h-[75px] w-[189px] object-contain object-bottom',
@@ -108,12 +101,6 @@ const NEWSLETTER_VARIANTS = {
   },
 } as const;
 
-/**
- * Boletín: UNIRME envía el correo; al confirmarse muestra el check un instante y
- * el botón vuelve a "UNIRME" con el campo vacío. Con un correo inválido o un
- * fallo no se muestra nada: el campo se queda como está. El gato se asoma sobre
- * el botón.
- */
 const NewsletterForm = ({ inputId, variant = 'mobile' }: { inputId: string; variant?: keyof typeof NEWSLETTER_VARIANTS }) => {
   const styles = NEWSLETTER_VARIANTS[variant];
   const [email, setEmail] = useState('');
@@ -200,7 +187,6 @@ const NewsletterForm = ({ inputId, variant = 'mobile' }: { inputId: string; vari
   );
 };
 
-/** Pie móvil (< lg): marca, redes, enlaces, boletín con el gato y políticas, sobre las montañas. */
 const MobileFooterContent = () => (
   <div className="relative z-10 px-[25px] pb-[34px] pt-1.5">
     <Wordmark className="text-[28px]" />
@@ -243,7 +229,6 @@ const MobileFooterContent = () => (
   </div>
 );
 
-/** Fila de redes del pie de PC: "redes footer iconos" (219×42) a 190 px de ancho. */
 const DESKTOP_SOCIAL_ROW_HEIGHT = 36.49;
 const DESKTOP_SOCIAL_SCALE = DESKTOP_SOCIAL_ROW_HEIGHT / FOOTER_SOCIAL_ROW_HEIGHT;
 
@@ -254,12 +239,10 @@ const DESKTOP_SOCIALS: { name: string; href: string; network: FooterSocialNetwor
   { name: 'YouTube', href: SOCIAL_LINKS.youtube, network: 'youtube' },
 ];
 
-/** Altura de cada fila de políticas del pie de PC. */
 const DESKTOP_LEGAL_ROW_TOPS = [398, 437];
 
 const fromCenter = (offset: number) => ({ left: `calc(50% + ${offset}px)` });
 
-/** El fondo se ancla arriba para que los recortes afecten solo al bosque inferior. */
 const DesktopFooter = ({ className }: { className: string }) => (
   <footer className={`relative bg-surface pt-[7px] text-ink ${className}`}>
     <div className="relative aspect-[1983/725] min-h-[524px] w-full">
@@ -317,7 +300,6 @@ const DesktopFooter = ({ className }: { className: string }) => (
     </div>
   </footer>
 );
-
 
 export const Footer = ({ className = '', homeDesign = false }: { className?: string; homeDesign?: boolean }) => {
   const isMobile = useIsMobileViewport();

@@ -9,24 +9,17 @@ const stopIfUnauthorized = (res: Response): boolean => {
     return false;
 };
 
-/**
- * Migra únicamente los marcadores manuales del antiguo tema WordPress.
- * El historial legado se descarta para que una visita no termine en el perfil.
- */
 export const migrateOldDataToWordPress = async () => {
-    // 1. Verificar si el usuario está autenticado en WP
-    const token = getStoredToken();
-    if (!token) return; // Si no hay sesión, no migramos nada todavía.
 
-    // 2. Migrar Bookmarks (Favoritos)
+    const token = getStoredToken();
+    if (!token) return;
+
     const oldBookmarksRaw = localStorage.getItem('bookmark');
     if (oldBookmarksRaw) {
         try {
             const oldBookmarks: string[] = JSON.parse(oldBookmarksRaw);
             if (Array.isArray(oldBookmarks) && oldBookmarks.length > 0) {
-                // Hacer peticiones a WP para cada bookmark
-                // Para no saturar el servidor, enviamos secuencialmente o creamos un endpoint bulk. 
-                // Como suelen ser pocos, lo hacemos secuencialmente:
+
                 for (const id of oldBookmarks) {
                     const res = await fetch(`${MANGAMUKAI_API}/bookmark`, {
                         method: 'POST',
@@ -47,6 +40,5 @@ export const migrateOldDataToWordPress = async () => {
         }
     }
 
-    // No migrar mangas vistos automáticamente; solo conservar Guardar/Bookmark.
     localStorage.removeItem('ts_mangareader_history');
 };

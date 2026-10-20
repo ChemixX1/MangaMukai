@@ -3,14 +3,6 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { AUTH_CHANGED_EVENT, getAuthCacheKey } from './authService';
 import { getMusicTracks, type MusicTrack } from './communityService';
 
-/**
- * Reproductor único de Mukai Music.
- *
- * Toda la web comparte esta instancia: una sola petición a /music, un solo
- * elemento de audio y un solo estado. Así la tarjeta se puede montar en
- * MangaDetail y en el lector sin duplicar peticiones ni pistas sonando a la vez,
- * y el desbloqueo (suscripción activada) se refleja en todas al instante.
- */
 export interface MusicPlayerState {
   tracks: MusicTrack[];
   loading: boolean;
@@ -56,13 +48,11 @@ const subscribe = (listener: () => void) => {
 
 const getSnapshot = () => state;
 
-/** Una pista solo suena si la sesión tiene acceso: el backend oculta la url. */
 export const isPlayableTrack = (track: MusicTrack | null | undefined): track is MusicTrack =>
   Boolean(track && track.url && !track.is_locked);
 
-export const getCurrentTrack = (): MusicTrack | null =>
+ const getCurrentTrack = (): MusicTrack | null =>
   state.tracks.find((track) => track.id === state.currentId) ?? null;
-
 
 let audio: HTMLAudioElement | null = null;
 let loadedSrc = '';
@@ -87,7 +77,6 @@ const startPlayback = () => {
   void element.play().catch(() => setState({ error: true, isPlaying: false }));
 };
 
-/** Apunta el audio compartido a la pista indicada (y opcionalmente la lanza). */
 const syncSource = (track: MusicTrack | null, autoplay: boolean) => {
   const url = isPlayableTrack(track) ? track.url : '';
 
@@ -113,8 +102,6 @@ const syncSource = (track: MusicTrack | null, autoplay: boolean) => {
   if (autoplay) startPlayback();
 };
 
-
-/** Cuenta + acceso premium; renovar el token no reinicia la música. */
 const authSignature = getAuthCacheKey;
 
 let inflight: Promise<void> | null = null;
@@ -125,7 +112,7 @@ const applyTracks = (tracks: MusicTrack[]) => {
   const wasPlaying = state.isPlaying;
 
   setState({ tracks, loading: false, currentId: current?.id ?? null });
-  // Si la suscripción acaba de activarse, la pista ya trae url y arranca sola.
+
   syncSource(current, wasPlaying && isPlayableTrack(current));
 };
 
@@ -148,24 +135,20 @@ const fetchLibrary = (): Promise<void> => {
   return inflight;
 };
 
-/** Carga la lista una sola vez por sesión/estado de cuenta. */
 export const ensureMusicLibrary = (): Promise<void> => {
   if (inflight) return inflight;
   if (loadedSignature === authSignature()) return Promise.resolve();
   return fetchLibrary();
 };
 
-/** Fuerza la recarga: se usa al volver de un pago o al activar la suscripción. */
 export const refreshMusicLibrary = (): Promise<void> => (inflight ? inflight : fetchLibrary());
 
 if (typeof window !== 'undefined') {
-  // Iniciar/cerrar sesión o activar el premium cambia la firma: se repite la
-  // consulta para que el candado se abra (o se cierre) sin recargar la página.
+
   window.addEventListener(AUTH_CHANGED_EVENT, () => {
     if (loadedSignature !== null && loadedSignature !== authSignature()) void fetchLibrary();
   });
 }
-
 
 export const selectTrack = (id: number, autoplay = true) => {
   const track = state.tracks.find((item) => item.id === id) ?? null;
@@ -209,14 +192,6 @@ export const seekTo = (seconds: number) => {
   element.currentTime = seconds;
   setState({ currentTime: seconds });
 };
-
-export const toggleLike = (id: number) => {
-  const likedIds = state.likedIds.includes(id)
-    ? state.likedIds.filter((liked) => liked !== id)
-    : [...state.likedIds, id];
-  setState({ likedIds });
-};
-
 
 export const useMusicPlayer = (): MusicPlayerState => {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);

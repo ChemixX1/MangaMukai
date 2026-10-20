@@ -18,7 +18,6 @@ const timeAgo = (value: string) => {
   return `Hace ${Math.floor(seconds / 86400)} d`;
 };
 
-/** Texto de la tarjeta social según el tipo (y la reacción, cuando la hay). */
 const socialCopy = (notification: SocialNotification) => {
   const reaction = notification.payload.reaction || '';
   const reactionVerb = ({
@@ -40,10 +39,8 @@ const socialCopy = (notification: SocialNotification) => {
   }
 };
 
-/** Flecha ↗ que va dentro de los botones de acción. */
 const ArrowIcon = () => <ArrowUpRight size={10} strokeWidth={3} className="shrink-0" aria-hidden="true" />;
 
-/** Estrella "NEW" del manga nuevo. */
 const NewBadge = () => (
   <svg viewBox="0 0 44 44" className="h-11 w-11 shrink-0" aria-hidden="true">
     <path
@@ -59,13 +56,10 @@ interface CardProps {
   onOpen: (notification: SocialNotification) => void;
 }
 
-/** Tarjeta "Nuevo capítulo publicado": imagen del capítulo de fondo, título de la serie y "Leer ahora". */
 const ChapterCard = ({ notification, onOpen }: CardProps) => {
   const { payload } = notification;
   const [image, setImage] = useState(payload.image || payload.cover || '');
 
-  // La misma escena que enseña el listado de capítulos de la ficha; si el capítulo es de pago
-  // y no está comprado, el servidor no la da y se queda la portada.
   useEffect(() => {
     let active = true;
     if (!payload.chapter_id) return;
@@ -81,7 +75,7 @@ const ChapterCard = ({ notification, onOpen }: CardProps) => {
       <div className="absolute inset-0 rounded-3xl bg-black/80" />
       <div className="relative flex h-full items-center gap-3 pl-5 pr-4 min-[420px]:pl-[30px]">
         <div className="min-w-0 flex-1">
-          {/* En pantallas estrechas baja un punto para que la frase entre completa junto al botón. */}
+
           <p className="flex items-center gap-2 font-[Montserrat] text-[13px] font-normal leading-6 text-white min-[420px]:text-base">
             <span className="truncate">Nuevo capítulo publicado</span>
             <img src={FIRE_ICON} alt="" className="h-6 w-6 shrink-0" />
@@ -98,12 +92,11 @@ const ChapterCard = ({ notification, onOpen }: CardProps) => {
   );
 };
 
-/** Tarjeta "manga nuevo": estrella NEW, título en negrita, lema en Michroma y "Ver". */
 const NewMangaCard = ({ notification, onOpen }: CardProps) => {
   const { payload } = notification;
   return (
     <article className={`relative h-24 w-full overflow-hidden rounded-3xl bg-zinc-800 ${notification.read ? 'opacity-70' : ''}`}>
-      {/* La portada de fondo se ve un poco más arriba del centro (la cabeza del personaje suele estar ahí). */}
+
       {payload.cover && <img src={payload.cover} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_28%]" loading="lazy" />}
       <div className="absolute inset-0 rounded-3xl bg-black/80" />
       <div className="relative flex h-full items-center gap-2 pl-0.5 pr-4">
@@ -123,7 +116,6 @@ const NewMangaCard = ({ notification, onOpen }: CardProps) => {
   );
 };
 
-/** Tarjeta social (reacciones, comentarios, publicaciones, seguidores): avatar, usuario y acción. */
 const SocialCard = ({ notification, onOpen }: CardProps) => {
   const copy = socialCopy(notification);
   const actor = notification.actor;

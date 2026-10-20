@@ -195,9 +195,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
 
   useEffect(() => {
     if (!success) return;
-    // Navegación interna: saveAuth ya avisó a la barra y a los servicios con
-    // AUTH_CHANGED_EVENT, así que no hace falta recargar toda la app (con
-    // Google/Discord eso sumaba una segunda carga completa tras los saltos por WordPress).
+
     const timer = window.setTimeout(() => navigate(returnTo, { replace: true }), reducedMotion ? 350 : 850);
     return () => window.clearTimeout(timer);
   }, [success, returnTo, reducedMotion, navigate]);
@@ -220,7 +218,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
         setRemoteCovers(selectedCovers);
       }
     }).catch(() => {
-      // Las portadas locales mantienen el fondo si el catálogo no responde.
+
     });
 
     return () => {
@@ -245,8 +243,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
   useDocumentTitle(isLogin ? "Iniciar sesión" : "Crear cuenta");
 
   useEffect(() => {
-    // WordPress devuelve aquí los fallos del proveedor (acceso cancelado, correo sin
-    // verificar, cuenta pendiente) en vez de mostrar su propia página de error.
+
     const query = new URLSearchParams(location.search);
     const code = query.get("social_error");
     if (!code) return;
@@ -272,7 +269,7 @@ export const AuthPage = ({ mode }: { mode?: "login" | "register" } = {}) => {
       if (!active) return;
       saveAuth(data.token, data.user, true);
       clearSocialReturn();
-      // Discard the temporary OAuth code before loading the next page.
+
       const cleanUrl = new URL(window.location.href);
       ['social', 'return_provider', 'social_code'].forEach((key) => cleanUrl.searchParams.delete(key));
       window.history.replaceState(window.history.state, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);

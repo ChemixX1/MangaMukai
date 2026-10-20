@@ -27,7 +27,7 @@ export const ReaderReactions = ({ chapterId }: { chapterId: string }) => {
       try {
         const saved = localStorage.getItem(`mm_chapter_guest_reaction:${chapterId}`);
         guestSelection.current = MANGA_REACTIONS.find(item => item.id === saved)?.id ?? null;
-      } catch { /* Storage is optional. */ }
+      } catch {                            }
       setSelected(guestSelection.current);
       const initial = createReactionCounts();
       if (guestSelection.current) initial[guestSelection.current]++;
@@ -62,10 +62,10 @@ export const ReaderReactions = ({ chapterId }: { chapterId: string }) => {
       try {
         if (nextSelection) localStorage.setItem(`mm_chapter_guest_reaction:${chapterId}`, nextSelection);
         else localStorage.removeItem(`mm_chapter_guest_reaction:${chapterId}`);
-      } catch { /* Keep the immediate interaction when storage is unavailable. */ }
+      } catch {                                                                   }
       return;
     }
-    // Serialize writes without blocking clicks, so the server keeps the last choice.
+
     queue.current = queue.current.then(async () => {
       try {
         const result = await setEntityReaction('chapter', chapterId, nextSelection || '');

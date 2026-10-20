@@ -256,7 +256,6 @@ void main() {
   float outside = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uRadius;
   float pixel = 1.0 / uSize.x;
   float alpha = clamp(0.5 - outside / pixel, 0.0, 1.0);
-  // Match centered object-fit: cover when the card and artwork have different proportions.
   float coverRatio = uAspect * uArtAspect;
   vec2 artScale = vec2(min(1.0, 1.0 / coverRatio), min(1.0, coverRatio));
   vec4 sampled = texture(uArt, (uv - 0.5) * artScale + 0.5);

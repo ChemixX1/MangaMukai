@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, BookOpen, Heart, Loader2, Send, User, X } from 'lucide-react';
 import { readLocalImage, useExperienceUser } from '../hooks/useLocalExperience';
-import { communityImage, formatCount, handleOf, timeAgo, type CommunityComment, type CommunityMangaTag, type CommunityPost } from '../data/communityPosts';
+import { formatCount, handleOf, timeAgo, type CommunityComment, type CommunityMangaTag, type CommunityPost } from '../data/communityPosts';
 import { CommunityIcon } from '../components/community/CommunityIcons';
 import { CommunityProCard, CommunityStoreCard } from '../components/community/CommunityPromotions';
 import { CommunityMangaPicker } from '../components/community/CommunityMangaPicker';
@@ -18,10 +18,10 @@ const MAX_LENGTH = 1000;
 function Avatar({ src, name = '' }: { src?: string; name?: string }) {
   const [failedSource, setFailedSource] = useState<string>();
   const hasImage = Boolean(src && failedSource !== src);
-  // Reserve the avatar's frame before the route styles or full-size photo load.
+
   return <span className="community-avatar relative flex h-[42px] w-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full" aria-hidden={hasImage ? undefined : true}>
     {hasImage
-      ? <img src={communityImage(src!)} alt={name} width={42} height={42} className="absolute inset-0 block h-full w-full object-cover" onError={() => setFailedSource(src)} />
+      ? <img src={src} alt={name} width={42} height={42} className="absolute inset-0 block h-full w-full object-cover" onError={() => setFailedSource(src)} />
       : <User size={22} />}
   </span>;
 }
@@ -94,7 +94,7 @@ function Community() {
   const readers = <Readers suggestions={suggestions} follows={follows} onFollow={toggleFollow} onSelect={(id) => setFilter({ autor: id })} />;
 
   return <main className={`community-page${postId ? ' is-thread' : ''}`}>
-    <h1 className="sr-only">{postId ? 'Publicación de la comunidad' : 'Comunidad MangaMukai'}</h1>
+    <h1 className="sr-only">{postId ? 'Publicación de la comunidad' : 'Comunidad Mukai'}</h1>
     <div className="community-shell">
       <aside id="community-navigation" className="community-nav" aria-label="Navegación de comunidad">
         <nav className="community-nav-links">
@@ -166,7 +166,7 @@ function AttachmentTools({ onImage, onGif, onManga, onEmoji, activeManga = false
   return <div className="community-attachments">
     <button type="button" disabled={disabled} onClick={onImage} aria-label="Añadir imagen" title="Añadir imagen"><CommunityIcon name="image" size={22} /></button>
     <button type="button" disabled={disabled} onClick={onGif} aria-label="Añadir GIF" title="Añadir GIF"><CommunityIcon name="gif" size={22} /></button>
-    {onManga && <button type="button" className={activeManga ? 'is-active' : ''} onClick={onManga} aria-label="Recomendar manga o capítulo" title="Recomendar manga o capítulo"><CommunityIcon name="manga" size={23} /></button>}
+    {onManga && <button type="button" data-manga-picker-trigger aria-haspopup="dialog" className={activeManga ? 'is-active' : ''} onClick={onManga} aria-label="Recomendar manga" title="Recomendar manga"><CommunityIcon name="manga" size={23} /></button>}
     <button type="button" className={activeEmoji ? 'is-active' : ''} onClick={onEmoji} aria-label="Añadir emoji" title="Añadir emoji"><CommunityIcon name="emoji" size={21} /></button>
   </div>;
 }
@@ -195,6 +195,7 @@ function Composer({ user, textareaRef, onPost, onError }: { user: ExperienceUser
   const [image, setImage] = useState('');
   const [manga, setManga] = useState<CommunityMangaTag | null>(null);
   const [picking, setPicking] = useState(false);
+  const closePicker = useCallback(() => setPicking(false), []);
   const [emoji, setEmoji] = useState(false);
   const [reading, setReading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -229,10 +230,10 @@ function Composer({ user, textareaRef, onPost, onError }: { user: ExperienceUser
         onChange={(event) => { setText(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${event.target.scrollHeight}px`; }}
       />
       {image && <AttachmentPreview image={image} onRemove={() => setImage('')} />}
-      {manga && <div className="community-draft-manga"><MangaAttachment manga={manga} /><div className="community-draft-manga-actions"><button type="button" onClick={() => setManga({ ...manga, showCover: !manga.showCover })}>{manga.showCover ? 'Ocultar portada' : 'Mostrar portada'}</button><button type="button" onClick={() => setManga(null)} aria-label="Quitar recomendación"><X size={15} />Quitar</button></div></div>}
-      {picking && <CommunityMangaPicker onPick={(tag) => { setManga(tag); setPicking(false); }} onClose={() => setPicking(false)} />}
+      {manga && <div className="community-draft-manga"><MangaAttachment manga={manga} /><div className="community-draft-manga-actions"><button type="button" onClick={() => setManga(null)} aria-label="Quitar recomendación"><X size={15} />Quitar</button></div></div>}
       {emoji && <EmojiChoices onPick={(value) => { setText((text) => `${text}${value}`.slice(0, MAX_LENGTH)); setEmoji(false); textareaRef.current?.focus(); }} />}
       <div className="community-compose-tools">
+        {picking && <CommunityMangaPicker onPick={(tag) => { setManga(tag); setPicking(false); }} onClose={closePicker} />}
         <AttachmentTools onImage={() => selectFile()} onGif={() => selectFile(true)} onManga={() => { setPicking(!picking); setEmoji(false); }} onEmoji={() => { setEmoji(!emoji); setPicking(false); }} activeManga={picking || Boolean(manga)} activeEmoji={emoji} disabled={reading} />
         <div className="community-compose-submit-wrap">
           {text.length > 0 && <small className={`community-character-count${text.length > 900 ? ' is-near-limit' : ''}`}>{text.length}/{MAX_LENGTH}</small>}
@@ -257,9 +258,9 @@ function PostText({ content, onTag, detailPath }: { content: string; onTag: (tag
 }
 
 function MangaAttachment({ manga }: { manga: CommunityMangaTag }) {
-  return <Link to={manga.chapterId ? `/read/${manga.chapterId}` : `/manga/${manga.id}`} className="community-manga-attachment">
-    {manga.showCover && manga.cover ? <img src={manga.cover} alt="" loading="lazy" /> : <span className="community-manga-attachment__icon"><BookOpen size={20} /></span>}
-    <span><strong>{manga.title}</strong>{manga.chapterLabel && <small>{manga.chapterLabel}</small>}</span>
+  return <Link to={`/manga/${manga.id}`} className="community-manga-attachment">
+    {manga.cover ? <img src={manga.cover} alt="" loading="lazy" /> : <span className="community-manga-attachment__icon"><BookOpen size={20} /></span>}
+    <span><strong>{manga.title}</strong></span>
     <span className="community-manga-attachment__arrow"><ArrowUpRight size={16} /></span>
   </Link>;
 }
@@ -312,7 +313,7 @@ function PostCard({ post, user, onUpdate, onAuthor, onTag, onOpen, onShare }: Po
         <time dateTime={post.createdAt}>{timeAgo(post.createdAt)}</time>
       </div>
       <PostText content={post.content} onTag={onTag} detailPath={`/comunidad/publicacion/${encodeURIComponent(post.id)}`} />
-      {post.image && <button type="button" className="community-image-link" onClick={() => onOpen(post)} aria-label="Ver publicación e imagen"><img src={communityImage(post.image)} alt="Imagen de la publicación" className="community-post-image" loading="lazy" /></button>}
+      {post.image && <button type="button" className="community-image-link" onClick={() => onOpen(post)} aria-label="Ver publicación e imagen"><img src={post.image} alt="Imagen de la publicación" className="community-post-image" loading="lazy" /></button>}
       {post.manga && <MangaAttachment manga={post.manga} />}
       <PostActions post={post} onUpdate={onUpdate} onComment={() => onOpen(post, true)} onShare={onShare} />
     </div>
@@ -331,7 +332,7 @@ function Thread({ post, user, onBack, onUpdate, onAuthor, onTag, onShare, replyR
     <article className="community-thread-post">
       <button type="button" className="community-thread-author" onClick={() => onAuthor(post)}><Avatar src={avatar} /><span><strong>{name}</strong><small>{handleOf(name)}</small></span></button>
       <PostText content={post.content} onTag={onTag} />
-      {post.image && <img src={communityImage(post.image)} alt="Imagen de la publicación" className="community-post-image" />}
+      {post.image && <img src={post.image} alt="Imagen de la publicación" className="community-post-image" />}
       {post.manga && <MangaAttachment manga={post.manga} />}
       <div className="community-thread-meta">{date && <time dateTime={post.createdAt}>{date.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' })} · {date.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' })}</time>}<span className="community-views"><CommunityIcon name="views" size={18} /><strong>{formatCount(post.views || 0)}</strong> Visualizaciones</span></div>
       <PostActions post={post} onUpdate={onUpdate} onComment={() => replyRef.current?.focus()} onShare={onShare} detail />

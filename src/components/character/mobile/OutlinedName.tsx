@@ -3,17 +3,12 @@ interface OutlinedNameProps {
   text: string;
   color: string;
   opacity: number;
-  /** Tamaño de letra en px (Russo One); el alto y la línea base se derivan de él. */
+
   fontSize?: number;
-  /** Posicionamiento (absolute, top/bottom…); el svg ocupa todo el ancho. */
+
   className?: string;
 }
 
-/**
- * Nombre sobre la portada: relleno translúcido (se ve la imagen a través) y un
- * contorno blanco de 2 px solo por fuera de las letras. El trazo se dibuja al
- * doble de grosor y una máscara recorta la mitad que cae dentro del glifo.
- */
 export const OutlinedName = ({ id, text, color, opacity, fontSize = 24, className = '' }: OutlinedNameProps) => {
   const maskId = `outlined-name-${id}`;
   const label = text.toUpperCase();

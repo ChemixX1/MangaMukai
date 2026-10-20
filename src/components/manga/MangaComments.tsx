@@ -31,7 +31,6 @@ type CommentReactionId = MangaReactionId;
 
 const VISIBLE_COMMENTS = 4;
 
-/** Stickers 3D de Fluent: el comentario los guarda como `[sticker:url]`. */
 const COMMENT_STICKERS = ([
   ['🫶', 'Corazón con manos'], ['🫠', 'Derretido'], ['💀', 'Calavera'], ['💅', 'Icónico'],
   ['💯', 'Cien'], ['🤯', 'Impactado'], ['🥹', 'Emocionado'], ['😭', 'Llorando'],
@@ -44,10 +43,9 @@ const COMMENT_STICKERS = ([
 type CommentSticker = (typeof COMMENT_STICKERS)[number];
 
 const STICKER_TOKEN = /(\[sticker:https:\/\/[^\]]+\])/g;
-/** Stickers de Twemoji de la versión anterior, que siguen en comentarios guardados. */
+
 const LEGACY_STICKER_PREFIX = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@';
 
-/** Solo se pintan como imagen los stickers conocidos; cualquier otra URL se queda como texto. */
 const stickerFromToken = (token: string) => {
   const url = token.slice('[sticker:'.length, -1);
   const known = COMMENT_STICKERS.find((sticker) => sticker.url === url);
@@ -55,7 +53,6 @@ const stickerFromToken = (token: string) => {
   return url.startsWith(LEGACY_STICKER_PREFIX) ? { url, name: 'Sticker' } : null;
 };
 
-/** Variables del selector de emojis con los colores de la web. */
 const EMOJI_PICKER_STYLE = {
   '--epr-emoji-size': '30px',
   '--epr-picker-border-color': 'rgba(255, 0, 140, 0.25)',
@@ -63,7 +60,6 @@ const EMOJI_PICKER_STYLE = {
   fontFamily: 'Montserrat, sans-serif',
 } as CSSProperties;
 
-/** Antigüedad del comentario, conservando la fecha completa en el atributo title. */
 const formatCommentDate = (value: string) => {
   const date = new Date(value.includes(' ') ? value.replace(' ', 'T') : value);
   if (!Number.isFinite(date.getTime())) return '';
@@ -73,11 +69,6 @@ const formatCommentDate = (value: string) => {
   return 'Hace ' + amount + ' ' + unit + (amount === 1 ? '' : unit === 'mes' ? 'es' : 's');
 };
 
-/**
- * El editor escribe HTML (negrita, cursiva y subrayado, como en un procesador
- * de textos). Al guardar y al pintar solo se dejan pasar esas marcas: el resto
- * se escapa, así nada de lo que escriba un lector llega al DOM como etiqueta.
- */
 const RICH_TAGS = ['b', 'strong', 'i', 'em', 'u', 's', 'strike', 'br'];
 const sanitizeRichText = (html: string) => {
   const holder = document.createElement('div');
@@ -95,12 +86,10 @@ const sanitizeRichText = (html: string) => {
   return walk(holder).replace(/(<br>)+$/, '').trim();
 };
 
-/** Texto plano del editor, para saber si hay algo que publicar. */
 const richTextToPlain = (html: string) => html.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
 
 const readActiveFormats = () => new Set(['bold', 'italic', 'underline', 'strikeThrough'].filter((command) => document.queryCommandState(command)));
 
-/** Editor compartido por comentarios y respuestas, con formato y selectores reales. */
 const CommentEditor = ({ value, onChange, sticker, onStickerChange, label, placeholder, forceDark, autoFocus = false, disabled = false }: {
   value: string;
   onChange: (value: string) => void;
@@ -128,7 +117,6 @@ const CommentEditor = ({ value, onChange, sticker, onStickerChange, label, place
     if (autoFocus) editorRef.current?.focus();
   }, [autoFocus]);
 
-  // Formato activo donde está el cursor, para resaltar sus botones, y la posición del cursor.
   useEffect(() => {
     const sync = () => {
       const editor = editorRef.current;
@@ -141,7 +129,6 @@ const CommentEditor = ({ value, onChange, sticker, onStickerChange, label, place
     return () => document.removeEventListener('selectionchange', sync);
   }, []);
 
-  // Los selectores de emojis y stickers se cierran al pulsar fuera de ellos.
   useEffect(() => {
     if (!tool) return;
     const close = (event: PointerEvent) => {
@@ -165,7 +152,6 @@ const CommentEditor = ({ value, onChange, sticker, onStickerChange, label, place
     setActiveFormats(readActiveFormats());
   };
 
-  /** Escribe en el cursor guardado o, si aún no se ha tocado el editor, al final. */
   const insertAtCaret = (text: string) => {
     const editor = editorRef.current;
     if (!editor || disabled) return;
@@ -233,7 +219,6 @@ const CommentEditor = ({ value, onChange, sticker, onStickerChange, label, place
   );
 };
 
-/** Texto del comentario con sus stickers intercalados. */
 const CommentBody = ({ content, className }: { content: string; className: string }) => (
   <p className={className}>
     {content.split(STICKER_TOKEN).filter(Boolean).map((part, index) => {
@@ -245,18 +230,13 @@ const CommentBody = ({ content, className }: { content: string; className: strin
   </p>
 );
 
-/**
- * Comentarios de la ficha y del lector (móvil y escritorio): el cuadro para
- * escribir con su barra de formato, emojis y stickers y, debajo, los hilos con
- * las respuestas anidadas de la referencia. Con `chapterId` son los comentarios de ese capítulo.
- */
 export const MangaComments = ({ mangaId, initialComments, chapterId, loading = false, loadError = '', forceDark = false }: {
   loading?: boolean;
   loadError?: string;
   mangaId: string;
   initialComments: MangaComment[];
   chapterId?: string;
-  /** Permite sincronizar el selector de emojis cuando un contenedor fuerza el tema oscuro. */
+
   forceDark?: boolean;
 }) => {
   const navigate = useNavigate();
@@ -271,15 +251,14 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
   const [openReplies, setOpenReplies] = useState<Set<number>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState('');
-  // Reacción que se está pintando ahora mismo (comentario:reaccion).
+
   const [painted, setPainted] = useState<string | null>(null);
-  // Solo la última petición de cada comentario puede reconciliar su reacción.
+
   const reactionSequences = useRef(new Map<number, number>());
   const isEmpty = !richTextToPlain(content);
 
   useEffect(() => { setComments(initialComments); }, [initialComments]);
 
-  // Nombre y foto al día si el lector edita su perfil con la ficha abierta.
   useEffect(() => {
     const updateProfile = (event: Event) => {
       const detail = (event as CustomEvent<ProfileUpdatedDetail>).detail;
@@ -333,7 +312,6 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
     return true;
   };
 
-  // Optimista: el contador cambia en el mismo toque y la red solo confirma.
   const react = async (comment: MangaComment, reactionId: CommentReactionId) => {
     if (!requireSession()) return;
     const next = comment.my_reaction === reactionId ? '' : reactionId;
@@ -357,7 +335,7 @@ export const MangaComments = ({ mangaId, initialComments, chapterId, loading = f
       setComments((current) => current.map((item) => (item.id === comment.id
         ? { ...item, reactions: result.reactions, my_reaction: result.my_reaction }
         : item)));
-      // El autor recibe el aviso de la reacción (el "me gusta" lo avisa el propio servidor).
+
       if (!next || next === 'like') void notifyCommentReaction(comment.id, null);
       else if (next === 'love' || next === 'haha' || next === 'sad') void notifyCommentReaction(comment.id, next);
     } catch {

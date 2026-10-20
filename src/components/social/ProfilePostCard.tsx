@@ -100,14 +100,14 @@ export function ProfilePostCard({ initialPost, isLight, onShared, variant = 'def
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await interactWithProfilePost(post.id, action, body);
-      // A share of a shared post returns its original; keep this card's identity.
+
       if (result.post.id === post.id) setPost(result.post);
       if (result.comment) { setComments(current => [...current, result.comment!]); setText(''); }
       if (result.shared) { setNotice('Compartido en tu perfil.'); onShared?.(result.shared); }
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'No se pudo guardar.'); }
     finally { setBusy(false); setReactionsOpen(false); }
   };
-  // La reaccion se pinta al instante y la peticion solo confirma o revierte: sin espera visible.
+
   const react = (reactionId: string) => {
     if (!requireAuth()) return;
     const previous = post;
@@ -137,7 +137,7 @@ export function ProfilePostCard({ initialPost, isLight, onShared, variant = 'def
       const ids = new Set<string>(JSON.parse(localStorage.getItem(key) || '[]') as string[]);
       if (next) ids.add(String(post.id)); else ids.delete(String(post.id));
       localStorage.setItem(key, JSON.stringify([...ids]));
-    } catch { /* Saving stays available for the current session. */ }
+    } catch {                                                       }
   };
   const media = (item: ProfilePost) => <>{item.content && <p className="whitespace-pre-wrap break-words px-4 pb-4 text-[15px] leading-6">{item.content}</p>}{item.media_url && (item.media_type === 'video'
     ? <video src={item.media_url} controls preload="metadata" className="max-h-[620px] w-full bg-black object-contain" />

@@ -1,58 +1,65 @@
 # MangaMukai
 
-Frontend React + TypeScript + Vite + Tailwind, conectado a WordPress.
+MangaMukai es un sitio de lectura de manga en español. Incluye colecciones,
+capítulos, recomendaciones de la comunidad, perfiles, Character Chat y una
+tienda. El frontend usa React, TypeScript, Vite y Tailwind. Los datos y las
+cuentas se conectan con WordPress.
 
-## Estructura
+## Uso del proyecto
 
-- `src/pages/`: pantallas y composición de cada ruta.
-- `src/components/`: componentes por dominio: home, manga, shop, character, collections, layout, modals y social.
-- `src/components/ui/`: piezas compartidas: títulos, pestañas, paginación, etiquetas y botones.
-- `src/components/*/mobile/`: composición para pantallas pequeñas; usa el mismo Tailwind, catálogo y componentes compartidos.
-- `src/styles/`: tema y estilos por dominio. No hay hojas de estilo independientes para móvil.
-- `src/hooks/`, `src/context/`: comportamiento reutilizable y estado de React.
-- `src/services/`: API, autenticación y persistencia.
-- `src/config/`, `src/data/`, `src/types/`, `src/utils/`: configuración, datos, tipos y utilidades.
-- `src/assets/`: recursos importados por los componentes; Vite los procesa.
-- `public/`: recursos con URL fija (favicon, imágenes de colección y promociones).
-- `backend/`: plugins de WordPress y conexiones con el servidor. `server/`: configuración y archivos SEO del servidor.
-- `scripts/`: compilación y despliegue. `tools/moderacion-mensajes/`: herramienta local de moderación.
-- `docs/`: documentación del servidor y referencias de diseño.
-- La raíz contiene la configuración de desarrollo y compilación. Las imágenes de cada sección viven en `src/assets/`; las de perfil están en `src/assets/profile/`.
+Para usar, modificar o publicar el código y el diseño propios del proyecto,
+solicita permiso al dueño y espera su autorización por escrito. Puedes hacerlo
+desde [Contacto](https://mangamukai.com/contacto). Las condiciones completas
+están en [LICENSE]. Los recursos de terceros conservan sus licencias.
 
-## Estilos compartidos
-
-`tailwind.config.js` define tipografías, colores y animaciones. `src/styles/theme.css` contiene las variables de superficie, texto y acentos para los temas claro y oscuro. Las utilidades `bg-surface`, `text-ink`, `bg-panel`, `text-muted` y `border-line` responden al tema automáticamente.
-
-`src/main.tsx` importa la base y los estilos comunes por sección. Los estilos específicos de tienda, experiencias y recarga se cargan desde sus páginas. La colección B&N cambia sus acentos mediante variables locales.
-
-El breakpoint compartido es `lg` (1024 px). Las composiciones móvil y escritorio mantienen sus posiciones propias; comparten el lenguaje visual, los iconos, las reacciones, las tarjetas de producto y otros controles. Antes de crear una variante, revisa los componentes de `ui/` y del dominio correspondiente.
-
-## Desarrollo y validación
+## Desarrollo
 
 ```bash
 npm ci
 npm run dev
+```
+
+Puedes copiar `.env.example` a `.env` y configurar `VITE_WORDPRESS_URL`.
+La configuración de la API está en `src/config/api.ts`. Durante el desarrollo,
+Vite puede consultar WordPress a través de su proxy local.
+
+## Comprobaciones
+
+```bash
 npm run lint
+npm test
 npm run build
 npm run preview
 ```
 
-Vite muestra el puerto local en la terminal. `npm run build` comprueba TypeScript, compila el frontend y copia `server/` y `backend/` a `dist/`. Compilar no publica cambios.
+La compilación comprueba TypeScript, genera `dist/` y copia los archivos de
+`server/` y `backend/`. No publica cambios. `npm run deploy:dry` permite revisar
+el despliegue y `npm run deploy` lo realiza cuando se dispone de la configuración.
 
-`src/config/api.ts` centraliza las rutas del backend. Puedes copiar `.env.example` a `.env` para configurar `VITE_WORDPRESS_URL`. En desarrollo, `vite.config.ts` incluye el proxy de WordPress del proyecto; en producción, sin variable, se usa el mismo origen.
+## Organización
 
-## Vista compartida en GitHub Pages
+- `src/pages` contiene las pantallas. El inicio usa una única composición adaptable.
+- `src/components` reúne los componentes de cada sección y sus piezas compartidas.
+- `src/styles` contiene los estilos. Los temas y tamaños de pantalla comparten la misma base.
+- `src/services`, `src/hooks` y `src/utils` gestionan datos, comportamiento y utilidades.
+- `src/assets` contiene los recursos que procesa Vite. `public` guarda los de dirección fija.
+- `server` contiene las rutas, los metadatos y los sitemaps que se sirven con PHP.
+- `backend` contiene los complementos de WordPress mantenidos en este repositorio.
+- `scripts` contiene las pruebas y las tareas de compilación y despliegue.
+- `tools/moderacion-mensajes` contiene la herramienta local de moderación.
 
-Enlace: https://chemixx1.github.io/MangaMukai/
+Las composiciones móviles que tienen un diseño propio siguen activas. La
+Biblioteca se utiliza dentro del buscador, aunque ya no tenga una página
+independiente. Los archivos de servidor, las pruebas y la moderación forman
+parte del proyecto aunque no aparezcan como una pantalla pública.
 
-La rama `gh-pages` contiene una copia compilada del frontend. Para preparar otra
-copia, ejecutar `npx tsc -b` y `node scripts/build-pages.mjs`; publicar el contenido
-de `dist-pages/` en esa rama. La publicación no actualiza el servidor WordPress.
-La vista usa rutas con `#` para que los enlaces internos funcionen en Pages,
-y consulta la API de `https://mangamukai.com`. Las funciones que necesitan PHP
-local (como `/api/character-chat`) no están disponibles en este alojamiento.
+En Comunidad solo se recomiendan mangas, con su portada. El buscador de mangas
+se abre sobre el contenido y no desplaza el formulario.
 
-## Documentación del servidor
+
+## Documentación
 
 - [Servidor y despliegue](docs/servidor.md)
-- [Referencias de iconos](docs/design/icons.md)
+- [Apariencia en buscadores](docs/seo.md)
+- [Notificaciones de Comunidad](docs/community-notifications.md)
+- [Transacciones](docs/transactions.md)

@@ -37,7 +37,7 @@ export function getCoinQuote(pack: { id: string; price: number }): Promise<Payme
     const response = await fetch(`${MANGAMUKAI_API}/coin-quote?pack=${encodeURIComponent(pack.id)}`, { signal: AbortSignal.timeout(15000), cache: 'no-store' });
     if (response.status === 404) {
       const rate = await getFallbackRate();
-      // Unsigned fallback quotes are display-only; they cannot authorize receipt submission.
+
       return {
         pack: pack.id,
         price_pen: (Math.ceil(Math.round(pack.price * rate.rate * 1e8) / 1e8 - 0.90) * 100 + 90) / 100,

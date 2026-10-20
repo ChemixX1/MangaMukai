@@ -95,8 +95,6 @@
 .coin-wallet__card--plin { background: radial-gradient(90.49% 90.49% at 50% 50%, #00e1ff 0%, #481566 100%); }
 .coin-wallet__card h3 { margin: 0 0 4px; font-size: 15px; line-height: 24px; font-weight: 700; }
 .coin-wallet__qr { width: 174px; height: 174px; object-fit: contain; border-radius: 8px; }
-.coin-wallet__brand { display: grid; width: 174px; height: 174px; place-items: center; }
-.coin-wallet__brand img { width: 142px; height: 142px; object-fit: contain; }
 .coin-wallet__card > span { margin-top: 1px; color: #fff; font-size: 11px; line-height: 18px; }
 .coin-wallet__number { display: flex; justify-content: center; align-items: center; gap: 8px; color: #fff; }
 .coin-wallet__number strong { font-size: 18px; font-weight: 800; line-height: 25px; }

@@ -7,7 +7,6 @@ interface HomePaginationProps {
   scrollTargetId: string;
 }
 
-/** Cinco casillas estables, con la página activa en negro como en el diseño de PC. */
 export const HomePagination = ({ currentPage, totalPages, onPageChange, scrollTargetId }: HomePaginationProps) => {
   const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
   const selectPage = (page: number) => {

@@ -56,7 +56,7 @@ function mount() {
   attach(tree);
   layouts.forEach((effect) => effect());
   const cleanup = effects.map((effect) => effect());
-  // React StrictMode runs setup, cleanup, then setup again on mount.
+
   cleanup.forEach((fn) => fn?.());
   layouts.forEach((effect) => effect());
   effects.forEach((effect) => effect());

@@ -22,7 +22,7 @@ const preloadImage = (source: string): Promise<void> => {
       try {
         await image.decode();
       } catch {
-        // onload ya confirma que el recurso llegó; decode puede no estar disponible.
+
       }
       finish();
     };

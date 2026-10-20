@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/** Oculta la navegación inferior al bajar y la recupera al subir. */
 export const useHideOnScrollDown = () => {
   const [hidden, setHidden] = useState(false);
 

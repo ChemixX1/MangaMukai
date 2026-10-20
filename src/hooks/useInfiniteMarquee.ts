@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react';
 
 interface MarqueeOptions {
-  /** Cantidad de tarjetas: con cero no hay nada que mover. */
+
   itemCount: number;
-  /** Velocidad de crucero en px/s (0 = quieto, solo arrastre). */
+
   speed: number;
-  /** Sentido de la cinta: las portadas viajan hacia la derecha o hacia la izquierda. */
+
   direction: 'right' | 'left';
-  /** Inset inicial de la primera portada respecto al borde izquierdo. */
+
   leadingInset?: number;
-  /** Pausa el avance al pasar el ratón, sin cambiar la posición de la cinta. */
+
   pauseOnHover?: boolean;
 }
 
@@ -24,24 +24,19 @@ interface DragState {
   moved: boolean;
 }
 
-const MAX_FLICK_VELOCITY = 3; // px/ms
-const FLICK_DECAY_MS = 380; // constante de tiempo del frenado tras soltar
-const STILL_BEFORE_RELEASE_MS = 100; // dedo parado antes de soltar: sin inercia
+const MAX_FLICK_VELOCITY = 3;
+const FLICK_DECAY_MS = 380;
+const STILL_BEFORE_RELEASE_MS = 100;
 const DRAG_THRESHOLD_PX = 6;
 
-/**
- * Cinta infinita con arrastre táctil. La pista lleva la secuencia repetida
- * varias veces; el desplazamiento se envuelve sobre el ancho de una secuencia,
- * así el bucle no se nota. Al arrastrar, la cinta sigue al dedo; al soltar con
- * impulso frena poco a poco y retoma sola la velocidad de crucero.
- */
 export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset = 0, pauseOnHover = false }: MarqueeOptions) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const sequenceRef = useRef<HTMLDivElement>(null);
   const [sequenceWidth, setSequenceWidth] = useState(0);
   const [copies, setCopies] = useState(2);
-  const [inView, setInView] = useState(true);
+  const [inView, setInView] = useState(false);
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
   const state = useRef<DragState>({ offset: 0, velocity: 0, dragging: false, pointerId: -1, lastX: 0, lastT: 0, startX: 0, moved: false });
   const initialized = useRef(false);
   const hovered = useRef(false);
@@ -57,7 +52,6 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     track.style.transform = `translate3d(${-state.current.offset}px, 0, 0)`;
   }, []);
 
-  // Medidas: ancho de una secuencia y copias necesarias para cubrir el viewport.
   useEffect(() => {
     const viewport = viewportRef.current;
     const sequence = sequenceRef.current;
@@ -79,12 +73,22 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
     const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting));
     observer.observe(viewport);
     return () => observer.disconnect();
+  }, [itemCount]);
+
+  useEffect(() => {
+    const onVisibility = () => setPageVisible(!document.hidden);
+    onVisibility();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  // Punto de partida: la primera portada con su inset (una sola vez por medida válida).
   useEffect(() => {
     if (sequenceWidth <= 0 || initialized.current) return;
     initialized.current = true;
@@ -96,9 +100,8 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     initialized.current = false;
   }, [itemCount]);
 
-  // Bucle de animación: crucero, inercia tras soltar o nada mientras se arrastra.
   useEffect(() => {
-    if (sequenceWidth <= 0 || itemCount === 0 || !inView) return;
+    if (sequenceWidth <= 0 || itemCount === 0 || !inView || !pageVisible) return;
     const cruise = (direction === 'right' ? -1 : 1) * (speed / 1000);
     let frame = 0;
     let last = performance.now();
@@ -121,7 +124,7 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     };
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
-  }, [sequenceWidth, itemCount, inView, speed, direction, wrap, paint, pauseOnHover]);
+  }, [sequenceWidth, itemCount, inView, pageVisible, speed, direction, wrap, paint, pauseOnHover]);
 
   const onPointerEnter = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'mouse') return;
@@ -157,13 +160,13 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     const now = performance.now();
     const dx = event.clientX - s.lastX;
     const dt = Math.max(1, now - s.lastT);
-    // Capturar antes del arrastre redirige el clic al contenedor y cancela el enlace de la portada.
+
     if (!s.moved && Math.abs(event.clientX - s.startX) > DRAG_THRESHOLD_PX) {
       s.moved = true;
       event.currentTarget.setPointerCapture(event.pointerId);
     }
     s.offset = wrap(s.offset - dx);
-    // Velocidad suavizada para que el impulso al soltar sea el del último tramo.
+
     const instant = Math.max(-MAX_FLICK_VELOCITY, Math.min(MAX_FLICK_VELOCITY, -dx / dt));
     s.velocity = 0.6 * instant + 0.4 * s.velocity;
     s.lastX = event.clientX;
@@ -180,7 +183,6 @@ export const useInfiniteMarquee = ({ itemCount, speed, direction, leadingInset =
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }, []);
 
-  /** Tras arrastrar, el toque no debe abrir la tarjeta bajo el dedo. */
   const onClickCapture = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (!state.current.moved) return;
     event.preventDefault();
