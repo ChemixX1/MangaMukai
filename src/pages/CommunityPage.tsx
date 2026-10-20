@@ -17,9 +17,13 @@ const MAX_LENGTH = 1000;
 
 function Avatar({ src, name = '' }: { src?: string; name?: string }) {
   const [failedSource, setFailedSource] = useState<string>();
-  return src && failedSource !== src
-    ? <img src={communityImage(src)} alt={name} className="community-avatar" onError={() => setFailedSource(src)} />
-    : <span className="community-avatar" aria-hidden="true"><User size={22} /></span>;
+  const hasImage = Boolean(src && failedSource !== src);
+  // Reserve the avatar's frame before the route styles or full-size photo load.
+  return <span className="community-avatar relative flex h-[42px] w-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full" aria-hidden={hasImage ? undefined : true}>
+    {hasImage
+      ? <img src={communityImage(src!)} alt={name} width={42} height={42} className="absolute inset-0 block h-full w-full object-cover" onError={() => setFailedSource(src)} />
+      : <User size={22} />}
+  </span>;
 }
 
 export default function CommunityPage() {
