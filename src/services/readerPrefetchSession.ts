@@ -40,6 +40,7 @@ export class ReaderPrefetchSession {
   private schedule: ReturnType<typeof setTimeout> | null = null;
 
   peek(id: string) { return this.cache.get(id); }
+  peekSiblings() { return this.series.get(this.mangaId) || []; }
   owns(id: string) { return this.focused === id || this.cache.has(id) || [...this.series.values()].some(chapters => chapters.some(chapter => String(chapter.id) === id)); }
   seed(mangaId: string, chapters: ReaderSibling[], routeId = mangaId) {
     this.mangaId = mangaId;
@@ -183,6 +184,11 @@ export class ReaderPrefetchSession {
 
 let shared: ReaderPrefetchSession | null = null;
 let owner: string | null = null;
+
+// Metadata remains available while chapter images load or are evicted.
+export function peekReaderSession(id: string) {
+  return owner === getAuthCacheKey() && shared?.owns(id) ? shared : null;
+}
 
 function ensureOwner() {
   const identity = getAuthCacheKey();

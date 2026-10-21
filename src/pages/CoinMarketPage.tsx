@@ -13,10 +13,10 @@ import coins1500 from '../assets/recharge/icon-3.webp';
 import coins2500 from '../assets/recharge/icon-4.webp';
 import coins5000 from '../assets/recharge/icon-5.webp';
 import coins10000 from '../assets/recharge/icon-6.webp';
-import paypalIcon from '../assets/recharge/paypal-logo.svg';
-import plinIcon from '../assets/recharge/plin-identico.svg';
+import paypalIcon from '../assets/recharge/paypal-logo.webp';
+import plinIcon from '../assets/recharge/plin-identico.webp';
 import receiptIcon from '../assets/recharge/icon-9.svg';
-import yapeIcon from '../assets/recharge/yape-identico.svg';
+import yapeIcon from '../assets/recharge/yape-identico.webp';
 import transferIcon from '../assets/recharge/icon-11.svg';
 import proLogo from '../assets/profile-icons/mukai-pro.svg';
 import walletQr from '../assets/recharge/wallet-qr.svg';
@@ -309,7 +309,7 @@ export const CoinMarketPage = () => {
                 {PAYMENT_METHODS.map((option) => (
                   <label key={option.id} className={`coin-recharge__method coin-recharge__method--${option.id}`}>
                     <input type="radio" name="payment-method" value={option.id} checked={method === option.id} onChange={() => selectMethod(option.id)} aria-label={option.label} />
-                    <img src={option.image} alt={option.id === 'transfer' ? '' : option.label} />
+                    <img src={option.image} alt={option.id === 'transfer' ? '' : option.label} width={option.id === 'transfer' ? 19 : 100} height={option.id === 'transfer' ? 19 : 43} loading="eager" decoding="async" />
                     {option.id === 'transfer' && <span>Transfer</span>}
                   </label>
                 ))}
@@ -366,7 +366,7 @@ export const CoinMarketPage = () => {
             </div>}
             {method === 'paypal' && <div className="coin-checkout__online">
               <button className="coin-checkout__paypal" type="button" onClick={() => void checkout()} disabled={pending} aria-busy={pending}>
-                <span>Continuar con</span><img src={paypalIcon} alt="PayPal" />
+                <span>Continuar con</span><img src={paypalIcon} alt="PayPal" width={88} height={24} loading="eager" decoding="async" />
               </button>
             </div>}
             </div>

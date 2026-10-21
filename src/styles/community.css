@@ -1111,6 +1111,9 @@
   box-shadow: var(--community-shadow);
 }
 
+.community-saved-header { display: flex; align-items: center; gap: 10px; padding: 18px 16px; border-bottom: 1px solid var(--community-border); }
+.community-saved-header h1 { margin: 0; font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 800; }
+
 .community-thread-topbar {
   display: flex;
   align-items: center;
@@ -1593,9 +1596,10 @@
   }
   .community-compose-tools {
     gap: 10px;
+    flex-wrap: wrap;
     min-height: 68px;
     margin-left: -54px;
-    padding: 10px 0 22px;
+    padding: 10px 0;
   }
   .community-compose-tools .community-attachments {
     flex-shrink: 0;
@@ -1610,13 +1614,12 @@
     height: 26px;
   }
   .community-compose-submit-wrap {
-    position: relative;
     flex-shrink: 0;
+    gap: 6px;
+    margin-left: auto;
   }
   .community-compose-submit-wrap .community-character-count {
-    position: absolute;
-    top: calc(100% + 3px);
-    right: 0;
+    order: 1;
     margin: 0;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;

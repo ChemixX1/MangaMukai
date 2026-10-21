@@ -8,11 +8,12 @@ import rewardCoins from '../../assets/manga/reward-coins.svg';
 import rewardDiscount from '../../assets/manga/reward-discount.svg';
 import rewardCover from '../../assets/manga/reward-cover.svg';
 import collectionCardBack from '../../assets/profile/collection-card-back.svg';
-import profileBanner from '../../assets/banners/illustration-anime-character-rain.jpg';
+import profileBanner from '../../assets/banners/illustration-anime-character-rain.webp';
 import HoloCard from './HoloCard';
 import { getUltimosCapitulos } from '../../services/mangaService';
 import { calculateMangaRewardProgress, getAccountCompletedRewardChapterIds, subscribeMangaRewardProgress } from '../../services/mangaRewardProgress';
 import { lockPageScroll } from '../../utils/scrollLock';
+import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
 import '../../styles/manga-rewards.css';
 
 interface MangaRewardProgressProps {
@@ -125,6 +126,9 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const reducedMotion = useReducedMotion();
+  const isMobile = useIsMobileViewport();
+  const sparkles = reducedMotion ? [] : isMobile ? revealSparkles.filter((_, index) => index % 2 === 0) : revealSparkles;
+  const mobileEntrance = { duration: .32, ease: 'easeOut' as const };
   useEffect(() => subscribeMangaRewardProgress(() => setRevision(value => value + 1)), []);
   useEffect(() => {
     let active = true;
@@ -180,14 +184,14 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
               className="reward-reveal-eyebrow"
               initial={reducedMotion ? false : { opacity: 0, y: -16, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={reducedMotion ? { duration: 0 } : { delay: 0.22, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              transition={reducedMotion ? { duration: 0 } : isMobile ? mobileEntrance : { delay: 0.22, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             >
               <motion.span
                 className="reward-reveal-check"
                 aria-hidden="true"
                 initial={reducedMotion ? false : { scale: 0, rotate: -45 }}
                 animate={{ scale: 1, rotate: 0 }}
-                transition={reducedMotion ? { duration: 0 } : { delay: 0.32, duration: 0.48, ease: [0.34, 1.56, 0.64, 1] }}
+                transition={reducedMotion ? { duration: 0 } : isMobile ? mobileEntrance : { delay: 0.32, duration: 0.48, ease: [0.34, 1.56, 0.64, 1] }}
               >
                 <Check size={22} strokeWidth={3.2} />
               </motion.span>
@@ -199,7 +203,7 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
                 <div className="reward-reveal-halo" aria-hidden="true" />
                 <div className="reward-reveal-ring" aria-hidden="true" />
                 <div className="reward-reveal-sparkles" aria-hidden="true">
-                  {revealSparkles.map((sparkle, index) => (
+                  {sparkles.map((sparkle, index) => (
                     <span
                       key={index}
                       className={`reward-reveal-sparkle${sparkle.star ? ' is-star' : ''}`}
@@ -215,14 +219,14 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
                 </div>
                 <motion.div
                   className="reward-reveal-prize-wrap"
-                  initial={reducedMotion ? false : { opacity: 0, y: 36, scale: 0.35, rotate: -6 }}
-                  animate={reducedMotion ? { opacity: 1, y: 0, scale: 1, rotate: 0 } : {
+                  initial={reducedMotion ? false : isMobile ? { opacity: 0, y: 16, scale: .92, rotate: 0 } : { opacity: 0, y: 36, scale: 0.35, rotate: -6 }}
+                  animate={reducedMotion || isMobile ? { opacity: 1, y: 0, scale: 1, rotate: 0 } : {
                     opacity: [0, 1, 1, 1],
                     y: [36, -10, 3, 0],
                     scale: [0.35, 1.12, 0.97, 1],
                     rotate: [-6, 2.5, -1, 0],
                   }}
-                  transition={reducedMotion ? { duration: 0 } : {
+                  transition={reducedMotion ? { duration: 0 } : isMobile ? { ...mobileEntrance, duration: .38 } : {
                     delay: 0.08,
                     duration: 0.72,
                     times: [0, 0.6, 0.84, 1],
@@ -243,6 +247,9 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
                       alt={`Girar portada: ${previewTitle}`}
                       preset="rainbow"
                       intensity={0.65}
+                      foilEnabled={!isMobile && !reducedMotion}
+                      idle={!isMobile && !reducedMotion}
+                      shadow={!isMobile}
                       tiltMax={20}
                       hoverScale={1.04}
                       frame={0}
@@ -257,8 +264,8 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
               <motion.h2
                 id={titleId}
                 initial={reducedMotion ? false : { opacity: 0, y: 20, scale: 0.88 }}
-                animate={reducedMotion ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0, scale: [0.88, 1.04, 1] }}
-                transition={reducedMotion ? { duration: 0 } : { delay: 0.3, duration: 0.52, ease: [0.16, 1, 0.3, 1] }}
+                animate={reducedMotion || isMobile ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0, scale: [0.88, 1.04, 1] }}
+                transition={reducedMotion ? { duration: 0 } : isMobile ? { ...mobileEntrance, delay: .06 } : { delay: 0.3, duration: 0.52, ease: [0.16, 1, 0.3, 1] }}
               >
                 {revealedPrize.revealTitle}
               </motion.h2>
@@ -266,7 +273,7 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
                 className="reward-reveal-note"
                 initial={reducedMotion ? false : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={reducedMotion ? { duration: 0 } : { delay: 0.38, duration: 0.46, ease: 'easeOut' }}
+                transition={reducedMotion ? { duration: 0 } : isMobile ? { ...mobileEntrance, delay: .1 } : { delay: 0.38, duration: 0.46, ease: 'easeOut' }}
               >
                 {revealedPrize.revealNote}
               </motion.p>
@@ -277,7 +284,7 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
               onClick={() => setOpen(false)}
               initial={reducedMotion ? false : { opacity: 0, y: 18, scale: 0.94 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={reducedMotion ? { duration: 0 } : { delay: 0.46, duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
+              transition={reducedMotion ? { duration: 0 } : isMobile ? { ...mobileEntrance, delay: .14 } : { delay: 0.46, duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
             >
               Continuar
             </motion.button>

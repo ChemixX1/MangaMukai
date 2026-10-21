@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { normalizeSeoPath, routeSeo, SEO_ROUTES, SITE_NAME, SITE_URL, type RouteSeo } from '../config/seo';
+import { getKnownMangaTitle } from '../services/mangaTitles';
 
 const buildTitle = (section?: string | null) => section?.trim() ? `${section.trim()} | ${SITE_NAME}` : SEO_ROUTES['/'].title;
 
@@ -81,16 +82,18 @@ export const applyRouteSeo = (pathname: string) => {
   const path = normalizeSeoPath(pathname);
   if (path === activePath) return;
   const seo = routeSeo(path);
+  const mangaId = /^\/manga\/(\d+)$/.exec(path)?.[1];
+  const knownTitle = mangaId ? getKnownMangaTitle(mangaId) : undefined;
   // Keep the richer server response (Book, chapter dates, lists) on initial load.
   const serverCanonical = document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
   const serverSchema = document.getElementById('mm-page-schema');
   const serverNoindex = document.head.querySelector('meta[name="robots"]')?.getAttribute('content')?.includes('noindex');
   const preserveServer = !activePath && (serverSchema || serverNoindex) && serverCanonical === `${SITE_URL}${path}`;
   activePath = path;
-  activeSeo = { ...seo };
+  activeSeo = { ...seo, ...(knownTitle ? { title: buildTitle(knownTitle) } : {}) };
   activeImage = `${SITE_URL}/favicon.svg`;
   if (preserveServer) {
-    activeSeo.title = document.title;
+    activeSeo.title = knownTitle ? buildTitle(knownTitle) : SEO_ROUTES[path]?.title || document.title;
     activeSeo.description = document.head.querySelector('meta[name="description"]')?.getAttribute('content') || seo.description;
     activeSeo.adult = document.head.querySelector('meta[name="rating" i]')?.getAttribute('content') === 'adult';
     activeSeo.noindex = seo.noindex || serverNoindex;
@@ -105,6 +108,17 @@ export const applyRouteSeo = (pathname: string) => {
   applyIndexing();
   updateTitleAndDescription();
   if (!preserveServer) updateSchema();
+  else if (serverSchema && SEO_ROUTES[path]) {
+    // Keep server-provided lists and dates while applying the frontend's route title.
+    try {
+      const schema = JSON.parse(serverSchema.textContent || '{}');
+      const nodes = Array.isArray(schema['@graph']) ? schema['@graph'] : [schema];
+      for (const node of nodes) {
+        if (node['@id'] === `${SITE_URL}${path}#webpage`) node.name = activeSeo.title;
+      }
+      serverSchema.textContent = JSON.stringify(schema);
+    } catch { /* Leave an unrecognized server schema intact. */ }
+  }
 };
 
 interface DocumentSeoOptions {

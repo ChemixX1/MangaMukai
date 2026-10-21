@@ -195,7 +195,7 @@
 .auth-reference .auth-switch { color: inherit; font: 400 10px/16px 'Montserrat', sans-serif; }
 .auth-reference .auth-switch a { color: #db2777; font-weight: 600; }
 @media (max-width: 1023px) {
-  .auth-reference .auth-form-shell { padding: 150px 24px 90px; align-items: flex-start; }
+  .auth-reference .auth-form-shell { padding: 126px 24px 90px; align-items: flex-start; }
   .auth-reference .auth-heading { margin-bottom: 23px; }
   .auth-reference .auth-fields-panel input:not([type='checkbox']):not([type='date']) { min-height: 50px; height: 50px; }
   .auth-reference .auth-fields-panel input::placeholder { font-size: 12px; }
@@ -233,12 +233,12 @@ body:has(.auth-reference) .navbar-primary-link { font-family: 'Anta', sans-serif
 @media (max-width: 1023px) {
   .auth-reference .auth-form-card-login { padding: 32px 28px; max-width: 440px; }
   .auth-reference :is(.auth-form-card-login, .auth-form-card-register) .auth-title-audiowide { font-size: clamp(20px, 5.5vw, 26px); }
-  .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding: 114px 24px 70px; }
+  .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding: 98px 24px 70px; }
   .auth-reference .auth-form-card-register { padding: 32px 28px; max-width: 440px; }
 }
 @media (max-width: 639px) {
-  .auth-reference:has(.auth-form-card-login) .auth-form-shell { padding-top: 126px; }
-  .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding-top: 104px; }
+  .auth-reference:has(.auth-form-card-login) .auth-form-shell { padding-top: 104px; }
+  .auth-reference:has(.auth-form-card-register) .auth-form-shell { padding-top: 88px; }
   .auth-reference :is(.auth-form-card-login, .auth-form-card-register) { padding: 26px 20px 28px; border-radius: 24px; }
   .auth-reference .auth-fields-panel { padding: 18px 16px 20px; }
   .auth-reference .auth-phone-grid { grid-template-columns: 78px minmax(0, 1fr); gap: 8px; }

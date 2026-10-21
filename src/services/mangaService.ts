@@ -3,6 +3,7 @@
 import type { WPManga, MangaCapitulo } from '../types/manga';
 import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from '../config/api';
 import { createPublicDataCache } from '../utils/publicDataCache';
+import { rememberMangaTitle } from './mangaTitles';
 
 const API_URL = WORDPRESS_POSTS_API;
 const MM_API = MANGAMUKAI_API;
@@ -25,6 +26,7 @@ const readCatalogSessionCache = () => {
       return null;
     }
 
+    parsed.data.forEach(manga => rememberMangaTitle(manga.id, manga.titulo));
     return { data: parsed.data, expiresAt: parsed.expiresAt };
   } catch {
     try { window.sessionStorage.removeItem(CATALOG_SESSION_CACHE_KEY); } catch {}
@@ -98,6 +100,8 @@ const limpiarTitulo = (titulo: string): string => {
 
 const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
   const titulo = item.title?.rendered || '';
+  rememberMangaTitle(item.id, limpiarTit ? limpiarTitulo(titulo) : titulo);
+  if (item.ero_seri) rememberMangaTitle(item.ero_seri, limpiarTitulo(titulo));
   const myCred = item.myCRED_sell_content;
   const esGratis = !myCred || myCred.status === 'disabled' || myCred.price === 0;
 
@@ -140,6 +144,7 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
 };
 
 const mapearMangaCatalog = (item: any): MangaCapitulo => {
+  rememberMangaTitle(item.id, item.titulo);
   const genres: string[] = Array.isArray(item.genres) ? item.genres : [];
   let genero: 'Hombre' | 'Mujer' | null = item.genero === 'Hombre' ? 'Hombre'
     : item.genero === 'Mujer' ? 'Mujer'
@@ -561,7 +566,9 @@ export const getRelatedMangas = (mangaId: number | string, limit = 10): Promise<
 
     const data: any = await res.json();
     if (!data.success || !Array.isArray(data.mangas)) return [];
-    return data.mangas as RelatedManga[];
+    const mangas = data.mangas as RelatedManga[];
+    mangas.forEach(manga => rememberMangaTitle(manga.id, manga.titulo));
+    return mangas;
   } catch (error) {
     console.error('Error getRelatedMangas:', error);
     return [];

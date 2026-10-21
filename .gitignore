@@ -26,23 +26,16 @@ dist-ssr
 *.sln
 *.sw?
 
-# Backend and  dumps
+# Backend remoto y volcados locales
+/backend/
+/server/
 .env
 *.php
 *.json
-!server/
-!server/**/*.php
-!server/**/*.json
-!backend/
-!backend/**/*.php
-!backend/**/*.json
+!src/config/seo-routes.json
 !package.json
 !package-lock.json
 !tsconfig.json
 !tsconfig.app.json
 !tsconfig.node.json
 !.vscode/extensions.json
-
-# Clave compartida de la herramienta local de moderacion (se genera sola; se publica con el deploy
-server/wp-content/mu-plugins/mangamukai-moderation-key.php
-backend/wp-content/mu-plugins/mangamukai-moderation-key.php

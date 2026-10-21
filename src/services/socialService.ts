@@ -8,7 +8,7 @@ export const OPEN_CHAT_EVENT = 'mm_open_chat';
 
 export const SOCIAL_REFRESH_EVENT = 'mm_social_refresh';
 
-export const CHAT_ACCENT = '#f43f5e';
+export const CHAT_ACCENT = '#ff008c';
 
 export interface FriendUser {
   id: number;

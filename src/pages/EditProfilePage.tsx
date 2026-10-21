@@ -14,7 +14,7 @@ import {
   type WordPressProfile,
 } from '../services/wordpressService';
 import { readerRankProgress } from '../utils/readerRank';
-import defaultBanner from '../assets/banners/illustration-anime-character-rain.jpg';
+import defaultBanner from '../assets/banners/illustration-anime-character-rain.webp';
 
 const BIO_MAX_LENGTH = 160;
 

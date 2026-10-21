@@ -54,6 +54,7 @@ import { Footer } from '../components/layout/Footer';
 import { useTheme } from '../hooks/useTheme';
 import { toTitleCase } from '../utils/titleCase';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { getKnownMangaTitle } from '../services/mangaTitles';
 import { collectionBadge } from '../utils/womenBlackWhite';
 import { whenIdle } from '../utils/whenIdle';
 import { mangaReaderSession } from '../services/readerPrefetchSession';
@@ -299,12 +300,13 @@ export const MangaDetail = () => {
     loadUser();
   }, [loadUser]);
 
+  const seoManga = manga && String(manga.id) === id ? manga : null;
   useDocumentTitle(
-    manga?.titulo,
-    manga
-      ? `Lee ${manga.titulo} en español en MangaMukai. ${cleanSynopsis(manga.titulo, manga.descripcion).replace(/\s+/g, ' ') || 'Consulta su sinopsis y todos los capítulos disponibles.'}`.slice(0, 200)
+    seoManga?.titulo || (id ? getKnownMangaTitle(id) : undefined),
+    seoManga
+      ? `Lee ${seoManga.titulo} en español en MangaMukai. ${cleanSynopsis(seoManga.titulo, seoManga.descripcion).replace(/\s+/g, ' ') || 'Consulta su sinopsis y todos los capítulos disponibles.'}`.slice(0, 200)
       : undefined,
-    { path: `/manga/${id}`, image: manga?.portada, adult: manga ? hasHotTag(manga) : undefined, noindex: manga ? false : !loading && !manga ? true : undefined },
+    { path: `/manga/${id}`, image: seoManga?.portada, adult: seoManga ? hasHotTag(seoManga) : undefined, noindex: seoManga ? false : !loading && !manga ? true : undefined },
   );
 
   useEffect(() => {
@@ -369,7 +371,10 @@ export const MangaDetail = () => {
           setRelated(buildMangaRecommendations(mangaData, catalog, recommendations));
         }).finally(() => { if (active) setRelatedLoading(false); });
         const chaptersRequest = getChaptersBySeries(mangaPostId).then(data => {
-          if (active) setChapters(data);
+          if (active) {
+            mangaReaderSession(id, String(mangaPostId), data);
+            setChapters(data);
+          }
         }).catch(() => { if (active) setChaptersError('No se pudieron cargar los capítulos.'); })
           .finally(() => { if (active) setChaptersLoading(false); });
         void loadInteractions(String(mangaData.id), () => active).catch(() => {});

@@ -57,7 +57,8 @@ const ScrollToTop = () => {
       const timeout = window.setTimeout(() => observer.disconnect(), 10000);
       return () => { observer.disconnect(); window.clearTimeout(timeout); };
     }
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    // The community restores its position once its cached feed is mounted.
+    if (pathname !== '/comunidad') window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [pathname, hash]);
   return null;
 };
@@ -120,6 +121,7 @@ function AppInner() {
             <Route path="/usuarios/:id" element={<PublicProfilePage />} />
               <Route path="/usuarios/:id/publicacion/:postId" element={<ProfilePostPage />} />
             <Route path="/comunidad" element={<CommunityPage />} />
+            <Route path="/comunidad/guardados" element={<CommunityPage />} />
             <Route path="/comunidad/publicacion/:postId" element={<CommunityPage />} />
             <Route path="/mensajes" element={<MessagesPage />} />
             <Route path="/mensajes/:userId" element={<MessagesPage />} />

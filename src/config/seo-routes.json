@@ -4,31 +4,31 @@
   "routes": {
     "/": {
       "kind": "home",
-      "title": "Leer manga en español: novedades y lectura juvenil | MangaMukai",
+      "title": "MangaMukai",
       "description": "Lee manga, manhwa y manhua en español. Descubre novedades, tendencias y lectura juvenil, y explora las colecciones de MangaMukai.",
       "heading": "Tendencia Ahora y Mangas Juveniles",
       "intro": "Manga, manhwa y manhua en español: tendencias, lectura juvenil y últimos capítulos disponibles."
     },
     "/manga-19": {
       "kind": "collection",
-      "title": "Manga HOT en español: lectura para adultos | MangaMukai",
-      "description": "Manga HOT y lectura para adultos en español: romance, drama y fantasía de la colección +19. Descubre historias y sus últimos capítulos en MangaMukai.",
+      "title": "Manga Hot en español: lectura para adultos | MangaMukai",
+      "description": "Manga Hot y lectura para adultos en español: romance, drama y fantasía de la colección +19. Descubre historias y sus últimos capítulos en MangaMukai.",
       "heading": "Mangas para adultos",
       "intro": "Selección madura de manga y manhwa en español. Contenido para mayores de 18 años.",
       "adult": true
     },
     "/manga-bn": {
       "kind": "collection",
-      "title": "Manga en blanco y negro: lectura clásica | MangaMukai",
+      "title": "Manga Blanco y Negro | MangaMukai",
       "description": "Explora manga en blanco y negro y de estilo clásico en español. Descubre historias, consulta sus capítulos y sigue las novedades en MangaMukai.",
       "heading": "Mangas Blanco & Negro",
       "intro": "Historias clásicas, acción y tinta pura para lectores de manga tradicional."
     },
     "/comunidad": {
       "kind": "page",
-      "title": "Comunidad Mukai | MangaMukai",
+      "title": "Comunidad | MangaMukai",
       "description": "Comparte tus mangas favoritos, publica recomendaciones y conversa con otros lectores en Comunidad Mukai.",
-      "heading": "Comunidad Mukai"
+      "heading": "Comunidad"
     },
     "/chat": {
       "kind": "page",

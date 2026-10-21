@@ -686,7 +686,25 @@
   0%, 55% { transform: translateX(-130%); }
   85%, 100% { transform: translateX(130%); }
 }
+@media (max-width: 1023px) {
+  /* One short entrance, with no full-screen glow filters or continuous animation. */
+  .manga-reward-banner::before, .manga-reward-banner::after,
+  .manga-reward-modal::before, .manga-reward-modal::after { animation: reward-backdrop-enter .45s ease-out both; }
+  .is-reached .reward-road-card { animation: none; }
+  .reward-reveal .reward-reveal-beam, .reward-reveal .reward-reveal-flash { display: none; }
+  .reward-reveal .reward-reveal-halo { animation-duration: .4s; animation-delay: 0s; }
+  .reward-reveal .reward-reveal-halo::before, .reward-reveal .reward-reveal-halo::after { animation: none; }
+  .reward-reveal .reward-reveal-halo::after, .reward-reveal .reward-reveal-ring::after { display: none; }
+  .reward-reveal .reward-reveal-ring::before { box-shadow: none; animation-duration: .6s; }
+  .reward-reveal .reward-reveal-sparkle { filter: none; box-shadow: none; animation-duration: .7s; animation-delay: .08s; }
+  .reward-reveal .reward-reveal-prize, .reward-reveal .reward-reveal-cover-card { filter: none; animation: none; }
+  .reward-reveal .reward-reveal-continue::after { display: none; }
+  .manga-reward-dialog.is-revealing { backdrop-filter: none; -webkit-backdrop-filter: none; background: #fffffff2; }
+  .dark .manga-reward-dialog.is-revealing, .manga-reward-dialog.is-revealing.theme-dark { background: #000000f2; }
+}
 @media (prefers-reduced-motion: reduce) {
+  .manga-reward-banner::before, .manga-reward-banner::after,
+  .manga-reward-modal::before, .manga-reward-modal::after { animation: none; }
   .reward-reveal-beam, .reward-reveal-flash, .reward-reveal-ring, .reward-reveal-sparkles { display: none; animation: none; }
   .reward-reveal-prize, .reward-reveal-halo, .reward-reveal-halo::before, .reward-reveal-halo::after, .reward-reveal-continue::after { animation: none; }
 }

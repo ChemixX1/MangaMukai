@@ -84,6 +84,21 @@ test('detail and reader reuse chapter data and the already loaded chapter list',
   assert.equal(api.mangaReaderSession('alias', '100', chapters), reader);
 });
 
+test('chapter metadata is available synchronously before content or background prefetch', async t => {
+  const { requests } = setup(t);
+  const detail = api.mangaReaderSession('alias', '100', chapters);
+  assert.equal(api.peekReaderSession('2'), detail);
+  assert.deepEqual(api.peekReaderSession('2').peekSiblings(), chapters);
+  assert.equal(detail.peek('2'), undefined);
+  assert.equal(requests.length, 0);
+  api.syncReaderPrefetchRoute('/read/2');
+  detail.pause();
+  assert.equal(api.peekReaderSession('3').peekSiblings()[2].chapter_number, 3);
+  detail.invalidate('2');
+  assert.equal(api.peekReaderSession('2').peekSiblings()[1].chapter_number, 2);
+  assert.equal(api.peekReaderSession('900'), null);
+});
+
 test('entering a chapter cancels its speculative images and keeps its URLs', async t => {
   const { images } = setup(t, { stalled: true });
   const session = api.mangaReaderSession('100', '100', chapters);

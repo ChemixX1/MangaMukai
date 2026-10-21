@@ -2,17 +2,29 @@ import { useEffect, useRef, useState } from 'react';
 import type { CommunityPost } from '../data/communityPosts';
 import { getCommunityFeed, getCommunityThread, publishCommunityPost, updateCommunityPost } from '../services/communityFeedService';
 import { followUser, unfollowUser, getFollows, SOCIAL_REFRESH_EVENT } from '../services/socialService';
+import { AUTH_CHANGED_EVENT, getStoredToken, getStoredUser } from '../services/authService';
+
+// Keep loaded pages in memory while visiting messages, including the pagination cursor.
+let feedSnapshot: { userId: string; posts: CommunityPost[]; follows: string[]; cursor?: string; hasMore: boolean } | null = null;
+window.addEventListener(AUTH_CHANGED_EVENT, () => {
+  if (!getStoredToken() || String(getStoredUser()?.id) !== feedSnapshot?.userId) feedSnapshot = null;
+});
 
 export function useCommunityFeed(userId: string, postId?: string) {
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [follows, setFollows] = useState<string[]>([]);
+  const [initial] = useState(() => !postId && feedSnapshot?.userId === userId ? feedSnapshot : null);
+  const [posts, setPosts] = useState<CommunityPost[]>(initial?.posts ?? []);
+  const [follows, setFollows] = useState<string[]>(initial?.follows ?? []);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const cursor = useRef<string | undefined>(undefined);
+  const [loading, setLoading] = useState(!initial);
+  const [hasMore, setHasMore] = useState(initial?.hasMore ?? false);
+  const [connected, setConnected] = useState(Boolean(initial));
+  const cursor = useRef<string | undefined>(initial?.cursor);
   const pending = useRef(new Set<string>());
   const revision = useRef(0);
+
+  useEffect(() => {
+    if (!postId && connected) feedSnapshot = { userId, posts, follows, hasMore, cursor: cursor.current };
+  }, [userId, postId, posts, follows, hasMore, connected]);
 
   useEffect(() => {
     let active = true;

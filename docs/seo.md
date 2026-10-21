@@ -9,11 +9,13 @@ Los dos títulos se eligen al combinar los rankings históricos del catálogo,
 eliminar series repetidas y ordenar sus vistas reales. No se usan las cifras
 provisionales de presentación. Si faltan datos, no se inventan títulos ni vistas.
 
-El navegador configura sus metadatos en `src/hooks/useDocumentTitle.ts`.
-El servidor los entrega en la primera respuesta con
-`server/backend-patches/manga-route-meta.php`. Las fichas de manga usan
-`manga-social-meta.php`. Los títulos y las descripciones deben mantenerse
-coherentes en ambos lados.
+El frontend define sus rutas en `src/config/seo-routes.json` y configura sus
+metadatos en `src/hooks/useDocumentTitle.ts`. La portada usa `MangaMukai` y
+Blanco y Negro usa `Manga Blanco y Negro / MangaMukai`.
+
+El PHP que entrega metadatos en la respuesta inicial se administra directamente
+en el servidor. Las rutas estáticas aplican los títulos del frontend al cargar,
+conservando los datos enriquecidos de listas y fechas enviados por el servidor.
 
 El sitemap `https://mangamukai.com/sitemap-react.xml` incluye las colecciones,
 Comunidad Mukai, Character Chat y las fichas de manga. Las páginas privadas,

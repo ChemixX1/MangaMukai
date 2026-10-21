@@ -169,7 +169,7 @@ export const MobileMangaDetail = ({
       </div>
 
       <header className="manga-detail-mobile-cover relative aspect-[440/630]">
-        <HoloCard image={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} foilEnabled={false} tiltMax={8} tiltDamping={26} hoverScale={1.015} radius={14} idle={false} />
+        <HoloCard image={manga.portada} alt={`Portada de ${toTitleCase(manga.titulo)}`} foilEnabled={false} shadow={false} tiltMax={8} tiltDamping={26} hoverScale={1.015} radius={14} idle={false} />
       </header>
 
 

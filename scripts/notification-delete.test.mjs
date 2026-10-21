@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
-import PhpParser from 'php-parser';
 
 const bundle = await build({ entryPoints: ['src/services/socialService.ts'], bundle: true, write: false, platform: 'node', format: 'esm', define: { 'import.meta.env': '{}' } });
 const api = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
@@ -27,14 +25,6 @@ test('delete only clears confirmed old notifications; failure preserves the list
   };
   await api.deleteNotifications(5);
   assert.deepEqual(api.getCachedNotifications().map(item => item.id), [6]);
-});
-
-test('notification deletion PHP parses and scopes deletion to the authenticated account', async () => {
-  const source = await readFile('backend/wp-content/mu-plugins/mangamukai-notification-delete.php', 'utf8');
-  new PhpParser({ parser: { suppressErrors: false } }).parseCode(source);
-  assert.match(source, /mm_social_auth_permission\(\$request\)/);
-  assert.match(source, /\$user_id = mm_interactions_viewer\(\$request\)/);
-  assert.match(source, /WHERE user_id=%d AND id<=%d/);
 });
 
 test('localhost deletion needs no endpoint and stays cleared after refreshing notifications', async (t) => {

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  ArrowUp,
+  PenLine,
   MessageCircle,
   MoreHorizontal,
   Search,
@@ -11,12 +11,16 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { MukaiLoaderWheel } from '../components/common/MukaiLoaderWheel';
+import { CommunityIcon } from '../components/community/CommunityIcons';
+import { MessageComposer } from '../components/community/MessageComposer';
+import { chatMessagePreview, formatChatDate, parseChatMessage } from '../utils/chatMessage';
+import '../styles/messages.css';
 import { getStoredToken, getStoredUser } from '../services/authService';
+import { getCachedMessageInbox, loadMessageInbox } from '../services/messageInbox';
+import { getCommunityPosition } from '../services/communityViewState';
 import {
   CHAT_ACCENT,
   getConversationMessages,
-  getConversations,
   getPublicProfile,
   markConversationRead,
   sendChatMessage,
@@ -38,29 +42,9 @@ const timeAgo = (value: string) => {
   return `${months} ${months === 1 ? 'Mes' : 'Meses'}`;
 };
 
-const formatTime = (date: Date) => new Intl.DateTimeFormat('es-PE', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
-
-const formatSeparator = (value: string) => {
-  const date = new Date(value);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  const day = sameDay(date, today)
-    ? 'Hoy'
-    : sameDay(date, yesterday)
-      ? 'Ayer'
-      : new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', ...(date.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) }).format(date);
-  return `${day} ${formatTime(date)}`;
-};
-
-const formatJoined = (value: string) => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(value));
-
-const formatCount = (value: number) => value >= 1000 ? `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1).replace(/\.0$/, '')}K` : String(value);
-
 const Avatar = ({ user, size = 'h-12 w-12', text = 'text-base' }: { user: Pick<FriendUser, 'avatar_url' | 'username'>; size?: string; text?: string }) => user.avatar_url
   ? <img src={user.avatar_url} alt="" className={`${size} shrink-0 rounded-full object-cover`} />
-  : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#FF4D88] font-black text-white ${text}`}>{user.username.charAt(0).toUpperCase()}</span>;
+  : <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[var(--mm-accent-pink)] font-black text-white ${text}`}>{user.username.charAt(0).toUpperCase()}</span>;
 
 export const MessagesPage = () => {
   const navigate = useNavigate();
@@ -71,8 +55,8 @@ export const MessagesPage = () => {
   const currentUserId = Number(currentUser?.id || 0);
   const activeId = Number(userId) || 0;
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [listLoading, setListLoading] = useState(true);
+  const [conversations, setConversations] = useState<Conversation[]>(() => getCachedMessageInbox()?.conversations ?? []);
+  const [listLoading, setListLoading] = useState(() => getCachedMessageInbox() === null);
   const [listError, setListError] = useState('');
   const [query, setQuery] = useState('');
 
@@ -81,8 +65,6 @@ export const MessagesPage = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState('');
   const [hasMore, setHasMore] = useState(false);
-  const [content, setContent] = useState('');
-  const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -99,14 +81,12 @@ export const MessagesPage = () => {
 
   const notifyNavbar = () => window.dispatchEvent(new Event(SOCIAL_REFRESH_EVENT));
 
-  const goBack = () => {
-    if (((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0) navigate(-1);
-    else navigate('/comunidad');
-  };
+  const communityReturn = getCommunityPosition(String(currentUserId))?.url || '/comunidad';
+  const goBack = () => navigate(communityReturn, { state: { restoreCommunityScroll: true } });
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (force = false) => {
     try {
-      const result = await getConversations();
+      const result = await loadMessageInbox(force);
       setConversations(result.conversations);
       setListError('');
     } catch (caught) {
@@ -142,7 +122,7 @@ export const MessagesPage = () => {
       hasLoaded.current = true;
 
       const pendingRead = result.messages.some((message) => message.sender_id === target && !message.read_at);
-      if (pendingRead && !document.hidden) void markConversationRead(target).then(() => { notifyNavbar(); void loadConversations(); }).catch(() => undefined);
+      if (pendingRead && !document.hidden) void markConversationRead(target).then(() => { notifyNavbar(); void loadConversations(true); }).catch(() => undefined);
       setChatError('');
     } catch (caught) {
       if (activeIdRef.current !== target) return;
@@ -154,7 +134,6 @@ export const MessagesPage = () => {
 
   useEffect(() => {
     setMessages([]);
-    setContent('');
     setChatError('');
     setHasMore(false);
     hasLoaded.current = false;
@@ -172,25 +151,14 @@ export const MessagesPage = () => {
     if (stickToBottom.current) bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [lastMessageId, partnerId]);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const body = content.trim();
-    if (!activeId || !body || sending) return;
-    setSending(true);
-    try {
-      const sent = await sendChatMessage(activeId, body);
-      if (activeIdRef.current !== activeId) return;
-      stickToBottom.current = true;
-      setMessages((current) => [...current.filter((message) => message.id !== sent.id), sent]);
-      setContent('');
-      setChatError('');
-      void loadConversations();
-    } catch (caught) {
-      if (activeIdRef.current !== activeId) return;
-      setChatError(caught instanceof Error ? caught.message : 'No se pudo enviar el mensaje.');
-    } finally {
-      setSending(false);
-    }
+  const submit = async (body: string) => {
+    if (!activeId || !body) return;
+    const sent = await sendChatMessage(activeId, body);
+    if (activeIdRef.current !== activeId) return;
+    stickToBottom.current = true;
+    setMessages((current) => [...current.filter((message) => message.id !== sent.id), sent]);
+    setChatError('');
+    void loadConversations(true);
   };
 
   const visibleConversations = conversations.filter((conversation) =>
@@ -210,20 +178,31 @@ export const MessagesPage = () => {
     const previous = messages[index - 1];
     const gap = previous ? new Date(message.created_at).getTime() - new Date(previous.created_at).getTime() : Infinity;
     if (!previous || new Date(previous.created_at).toDateString() !== new Date(message.created_at).toDateString() || gap > 30 * 60 * 1000) {
-      rows.push({ type: 'separator', key: `sep-${message.id}`, label: formatSeparator(message.created_at) });
+      rows.push({ type: 'separator', key: `sep-${message.id}`, label: formatChatDate(message.created_at) });
     }
     rows.push({ type: 'message', message });
   });
   const lastOwnRead = [...messages].reverse().find((message) => message.sender_id === currentUserId && message.read_at);
 
   return (
-    <main className={`messages-page pt-[env(safe-area-inset-top)] transition-colors ${surface}`}>
+    <main className={`messages-page ${isLight ? 'is-light' : ''} pt-[env(safe-area-inset-top)] transition-colors ${surface}`}>
 
-      <div className={`mx-auto flex h-[calc(100dvh-64px-env(safe-area-inset-bottom)-env(safe-area-inset-top))] w-full max-w-6xl lg:grid lg:h-[100dvh] lg:grid-cols-[360px_minmax(0,1fr)] lg:border-x ${divider}`}>
+      <div className={`mx-auto flex h-[calc(100dvh-env(safe-area-inset-top))] w-full max-w-6xl lg:grid lg:h-[100dvh] lg:grid-cols-[76px_320px_minmax(0,1fr)] lg:border-x ${divider}`}>
+        <nav className="messages-rail" aria-label="Navegación de comunidad">
+          {([
+            ['home', 'Inicio', communityReturn],
+            ['search', 'Explorar', '/comunidad?explorar=1'],
+            ['messages', 'Mensajes', '/mensajes'],
+            ['bookmark', 'Guardados', '/comunidad/guardados'],
+            ['pro', 'MukaiPro', '/pro'],
+            ['profile', 'Ver perfil', '/profile'],
+          ] as const).map(([icon, label, to]) => <Link key={icon} to={to} state={icon === 'home' ? { restoreCommunityScroll: true } : undefined} aria-label={label} title={label} aria-current={icon === 'messages' ? 'page' : undefined}><CommunityIcon name={icon} size={28} /></Link>)}
+          <Link to="/comunidad?publicar=1" className="messages-rail-publish" aria-label="Publicar" title="Publicar"><PenLine size={24} /></Link>
+        </nav>
         <section className={`relative flex min-h-0 w-full min-w-0 flex-col lg:border-r ${divider} ${activeId ? 'hidden lg:flex' : 'flex'}`} aria-label="Chats">
           <header className={`flex h-14 shrink-0 items-center justify-between gap-3 border-b px-3 ${divider}`}>
             <div className="flex items-center gap-1">
-              <button type="button" onClick={goBack} aria-label="Volver" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${hover}`}><ArrowLeft size={20} /></button>
+              <button type="button" onClick={goBack} aria-label="Volver a Comunidad" className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${hover}`}><ArrowLeft size={20} /></button>
               <Link to="/profile" aria-label="Ir a mi perfil" className="shrink-0 rounded-full">
                 {currentUser?.avatar
                   ? <img src={currentUser.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
@@ -234,7 +213,7 @@ export const MessagesPage = () => {
             <span aria-hidden="true" className="w-[68px]" />
           </header>
 
-          <label className={`mx-4 mt-3 flex h-11 items-center gap-3 rounded-[8px] px-4 ${pill}`}>
+          <label className={`messages-search mx-4 mt-3 flex h-11 items-center gap-3 rounded-[8px] px-4 ${pill}`}>
             <Search size={18} className={muted} />
             <input aria-label="Buscar chat" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:opacity-60" />
             {query && <button type="button" onClick={() => setQuery('')} aria-label="Limpiar búsqueda"><X size={16} /></button>}
@@ -272,7 +251,7 @@ export const MessagesPage = () => {
                       <small className={`shrink-0 text-xs ${muted}`}>{timeAgo(conversation.created_at)}</small>
                     </span>
                     <span className={`mt-0.5 block truncate text-sm ${conversation.unread_count > 0 ? 'font-semibold' : muted}`} style={conversation.unread_count > 0 ? { color: CHAT_ACCENT } : undefined}>
-                      {own ? 'Tú: ' : ''}{conversation.body}
+                      {own ? 'Tú: ' : ''}{chatMessagePreview(conversation.body)}
                     </span>
                   </span>
                   {conversation.unread_count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black text-white" style={{ backgroundColor: CHAT_ACCENT }}>{conversation.unread_count}</span>}
@@ -311,14 +290,10 @@ export const MessagesPage = () => {
                   <div className="mb-8 flex flex-col items-center text-center">
                     {partner ? (
                       <>
-                        <div className={`relative mb-3 h-[76px] w-[76px] overflow-hidden rounded-full ring-4 ${isLight ? 'ring-black/5' : 'ring-white/10'}`}>
-                          {partner.banner_url && <img src={partner.banner_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />}
-                          <div className="absolute inset-0 flex items-center justify-center"><Avatar user={partner} size="h-16 w-16" text="text-xl" /></div>
-                        </div>
+                        <Link to={`/usuarios/${partner.id}`} aria-label={`Ver perfil de ${partner.username}`} className="mb-3 block h-[84px] w-[84px] overflow-hidden rounded-full">
+                          <Avatar user={partner} size="h-full w-full" text="text-xl" />
+                        </Link>
                         <p className="font-[Montserrat] text-base font-extrabold">{partner.username}</p>
-                        <p className={`mt-1 text-sm ${muted}`}>Se unió en {formatJoined(partner.created_at)}</p>
-                        <p className={`text-sm ${muted}`}>{formatCount(partner.followers_count)} {partner.followers_count === 1 ? 'seguidor' : 'seguidores'}</p>
-                        <Link to={`/usuarios/${partner.id}`} className={`mt-3 rounded-full px-5 py-2.5 text-sm font-bold ${pill}`}>Ver perfil</Link>
                       </>
                     ) : null}
                   </div>
@@ -327,17 +302,19 @@ export const MessagesPage = () => {
 
                 <div className="space-y-1.5">
                   {rows.map((row) => row.type === 'separator' ? (
-                    <p key={row.key} className={`py-3 text-center text-[13px] ${muted}`}>{row.label}</p>
+                    <p key={row.key} className={`messages-date py-3 text-center text-[13px] ${muted}`}>{row.label}</p>
                   ) : (() => {
                     const own = row.message.sender_id === currentUserId;
+                    const parsed = parseChatMessage(row.message.body);
                     return (
                       <div key={row.message.id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
                         <div
                           className={`max-w-[78%] rounded-[22px] px-4 py-2.5 text-[15px] leading-snug ${own ? 'rounded-br-md text-white' : `rounded-bl-md ${isLight ? 'bg-[#eff3f4] text-black' : 'bg-[#2f3336] text-white'}`}`}
                           style={own ? { backgroundColor: CHAT_ACCENT } : undefined}
-                          title={formatTime(new Date(row.message.created_at))}
+                          title={formatChatDate(row.message.created_at)}
                         >
-                          <p className="whitespace-pre-wrap break-words">{row.message.body}</p>
+                          {parsed.media && <a href={parsed.media.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${parsed.media.label}`}><img src={parsed.media.url} alt={parsed.media.label} className="mb-1 max-h-72 max-w-full rounded-xl object-contain" onLoad={() => { if (stickToBottom.current) bottomRef.current?.scrollIntoView({ block: 'end' }); }} /></a>}
+                          {parsed.text && <p className="whitespace-pre-wrap break-words">{parsed.text}</p>}
                         </div>
                       </div>
                     );
@@ -349,22 +326,7 @@ export const MessagesPage = () => {
 
               {chatError && <p className="bg-red-500/10 px-4 py-2 text-xs text-red-500">{chatError}</p>}
 
-              <form onSubmit={submit} className={`grid shrink-0 grid-cols-[minmax(0,1fr)_44px] items-end gap-2 border-t px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 ${divider}`}>
-                <label className={`flex min-h-11 w-full items-center rounded-[24px] border px-4 ${isLight ? 'border-black/15 bg-white' : 'border-white/20 bg-black'}`}>
-                  <textarea
-                    aria-label="Mensaje"
-                    value={content}
-                    onChange={(event) => setContent(event.target.value.slice(0, 2000))}
-                    onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}
-                    rows={1}
-                    placeholder="Escribe un mensaje"
-                    className="max-h-28 min-h-[22px] w-full resize-none bg-transparent py-2.5 text-[15px] leading-[22px] outline-none placeholder:opacity-60"
-                  />
-                </label>
-                <button type="submit" disabled={!content.trim() || sending} aria-label="Enviar mensaje" className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40" style={{ backgroundColor: CHAT_ACCENT }}>
-                  {sending ? <MukaiLoaderWheel size={20} isLight={false} /> : <ArrowUp size={21} strokeWidth={2.6} />}
-                </button>
-              </form>
+              <MessageComposer key={activeId} onSend={submit} />
             </>
           )}
         </section>

@@ -12,7 +12,8 @@ export function ReaderChapterSelect({ value, number, options, isLight, onChange 
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const items: ReaderChapterOption[] = options.length ? options : [{ id: value || '', number: number || 0 }];
+  const selectedNumber = options.find(chapter => chapter.id === value)?.number ?? number;
+  const items: ReaderChapterOption[] = options.length ? options : value && selectedNumber !== undefined ? [{ id: value, number: selectedNumber }] : [];
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
@@ -37,7 +38,7 @@ export function ReaderChapterSelect({ value, number, options, isLight, onChange 
     const list = selected?.parentElement;
     if (selected && list) list.scrollTop = selected.offsetTop - (list.clientHeight - selected.offsetHeight) / 2;
   }}>
-    <button ref={button} type="button" aria-label="Seleccionar capítulo" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} onClick={() => setOpen(current => !current)} className={`flex h-16 w-full items-center justify-between rounded-3xl border px-6 shadow-sm text-sm outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 ${isLight ? 'border-black/10 bg-white' : 'border-white/15 bg-zinc-900'}`}><span>Capítulo <strong className="ml-2">{number}</strong></span><ChevronDown size={18} className={`transition-transform ${open ? 'rotate-180' : ''}`} /></button>
+    <button ref={button} type="button" aria-label="Seleccionar capítulo" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId} onClick={() => setOpen(current => !current)} className={`flex h-16 w-full items-center justify-between rounded-3xl border px-6 shadow-sm text-sm outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 ${isLight ? 'border-black/10 bg-white' : 'border-white/15 bg-zinc-900'}`}><span>Capítulo <strong className="ml-2">{selectedNumber ?? '…'}</strong></span><ChevronDown size={18} className={`transition-transform ${open ? 'rotate-180' : ''}`} /></button>
     {open && <div id={listId} role="listbox" aria-label="Capítulos" className={`absolute inset-x-0 top-full z-[80] mt-2 max-h-52 overflow-y-auto overscroll-contain rounded-2xl border p-1.5 shadow-xl ${isLight ? 'border-black/10 bg-white' : 'border-white/15 bg-zinc-900'}`} style={{ WebkitOverflowScrolling: 'touch' }}>
       {items.map(chapter => <button key={chapter.id} type="button" role="option" aria-selected={chapter.id === value} onClick={() => { setOpen(false); onChange(chapter.id); button.current?.focus({ preventScroll: true }); }} className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-400/60 ${chapter.id === value ? (isLight ? 'bg-zinc-100 font-semibold text-zinc-950' : 'bg-zinc-800 font-semibold text-white') : isLight ? 'hover:bg-black/5' : 'hover:bg-white/5'}`}><span>Capítulo {chapter.number}</span><span className="ml-2 inline-flex shrink-0 items-center gap-2">{chapter.isPurchased ? <span className="inline-flex items-center gap-1 text-xs font-semibold"><PurchasedIcon size={18} /><span>Comprado</span></span> : chapter.isPaid && <span className="inline-flex items-center gap-1 text-xs font-semibold" aria-label={`${chapter.price ?? 0} monedas`}><img src={navbarCoins} alt="" aria-hidden="true" className="h-5 w-6 object-contain" />{chapter.price ?? 0}</span>}</span></button>)}
     </div>}

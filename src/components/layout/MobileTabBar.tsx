@@ -57,7 +57,7 @@ export const MobileTabBar = () => {
   const { pathname } = useLocation();
   const hidden = useHideOnScrollDown();
 
-  if (pathname.startsWith('/read/') || pathname.startsWith('/comunidad/publicacion/') || /^\/usuarios\/[^/]+\/publicacion\/[^/]+$/.test(pathname) || /^\/chat\/.+/.test(pathname) || pathname === '/perfil/editar' || isMobileSectionRoute(pathname)) return null;
+  if (pathname === '/mensajes' || pathname.startsWith('/mensajes/') || pathname.startsWith('/read/') || pathname.startsWith('/comunidad/publicacion/') || /^\/usuarios\/[^/]+\/publicacion\/[^/]+$/.test(pathname) || /^\/chat\/.+/.test(pathname) || pathname === '/perfil/editar' || isMobileSectionRoute(pathname)) return null;
 
   const labelClass = (active: boolean) => `flex h-full w-full flex-col items-center justify-center gap-1.5 pb-0.5 font-[Montserrat] text-[10px] leading-none transition-colors ${active ? 'font-bold text-black dark:text-white' : 'font-semibold text-[#262626] dark:text-[#e4e4e7]'}`;
 

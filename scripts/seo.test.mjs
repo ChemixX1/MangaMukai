@@ -3,9 +3,8 @@ import test from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { build } from 'esbuild';
-import PhpParser from 'php-parser';
 import { mostViewedMangas } from '../src/utils/mostViewedMangas.ts';
-import config from '../server/backend-patches/seo-config.json' with { type: 'json' };
+import config from '../src/config/seo-routes.json' with { type: 'json' };
 import { seoHtml } from './seo-html.mjs';
 
 const manga = (id, totalViews, extra = {}) => ({ id, titulo: `Manga ${id}`, totalViews, ...extra });
@@ -46,9 +45,24 @@ test('navigation updates titles and canonical URLs and clears private robots met
     if (previous) Object.defineProperty(globalThis, 'document', previous);
     else delete globalThis.document;
   });
-  const result = await build({ entryPoints: ['src/hooks/useDocumentTitle.ts'], bundle: true, write: false, format: 'esm', platform: 'node' });
-  const { applyRouteSeo } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+  const result = await build({ stdin: { contents: "export * from './src/hooks/useDocumentTitle.ts'; export * from './src/services/mangaTitles.ts';", resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'node' });
+  const { applyRouteSeo, rememberMangaTitle } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
   const meta = name => tags.get(`meta[name="${name}"]`).attributes.content;
+  const canonical = document.createElement('link');
+  canonical.setAttribute('rel', 'canonical');
+  canonical.setAttribute('href', 'https://mangamukai.com/manga-bn');
+  document.head.appendChild(canonical);
+  const serverSchema = document.createElement('script');
+  serverSchema.id = 'mm-page-schema';
+  serverSchema.type = 'application/ld+json';
+  serverSchema.textContent = JSON.stringify({ '@graph': [{ '@id': 'https://mangamukai.com/manga-bn#webpage', name: 'Título anterior', mainEntity: { '@type': 'ItemList', numberOfItems: 12 } }] });
+  document.head.appendChild(serverSchema);
+  document.title = 'Título anterior';
+  applyRouteSeo('/manga-bn');
+  assert.equal(document.title, 'Manga Blanco y Negro | MangaMukai');
+  const preservedPage = JSON.parse(serverSchema.textContent)['@graph'][0];
+  assert.equal(preservedPage.name, document.title);
+  assert.equal(preservedPage.mainEntity.numberOfItems, 12);
   applyRouteSeo('/chat/alex/conversacion');
   assert.equal(meta('robots'), 'noindex,follow');
   applyRouteSeo('/chat');
@@ -56,9 +70,9 @@ test('navigation updates titles and canonical URLs and clears private robots met
   assert.match(meta('description'), /vive una aventura/);
   assert.match(meta('robots'), /^index,follow/);
   applyRouteSeo('/comunidad');
-  assert.equal(document.title, 'Comunidad Mukai | MangaMukai');
+  assert.equal(document.title, 'Comunidad | MangaMukai');
   assert.equal(tags.get('link[rel="canonical"]').attributes.href, 'https://mangamukai.com/comunidad');
-  for (const route of ['/profile', '/perfil/editar', '/pro/pago', '/tienda/pago', '/mensajes/123']) {
+  for (const route of ['/profile', '/perfil/editar', '/pro/pago', '/tienda/pago', '/mensajes/123', '/comunidad/guardados']) {
     applyRouteSeo(route);
     assert.equal(meta('robots'), 'noindex,follow', route);
   }
@@ -67,15 +81,28 @@ test('navigation updates titles and canonical URLs and clears private robots met
   assert.equal(meta('robots'), 'noindex,follow');
   assert.equal(tags.get('link[rel="canonical"]').attributes.href, 'https://mangamukai.com/recargar');
   applyRouteSeo('/manga-bn');
-  assert.equal(document.title, config.routes['/manga-bn'].title);
+  assert.equal(document.title, 'Manga Blanco y Negro | MangaMukai');
+  assert.equal(meta('twitter:title'), 'Manga Blanco y Negro | MangaMukai');
   applyRouteSeo('/manga-19');
   assert.equal(document.title, config.routes['/manga-19'].title);
   assert.equal(meta('rating'), 'adult');
   assert.equal(JSON.parse(document.getElementById('mm-page-schema').textContent)['@graph'][2].isFamilyFriendly, false);
   applyRouteSeo('/');
+  assert.equal(document.title, 'MangaMukai');
+  assert.equal(meta('twitter:title'), 'MangaMukai');
   assert.equal(querySelectorAll('meta[name="rating" i]').length, 0);
   assert.equal(meta('googlebot-image'), 'index,follow');
   assert.equal(JSON.parse(document.getElementById('mm-page-schema').textContent)['@graph'][2].url, `${config.siteUrl}/`);
+  rememberMangaTitle(42, 'La historia ya cargada');
+  rememberMangaTitle(43, 'Otro manga');
+  applyRouteSeo('/manga/42');
+  assert.equal(document.title, 'La historia ya cargada | MangaMukai');
+  assert.equal(meta('twitter:title'), document.title);
+  assert.equal(JSON.parse(document.getElementById('mm-page-schema').textContent)['@graph'][2].mainEntity.name, 'La historia ya cargada');
+  applyRouteSeo('/manga/43');
+  assert.equal(document.title, 'Otro manga | MangaMukai');
+  applyRouteSeo('/manga/999');
+  assert.equal(document.title, 'Ficha del manga | MangaMukai', 'unknown titles never reuse another manga name');
   applyRouteSeo('/not-a-page');
   assert.equal(meta('robots'), 'noindex,follow');
   assert.equal(meta('googlebot-image'), 'noindex');
@@ -93,12 +120,7 @@ test('verification tokens are escaped, absent tokens emit nothing and previews c
   assert.match(preview, /name="robots" content="noindex,nofollow"/);
 });
 
-test('maintained PHP sources parse and the HTML structured data is valid JSON', () => {
-  const parser = new PhpParser({ parser: { suppressErrors: false } });
-  const walk = directory => fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(path.join(directory, entry.name)) : [path.join(directory, entry.name)]);
-  for (const file of [...walk('server'), ...walk('backend')].filter(file => file.endsWith('.php'))) {
-    assert.doesNotThrow(() => parser.parseCode(fs.readFileSync(file, 'utf8'), file), file);
-  }
+test('the HTML structured data is valid JSON', () => {
   const html = fs.readFileSync('index.html', 'utf8');
   for (const match of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) assert.doesNotThrow(() => JSON.parse(match[1]));
 });

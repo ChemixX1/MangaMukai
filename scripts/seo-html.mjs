@@ -1,4 +1,4 @@
-import config from '../server/backend-patches/seo-config.json' with { type: 'json' };
+import config from '../src/config/seo-routes.json' with { type: 'json' };
 
 const escape = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 

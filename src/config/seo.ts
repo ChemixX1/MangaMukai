@@ -1,4 +1,4 @@
-import config from '../../server/backend-patches/seo-config.json';
+import config from './seo-routes.json';
 
 export interface RouteSeo {
   kind: string;
@@ -16,6 +16,7 @@ export const normalizeSeoPath = (pathname: string) => pathname.replace(/\/+$/, '
 
 export const routeSeo = (pathname: string): RouteSeo => {
   const path = normalizeSeoPath(pathname);
+  if (path === '/comunidad/guardados') return { kind: 'private', title: 'Publicaciones guardadas | MangaMukai', description: 'Tus publicaciones guardadas de la comunidad.', noindex: true };
   if (SEO_ROUTES[path]) return SEO_ROUTES[path];
   if (/^\/(?:auth|usuarios|mensajes|chat)(?:\/|$)|^\/comunidad\/publicacion\//.test(path)
     || ['/profile', '/perfil/editar', '/transacciones', '/notificaciones', '/recargar', '/recargar/pago', '/pro/pago', '/tienda/pago', '/pago-exitoso', '/login'].includes(path)) {

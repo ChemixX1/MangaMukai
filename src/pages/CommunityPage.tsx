@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, BookOpen, Heart, Loader2, Send, User, X } from 'lucide-react';
 import { readLocalImage, useExperienceUser } from '../hooks/useLocalExperience';
 import { formatCount, handleOf, timeAgo, type CommunityComment, type CommunityMangaTag, type CommunityPost } from '../data/communityPosts';
@@ -10,6 +10,9 @@ import PulseHeart from '../components/common/PulseHeart';
 import { useHideOnScrollDown } from '../hooks/useHideOnScrollDown';
 import '../styles/community.css';
 import { useCommunityFeed } from '../hooks/useCommunityFeed';
+import { useCommunityScroll } from '../hooks/useCommunityScroll';
+import { loadMessageInbox } from '../services/messageInbox';
+import { getCommunityPosition } from '../services/communityViewState';
 
 type ExperienceUser = ReturnType<typeof useExperienceUser>;
 type Tab = 'recent' | 'popular' | 'following' | 'saved';
@@ -28,11 +31,19 @@ function Avatar({ src, name = '' }: { src?: string; name?: string }) {
 
 export default function CommunityPage() {
   const user = useExperienceUser();
-  useEffect(() => { void import('./MessagesPage'); }, []);
-  return <Community key={user.id} />;
+  const { pathname, search } = useLocation();
+  const saved = pathname === '/comunidad/guardados';
+  useEffect(() => {
+    void import('./MessagesPage').catch(() => undefined);
+    if (user.signedIn) void loadMessageInbox().catch(() => undefined);
+  }, [user.id, user.signedIn]);
+  if (!saved && pathname === '/comunidad' && new URLSearchParams(search).get('tab') === 'saved') {
+    return <Navigate to="/comunidad/guardados" replace />;
+  }
+  return <Community key={`${user.id}:${saved}`} saved={saved} />;
 }
 
-function Community() {
+function Community({ saved }: { saved: boolean }) {
   const user = useExperienceUser();
   const mobileBarHidden = useHideOnScrollDown();
   const navigate = useNavigate();
@@ -41,14 +52,22 @@ function Community() {
   const [params, setParams] = useSearchParams();
   const author = params.get('autor') || '';
   const query = params.get('q') || '';
-  const tab: Tab = ['popular', 'following', 'saved'].includes(params.get('tab') || '') ? params.get('tab') as Tab : 'recent';
+  const tab: Tab = saved ? 'saved' : ['popular', 'following'].includes(params.get('tab') || '') ? params.get('tab') as Tab : 'recent';
   const { posts, follows, error, setError, loading, hasMore, loadMore, publish, update, toggleFollow } = useCommunityFeed(user.id, postId);
+  useCommunityScroll(user.id, loading);
   const [notice, setNotice] = useState('');
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const replyRef = useRef<HTMLTextAreaElement>(null);
-  const [exploring, setExploring] = useState(false);
+  const [exploring, setExploring] = useState(params.get('explorar') === '1');
   const selected = posts.find((post) => post.id === postId);
+
+  useEffect(() => {
+    if (params.get('publicar') === '1') {
+      composerRef.current?.focus();
+      composerRef.current?.scrollIntoView({ block: 'center' });
+    } else if (params.get('explorar') === '1') searchRef.current?.focus();
+  }, [params]);
 
   useEffect(() => {
     if (!notice) return;
@@ -57,7 +76,7 @@ function Community() {
   }, [notice]);
 
   const setFilter = (next: Record<string, string>) => {
-    if (postId) navigate(`/comunidad?${new URLSearchParams(next)}`);
+    if (postId || saved) navigate(`/comunidad?${new URLSearchParams(next)}`);
     else setParams(next);
   };
   const showAuthor = (post: CommunityPost) => {
@@ -66,11 +85,12 @@ function Community() {
   };
   const search = (tag: string) => { setFilter({ q: tag }); setExploring(true); };
   const compose = () => {
+    if (saved || postId) { navigate('/comunidad?publicar=1'); return; }
     setFilter({});
     window.setTimeout(() => { composerRef.current?.focus(); composerRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 0);
   };
   const openPost = (post: CommunityPost, focusReply = false) => {
-    navigate(`/comunidad/publicacion/${encodeURIComponent(post.id)}`, { state: { communityReturn: `/comunidad${location.search}` }, flushSync: focusReply });
+    navigate(`/comunidad/publicacion/${encodeURIComponent(post.id)}`, { state: { communityReturn: `${location.pathname}${location.search}` }, flushSync: focusReply });
     if (focusReply && window.matchMedia('(max-width: 1023px)').matches) replyRef.current?.focus({ preventScroll: true });
   };
   const goBack = () => {
@@ -83,6 +103,7 @@ function Community() {
     try { await navigator.clipboard.writeText(shareText); setNotice('Enlace de la publicación copiado al portapapeles.'); }
     catch { setNotice(`Puedes copiar y compartir: ${shareText}`); }
   };
+  const communityReturn = getCommunityPosition(user.id)?.url || '/comunidad';
   const needle = query.trim().toLocaleLowerCase('es');
   const feed = posts.filter((post) => (!author || post.userId === author)
     && (tab !== 'saved' || post.saved)
@@ -94,14 +115,14 @@ function Community() {
   const readers = <Readers suggestions={suggestions} follows={follows} onFollow={toggleFollow} onSelect={(id) => setFilter({ autor: id })} />;
 
   return <main className={`community-page${postId ? ' is-thread' : ''}`}>
-    <h1 className="sr-only">{postId ? 'Publicación de la comunidad' : 'Comunidad Mukai'}</h1>
+    {!saved && <h1 className="sr-only">{postId ? 'Publicación de la comunidad' : 'Comunidad'}</h1>}
     <div className="community-shell">
       <aside id="community-navigation" className="community-nav" aria-label="Navegación de comunidad">
         <nav className="community-nav-links">
           <button type="button" className={!postId && tab === 'recent' && !author && !needle && !exploring ? 'is-active' : ''} onClick={() => { setFilter({}); setExploring(false); }}><CommunityIcon name="home" size={30} />Inicio</button>
-          <button type="button" className={exploring || Boolean(needle) ? 'is-active' : ''} onClick={() => { setExploring((prev) => !prev); window.setTimeout(() => searchRef.current?.focus(), 0); }}><CommunityIcon name="search" size={30} />Explorar</button>
+          <button type="button" className={exploring || Boolean(needle) ? 'is-active' : ''} onClick={() => { if (saved) { navigate('/comunidad?explorar=1'); return; } setExploring((prev) => !prev); window.setTimeout(() => searchRef.current?.focus(), 0); }}><CommunityIcon name="search" size={30} />Explorar</button>
           <Link to="/mensajes"><CommunityIcon name="messages" size={30} />Mensajes</Link>
-          <button type="button" className={tab === 'saved' ? 'is-active' : ''} onClick={() => setFilter({ tab: 'saved' })}><CommunityIcon name="bookmark" size={30} />Guardados</button>
+          <Link to="/comunidad/guardados" className={saved ? 'is-active' : ''} aria-current={saved ? 'page' : undefined}><CommunityIcon name="bookmark" size={30} />Guardados</Link>
           <button type="button" onClick={() => navigate('/pro')}><CommunityIcon name="pro" size={30} />MukaiPro</button>
           <Link to={user.signedIn ? '/profile' : '/auth/login'}><CommunityIcon name="profile" size={30} />Ver Perfil</Link>
         </nav>
@@ -115,6 +136,7 @@ function Community() {
         {postId ? selected ? <Thread post={selected} user={user} onBack={goBack} onUpdate={update} onAuthor={showAuthor} onTag={search} onShare={share} replyRef={replyRef} onError={setError} />
           : <section className="community-empty"><button type="button" className="community-back" onClick={goBack}><ArrowLeft size={20} />Regresar</button><h2>Publicación no disponible</h2><p>No se pudo encontrar esta publicación en la comunidad.</p></section>
           : <>
+            {saved ? <header className="community-saved-header"><Link to={communityReturn} state={{ restoreCommunityScroll: true }} className="community-back" aria-label="Volver a Comunidad"><ArrowLeft size={20} /></Link><h1>Publicaciones guardadas</h1></header> : <>
             <div className="community-tabs" role="group" aria-label="Filtrar publicaciones">
               {([{ id: 'recent', name: 'recent', label: 'Recientes' }, { id: 'popular', name: 'popular', label: 'Populares' }, { id: 'following', name: 'following', label: 'Siguiendo' }] as const).map(({ id, name, label }) => <button key={id} type="button" aria-label={label} aria-pressed={tab === id} className={tab === id ? 'is-active' : ''} onClick={() => setFilter(id === 'recent' ? {} : { tab: id })}><CommunityIcon name={name} size={19} /><span>{label}</span></button>)}
             </div>
@@ -123,17 +145,18 @@ function Community() {
               if (!await publish(post)) return false;
               setFilter({}); setExploring(false); return true;
             }} />
-            {(author || tab === 'saved' || query) && <div className="community-filter-summary"><span>{author ? `Publicaciones de ${posts.find((post) => post.userId === author)?.name || 'este lector'}` : tab === 'saved' ? `Publicaciones guardadas (${feed.length})` : `Resultados para «${query}» (${feed.length})`}</span><button type="button" onClick={() => { setFilter({}); setExploring(false); }}>Ver todas</button></div>}
-            <section className="community-feed" aria-label="Publicaciones de la comunidad">
+            </>}
+            {!saved && (author || query) && <div className="community-filter-summary"><span>{author ? `Publicaciones de ${posts.find((post) => post.userId === author)?.name || 'este lector'}` : `Resultados para «${query}» (${feed.length})`}</span><button type="button" onClick={() => { setFilter({}); setExploring(false); }}>Ver todas</button></div>}
+            <section className="community-feed" aria-label={saved ? 'Publicaciones guardadas' : 'Publicaciones de la comunidad'}>
               {feed.map((post, index) => <Fragment key={post.id}>
                 <PostCard post={post} user={user} onUpdate={update} onAuthor={showAuthor} onTag={search} onOpen={openPost} onShare={share} />
-                {index === 1 && <div className="community-mobile-insert"><CommunityStoreCard /></div>}
-                {index === 3 && <div className="community-mobile-insert">{readers}</div>}
+                {!saved && index === 1 && <div className="community-mobile-insert"><CommunityStoreCard /></div>}
+                {!saved && index === 3 && <div className="community-mobile-insert">{readers}</div>}
               </Fragment>)}
-              {!loading && !error && !feed.length && <div className="community-empty"><CommunityIcon name={tab === 'saved' ? 'bookmark' : 'following'} size={32} /><h2>{tab === 'saved' ? 'Aún no tienes guardados' : tab === 'following' ? 'Empieza a seguir lectores' : 'No encontramos publicaciones'}</h2><p>{tab === 'following' ? 'Sigue a otros lectores para ver sus publicaciones y recomendaciones aquí.' : tab === 'saved' ? 'Guarda tus publicaciones y reseñas favoritas para leerlas más tarde.' : 'Comparte una historia o explora las conversaciones de la comunidad.'}</p>{(tab !== 'recent' || author || query) && <button type="button" onClick={() => { setFilter({}); setExploring(false); }}>Ver todas las publicaciones</button>}</div>}
-              {feed.length < 2 && <div className="community-mobile-insert"><CommunityStoreCard /></div>}
-              {feed.length < 4 && <div className="community-mobile-insert">{readers}</div>}
-              {hasMore && <div className="community-load-more"><button type="button" className="community-submit" onClick={() => void loadMore()}>Cargar más publicaciones</button></div>}
+              {!loading && !error && !feed.length && <div className="community-empty"><CommunityIcon name={tab === 'saved' ? 'bookmark' : 'following'} size={32} /><h2>{tab === 'saved' ? hasMore ? 'Busca entre tus publicaciones anteriores' : 'Aún no tienes guardados' : tab === 'following' ? 'Empieza a seguir lectores' : 'No encontramos publicaciones'}</h2><p>{tab === 'following' ? 'Sigue a otros lectores para ver sus publicaciones y recomendaciones aquí.' : tab === 'saved' ? hasMore ? 'Carga más publicaciones para encontrar otros guardados.' : 'Guarda tus publicaciones y reseñas favoritas para leerlas más tarde.' : 'Comparte una historia o explora las conversaciones de la comunidad.'}</p>{(tab !== 'recent' || author || query) && <button type="button" onClick={() => { setFilter({}); setExploring(false); }}>Ver todas las publicaciones</button>}</div>}
+              {!saved && feed.length < 2 && <div className="community-mobile-insert"><CommunityStoreCard /></div>}
+              {!saved && feed.length < 4 && <div className="community-mobile-insert">{readers}</div>}
+              {hasMore && <div className="community-load-more"><button type="button" className="community-submit" onClick={() => void loadMore()}>{saved ? 'Buscar más guardados' : 'Cargar más publicaciones'}</button></div>}
             </section>
           </>}
       </div>
@@ -251,10 +274,10 @@ function Composer({ user, textareaRef, onPost, onError }: { user: ExperienceUser
 }
 
 function PostText({ content, onTag, detailPath }: { content: string; onTag: (tag: string) => void; detailPath?: string }) {
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   return <p className="community-post-text">{content.split(/(#[\p{L}\p{N}_]+)/u).map((part, index) => part.startsWith('#')
     ? <button key={index} type="button" onClick={() => onTag(part)}>{part}</button>
-    : detailPath && part.trim() ? <Link className="community-post-content-link" key={index} to={detailPath} state={{ communityReturn: `/comunidad${search}` }}>{part}</Link> : part)}</p>;
+    : detailPath && part.trim() ? <Link className="community-post-content-link" key={index} to={detailPath} state={{ communityReturn: `${pathname}${search}` }}>{part}</Link> : part)}</p>;
 }
 
 function MangaAttachment({ manga }: { manga: CommunityMangaTag }) {

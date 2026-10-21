@@ -274,7 +274,7 @@
 .collection-hero-action--save[aria-pressed="true"] { color: var(--mm-accent-pink); border-color: var(--mm-accent-pink); }
 .collection-hero-action:hover { filter: brightness(1.1); }
 .collection-hero-action--save:hover { border-color: var(--mm-accent-pink); }
-.collection-hero-action:active { transform: scale(.96); }
+.collection-hero-action:active { transform: none; }
 .collection-hero-action:focus-visible { outline: 2px solid var(--mm-accent-pink); outline-offset: 4px; }
 @media (min-width: 1024px) { .collection-hero-action { min-height: 54px; font-size: 13px; } }
 @media (prefers-reduced-motion: reduce) { .collection-hero-action { transition: none; } }

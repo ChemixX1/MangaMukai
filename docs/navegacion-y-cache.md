@@ -43,14 +43,14 @@ refresca progresivamente; un fallo temporal no vacía lo que ya estaba visible.
 Los rankings y el catálogo conservan su caché existente de cinco minutos.
 No se añaden cachés de compras, saldos, mensajes ni permisos de lectura.
 
-`server/assets/.htaccess` permite reutilizar durante un año los archivos
+La configuración de caché administrada en el servidor permite reutilizar durante un año los archivos
 estáticos cuyo nombre contiene la huella generada por Vite. Cada versión
 modificada recibe otra URL. HTML y API quedan fuera de esa regla; no se añade
 un service worker.
 
 ## Comprobación
 
-Ejecutar `npm test`, `npm run lint` y `npm run build`. Las pruebas cubren
+Ejecutar `npm test`, `npm run lint` y `npm run typecheck`, sin generar `dist`. Las pruebas cubren
 prioridad, cancelación, conexiones lentas, caché, reintentos, expiración y pausa
 de carruseles fuera de pantalla.
 

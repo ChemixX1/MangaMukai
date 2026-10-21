@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import navbarCoins from '../../assets/recharge/icon-2.svg';
@@ -8,6 +8,7 @@ import { isRecentChapter } from '../../utils/chapterFreshness';
 import { PurchaseModal } from '../modals';
 import PulseHeart from '../common/PulseHeart';
 import { readGuestChapterLike, setGuestChapterLike } from '../../utils/guestChapterLikes';
+import { createQueuedLike } from '../../utils/queuedLike';
 import { getChapterPreviewImage, type SeriesChapter } from '../../services/mangaService';
 import { getChapterEngagement, getMangaComments, setEntityReaction } from '../../services/communityService';
 import { buyChapter, getStoredToken } from '../../services/authService';
@@ -254,7 +255,11 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
   const [chapterLikes, setChapterLikes] = useState<Record<string, number>>({});
   const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(new Set());
   const [commentedIds, setCommentedIds] = useState<Set<string>>(new Set());
-  const [likeBusy, setLikeBusy] = useState(false);
+  const likeQueues = useRef(new Map<string, ReturnType<typeof createQueuedLike>>());
+  useEffect(() => {
+    const queues = likeQueues.current;
+    return () => { queues.forEach(queue => queue.dispose()); queues.clear(); };
+  }, [mangaId, userInfo.id]);
 
   const chapterIds = chapters.map((chapter) => String(chapter.id)).join(',');
   useEffect(() => {
@@ -265,8 +270,16 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
         if (!active) return;
         setCommentCounts(counts);
         const guest = !getStoredToken();
-        setChapterLikes(Object.fromEntries(chapterIds.split(',').map(id => [id, (engagement[id]?.reactions.like || 0) + Number(guest && readGuestChapterLike(id))])));
-        setLikedChapterIds(new Set(chapterIds.split(',').filter(id => guest ? readGuestChapterLike(id) : engagement[id]?.my_reaction === 'like')));
+        setChapterLikes(current => ({ ...current, ...Object.fromEntries(chapterIds.split(',').filter(id => !likeQueues.current.has(id)).map(id => [id, (engagement[id]?.reactions.like || 0) + Number(guest && readGuestChapterLike(id))])) }));
+        setLikedChapterIds(current => {
+          const next = new Set(current);
+          chapterIds.split(',').forEach(id => {
+            if (likeQueues.current.has(id)) return;
+            if (guest ? readGuestChapterLike(id) : engagement[id]?.my_reaction === 'like') next.add(id);
+            else next.delete(id);
+          });
+          return next;
+        });
       }).catch(() => undefined);
     };
     load();
@@ -299,33 +312,37 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
     setIsModalOpen(true);
   };
 
-  const toggleLike = async (chapterId: number) => {
-    if (likeBusy) return;
+  const toggleLike = (chapterId: number) => {
     const id = String(chapterId);
-    if (!getStoredToken()) {
-      const liked = likedChapterIds.has(id);
-      try {
-        setGuestChapterLike(id, !liked);
-        setChapterLikes(current => ({ ...current, [id]: Math.max(0, (current[id] || 0) + (liked ? -1 : 1)) }));
-        setLikedChapterIds(current => {
-          const next = new Set(current);
-          if (liked) next.delete(id); else next.add(id);
-          return next;
-        });
-      } catch {                                                                         }
-      return;
+    let queue = likeQueues.current.get(id);
+    if (!queue) {
+      const guest = !getStoredToken();
+      let confirmed = guest ? readGuestChapterLike(id) : likedChapterIds.has(id);
+      const publicCount = Math.max(0, (chapterLikes[id] || 0) - Number(confirmed));
+      queue = createQueuedLike(
+        { liked: confirmed, count: chapterLikes[id] || 0 },
+        async () => {
+          if (guest) {
+            setGuestChapterLike(id, !confirmed);
+            confirmed = !confirmed;
+            return { action: confirmed ? 'added' : 'removed', total: publicCount + Number(confirmed) };
+          }
+          const result = await setEntityReaction('chapter', id, confirmed ? '' : 'like');
+          confirmed = result.my_reaction === 'like';
+          return { action: confirmed ? 'added' : 'removed', total: result.reactions.like || 0 };
+        },
+        ({ liked, count }) => {
+          setChapterLikes(current => ({ ...current, [id]: count }));
+          setLikedChapterIds(current => {
+            const next = new Set(current);
+            if (liked) next.add(id); else next.delete(id);
+            return next;
+          });
+        },
+      );
+      likeQueues.current.set(id, queue);
     }
-    setLikeBusy(true);
-    try {
-      const result = await setEntityReaction('chapter', id, likedChapterIds.has(id) ? '' : 'like');
-      setChapterLikes((current) => ({ ...current, [id]: result.reactions.like || 0 }));
-      setLikedChapterIds((current) => {
-        const next = new Set(current);
-        if (result.my_reaction === 'like') next.add(id); else next.delete(id);
-        return next;
-      });
-    } catch {                                                     }
-    finally { setLikeBusy(false); }
+    queue.click();
   };
 
   const confirmPurchase = async () => {
@@ -412,7 +429,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
 
                   {locked ? (
                     <span title={`${chapter.price_coins} monedas`} className="manga-chapter-price">
-                      <img src={navbarCoins} alt="" aria-hidden="true" width={23} height={20} className="shrink-0 object-contain" />
+                      <img src={navbarCoins} alt="" aria-hidden="true" width={25} height={22} className="shrink-0 object-contain" />
                       {chapter.price_coins}
                     </span>
                   ) : isPurchased(chapter) ? (
@@ -437,7 +454,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
                     liked={liked}
                     count={chapterLikes[id] || 0}
                     onChange={() => { void toggleLike(chapter.id); }}
-                    disabled={likeBusy}
+                    interruptible
                     label={liked ? 'Quitar me gusta' : 'Me gusta'}
                     className="manga-chapter-like font-montserrat"
                     size={19}

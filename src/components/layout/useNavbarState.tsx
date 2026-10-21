@@ -28,7 +28,6 @@ export const useNavbarState = () => {
   const isProfileRoute = location.pathname === '/profile';
 
   const [currentUser, setCurrentUser] = useState<MMUser | null>(getCurrentStoredUser);
-  const [sessionNotice, setSessionNotice] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
 
@@ -237,7 +236,6 @@ export const useNavbarState = () => {
     };
     const handleExpired = () => {
       setCurrentUser(null);
-      setSessionNotice(true);
     };
 
     window.addEventListener(AUTH_CHANGED_EVENT, update);
@@ -268,7 +266,6 @@ export const useNavbarState = () => {
   };
 
   const openAuthPage = (view: 'login' | 'register') => {
-    setSessionNotice(false);
     const returnTo = `${location.pathname}${location.search}${location.hash}`;
     navigate(`/auth/${view}?${new URLSearchParams({ returnTo })}`, { state: { returnTo } });
   };
@@ -297,7 +294,6 @@ export const useNavbarState = () => {
   const handleLogoClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
     setIsTimerModalOpen(false);
     setIsNotificationsOpen(false);
-    setSessionNotice(false);
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
     if (location.pathname === '/' && window.matchMedia('(max-width: 1023px)').matches) {
@@ -308,7 +304,7 @@ export const useNavbarState = () => {
 
   const desktopIconClass = "relative flex h-[23.52px] w-[23.52px] shrink-0 items-center justify-center text-ink transition-transform duration-200 hover:scale-110 motion-reduce:transition-none after:absolute after:-inset-2 after:content-['']";
 
-  return { location, theme, isLightMode, isProfileRoute, currentUser, sessionNotice, setSessionNotice, unreadNotifications, isHeaderHidden, isMobile, isStoreMode, headerUsesDarkText, hideHeaderOnMobile, isMessagesRoute, isSearchOpen, closeSearchOverlay, isNotificationsOpen, openNotifications, prefetchNotifications, closeNotificationsOverlay, isCartOpen, closeCartOverlay, cartCount, openSearch, prefetchSearch, openCart, isTimerModalOpen, setIsTimerModalOpen, isAlarmAlertOpen, setIsAlarmAlertOpen, timeLeft, isTimerActive, startTimer, stopTimer, handleThemeToggle, goToRecharge, openAuthPage, renderMobileBell, handleLogoClick, desktopIconClass };
+  return { location, theme, isLightMode, isProfileRoute, currentUser, unreadNotifications, isHeaderHidden, isMobile, isStoreMode, headerUsesDarkText, hideHeaderOnMobile, isMessagesRoute, isSearchOpen, closeSearchOverlay, isNotificationsOpen, openNotifications, prefetchNotifications, closeNotificationsOverlay, isCartOpen, closeCartOverlay, cartCount, openSearch, prefetchSearch, openCart, isTimerModalOpen, setIsTimerModalOpen, isAlarmAlertOpen, setIsAlarmAlertOpen, timeLeft, isTimerActive, startTimer, stopTimer, handleThemeToggle, goToRecharge, openAuthPage, renderMobileBell, handleLogoClick, desktopIconClass };
 };
 
 export type NavbarViewProps = { model: ReturnType<typeof useNavbarState> };

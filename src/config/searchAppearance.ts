@@ -1,11 +1,11 @@
-import asset0 from '../assets/search/BannerDerechoSearch.png';
-import asset1 from '../assets/search/BannerIzquierdoSearch.png';
-import asset2 from '../assets/search/Drama.png';
-import asset3 from '../assets/search/Reencarnación.png';
-import asset4 from '../assets/search/Romance.png';
-import asset5 from '../assets/search/Comedia.png';
-import asset6 from '../assets/search/Romance Obsesivo.png';
-import asset7 from '../assets/search/Venganza.png';
+import asset0 from '../assets/search/BannerDerechoSearch.webp';
+import asset1 from '../assets/search/BannerIzquierdoSearch.webp';
+import asset2 from '../assets/search/Drama.webp';
+import asset3 from '../assets/search/Reencarnación.webp';
+import asset4 from '../assets/search/Romance.webp';
+import asset5 from '../assets/search/Comedia.webp';
+import asset6 from '../assets/search/Romance Obsesivo.webp';
+import asset7 from '../assets/search/Venganza.webp';
 
 export const searchBanners = { left: asset1, right: asset0 };
 export const searchGenres = [

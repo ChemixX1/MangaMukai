@@ -8,7 +8,7 @@ import { getStoredToken, getStoredUser } from '../services/authService';
 import { followUser, getPublicProfile, getSocialLibrary, openChat, unfollowUser, type PublicProfile, type SocialLibrary } from '../services/socialService';
 import { isPlaceholderAvatar } from '../services/wordpressService';
 import { readerRankName } from '../utils/readerRank';
-import profileBanner from '../assets/banners/illustration-anime-character-rain.jpg';
+import profileBanner from '../assets/banners/illustration-anime-character-rain.webp';
 import postIcon from '../assets/profile-icons/post.svg';
 import collectionIcon from '../assets/profile-icons/collection.svg';
 import collectionActiveIcon from '../assets/profile-icons/collection-active.svg';

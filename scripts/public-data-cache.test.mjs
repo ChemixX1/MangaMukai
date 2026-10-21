@@ -52,10 +52,14 @@ const serviceCode = ts.transpileModule(readFileSync(new URL('../src/services/man
 
 const manga = { id: 1, titulo: 'Manga', portada: '/cover.webp', fecha: '2026-10-20', genres: [] };
 
-function setup(responseFor) {
+function setup(responseFor, catalog = null) {
   const requests = [];
+  const titles = new Map();
   const blockedStorage = {
-    getItem() { throw new Error('Storage disabled'); },
+    getItem(key) {
+      if (catalog && key === 'mangamukai:catalog-cache:v1') return JSON.stringify({ data: catalog, expiresAt: Date.now() + 60_000 });
+      throw new Error('Storage disabled');
+    },
     removeItem() { throw new Error('Storage disabled'); },
     setItem() { throw new Error('Storage disabled'); },
   };
@@ -67,14 +71,37 @@ function setup(responseFor) {
     console: { error() {} },
     require: name => name.includes('publicDataCache')
       ? { createPublicDataCache }
+      : name.includes('mangaTitles') ? { rememberMangaTitle: (id, title) => titles.set(String(id), title) }
       : { MANGAMUKAI_API: '/api', WORDPRESS_POSTS_API: '/posts' },
     fetch: async (url, options) => {
       requests.push({ url, options });
       return { ok: true, json: async () => responseFor(url) };
     },
   });
-  return { service: exports, requests };
+  return { service: exports, requests, titles };
 }
+
+test('home, search and recommendation responses remember titles without fetching details', async () => {
+  const { service, requests, titles } = setup(url => ({ success: true, mangas: [{ ...manga, titulo: url }] }));
+  for (const load of [
+    () => service.getPopularWomenByViews('historical', false),
+    () => service.getLatestMenUpdates(72),
+    () => service.getUltimosCapitulos(),
+    () => service.getRelatedMangas(9),
+  ]) {
+    const items = await load();
+    assert.equal(titles.get('1'), items[0].titulo);
+  }
+  assert.equal(requests.length, 4);
+  assert.ok(requests.every(({ url }) => !url.includes('/manga/')));
+});
+
+test('a restored catalog also supplies titles without a network request', async () => {
+  const { service, requests, titles } = setup(() => { throw new Error('unexpected fetch'); }, [manga]);
+  await service.getUltimosCapitulos();
+  assert.equal(titles.get('1'), manga.titulo);
+  assert.equal(requests.length, 0);
+});
 
 test('public service caches are shared across consumers while keeping keys distinct', async () => {
   const { service, requests } = setup(url => url.startsWith('/posts')

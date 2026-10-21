@@ -573,18 +573,19 @@
 #tendencia-ahora, #mangas-juveniles { scroll-margin-top: 100px; }
 
 /* Shared feedback for the home actions, filters and navigation controls. */
-:is(.home-hero-actions > button, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled) {
+:is(.home-hero-actions > button, .collection-hero-action, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled) {
   transition: scale 360ms cubic-bezier(.4, 0, .2, 1), filter 300ms ease, background-color 300ms ease, border-color 300ms ease;
 }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  :is(.home-hero-actions > button, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled):hover { scale: 1.025; }
+  :is(.home-hero-actions > button, .collection-hero-action, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled):hover { scale: 1.025; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  :is(.home-hero-actions > button, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled):focus-visible { scale: 1.025; }
-  :is(.home-hero-actions > button, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled):active { scale: .99; }
+  :is(.home-hero-actions > button, .collection-hero-action, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled):focus-visible { scale: 1.025; }
+  :is(.home-hero-actions > button, .collection-hero-action, .home-trending-heading [role="tab"][aria-selected="false"], .home-latest-heading [role="tab"][aria-selected="false"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button):not(:disabled):active { scale: .99; }
 }
 .home-hero-actions > button:active { transform: none; }
 .home-hero-actions > button[aria-pressed]:active { scale: 1; }
+.collection-hero-action[aria-pressed]:active { scale: 1; }
 @media (prefers-reduced-motion: reduce) {
-  :is(.home-hero-actions > button, .home-trending-heading [role="tab"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button) { transition: none; }
+  :is(.home-hero-actions > button, .collection-hero-action, .home-trending-heading [role="tab"], .home-latest-heading [role="tab"], .home-latest-heading > button, .home-community-strip > a, .home-pagination button) { transition: none; }
 }

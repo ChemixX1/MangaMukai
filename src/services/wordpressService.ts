@@ -6,6 +6,7 @@ import {
   type MMUser,
 } from './authService';
 import { MANGAMUKAI_API } from '../config/api';
+import { optimizeProfileImage } from '../utils/optimizeProfileImage';
 
 const WP_API = MANGAMUKAI_API;
 
@@ -105,31 +106,6 @@ const readJson = async <T>(res: Response): Promise<T | null> => {
     return (await res.json()) as T;
   } catch {
     return null;
-  }
-};
-
-const optimizeProfileImage = async (file: File, type: 'avatar' | 'banner'): Promise<File> => {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') {
-    return file;
-  }
-
-  try {
-    const bitmap = await createImageBitmap(file);
-    const maxWidth = type === 'avatar' ? 512 : 1920;
-    const maxHeight = type === 'avatar' ? 512 : 1080;
-    const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext('2d');
-    if (!context) return file;
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', type === 'avatar' ? 0.86 : 0.88));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webp`, { type: 'image/webp' });
-  } catch {
-    return file;
   }
 };
 

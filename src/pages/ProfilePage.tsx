@@ -21,7 +21,7 @@ import type { MangaCapitulo } from '../types/manga';
 import { readerRankName } from '../utils/readerRank';
 import { displayViews } from '../utils/seriesViews';
 import { selectLikedSeries } from '../utils/profileSeriesLikes';
-import profileBanner from '../assets/banners/illustration-anime-character-rain.jpg';
+import profileBanner from '../assets/banners/illustration-anime-character-rain.webp';
 import editIcon from '../assets/profile-icons/edit.svg';
 import menuIcon from '../assets/profile-icons/menu.svg';
 import crownIcon from '../assets/profile-icons/crown.svg';

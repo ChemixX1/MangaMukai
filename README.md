@@ -28,13 +28,12 @@ Vite puede consultar WordPress a través de su proxy local.
 ```bash
 npm run lint
 npm test
-npm run build
-npm run preview
+npm run typecheck
 ```
 
-La compilación comprueba TypeScript, genera `dist/` y copia los archivos de
-`server/` y `backend/`. No publica cambios. `npm run deploy:dry` permite revisar
-el despliegue y `npm run deploy` lo realiza cuando se dispone de la configuración.
+Estas comprobaciones no generan `dist/` ni respaldos. WordPress y sus
+complementos se administran directamente en el servidor. La conexión API y
+la configuración FTPS se conservan para trabajar con el frontend.
 
 ## Organización
 
@@ -43,15 +42,14 @@ el despliegue y `npm run deploy` lo realiza cuando se dispone de la configuraci�
 - `src/styles` contiene los estilos. Los temas y tamaños de pantalla comparten la misma base.
 - `src/services`, `src/hooks` y `src/utils` gestionan datos, comportamiento y utilidades.
 - `src/assets` contiene los recursos que procesa Vite. `public` guarda los de dirección fija.
-- `server` contiene las rutas, los metadatos y los sitemaps que se sirven con PHP.
-- `backend` contiene los complementos de WordPress mantenidos en este repositorio.
+- `src/config/seo-routes.json` define los títulos y metadatos de las rutas del frontend.
 - `scripts` contiene las pruebas y las tareas de compilación y despliegue.
 - `tools/moderacion-mensajes` contiene la herramienta local de moderación.
 
 Las composiciones móviles que tienen un diseño propio siguen activas. La
 Biblioteca se utiliza dentro del buscador, aunque ya no tenga una página
-independiente. Los archivos de servidor, las pruebas y la moderación forman
-parte del proyecto aunque no aparezcan como una pantalla pública.
+independiente. El código y los datos de WordPress permanecen en el servidor;
+este proyecto mantiene los clientes que consumen sus servicios.
 
 En Comunidad solo se recomiendan mangas, con su portada. El buscador de mangas
 se abre sobre el contenido y no desplaza el formulario.
