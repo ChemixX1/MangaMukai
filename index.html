@@ -21,33 +21,34 @@
       }
     </style>
     <script>
-      (function () {
-        try {
-          var isDark = localStorage.getItem('mangamukai-theme') === 'dark';
-          document.documentElement.style.setProperty('--initial-loader-bg', isDark ? '#070709' : '#f6f7f9');
-          document.documentElement.style.setProperty('--initial-loader-color', isDark ? '#ffffff' : '#111216');
-          document.documentElement.classList.toggle('dark', isDark);
-          document.documentElement.classList.toggle('home-theme-dark', isDark);
-          document.documentElement.classList.toggle('home-theme-light', !isDark);
-          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-        } catch (_) {
-          document.documentElement.style.backgroundColor = '#f6f7f9';
-        }
-      })();
-    </script>
-    <link rel="icon" type="image/svg+xml" href="/MangaMukai/favicon.svg?v=vite" />
+(function () {
+    try {
+        var isDark = localStorage.getItem('mangamukai-theme') === 'dark';
+        document.documentElement.style.setProperty('--initial-loader-bg', isDark ? '#070709' : '#f6f7f9');
+        document.documentElement.style.setProperty('--initial-loader-color', isDark ? '#ffffff' : '#111216');
+        document.documentElement.classList.toggle('dark', isDark);
+        document.documentElement.classList.toggle('home-theme-dark', isDark);
+        document.documentElement.classList.toggle('home-theme-light', !isDark);
+        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    }
+    catch (_) {
+        document.documentElement.style.backgroundColor = '#f6f7f9';
+    }
+})();
+</script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=vite" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://fonts.cdnfonts.com" crossorigin />
     <link rel="preconnect" href="https://mangamukai.com" crossorigin />
     <link rel="dns-prefetch" href="https://mangamukai.com" />
     <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Barlow+Condensed:ital,wght@0,700;1,700&family=Changa+One:ital@0;1&family=Dela+Gothic+One&family=Goldman:wght@400;700&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Michroma&family=Inter:wght@300;400;500;600;700&family=Open+Sans:wght@400;600;700&family=Orbitron:wght@400..900&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;500;600;700&family=Rammetto+One&family=Reggae+One&family=Russo+One&family=KoHo:wght@600;700&family=Luckiest+Guy&family=Science+Gothic:wght@100..900&display=swap" rel="stylesheet" />
-    <link rel="preload" href="/MangaMukai/fonts/montserrat/files/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="/MangaMukai/fonts/manga-detail.css" />
+    <link rel="preload" href="/fonts/montserrat/files/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts/manga-detail.css" />
     <link href="https://fonts.cdnfonts.com/css/glacial-indifference-2" rel="stylesheet" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MangaMukai — Leer manga online gratis en español</title>
-    <meta name="description" content="Lee manga online gratis y en español en MangaMukai: manhwa, manhua, romance, acción, fantasía, seinen y contenido +19. Capítulos nuevos cada día con lector rápido." />
+    <title>Leer manga en español: novedades y lectura juvenil | MangaMukai</title>
+    <meta name="description" content="Lee manga, manhwa y manhua en español. Descubre novedades, tendencias y lectura juvenil, y explora las colecciones de MangaMukai." />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
     <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
     <meta name="googlebot-image" content="index,follow" />
@@ -55,14 +56,13 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="MangaMukai" />
     <meta property="og:locale" content="es_ES" />
-    <meta property="og:title" content="MangaMukai — Leer manga online gratis en español" />
-    <meta property="og:description" content="Manga, manhwa y manhua en español con capítulos nuevos cada día." />
+    <meta property="og:title" content="Leer manga en español: novedades y lectura juvenil | MangaMukai" />
+    <meta property="og:description" content="Lee manga, manhwa y manhua en español. Descubre novedades, tendencias y lectura juvenil, y explora las colecciones de MangaMukai." />
     <meta property="og:url" content="https://mangamukai.com/" />
     <meta property="og:image" content="https://mangamukai.com/favicon.svg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@MangaMukai" />
-    <!-- Identidad del sitio para Google. Los handlers PHP sustituyen este bloque
-         por uno especifico de cada ruta (portada, coleccion, ficha, capitulo). -->
+
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -86,40 +86,33 @@
             "url": "https://mangamukai.com/",
             "name": "MangaMukai",
             "inLanguage": "es",
-            "publisher": { "@id": "https://mangamukai.com/#organization" },
-            "potentialAction": {
-              "@type": "SearchAction",
-              "target": {
-                "@type": "EntryPoint",
-                "urlTemplate": "https://mangamukai.com/biblioteca?buscar={search_term_string}"
-              },
-              "query-input": "required name=search_term_string"
-            }
+            "publisher": { "@id": "https://mangamukai.com/#organization" }
           }
         ]
       }
     </script>
     <script>
-      if ('scrollRestoration' in history) {
-        history.scrollRestoration = 'manual';
-      }
-      window.scrollTo(0, 0);
-      window.addEventListener('load', function() {
-        requestAnimationFrame(function() {
-          requestAnimationFrame(function() {
+if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+}
+window.scrollTo(0, 0);
+window.addEventListener('load', function () {
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
             window.scrollTo(0, 0);
-          });
         });
-      });
-      window.addEventListener('pageshow', function() {
-        requestAnimationFrame(function() {
-          window.scrollTo(0, 0);
-        });
-      });
-    </script>
-    <script type="module" crossorigin src="/MangaMukai/assets/index-YgCt6FNV.js"></script>
-    <link rel="stylesheet" crossorigin href="/MangaMukai/assets/index-9OwgR00U.css">
-  </head>
+    });
+});
+window.addEventListener('pageshow', function () {
+    requestAnimationFrame(function () {
+        window.scrollTo(0, 0);
+    });
+});
+</script>
+    <script type="module" crossorigin src="/assets/index-JYctCyh_.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Ch1lfwP1.css">
+  
+</head>
   <body>
     <div id="root"></div>
   </body>
