@@ -47,7 +47,7 @@ export function HomePageFrame({
           </div>
         </div>
 
-        <Footer homeDesign className="mt-[94px] lg:mt-[125px]" />
+        <Footer ready={isReady} homeDesign className="mt-[94px] lg:mt-[125px]" />
       </div>
     </div>
   );

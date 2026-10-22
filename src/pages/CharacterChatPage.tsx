@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Link, useMatch, useParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useMatch, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, Info, UserRound, Volume2, X } from 'lucide-react';
 import { chatCharacters, demoReply, type CharacterMessage, type ChatCharacter } from '../data/chatCharacters';
 import { characterIntros } from '../data/characterIntros';
@@ -15,9 +15,14 @@ function Avatar({ src, name }: { src?: string; name: string }) {
 
 export default function CharacterChatPage() {
   const { characterId } = useParams();
+  const location = useLocation();
   const inConversation = useMatch('/chat/:characterId/conversacion') !== null;
   const user = useExperienceUser();
   const character = chatCharacters.find(item => item.id === characterId);
+  if (character && !user.signedIn) {
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to={`/auth/login?${new URLSearchParams({ returnTo })}`} state={{ returnTo }} replace />;
+  }
   if (character && inConversation) return <Conversation key={`${user.id}-${character.id}`} character={character} />;
   if (character) return <MobileCharacterIntro character={character} />;
   return <MobileCharacterHome />;

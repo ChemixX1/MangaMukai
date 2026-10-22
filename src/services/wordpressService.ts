@@ -17,6 +17,7 @@ export interface ProfileUpdatedDetail {
   username?: string;
   avatarUrl?: string;
   bannerUrl?: string;
+  bio?: string;
 }
 
 const emitProfileUpdated = (detail: ProfileUpdatedDetail) => {
@@ -169,7 +170,7 @@ export const saveWordPressProfile = async (
       const user = getStoredUser();
       if (user) {
         updateStoredUser({ username: profile.username, display_name: profile.username });
-        emitProfileUpdated({ userId: String(user.id), username: profile.username, avatarUrl: profile.avatar_url, bannerUrl: profile.banner_url });
+        emitProfileUpdated({ userId: String(user.id), username: profile.username, avatarUrl: profile.avatar_url, bannerUrl: profile.banner_url, bio: profile.bio });
       }
     }
     return result;

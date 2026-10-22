@@ -58,6 +58,7 @@ import { getKnownMangaTitle } from '../services/mangaTitles';
 import { collectionBadge } from '../utils/womenBlackWhite';
 import { whenIdle } from '../utils/whenIdle';
 import { mangaReaderSession } from '../services/readerPrefetchSession';
+import { peekPreparedMangaDetail } from '../services/homeNavigationPrefetch';
 import { ensureMusicLibrary } from '../services/musicPlayer';
 import { MangaCommunityLinks } from '../components/manga/MangaCommunityLinks';
 import { MangaSeasonSelector } from '../components/manga/MangaSeasonSelector';
@@ -147,15 +148,16 @@ export const MangaDetail = () => {
   const isLightMode = theme === 'light';
   const isMobile = useIsMobileViewport();
 
-  const [manga, setManga] = useState<MangaCapitulo | null>(null);
-  const [chapters, setChapters] = useState<SeriesChapter[]>([]);
-  const [related, setRelated] = useState<RelatedManga[]>([]);
-  const [initialComments, setInitialComments] = useState<MangaComment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [chaptersLoading, setChaptersLoading] = useState(true);
-  const [commentsLoading, setCommentsLoading] = useState(true);
-  const [relatedLoading, setRelatedLoading] = useState(true);
-  const [secondaryReady, setSecondaryReady] = useState(false);
+  const prepared = id ? peekPreparedMangaDetail(id) : undefined;
+  const [manga, setManga] = useState<MangaCapitulo | null>(() => prepared?.manga ?? null);
+  const [chapters, setChapters] = useState<SeriesChapter[]>(() => prepared?.chapters ?? []);
+  const [related, setRelated] = useState<RelatedManga[]>(() => prepared?.related ?? []);
+  const [initialComments, setInitialComments] = useState<MangaComment[]>(() => prepared?.comments ?? []);
+  const [loading, setLoading] = useState(!prepared);
+  const [chaptersLoading, setChaptersLoading] = useState(!prepared?.chapters);
+  const [commentsLoading, setCommentsLoading] = useState(!prepared?.comments);
+  const [relatedLoading, setRelatedLoading] = useState(!prepared?.related);
+  const [secondaryReady, setSecondaryReady] = useState(!!prepared);
   const [commentsError, setCommentsError] = useState('');
   const [chaptersError, setChaptersError] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -312,19 +314,21 @@ export const MangaDetail = () => {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    setLoading(true);
-    setChaptersLoading(true);
-    setCommentsLoading(true);
-    setRelatedLoading(true);
+    const initial = peekPreparedMangaDetail(id);
+    setLoading(!initial);
+    setChaptersLoading(!initial?.chapters);
+    setCommentsLoading(!initial?.comments);
+    setRelatedLoading(!initial?.related);
     setCommentsError('');
     setChaptersError('');
-    setSecondaryReady(false);
+    setSecondaryReady(!!initial);
     let cancelSecondary = () => {};
+    const commentsController = new AbortController();
     setError(null);
-    setManga(null);
-    setChapters([]);
-    setRelated([]);
-    setInitialComments([]);
+    setManga(initial?.manga ?? null);
+    setChapters(initial?.chapters ?? []);
+    setRelated(initial?.related ?? []);
+    setInitialComments(initial?.comments ?? []);
     setSynopsisExpanded(false);
     setActiveContent('chapters');
     setTabIndex(0);
@@ -336,7 +340,8 @@ export const MangaDetail = () => {
 
     const fetchData = async () => {
       try {
-        const mangaData = await getMangaById(id);
+        const fresh = peekPreparedMangaDetail(id, 60_000);
+        const mangaData = fresh?.manga ?? await getMangaById(id);
         if (!active) return;
         if (!mangaData) {
           setError('Manga no encontrado.');
@@ -351,42 +356,51 @@ export const MangaDetail = () => {
 
         setLoading(false);
         setSecondaryReady(true);
-        const relatedRequest = getRelatedMangas(mangaPostId, 18).catch(() => []);
-        const catalogRequest = getUltimosCapitulos().catch(() => []);
-        void catalogRequest.then(catalog => {
-          if (!active) return;
-          const catalogManga = catalog.find(item => String(item.eroSeri || item.id) === String(mangaPostId));
-          if (catalogManga) {
-            setManga(current => current && String(current.id) === String(mangaData.id)
-              ? {
-                  ...current,
-                  totalViews: catalogManga.totalViews ?? current.totalViews,
-                  chapterCount: catalogManga.chapterCount ?? current.chapterCount,
-                }
-              : current);
-          }
-        });
-        void Promise.all([catalogRequest, relatedRequest]).then(([catalog, recommendations]) => {
-          if (!active) return;
-          setRelated(buildMangaRecommendations(mangaData, catalog, recommendations));
-        }).finally(() => { if (active) setRelatedLoading(false); });
-        const chaptersRequest = getChaptersBySeries(mangaPostId).then(data => {
+        const chaptersRequest = (fresh?.chapters ? Promise.resolve(fresh.chapters) : getChaptersBySeries(mangaPostId)).then(data => {
           if (active) {
             mangaReaderSession(id, String(mangaPostId), data);
             setChapters(data);
           }
         }).catch(() => { if (active) setChaptersError('No se pudieron cargar los capítulos.'); })
           .finally(() => { if (active) setChaptersLoading(false); });
+        if (fresh?.related) {
+          setRelated(fresh.related);
+          setRelatedLoading(false);
+        } else {
+          let catalog: MangaCapitulo[] = [];
+          let recommendations: RelatedManga[] = [];
+          const updateRelated = () => {
+            if (!active) return;
+            setRelated(buildMangaRecommendations(mangaData, catalog, recommendations));
+            setRelatedLoading(false);
+          };
+          // Show whichever source arrives first; the full catalog must not hold the sidebar.
+          void getRelatedMangas(mangaPostId, 18).then(data => {
+            recommendations = data;
+            updateRelated();
+          }).catch(updateRelated);
+          void getUltimosCapitulos().then(data => {
+            catalog = data;
+            if (!active) return;
+            const catalogManga = catalog.find(item => String(item.eroSeri || item.id) === String(mangaPostId));
+            if (catalogManga) {
+              setManga(current => current && String(current.id) === String(mangaData.id)
+                ? { ...current, totalViews: catalogManga.totalViews ?? current.totalViews, chapterCount: catalogManga.chapterCount ?? current.chapterCount }
+                : current);
+            }
+            updateRelated();
+          }).catch(updateRelated);
+        }
         void loadInteractions(String(mangaData.id), () => active).catch(() => {});
-        await Promise.allSettled([relatedRequest, chaptersRequest]);
-        if (!active) return;
+        await chaptersRequest;
+        if (!active || initial?.comments) return;
         cancelSecondary = whenIdle(() => {
           if (!active) return;
-          void getMangaComments(String(mangaData.id)).then(data => {
+          void getMangaComments(String(mangaData.id), undefined, commentsController.signal).then(data => {
             if (active) setInitialComments(data);
           }).catch(() => { if (active) setCommentsError('No se pudieron cargar los comentarios.'); })
             .finally(() => { if (active) setCommentsLoading(false); });
-        });
+        }, 250);
       } catch (requestError) {
         console.error('Error MangaDetail:', requestError);
         if (active) {
@@ -400,6 +414,7 @@ export const MangaDetail = () => {
     return () => {
       active = false;
       cancelSecondary();
+      commentsController.abort();
     };
   }, [id, loadInteractions]);
 
@@ -746,7 +761,7 @@ export const MangaDetail = () => {
               </div>
               <div className={`manga-detail-comments${activeContent === 'comments' ? ' order-first' : ''}`}><MangaComments key={manga.id} mangaId={String(manga.id)} initialComments={initialComments} loading={commentsLoading} loadError={commentsError} /></div>
               </div>
-              <Footer homeDesign className="manga-detail-footer" />
+              <Footer ready={!chaptersLoading && !commentsLoading && !relatedLoading} homeDesign className="manga-detail-footer" />
             </motion.section>
 
             <motion.div ref={sidebarRef} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="manga-detail-sidebar flex flex-col gap-5">

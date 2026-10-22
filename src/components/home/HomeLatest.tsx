@@ -1,20 +1,31 @@
 import { openSearchPanel } from '../../hooks/useSearchTerm';
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 
 import { HomeChapterIcon, HomeClockIcon, HomeCoinsIcon, HomeNewIcon, HomeRecentIcon } from '../../components/home/HomeIcons';
 import { HomePagination } from '../../components/home/HomePagination';
 import { ACCENT_COLOR, ViewAllIcon, type Accent } from '../../components/ui';
 import { useHomeData } from '../../context/HomeDataContext';
+import { useHomePrefetchGroup } from '../../context/HomePrefetchContext';
 import { useChapterAccess } from '../../hooks/useChapterAccess';
 import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
 import { isPublishedChapter, matchesTypeTab, TYPE_TABS, type MangaTypeTab } from '../../utils/mangaFormat';
 import { filterYouthMen } from '../../utils/youthFilter';
+import { createChapterMetadata, rememberChapterMetadata } from '../../services/chapterMetadata';
 
 import { toLatestMangas, type Audience, type LatestChapter, type LatestManga } from './homeModels';
 
 const LATEST_PER_PAGE = 18;
 const MOBILE_LATEST_PER_PAGE = 6;
+const prefetchTargets = (items: LatestManga[]) => items.map(manga => {
+  const chapters = manga.chapters.filter(isPublishedChapter);
+  return {
+    mangaId: String(manga.id),
+    seriesId: String(manga.seriesId || manga.id),
+    prioritizeChapters: chapters.length > 0,
+    chapterIds: chapters.filter(chapter => chapter.isFree).map(chapter => String(chapter.id)),
+  };
+});
 
 const TYPE_TAB_POSITION: Record<MangaTypeTab, string> = { Manga: 'left-0', Manhua: 'left-[78px]', Manhwa: 'left-[165px]' };
 
@@ -33,7 +44,9 @@ const ChapterRow = ({ manga, chapter, accentColor, onOpenPaid, className }: Chap
   }
 
   const published = isPublishedChapter(chapter);
+  const readerChapter = published ? createChapterMetadata(chapter.id, manga.seriesId || manga.id, chapter.numero, manga.title) : undefined;
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (readerChapter) rememberChapterMetadata(readerChapter.id, readerChapter.mangaId, readerChapter.number, readerChapter.title);
     if (!published || chapter.isFree) return;
     event.preventDefault();
     onOpenPaid(manga, chapter);
@@ -42,6 +55,7 @@ const ChapterRow = ({ manga, chapter, accentColor, onOpenPaid, className }: Chap
   return (
     <Link
       to={published ? `/read/${chapter.id}` : `/manga/${manga.id}`}
+      state={readerChapter ? { readerChapter } : undefined}
       onClick={handleClick}
       className={rowClass}
       aria-label={`${manga.title}: capítulo ${chapter.numero}, ${chapter.isFree ? 'gratis' : 'de pago'}, ${chapter.isNew ? 'nuevo' : chapter.date}`}
@@ -94,6 +108,7 @@ export const LatestSection = ({ audience, className }: { audience: Audience; cla
   const accent: Accent = audience === 'men' ? 'cyan' : 'pink';
   const accentColor = ACCENT_COLOR[accent];
   const gridId = `latest-${audience}`;
+  const sectionRef = useRef<HTMLElement>(null);
 
   const allItems = useMemo(
     () => toLatestMangas(audience === 'men' ? filterYouthMen(latestMen) : latestWomen),
@@ -109,6 +124,7 @@ export const LatestSection = ({ audience, className }: { audience: Audience; cla
   const totalPages = Math.max(1, Math.ceil(items.length / perPage));
   const visiblePage = tab === activeTab ? Math.min(currentPage, totalPages) : 1;
   const pageItems = items.slice((visiblePage - 1) * perPage, visiblePage * perPage);
+  useHomePrefetchGroup(sectionRef, prefetchTargets(pageItems), prefetchTargets(items.slice(visiblePage * perPage, (visiblePage + 1) * perPage)));
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -131,7 +147,7 @@ export const LatestSection = ({ audience, className }: { audience: Audience; cla
   };
 
   return (
-    <section id={gridId} aria-busy={!isReady} className={`relative w-full scroll-mt-24 ${className}`}>
+    <section ref={sectionRef} id={gridId} aria-busy={!isReady} className={`relative w-full scroll-mt-24 ${className}`}>
       <div className="home-latest-container mx-auto w-full max-w-[1440px] px-3">
         <div className="home-latest-heading relative h-[95px] lg:h-[121px]">
           <span aria-hidden="true" className="absolute left-[23px] top-0 flex lg:left-[6px] lg:h-11 lg:w-12 lg:items-center lg:justify-center" style={{ color: accentColor }}>

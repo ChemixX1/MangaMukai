@@ -5,10 +5,12 @@ import { LatestSection } from '../../components/home/HomeLatest';
 import type { HomeLayoutProps } from '../../components/home/homeModels';
 import { TrendingSection } from '../../components/home/HomeTrending';
 import { Footer } from '../../components/layout/Footer';
+import { HomePrefetchProvider } from '../../context/HomePrefetchContext';
 
 export default function HomeContent({ womenHero, menHero, isReady }: HomeLayoutProps) {
-  const { loaded } = useHomeData();
+  const { loaded, isReady: homeReady } = useHomeData();
   return (
+    <HomePrefetchProvider>
     <div className={`home-page flex min-h-screen flex-col overflow-x-clip bg-surface pt-12 font-sans text-ink lg:pt-[73px] ${isReady ? 'home-data-ready' : 'home-data-pending'}`}>
       <h1 className="sr-only">Tendencia Ahora y Mangas Juveniles</h1>
 
@@ -22,7 +24,8 @@ export default function HomeContent({ womenHero, menHero, isReady }: HomeLayoutP
       <TrendingSection audience="men" className="home-block home-block-youth lg:mt-[71px]" />
       <LatestSection audience="men" className="home-block home-block-youth-latest mt-[50px] lg:mt-[68px]" />
 
-      <Footer homeDesign className="mt-[94px] lg:mt-[125px]" />
+      <Footer ready={homeReady} homeDesign className="mt-[94px] lg:mt-[125px]" />
     </div>
+    </HomePrefetchProvider>
   );
 }

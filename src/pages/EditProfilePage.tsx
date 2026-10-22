@@ -5,6 +5,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { getStoredToken, getStoredUser, type MMUser } from '../services/authService';
 import { getPublicProfile } from '../services/socialService';
+import { loadProfileData } from '../services/profilePageCache';
 import {
   emptySocialLinks,
   getWordPressProfile,
@@ -58,7 +59,7 @@ const EditProfilePage = () => {
     }
     let active = true;
     void getWordPressProfile(user).then((loaded) => { if (active) setProfile(loaded); }).catch(() => undefined);
-    void getPublicProfile(user.id).then((social) => { if (active) setChaptersRead(social.chapters_read_count ?? 0); }).catch(() => undefined);
+    void loadProfileData(user.id, 'profile', () => getPublicProfile(user.id)).then((social) => { if (active) setChaptersRead(social.chapters_read_count ?? 0); }).catch(() => undefined);
     return () => { active = false; };
   }, [navigate, user]);
 

@@ -212,7 +212,7 @@ export function AdultLanding() {
           loading={loading && !homeReady}
         />
       </div>
-      <Footer homeDesign className="mt-[94px] lg:mt-[125px]" />
+      <Footer ready={homeReady && !loading} homeDesign className="mt-[94px] lg:mt-[125px]" />
     </main>
   );
 }

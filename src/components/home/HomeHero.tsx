@@ -2,6 +2,7 @@ import { HERO_AUTOPLAY_MS, HERO_TRANSITION_SECONDS, HERO_COVER_EASE } from './he
 import { HERO_TAG_CLASS, HERO_TAG_ROW, HERO_TITLE_CLASS } from './heroTagStyles';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type TouchEvent } from 'react';
+import { useHomePrefetchGroup } from '../../context/HomePrefetchContext';
 import { useNavigate } from 'react-router-dom';
 
 import { HomeReadIcon, HomeSaveIcon } from '../../components/home/HomeIcons';
@@ -445,8 +446,6 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
     goTo(currentIndex + (delta < 0 ? 1 : -1));
   };
 
-  if (!loading && !activeItem) return null;
-
   const centered = layout.slots.first < 0;
 
   const relativeIndex = (index: number) => {
@@ -454,6 +453,12 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
     const waitingBefore = centered ? Math.floor((count - 1) / 2) : Number(count > layout.slots.last + 1);
     return delta >= count - waitingBefore ? delta - count : delta;
   };
+  useHomePrefetchGroup(sectionRef, items.filter((_, index) => {
+    const delta = relativeIndex(index);
+    return delta >= layout.slots.first && delta <= layout.slots.last;
+  }).map(item => ({ mangaId: String(item.id), chapterIds: [] })));
+
+  if (!loading && !activeItem) return null;
 
   const coverOffset = (delta: number) => {
     if (delta === 0) return 0;

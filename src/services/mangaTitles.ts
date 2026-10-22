@@ -1,4 +1,4 @@
-// Reuse public titles already received by lists, without fetching a detail page.
+// Reuse public series titles by manga or chapter ID, without fetching a detail page.
 const titles = new Map<string, string>();
 const MAX_TITLES = 5000;
 

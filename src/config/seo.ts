@@ -23,6 +23,6 @@ export const routeSeo = (pathname: string): RouteSeo => {
     return { kind: 'private', title: `Área privada | ${SITE_NAME}`, description: 'Área privada de MangaMukai.', noindex: true };
   }
   if (/^\/manga\/\d+$/.test(path)) return { kind: 'manga', title: `Ficha del manga | ${SITE_NAME}`, description: 'Sinopsis y capítulos de manga en español en MangaMukai.' };
-  if (/^\/read\/\d+$/.test(path)) return { kind: 'chapter', title: `Lector | ${SITE_NAME}`, description: 'Lee capítulos de manga en español en MangaMukai.' };
+  if (/^\/read\/\d+$/.test(path)) return { kind: 'chapter', title: SITE_NAME, description: 'Lee capítulos de manga en español en MangaMukai.' };
   return { kind: 'missing', title: `Página no encontrada | ${SITE_NAME}`, description: 'El contenido solicitado no está disponible en MangaMukai.', noindex: true };
 };

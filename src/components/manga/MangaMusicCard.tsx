@@ -9,12 +9,14 @@ import {
   seekTo,
   selectTrack,
   setVolume,
+  setMusicPlaylistOpen,
   togglePlay,
   useMusicPlayer,
 } from '../../services/musicPlayer';
 import { MukaiMusicPromo } from './MukaiMusicPromo';
 import { useNavigate } from 'react-router-dom';
 import ElasticSlider from '../ui/ElasticSlider';
+import { getStoredToken } from '../../services/authService';
 
 interface MangaMusicCardProps {
   cover: string;
@@ -32,15 +34,16 @@ const formatTime = (time: number) => {
 export const MangaMusicCard = ({ compactHeight = false, isLight = false }: MangaMusicCardProps) => {
   const navigate = useNavigate();
 
-  const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, volume } = useMusicPlayer();
-  const [showPlaylist, setShowPlaylist] = useState(false);
+  const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, volume, playlistOpen: showPlaylist } = useMusicPlayer();
   const [seekPreview, setSeekPreview] = useState<{ trackId: number | null; time: number } | null>(null);
   const progressTime = seekPreview?.trackId === currentId ? seekPreview.time : currentTime;
   const [failedCover, setFailedCover] = useState<string | null>(null);
 
   const currentTrack = tracks.find((track) => track.id === currentId) ?? null;
   const canPlay = isPlayableTrack(currentTrack);
-  const isLocked = !loading && !canPlay;
+  // The subscription artwork is already usable for guests, even if the shared
+  // library is still arriving after they move from the manga into the reader.
+  const isLocked = !canPlay && (!loading || !getStoredToken());
   const canBrowsePlaylist = canPlay;
   const displayImage = currentTrack?.cover_url;
 
@@ -50,7 +53,7 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
       return;
     }
     selectTrack(id);
-    setShowPlaylist(false);
+    setMusicPlaylistOpen(false);
   };
 
   const heightClass = compactHeight ? 'min-h-[200px] lg:min-h-[220px]' : 'min-h-[220px] lg:min-h-[240px]';
@@ -131,7 +134,7 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
             </button>
             <button type="button" aria-label="Pista siguiente" onClick={() => playNext(isPlaying)} disabled={!canPlay} className={`transition-transform enabled:hover:translate-x-0.5 disabled:cursor-not-allowed ${isLight ? 'text-black' : 'text-white'}`}><HugeiconsIcon icon={NextIcon} size={24} fill="none" /></button>
           </div>
-          <button type="button" onClick={() => canBrowsePlaylist && setShowPlaylist((show) => !show)} disabled={!canBrowsePlaylist} className={`relative transition-colors disabled:opacity-40 ${showPlaylist ? 'text-[#1DB954]' : isLight ? 'text-black/60 hover:text-black' : 'text-white/60 hover:text-white'}`} aria-label="Mostrar lista de reproducción"><HugeiconsIcon icon={Playlist01Icon} size={22} /></button>
+          <button type="button" onClick={() => canBrowsePlaylist && setMusicPlaylistOpen(!showPlaylist)} disabled={!canBrowsePlaylist} className={`relative transition-colors disabled:opacity-40 ${showPlaylist ? 'text-[#1DB954]' : isLight ? 'text-black/60 hover:text-black' : 'text-white/60 hover:text-white'}`} aria-label="Mostrar lista de reproducción"><HugeiconsIcon icon={Playlist01Icon} size={22} /></button>
         </div>
         <div className="flex justify-center">
           <ElasticSlider
@@ -164,7 +167,7 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
           <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className={`absolute inset-0 z-30 flex flex-col ${isLight ? 'bg-white' : 'bg-[#0a0a0d]'}`}>
             <div className={`flex items-center justify-between border-b p-4 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
               <span className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${isLight ? 'text-black/80' : 'text-white/80'}`}>Playlist ({tracks.length})</span>
-              <button type="button" aria-label="Cerrar lista de reproducción" onClick={() => setShowPlaylist(false)} className={`transition-all hover:rotate-90 ${isLight ? 'text-black' : 'text-white'}`}><HugeiconsIcon icon={Cancel01Icon} size={22} /></button>
+              <button type="button" aria-label="Cerrar lista de reproducción" onClick={() => setMusicPlaylistOpen(false)} className={`transition-all hover:rotate-90 ${isLight ? 'text-black' : 'text-white'}`}><HugeiconsIcon icon={Cancel01Icon} size={22} /></button>
             </div>
             <div className="hide-scroll flex-1 space-y-1 overflow-y-auto p-2">
               {tracks.map((track) => (

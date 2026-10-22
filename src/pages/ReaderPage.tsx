@@ -17,6 +17,9 @@ import { ReaderImages } from "../components/manga/ReaderImages";
 import { getMangaComments, type MangaComment } from "../services/communityService";
 import { useTheme } from "../hooks/useTheme";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { getKnownMangaTitle } from "../services/mangaTitles";
+import { peekChapterMetadata, readChapterNavigationState, type ChapterMetadata } from "../services/chapterMetadata";
+import { cleanTitle } from "../utils/mangaFormat";
 import { ReaderChapterSelect } from "../components/manga/ReaderChapterSelect";
 import { chapterReaderSession, peekReaderSession, type ReaderPrefetchSession, type ReaderSibling } from "../services/readerPrefetchSession";
 import '../styles/reader.css';
@@ -74,21 +77,25 @@ export const ReaderPage = () => {
   const unlockedRef = useRef<Set<string> | null>(null);
   const metadataSession = chapterId ? peekReaderSession(chapterId) : null;
   const knownChapters = metadataSession?.peekSiblings() || [];
-  const knownChapter = knownChapters.find(chapter => String(chapter.id) === chapterId);
-  const knownBundle = chapterId ? metadataSession?.peek(chapterId) : undefined;
+  const knownMetadata = chapterId ? metadataSession?.peekMetadata(chapterId) || readChapterNavigationState(location.state, chapterId) || peekChapterMetadata(chapterId) : undefined;
   const navData = loadedNavData?.id === chapterId ? loadedNavData
-    : chapterId && metadataSession && (knownChapter || knownBundle)
-      ? navigationFor(chapterId, metadataSession.mangaId, knownBundle?.title || knownChapter?.title || '', knownBundle?.number ?? knownChapter!.chapter_number, knownChapters, unlockedRef.current || new Set())
+    : chapterId && knownMetadata
+      ? navigationFor(chapterId, knownMetadata.mangaId, knownMetadata.title, knownMetadata.number, knownChapters, unlockedRef.current || new Set())
       : null;
   const chapterOptions = knownChapters.map(chapter => ({ id: String(chapter.id), number: chapter.chapter_number, isPaid: chapter.is_paid && !(chapter.free_at && new Date(chapter.free_at) <= new Date()), price: chapter.price_coins, isPurchased: unlockedRef.current?.has(String(chapter.id)) || false }));
 
+  const mangaId = navData?.mangaId || metadataSession?.mangaId;
+  const mangaTitle = (mangaId ? getKnownMangaTitle(mangaId) : undefined)
+    || (chapterId ? getKnownMangaTitle(chapterId) : undefined)
+    || (navData ? cleanTitle(navData.title).replace(/\s*[—–|:-]\s*$/, '').trim() : undefined)
+    || undefined;
   const readerTitle = navData
     ? (new RegExp(`cap[ií]tulo\\s*0*${navData.chapterNum}(\\D|$)`, 'i').test(navData.title)
         ? navData.title
         : `${navData.title} — Capítulo ${navData.chapterNum}`)
     : undefined;
   useDocumentTitle(
-    readerTitle,
+    mangaTitle,
     readerTitle ? `Lee ${readerTitle} en español en MangaMukai. Consulta su disponibilidad y sigue los capítulos de la historia.` : undefined,
     { path: `/read/${chapterId}`, noindex: navData ? false : !loading && !!error ? true : undefined },
   );
@@ -156,6 +163,8 @@ export const ReaderPage = () => {
   useEffect(() => {
     if (!chapterId) return;
     const session = chapterReaderSession(chapterId);
+    const clickedChapter = readChapterNavigationState(location.state, chapterId);
+    if (clickedChapter) session.seedMetadata(clickedChapter);
     sessionRef.current = session;
     chapterRef.current = chapterId;
     session.focus(chapterId);
@@ -175,6 +184,20 @@ export const ReaderPage = () => {
 
     let active = true;
     const commentsController = new AbortController();
+    const loadNavigation = async (metadata: ChapterMetadata) => {
+      if (!active) return [];
+      setNavData(navigationFor(chapterId, metadata.mangaId, metadata.title, metadata.number, session.peekSiblings(), unlockedRef.current || new Set()));
+      const chapters = metadata.mangaId ? await session.siblings(metadata.mangaId) : [];
+      if (active) {
+        siblingsRef.current = chapters;
+        setNavData(navigationFor(chapterId, metadata.mangaId, metadata.title, metadata.number, chapters, unlockedRef.current || new Set()));
+      }
+      return chapters;
+    };
+    // Start the selector first when home/detail already supplied the series ID.
+    // Direct links request it as soon as metadata arrives, independently of content.
+    const metadata = session.peekMetadata(chapterId);
+    const chaptersPromise = (metadata ? loadNavigation(metadata) : session.metadata(chapterId).then(loadNavigation)).catch(() => []);
     void (async () => {
       try {
         const data = await session.load(chapterId);
@@ -185,18 +208,11 @@ export const ReaderPage = () => {
         setLock(data.locked ? { price: data.price, requiresLogin: data.requiresLogin, freeAt: null } : null);
         setNavData(navigationFor(chapterId, data.mangaId, data.title, data.number, session.peekSiblings(), unlockedRef.current || new Set()));
         setLoading(false);
-        const comments = getMangaComments(data.mangaId, chapterId, commentsController.signal);
-        void comments.then(items => { if (active) setChapterComments(items); }).catch(() => undefined);
-        const chaptersPromise = data.mangaId ? session.siblings(data.mangaId).then(chapters => {
-          if (active) {
-            siblingsRef.current = chapters;
-            setNavData(navigationFor(chapterId, data.mangaId, data.title, data.number, chapters, unlockedRef.current || new Set()));
-          }
-          return chapters;
-        }).catch(() => []) : Promise.resolve([]);
         const unlockedPromise = unlockedRef.current ? Promise.resolve(unlockedRef.current) : getStoredToken() ? getUnlockedChapters().catch(() => new Set<string>()) : Promise.resolve(new Set<string>());
         const [chapters, unlocked] = await Promise.all([chaptersPromise, unlockedPromise]);
         if (!active) return;
+        void getMangaComments(data.mangaId, chapterId, commentsController.signal)
+          .then(items => { if (active) setChapterComments(items); }).catch(() => undefined);
         unlockedRef.current = unlocked;
         siblingsRef.current = chapters;
         setNavData(navigationFor(chapterId, data.mangaId, data.title, data.number, chapters, unlocked));
@@ -230,7 +246,7 @@ export const ReaderPage = () => {
       }
     })();
     return () => { active = false; commentsController.abort(); };
-  }, [chapterId, authGeneration]);
+  }, [chapterId, authGeneration, location.state]);
 
   const chapterEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

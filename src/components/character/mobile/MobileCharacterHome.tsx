@@ -72,6 +72,7 @@ export const MobileCharacterHome = () => {
       <div className="mt-7 grid grid-cols-2 gap-x-[15px] gap-y-[17px] lg:grid-cols-4 lg:gap-6">
         {CHARACTER_CARDS.map((card, index) => {
           const description = characterDescriptions.get(card.id);
+          const returnTo = `/chat/${card.id}`;
           return (
             <motion.div
               key={card.id}
@@ -80,7 +81,8 @@ export const MobileCharacterHome = () => {
               transition={{ duration: 0.44, delay: index * 0.07, ease: [0.22, 1, 0.36, 1] }}
             >
               <Link
-                to={`/chat/${card.id}`}
+                to={user.signedIn ? returnTo : `/auth/login?${new URLSearchParams({ returnTo })}`}
+                state={user.signedIn ? undefined : { returnTo }}
                 aria-label={`Ver la ficha de ${card.label}`}
                 className="group relative block aspect-[171/246] overflow-hidden rounded-xl shadow-[0_10px_24px_-6px_rgba(0,0,0,0.32)] ring-1 ring-black/10 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_18px_36px_-6px_rgba(0,0,0,0.45)] active:scale-[0.97] dark:ring-white/15 dark:shadow-[0_14px_30px_-6px_rgba(0,0,0,0.75)] lg:rounded-2xl"
               >
@@ -147,7 +149,8 @@ export const MobileCharacterHome = () => {
               transition={{ duration: 0.35, delay: index * 0.05 }}
             >
               <Link
-                to={`/chat/${chat.id}/conversacion`}
+                to={user.signedIn ? `/chat/${chat.id}/conversacion` : `/auth/login?${new URLSearchParams({ returnTo: `/chat/${chat.id}/conversacion` })}`}
+                state={user.signedIn ? undefined : { returnTo: `/chat/${chat.id}/conversacion` }}
                 className="group -mx-2 flex items-start gap-2.5 rounded-xl px-2 py-1.5 transition-all duration-300 hover:-translate-y-0.5 hover:bg-black/[0.04] hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.1)] active:scale-[0.99] dark:hover:bg-white/[0.04] lg:mx-0 lg:items-center lg:rounded-2xl lg:bg-[#f0f0f0] lg:p-4 lg:shadow-[0_8px_22px_-6px_rgba(0,0,0,0.14)] lg:ring-1 lg:ring-black/5 lg:hover:bg-[#ebebeb] lg:hover:shadow-[0_14px_28px_-6px_rgba(0,0,0,0.2)] lg:dark:bg-zinc-900 lg:dark:ring-white/10 lg:dark:shadow-[0_10px_26px_-6px_rgba(0,0,0,0.55)] lg:dark:hover:bg-zinc-800/90"
               >
 

@@ -84,6 +84,47 @@ test('detail and reader reuse chapter data and the already loaded chapter list',
   assert.equal(api.mangaReaderSession('alias', '100', chapters), reader);
 });
 
+test('home keeps multiple manga prepared and promotes only the selected reader', async t => {
+  const { requests } = setup(t);
+  const first = api.homeReaderSession('alias', '100', chapters);
+  await first.load('1');
+  const other = api.homeReaderSession('200', '200', [{ ...chapters[0], id: 9 }]);
+  assert.equal(api.peekReaderSession('1'), first);
+  assert.equal(api.peekReaderSession('9'), other);
+  api.syncReaderPrefetchRoute('/read/1');
+  assert.equal(api.chapterReaderSession('1'), first);
+  await first.load('1');
+  assert.equal(requests.length, 1);
+  assert.equal(api.peekReaderSession('9'), null);
+  await assert.rejects(other.load('9'), { name: 'AbortError' });
+});
+
+test('home-to-detail navigation keeps the prepared chapter and its alias', async t => {
+  setup(t);
+  const prepared = api.homeReaderSession('alias', '100', chapters);
+  const data = await prepared.load('1');
+  api.syncReaderPrefetchRoute('/manga/alias');
+  api.pauseHomeReaderSession(prepared);
+  assert.equal(api.mangaReaderSession('alias', '100', chapters), prepared);
+  assert.equal(prepared.peek('1'), data);
+  api.syncReaderPrefetchRoute('/read/1');
+  assert.equal(api.chapterReaderSession('1').peek('1'), data);
+});
+
+test('home sessions expire, stay bounded and never survive a changed account', async t => {
+  const { setToken } = setup(t);
+  t.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  for (let id = 1; id <= 129; id++) api.homeReaderSession(String(id), String(id), [{ ...chapters[0], id }]);
+  assert.equal(api.peekReaderSession('1'), null);
+  assert.ok(api.peekReaderSession('129'));
+  t.mock.timers.tick(5 * 60 * 1000);
+  assert.equal(api.peekReaderSession('129'), null);
+  api.homeReaderSession('100', '100', chapters);
+  setToken('another-account');
+  api.syncReaderPrefetchAuth();
+  assert.equal(api.peekReaderSession('1'), null);
+});
+
 test('chapter metadata is available synchronously before content or background prefetch', async t => {
   const { requests } = setup(t);
   const detail = api.mangaReaderSession('alias', '100', chapters);

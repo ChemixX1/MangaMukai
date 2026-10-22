@@ -335,7 +335,8 @@ html:has(.site-navbar-desktop[style*="translateY(-100%)"]) .manga-detail-desktop
 .manga-detail-mobile-metadata > div:first-child > span:last-child { line-height: 22px; }
 .manga-detail-mobile-metadata > div > span { font-size: 16px; line-height: 16px; }
 .manga-detail-mobile-metadata > div > span:nth-child(2) { font-weight: 700; }
-.manga-detail-mobile-music { margin: 14px auto 0; width: 288px; max-width: 80%; height: 175px; }
+.manga-detail-mobile-music { margin: 14px auto 0; width: 288px; max-width: 80%; min-height: 175px; }
+.manga-detail-mobile-music .manga-music-locked-card { height: 175px; }
 .manga-detail-mobile .manga-detail-tab { font-size: 12px; gap: 4px; }
 .manga-detail-mobile .manga-detail-tabs { box-shadow: 0 4px 4px #4b4b4b; }
 .manga-detail-mobile nav[aria-label='Secciones del manga'] { margin-top: 35px; width: 90%; }

@@ -13,6 +13,7 @@ export interface MusicPlayerState {
   error: boolean;
   likedIds: number[];
   volume: number;
+  playlistOpen: boolean;
 }
 
 const initialState: MusicPlayerState = {
@@ -25,6 +26,7 @@ const initialState: MusicPlayerState = {
   error: false,
   likedIds: [],
   volume: 50,
+  playlistOpen: false,
 };
 
 let state: MusicPlayerState = initialState;
@@ -104,7 +106,7 @@ const syncSource = (track: MusicTrack | null, autoplay: boolean) => {
 
 const authSignature = getAuthCacheKey;
 
-let inflight: Promise<void> | null = null;
+let inflight: { signature: string; promise: Promise<void> } | null = null;
 let loadedSignature: string | null = null;
 
 const applyTracks = (tracks: MusicTrack[]) => {
@@ -118,37 +120,49 @@ const applyTracks = (tracks: MusicTrack[]) => {
 
 const fetchLibrary = (): Promise<void> => {
   const signature = authSignature();
+  if (loadedSignature !== null && loadedSignature !== signature) {
+    // A different account cannot inherit the previous account's playable URLs.
+    syncSource(null, false);
+    loadedSignature = null;
+    setState({ tracks: [], currentId: null, playlistOpen: false });
+  }
   if (!state.tracks.length) setState({ loading: true });
 
-  inflight = getMusicTracks()
+  const request = getMusicTracks()
     .then((tracks) => {
+      if (authSignature() !== signature || inflight?.promise !== request) return;
       loadedSignature = signature;
       applyTracks(tracks);
     })
     .catch(() => {
-      setState({ loading: false });
+      if (authSignature() === signature && inflight?.promise === request) setState({ loading: false });
     })
     .finally(() => {
-      inflight = null;
+      if (inflight?.promise === request) inflight = null;
     });
 
-  return inflight;
+  inflight = { signature, promise: request };
+  return request;
 };
 
 export const ensureMusicLibrary = (): Promise<void> => {
-  if (inflight) return inflight;
-  if (loadedSignature === authSignature()) return Promise.resolve();
+  const signature = authSignature();
+  if (inflight?.signature === signature) return inflight.promise;
+  if (loadedSignature === signature) return Promise.resolve();
   return fetchLibrary();
 };
 
-export const refreshMusicLibrary = (): Promise<void> => (inflight ? inflight : fetchLibrary());
+export const refreshMusicLibrary = (): Promise<void> =>
+  inflight?.signature === authSignature() ? inflight.promise : fetchLibrary();
 
 if (typeof window !== 'undefined') {
 
   window.addEventListener(AUTH_CHANGED_EVENT, () => {
-    if (loadedSignature !== null && loadedSignature !== authSignature()) void fetchLibrary();
+    if (loadedSignature !== null || inflight) void ensureMusicLibrary();
   });
 }
+
+export const setMusicPlaylistOpen = (open: boolean) => setState({ playlistOpen: open });
 
 export const selectTrack = (id: number, autoplay = true) => {
   const track = state.tracks.find((item) => item.id === id) ?? null;

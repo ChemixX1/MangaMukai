@@ -19,7 +19,7 @@ import { Footer } from '../../layout/Footer';
 import { ChapterList } from '../ChapterList';
 import { MangaComments } from '../MangaComments';
 import { MangaRecommendations } from '../MangaRecommendations';
-import { MukaiMusicPromo } from '../MukaiMusicPromo';
+import { MangaMusicCard } from '../MangaMusicCard';
 import { MobileReactions } from './MobileReactions';
 import type { MangaReactionId } from '../reactions';
 import {
@@ -237,7 +237,7 @@ export const MobileMangaDetail = ({
       </div>
 
       <section aria-label="Mukai Music" className="manga-detail-mobile-music">
-        <div className="h-full overflow-hidden rounded-2xl">{secondaryReady && <MukaiMusicPromo />}</div>
+        <div className="h-full overflow-hidden rounded-2xl">{secondaryReady && <MangaMusicCard cover={manga.portada} compactHeight isLight={theme === 'light'} />}</div>
       </section>
 
 
@@ -333,7 +333,7 @@ export const MobileMangaDetail = ({
       </div>
 
       <div className="mt-12">
-        <Footer homeDesign className="-mt-6" />
+        <Footer ready={!chaptersLoading && !commentsLoading && !relatedLoading} homeDesign className="-mt-6" />
       </div>
     </div>
     </main>

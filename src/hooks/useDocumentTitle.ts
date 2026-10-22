@@ -82,15 +82,19 @@ export const applyRouteSeo = (pathname: string) => {
   const path = normalizeSeoPath(pathname);
   if (path === activePath) return;
   const seo = routeSeo(path);
-  const mangaId = /^\/manga\/(\d+)$/.exec(path)?.[1];
-  const knownTitle = mangaId ? getKnownMangaTitle(mangaId) : undefined;
+  const contentId = /^\/(?:manga|read)\/(\d+)$/.exec(path)?.[1];
+  const knownTitle = contentId ? getKnownMangaTitle(contentId) : undefined;
+  // Keep the series title while the reader loads its chapter metadata.
+  const title = knownTitle ? buildTitle(knownTitle)
+    : seo.kind === 'chapter' && ['manga', 'chapter'].includes(activeSeo.kind) ? activeSeo.title
+    : seo.title;
   // Keep the richer server response (Book, chapter dates, lists) on initial load.
   const serverCanonical = document.head.querySelector('link[rel="canonical"]')?.getAttribute('href');
   const serverSchema = document.getElementById('mm-page-schema');
   const serverNoindex = document.head.querySelector('meta[name="robots"]')?.getAttribute('content')?.includes('noindex');
   const preserveServer = !activePath && (serverSchema || serverNoindex) && serverCanonical === `${SITE_URL}${path}`;
   activePath = path;
-  activeSeo = { ...seo, ...(knownTitle ? { title: buildTitle(knownTitle) } : {}) };
+  activeSeo = { ...seo, title };
   activeImage = `${SITE_URL}/favicon.svg`;
   if (preserveServer) {
     activeSeo.title = knownTitle ? buildTitle(knownTitle) : SEO_ROUTES[path]?.title || document.title;

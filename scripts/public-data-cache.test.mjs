@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { rememberChapterMetadata } from '../src/services/chapterMetadata.ts';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -72,6 +73,7 @@ function setup(responseFor, catalog = null) {
     require: name => name.includes('publicDataCache')
       ? { createPublicDataCache }
       : name.includes('mangaTitles') ? { rememberMangaTitle: (id, title) => titles.set(String(id), title) }
+      : name.includes('chapterMetadata') ? { rememberChapterMetadata }
       : { MANGAMUKAI_API: '/api', WORDPRESS_POSTS_API: '/posts' },
     fetch: async (url, options) => {
       requests.push({ url, options });

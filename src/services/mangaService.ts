@@ -4,6 +4,7 @@ import type { WPManga, MangaCapitulo } from '../types/manga';
 import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from '../config/api';
 import { createPublicDataCache } from '../utils/publicDataCache';
 import { rememberMangaTitle } from './mangaTitles';
+import { rememberChapterMetadata } from './chapterMetadata';
 
 const API_URL = WORDPRESS_POSTS_API;
 const MM_API = MANGAMUKAI_API;
@@ -26,7 +27,13 @@ const readCatalogSessionCache = () => {
       return null;
     }
 
-    parsed.data.forEach(manga => rememberMangaTitle(manga.id, manga.titulo));
+    parsed.data.forEach(manga => {
+      rememberMangaTitle(manga.id, manga.titulo);
+      manga.capitulosRecientes?.forEach(chapter => {
+        if (Number(chapter.id) > 0) rememberMangaTitle(chapter.id, manga.titulo);
+        rememberChapterMetadata(chapter.id, manga.eroSeri || manga.id, chapter.numero, manga.titulo);
+      });
+    });
     return { data: parsed.data, expiresAt: parsed.expiresAt };
   } catch {
     try { window.sessionStorage.removeItem(CATALOG_SESSION_CACHE_KEY); } catch {}
@@ -102,6 +109,7 @@ const mapearManga = (item: any, limpiarTit = true): MangaCapitulo => {
   const titulo = item.title?.rendered || '';
   rememberMangaTitle(item.id, limpiarTit ? limpiarTitulo(titulo) : titulo);
   if (item.ero_seri) rememberMangaTitle(item.ero_seri, limpiarTitulo(titulo));
+  rememberChapterMetadata(item.id, item.ero_seri, item.ero_chapter, titulo);
   const myCred = item.myCRED_sell_content;
   const esGratis = !myCred || myCred.status === 'disabled' || myCred.price === 0;
 
@@ -161,6 +169,10 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     : item.firstChapterId
       ? [{ id: item.firstChapterId, numero: '1', esGratis: !!item.esGratis, fecha: item.fecha }]
       : [];
+  caps.forEach(chapter => {
+    if (Number(chapter.id) > 0) rememberMangaTitle(chapter.id, item.titulo);
+    rememberChapterMetadata(chapter.id, item.id, chapter.numero, item.titulo);
+  });
 
   return {
     id:          item.id,

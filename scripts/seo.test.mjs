@@ -45,8 +45,8 @@ test('navigation updates titles and canonical URLs and clears private robots met
     if (previous) Object.defineProperty(globalThis, 'document', previous);
     else delete globalThis.document;
   });
-  const result = await build({ stdin: { contents: "export * from './src/hooks/useDocumentTitle.ts'; export * from './src/services/mangaTitles.ts';", resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'node' });
-  const { applyRouteSeo, rememberMangaTitle } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+  const result = await build({ stdin: { contents: "export * from './src/hooks/useDocumentTitle.ts'; export * from './src/services/mangaTitles.ts'; export { getLatestWomenUpdates, getLatestMenUpdates, getUltimosCapitulos } from './src/services/mangaService.ts';", resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'node', define: { 'import.meta.env': '{}' } });
+  const { applyRouteSeo, rememberMangaTitle, getLatestWomenUpdates, getLatestMenUpdates, getUltimosCapitulos } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
   const meta = name => tags.get(`meta[name="${name}"]`).attributes.content;
   const canonical = document.createElement('link');
   canonical.setAttribute('rel', 'canonical');
@@ -88,8 +88,8 @@ test('navigation updates titles and canonical URLs and clears private robots met
   assert.equal(meta('rating'), 'adult');
   assert.equal(JSON.parse(document.getElementById('mm-page-schema').textContent)['@graph'][2].isFamilyFriendly, false);
   applyRouteSeo('/');
-  assert.equal(document.title, 'MangaMukai');
-  assert.equal(meta('twitter:title'), 'MangaMukai');
+  assert.equal(document.title, 'MangaMukai - Leer manga online gratis en español');
+  assert.equal(meta('twitter:title'), 'MangaMukai - Leer manga online gratis en español');
   assert.equal(querySelectorAll('meta[name="rating" i]').length, 0);
   assert.equal(meta('googlebot-image'), 'index,follow');
   assert.equal(JSON.parse(document.getElementById('mm-page-schema').textContent)['@graph'][2].url, `${config.siteUrl}/`);
@@ -99,6 +99,45 @@ test('navigation updates titles and canonical URLs and clears private robots met
   assert.equal(document.title, 'La historia ya cargada | MangaMukai');
   assert.equal(meta('twitter:title'), document.title);
   assert.equal(JSON.parse(document.getElementById('mm-page-schema').textContent)['@graph'][2].mainEntity.name, 'La historia ya cargada');
+  applyRouteSeo('/read/100');
+  assert.equal(document.title, 'La historia ya cargada | MangaMukai');
+  assert.equal(meta('twitter:title'), document.title);
+  assert.equal(tags.get('link[rel="canonical"]').attributes.href, 'https://mangamukai.com/read/100');
+  applyRouteSeo('/read/101');
+  assert.equal(document.title, 'La historia ya cargada | MangaMukai');
+  applyRouteSeo('/');
+  applyRouteSeo('/read/999');
+  assert.equal(document.title, 'MangaMukai', 'a reader without a known series never uses the generic Lector title');
+  const recentManga = { id: 51, titulo: 'Serie del inicio', fecha: '2026-10-21', esGratis: true,
+    capitulosRecientes: [{ id: 5101, numero: '1', esGratis: true }, { id: 5102, numero: '2', esGratis: false }] };
+  const firstChapterManga = { id: 52, titulo: 'Otra serie del inicio', fecha: '2026-10-21', firstChapterId: 5201, esGratis: true };
+  t.mock.method(globalThis, 'fetch', async url => {
+    assert.match(url, /\/latest-(women|men)\?limit=18$/);
+    return { ok: true, json: async () => ({ success: true, mangas: [url.includes('/latest-women') ? recentManga : firstChapterManga] }) };
+  });
+  await Promise.all([getLatestWomenUpdates(), getLatestMenUpdates()]);
+  for (const [chapterId, title] of [[5101, recentManga.titulo], [5102, recentManga.titulo], [5201, firstChapterManga.titulo]]) {
+    applyRouteSeo('/');
+    applyRouteSeo(`/read/${chapterId}`);
+    assert.equal(document.title, `${title} | MangaMukai`, 'home chapter titles are available before the reader mounts or fetches');
+    assert.equal(meta('twitter:title'), document.title);
+  }
+  await Promise.all([getLatestWomenUpdates(), getLatestMenUpdates()]);
+  assert.equal(fetch.mock.callCount(), 2, 'titles and cached home lists need no additional requests');
+
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+    sessionStorage: { getItem: () => JSON.stringify({ data: [{ id: 53, titulo: 'Serie guardada', capitulosRecientes: [{ id: 5301 }] }], expiresAt: Date.now() + 60_000 }) },
+  } });
+  t.after(() => {
+    if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
+    else delete globalThis.window;
+  });
+  await getUltimosCapitulos();
+  applyRouteSeo('/');
+  applyRouteSeo('/read/5301');
+  assert.equal(document.title, 'Serie guardada | MangaMukai', 'restoring the catalog also restores chapter titles');
+  assert.equal(fetch.mock.callCount(), 2);
   applyRouteSeo('/manga/43');
   assert.equal(document.title, 'Otro manga | MangaMukai');
   applyRouteSeo('/manga/999');

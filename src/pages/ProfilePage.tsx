@@ -21,6 +21,7 @@ import type { MangaCapitulo } from '../types/manga';
 import { readerRankName } from '../utils/readerRank';
 import { displayViews } from '../utils/seriesViews';
 import { selectLikedSeries } from '../utils/profileSeriesLikes';
+import { getReadyProfileImages, isProfileImageReady, loadProfileData, peekProfileData, rememberProfileImage } from '../services/profilePageCache';
 import profileBanner from '../assets/banners/illustration-anime-character-rain.webp';
 import editIcon from '../assets/profile-icons/edit.svg';
 import menuIcon from '../assets/profile-icons/menu.svg';
@@ -89,7 +90,7 @@ const Chapter = ({ item, history = false }: { item: LibraryChapter; history?: bo
 const ProfileLoading = () => <div className="profile-loading-grid" role="status" aria-label="Cargando contenido del perfil">{[0, 1, 2].map(index => <span key={index} className="profile-loading-block" aria-hidden="true" />)}</div>;
 
 const ProfileImage = ({ src, className = '', onSettled }: { src: string; className?: string; onSettled: (src: string) => void }) => {
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => isProfileImageReady(src));
   useEffect(() => {
 
     const timer = window.setTimeout(() => onSettled(src), 8000);
@@ -97,28 +98,28 @@ const ProfileImage = ({ src, className = '', onSettled }: { src: string; classNa
   }, [src, onSettled]);
   return <img src={src} alt="" loading="eager" fetchPriority="high" decoding="async"
     className={`${className} profile-priority-image${ready ? ' is-ready' : ''}`}
-    onLoad={event => { const image = event.currentTarget; void image.decode().catch(() => undefined).then(() => { setReady(true); onSettled(src); }); }}
+    onLoad={event => { const image = event.currentTarget; void image.decode().catch(() => undefined).then(() => { rememberProfileImage(src); setReady(true); onSettled(src); }); }}
     onError={() => onSettled(src)} />;
 };
 
 export const ProfilePage = () => {
   const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState<MMUser | null>(() => getStoredToken() ? getStoredUser() : null);
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [profile, setProfile] = useState<PublicProfile | null>(() => user ? peekProfileData(user.id, 'profile') ?? null : null);
   const [tab, setTab] = useState<Tab>('collection');
   const [collectionFilter, setCollectionFilter] = useState<LibraryFilter>('covers');
   const [likesFilter, setLikesFilter] = useState<LibraryFilter>('series');
-  const [catalog, setCatalog] = useState<MangaCapitulo[]>([]);
-  const [library, setLibrary] = useState<SocialLibrary>(emptyLibrary);
-  const [likedIds, setLikedIds] = useState<string[]>([]);
-  const [posts, setPosts] = useState<ProfilePost[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const [catalog, setCatalog] = useState<MangaCapitulo[]>(() => user ? peekProfileData(user.id, 'catalog') ?? [] : []);
+  const [library, setLibrary] = useState<SocialLibrary>(() => user ? peekProfileData(user.id, 'library') ?? emptyLibrary() : emptyLibrary());
+  const [likedIds, setLikedIds] = useState<string[]>(() => user ? peekProfileData(user.id, 'likedIds') ?? [] : []);
+  const [posts, setPosts] = useState<ProfilePost[]>(() => user ? peekProfileData(user.id, 'posts') ?? [] : []);
+  const [loaded, setLoaded] = useState(() => !!user && ['catalog', 'library', 'likedIds', 'posts'].every(key => peekProfileData(user.id, key as 'catalog' | 'library' | 'likedIds' | 'posts') !== undefined));
+  const [catalogLoaded, setCatalogLoaded] = useState(() => !!user && peekProfileData(user.id, 'catalog') !== undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuSection, setMenuSection] = useState<MenuSection>('main');
-  const [profileLoadedFor, setProfileLoadedFor] = useState<string | null>(null);
+  const [profileLoadedFor, setProfileLoadedFor] = useState<string | null>(() => user && profile ? String(user.id) : null);
   const profileLoaded = !!user && profileLoadedFor === String(user.id);
-  const [settledImages, setSettledImages] = useState<string[]>([]);
+  const [settledImages, setSettledImages] = useState<string[]>(getReadyProfileImages);
   const settleImage = useCallback((src: string) => setSettledImages(current => current.includes(src) ? current : [...current, src]), []);
   const avatar = profile?.avatar_url || user?.avatar || '';
   const banner = profile?.banner_url || profileBanner;
@@ -135,29 +136,37 @@ export const ProfilePage = () => {
   useEffect(() => {
     if (!userId) return;
     let active = true;
-    setLoaded(false);
-    setCatalogLoaded(false);
-    setProfileLoadedFor(null);
-    setProfile(null);
-    setCatalog([]);
-    setPosts([]);
-    setLibrary(emptyLibrary());
-    setLikedIds([]);
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 10000);
-    void getPublicProfile(userId, controller.signal).then(result => { if (active) setProfile(result); }).catch(() => undefined)
-      .finally(() => { window.clearTimeout(timeout); if (active) setProfileLoadedFor(String(userId)); });
-    return () => { active = false; window.clearTimeout(timeout); controller.abort(); };
+    const cachedProfile = peekProfileData(userId, 'profile');
+    setLoaded(['catalog', 'library', 'likedIds', 'posts'].every(key => peekProfileData(userId, key as 'catalog' | 'library' | 'likedIds' | 'posts') !== undefined));
+    setCatalogLoaded(peekProfileData(userId, 'catalog') !== undefined);
+    setProfileLoadedFor(cachedProfile ? String(userId) : null);
+    setProfile(cachedProfile ?? null);
+    setCatalog(peekProfileData(userId, 'catalog') ?? []);
+    setPosts(peekProfileData(userId, 'posts') ?? []);
+    setLibrary(peekProfileData(userId, 'library') ?? emptyLibrary());
+    setLikedIds(peekProfileData(userId, 'likedIds') ?? []);
+    void loadProfileData(userId, 'profile', async () => {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 10000);
+      try { return await getPublicProfile(userId, controller.signal); }
+      finally { window.clearTimeout(timeout); }
+    }).then(result => { if (active) setProfile(result); }).catch(() => undefined)
+      .finally(() => { if (active) setProfileLoadedFor(String(userId)); });
+    return () => { active = false; };
   }, [userId]);
   useEffect(() => {
     if (!userId || !primaryReady) return;
     let active = true;
-    const catalogRequest = getUltimosCapitulos().then(items => {
+    const catalogRequest = loadProfileData(userId, 'catalog', getUltimosCapitulos).then(items => {
       if (active) setCatalog(items);
     }).catch(() => undefined).finally(() => { if (active) setCatalogLoaded(true); });
-    const libraryRequest = getSocialLibrary().then(items => { if (active) setLibrary(items); });
-    const interactionsRequest = getInteractions().then(items => { if (active) setLikedIds(items?.likes.map(String) ?? []); });
-    const postsRequest = getProfilePosts(userId).then(items => { if (active) setPosts(items); });
+    const libraryRequest = loadProfileData(userId, 'library', getSocialLibrary).then(items => { if (active) setLibrary(items); });
+    const interactionsRequest = loadProfileData(userId, 'likedIds', async () => {
+      const items = await getInteractions();
+      if (!items) throw new Error('No se pudieron cargar las interacciones.');
+      return items.likes.map(String);
+    }).then(items => { if (active) setLikedIds(items); });
+    const postsRequest = loadProfileData(userId, 'posts', () => getProfilePosts(userId)).then(items => { if (active) setPosts(items); });
     void Promise.allSettled([catalogRequest, libraryRequest, interactionsRequest, postsRequest])
       .then(() => { if (active) setLoaded(true); });
     return () => { active = false; };

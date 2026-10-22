@@ -1,6 +1,7 @@
 import { useReducedMotion } from 'framer-motion';
 import { GooeySelector } from '../ui/GooeySelector';
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
+import { useHomePrefetchGroup } from '../../context/HomePrefetchContext';
 import { Link } from 'react-router-dom';
 
 import { HomeChaptersIcon, HomeCrownIcon, HomeTrendingIcon, HomeViewsIcon } from '../../components/home/HomeIcons';
@@ -103,6 +104,7 @@ export const TrendingSection = ({
   const prefersReducedMotion = useReducedMotion();
   const isMobile = useIsMobileViewport();
   const [period, setPeriod] = useState<RankingPeriod>('Semanal');
+  const sectionRef = useRef<HTMLElement>(null);
   const { items, loading } = useTrendingRanking({
     audience,
     period,
@@ -118,9 +120,10 @@ export const TrendingSection = ({
     leadingInset: TRENDING_CARD[isMobile ? 'mobile' : 'desktop'].inset,
     pauseOnHover: !isMobile,
   });
+  useHomePrefetchGroup(sectionRef, items.map(item => ({ mangaId: String(item.id), chapterIds: [] })));
 
   return (
-    <section id={!filterMangas ? (audience === 'men' ? 'mangas-juveniles' : 'tendencia-ahora') : undefined} className={`relative w-full ${className}`} aria-busy={loading}>
+    <section ref={sectionRef} id={!filterMangas ? (audience === 'men' ? 'mangas-juveniles' : 'tendencia-ahora') : undefined} className={`relative w-full ${className}`} aria-busy={loading}>
       <div className="relative mx-auto w-full max-w-[1440px]">
 
         <div className="home-trending-heading relative h-[111px] lg:h-[103px]">

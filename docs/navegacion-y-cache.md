@@ -43,6 +43,63 @@ refresca progresivamente; un fallo temporal no vacía lo que ya estaba visible.
 Los rankings y el catálogo conservan su caché existente de cinco minutos.
 No se añaden cachés de compras, saldos, mensajes ni permisos de lectura.
 
+## Precarga desde el inicio
+
+`HomePrefetchProvider` se activa cuando todas las listas del inicio terminan y
+utiliza la misma cola de tiempo libre, sin modificar su carga progresiva.
+Prepara el código de la ficha y del lector y reutiliza la biblioteca musical.
+Los hero registran sus portadas mostradas; las tendencias, el ranking activo;
+y las novedades, la página y pestaña seleccionadas y su página siguiente.
+
+`homeNavigationQueue.ts` atiende primero las secciones en pantalla, luego el
+resto de las páginas actuales y finalmente las páginas siguientes. Cambiar de
+página o pestaña sustituye los candidatos y cancela los capítulos especulativos
+que dejaron de tener prioridad. Al salir del inicio o esconder la pestaña se
+cancela la cola; las peticiones públicas compartidas que ya empezaron pueden
+terminar para otros consumidores.
+
+La cola trabaja por etapas dentro de cada grupo: primero la ficha y el listado
+de capítulos de todas las series visibles; después, los capítulos recientes;
+por último, recomendaciones y comentarios. Solo entonces pasa a las tarjetas
+fuera de pantalla y a la página siguiente. Los comentarios lentos no bloquean
+la preparación inicial de las otras series visibles.
+
+Cada sección se publica en cuanto llega: la sinopsis no espera al listado y el
+selector del lector no espera recomendaciones, comentarios ni imágenes.
+Las tarjetas recientes también conservan en memoria el ID de serie, el título
+y el número de sus capítulos desde que llega la respuesta del inicio. Ese
+registro público está limitado a 5.000 capítulos y permite mostrar el número
+en el primer render del lector, incluso si todavía no hubo tiempo de precargar.
+No contiene imágenes ni permisos de acceso.
+
+Cuando una tarjeta ya identifica su serie, la precarga inicia su listado antes
+de pedir la ficha y publica el selector aunque la ficha siga pendiente. Al abrir
+el lector se solicita el listado antes del contenido si la serie ya es conocida;
+en un enlace directo comienza en cuanto llegan los metadatos. Ambos avanzan de
+forma independiente. Home, ficha y lector comparten la caché pública y las
+peticiones de listados en curso. Los comentarios del lector se piden después.
+
+Se conserva una instantánea parcial durante cinco minutos, con un máximo de
+128 fichas. Al abrir `MangaDetail`, las secciones preparadas hace menos de un
+minuto se reutilizan directamente; las antiguas se muestran mientras se
+actualizan mediante las cachés públicas compartidas. Recomendaciones y catálogo
+pueden completar la barra lateral por separado. Los comentarios se solicitan
+después del listado, sin esperar al catálogo y con una espera de tiempo libre
+limitada a 250 ms en navegadores con `requestIdleCallback`.
+Los comentarios preparados solo se muestran durante 60 segundos y para la
+misma cuenta. Las cachés públicas anteriores conservan sus límites y vigencia.
+
+El fondo de Mukai Music ya estaba en WebP; se recomprimió de 117.994 a 71.378
+bytes conservando los 768 × 432 píxeles y su prioridad de descarga baja.
+
+De los dos capítulos recientes mostrados en cada tarjeta, solo se solicitan los
+publicados y gratuitos, comprobando también la lista de capítulos. Se preparan
+sus datos y las primeras cinco imágenes, con prioridad baja. No se registran
+vistas ni progreso y no se realizan compras. Las sesiones del inicio se mantienen
+separadas (máximo 128, cinco minutos); al navegar se conserva la sesión elegida
+y se descartan las demás. Un cambio de cuenta invalida las sesiones. La carga
+del capítulo completo y de sus vecinos sigue a cargo del lector existente.
+
 La configuración de caché administrada en el servidor permite reutilizar durante un año los archivos
 estáticos cuyo nombre contiene la huella generada por Vite. Cada versión
 modificada recibe otra URL. HTML y API quedan fuera de esa regla; no se añade
