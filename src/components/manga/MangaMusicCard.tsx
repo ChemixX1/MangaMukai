@@ -49,7 +49,7 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
 
   const playTrack = (id: number, locked: boolean) => {
     if (locked) {
-      navigate('/pro');
+      navigate(getStoredToken() ? '/pro' : '/auth/login?returnTo=%2Fpro', { state: { returnTo: '/pro' } });
       return;
     }
     selectTrack(id);

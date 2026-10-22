@@ -2,7 +2,6 @@ import { clearStoredAuth, getStoredToken } from './authService';
 import { MANGAMUKAI_API } from '../config/api';
 import { syncMangaSubscriptions } from './socialService';
 import { readGuestMangaLike, toggleGuestMangaLike } from '../utils/guestMangaLikes';
-import { notifyProfileContentChanged } from './profileCacheEvents';
 
 const WP_AUTH = MANGAMUKAI_API;
 

@@ -5,13 +5,15 @@ import { GooeySelector } from '../components/ui/GooeySelector';
 import { createQueuedLike } from '../utils/queuedLike';
 import { readGuestMangaLike } from '../utils/guestMangaLikes';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BookOpen, ChevronDown } from 'lucide-react';
 
 import {
   getChaptersBySeries,
   getMangaById,
+  peekKnownManga,
+  peekSeriesChapters,
   getRelatedMangas,
   getUltimosCapitulos,
   trackChapterView,
@@ -66,6 +68,14 @@ import { MangaSeriesLikeButton } from '../components/manga/MangaSeriesLikeButton
 import { MangaRewardProgress } from '../components/manga/MangaRewardProgress';
 import { MangaDetailSocials } from '../components/manga/MangaDetailSocials';
 import { DetailViewsIcon } from '../components/manga/referenceIcons';
+import { hasKnownChapters, knownFirstChapterId, mangaDetailAccent } from '../utils/mangaDetailState';
+
+const initialDetail = (id: string) => {
+  const prepared = peekPreparedMangaDetail(id);
+  const manga = prepared?.manga ?? peekKnownManga(id);
+  if (!manga) return undefined;
+  return { ...prepared, manga, chapters: prepared?.chapters ?? peekSeriesChapters(manga.eroSeri || manga.id) };
+};
 
 const formatCompactNumber = (value: number) => new Intl.NumberFormat('es-PE', {
   notation: value >= 1000 ? 'compact' : 'standard',
@@ -123,7 +133,7 @@ const typeDotColor = (type = '') => {
   if (normalized.includes('manhua')) return '#22C55E';
   if (normalized.includes('manhwa')) return '#B000AD';
   if (normalized.includes('comic')) return '#38BDF8';
-  return '#FF008C';
+  return 'var(--detail-magenta, #FF008C)';
 };
 
 const MetaRow = ({ icon, label, value, dotColor }: { icon: ReactNode; label: string; value: string; dotColor?: string }) => (
@@ -143,12 +153,18 @@ const tabClass = (active = false) => `manga-detail-tab ${active ? 'is-active' : 
 
 export const MangaDetail = () => {
   const { id } = useParams<{ id: string }>();
+  return <MangaDetailContent key={id} />;
+};
+
+const MangaDetailContent = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme } = useTheme();
   const isLightMode = theme === 'light';
   const isMobile = useIsMobileViewport();
 
-  const prepared = id ? peekPreparedMangaDetail(id) : undefined;
+  const prepared = id ? initialDetail(id) : undefined;
   const [manga, setManga] = useState<MangaCapitulo | null>(() => prepared?.manga ?? null);
   const [chapters, setChapters] = useState<SeriesChapter[]>(() => prepared?.chapters ?? []);
   const [related, setRelated] = useState<RelatedManga[]>(() => prepared?.related ?? []);
@@ -314,7 +330,7 @@ export const MangaDetail = () => {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    const initial = peekPreparedMangaDetail(id);
+    const initial = initialDetail(id);
     setLoading(!initial);
     setChaptersLoading(!initial?.chapters);
     setCommentsLoading(!initial?.comments);
@@ -349,7 +365,7 @@ export const MangaDetail = () => {
           return;
         }
 
-        setManga(mangaData);
+        setManga({ ...mangaData, firstChapterId: mangaData.firstChapterId ?? initial?.manga.firstChapterId });
 
         void ensureMusicLibrary();
         const mangaPostId = mangaData.eroSeri || mangaData.id;
@@ -418,7 +434,13 @@ export const MangaDetail = () => {
     };
   }, [id, loadInteractions]);
 
-  const firstChapter = useMemo(() => [...chapters].sort((a, b) => a.chapter_number - b.chapter_number)[0], [chapters]);
+  const firstChapterId = knownFirstChapterId(manga, chaptersLoading ? undefined : chapters);
+  const hasFirstChapter = Boolean(firstChapterId || (chaptersLoading && hasKnownChapters(manga)));
+  const detailAccent = mangaDetailAccent(manga, location.state?.mangaAccent);
+  const readingFirst = useRef(false);
+  const currentMangaId = useRef(id);
+  useLayoutEffect(() => { currentMangaId.current = id; readingFirst.current = false; }, [id]);
+  useEffect(() => () => { currentMangaId.current = undefined; }, []);
   useEffect(() => {
     if (!id || !manga || loading || chaptersLoading || commentsLoading || relatedLoading || !chapters.length) return;
     const session = mangaReaderSession(id, String(manga.eroSeri || manga.id), chapters);
@@ -443,10 +465,21 @@ export const MangaDetail = () => {
     });
   };
 
-  const handleReadFirst = () => {
-    if (!manga || !firstChapter) return;
-    void trackChapterView(firstChapter.id, manga.id);
-    navigate(`/read/${firstChapter.id}`);
+  const handleReadFirst = async () => {
+    if (!manga || !hasFirstChapter || readingFirst.current) return;
+    readingFirst.current = true;
+    try {
+      const chapterId = firstChapterId ?? knownFirstChapterId(manga, await getChaptersBySeries(manga.eroSeri || manga.id));
+      if (currentMangaId.current !== id) return;
+      if (!chapterId) {
+        setChaptersError('No se pudo abrir el primer capítulo. Inténtalo de nuevo.');
+        return;
+      }
+      void trackChapterView(chapterId, manga.id);
+      navigate(`/read/${chapterId}`);
+    } finally {
+      readingFirst.current = false;
+    }
   };
 
   const handleBookmark = async () => {
@@ -558,6 +591,7 @@ export const MangaDetail = () => {
   if (isMobile) {
     return (
       <MobileMangaDetail
+        accent={detailAccent}
         manga={manga}
         chapters={chapters}
         related={related}
@@ -584,14 +618,14 @@ export const MangaDetail = () => {
         userInfo={userInfo}
         onPurchaseSuccess={handlePurchaseSuccess}
         onReadFirst={handleReadFirst}
-        hasFirstChapter={Boolean(firstChapter)}
+        hasFirstChapter={hasFirstChapter}
         synopsis={synopsis}
       />
     );
   }
 
   return (
-    <main className="manga-detail-desktop relative min-h-screen overflow-x-clip bg-surface text-ink">
+    <main data-accent={detailAccent} className="manga-detail-desktop relative min-h-screen overflow-x-clip bg-surface text-ink">
 
       <div className="fixed inset-0 z-0" aria-hidden="true">
         <img src={manga.portada} alt="" className="h-full w-full origin-top scale-105 object-cover object-top blur-[2px]" />
@@ -627,7 +661,7 @@ export const MangaDetail = () => {
 
 
               <div className="manga-detail-actions">
-                <button type="button" onClick={handleReadFirst} disabled={!firstChapter} className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-mukai-magenta px-2 font-montserrat text-[13px] font-extrabold text-white transition-transform hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45">
+                <button type="button" onClick={handleReadFirst} disabled={!hasFirstChapter} className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-mukai-magenta px-2 font-montserrat text-[13px] font-extrabold text-white transition-transform hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45">
                   Leer Capítulo 1
                 </button>
                 <SaveButton
@@ -698,8 +732,7 @@ export const MangaDetail = () => {
                 </div>
               </nav>
 
-              {activeContent === 'chapters' ? (
-                <section id="capitulos" aria-label="Capítulos" className="manga-chapters-section scroll-mt-28">
+              <section hidden={activeContent !== 'chapters'} id="capitulos" aria-label="Capítulos" className="manga-chapters-section scroll-mt-28">
                   <div className="manga-chapter-search">
                     <label className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border-[0.5px] border-line bg-ink/[.06] px-3.5">
                       <SearchIcon size={22} className="shrink-0 text-ink/60" />
@@ -729,7 +762,7 @@ export const MangaDetail = () => {
                     <ChapterList mangaId={String(manga.eroSeri || manga.id)} loading={chaptersLoading} loadError={chaptersError} chapters={filteredChapters} purchasedChapterIds={purchasedIds} userCoins={userCoins} userInfo={userInfo} onPurchaseSuccess={handlePurchaseSuccess} sortOrder={chapterSortOrder} />
                   )}
                 </section>
-              ) : activeContent === 'synopsis' ? (
+              {activeContent === 'synopsis' ? (
                 <section id="sinopsis" aria-label="Sinopsis" className="mt-5 scroll-mt-28 rounded-2xl border-[0.5px] border-line bg-surface/60 p-5">
                   <p ref={synopsisRef} className={`text-justify font-montserrat text-[14px] font-normal leading-6 text-ink/90 ${synopsisExpanded ? '' : 'line-clamp-[9]'}`}>{synopsis || 'La sinopsis de este manga todavía no está disponible.'}</p>
                   {synopsisHasOverflow && (

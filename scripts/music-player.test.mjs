@@ -145,7 +145,8 @@ test('card restores the subscription prompt without mounting player controls', (
   assert.match(playable.props.className, /manga-music-player/);
 });
 
-test('Mukai Music subscription link opens the plans page', () => {
+test('Mukai Music sends guests through login and signed-in users to plans', () => {
+  let token = null;
   const exports = {};
   const jsx = (type, props) => ({ type, props });
   vm.runInNewContext(compile('../src/components/manga/MukaiMusicPromo.tsx'), {
@@ -153,12 +154,17 @@ test('Mukai Music subscription link opens the plans page', () => {
     require: (name) => {
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
       if (name === 'react-router-dom') return { Link: 'Link' };
+      if (name.endsWith('/authService')) return { getStoredToken: () => token };
       return {};
     },
   });
   const promo = exports.MukaiMusicPromo();
   const content = promo.props.children[1];
   const link = content.props.children.find((child) => child.type === 'Link');
-  assert.equal(link.props.to, '/pro');
+  assert.equal(link.props.to, '/auth/login?returnTo=%2Fpro');
+  assert.equal(link.props.state.returnTo, '/pro');
+  token = 'session';
+  const signedIn = exports.MukaiMusicPromo().props.children[1].props.children.find(child => child.type === 'Link');
+  assert.equal(signedIn.props.to, '/pro');
   assert.equal(link.props.children, 'SUSCRÍBETE');
 });

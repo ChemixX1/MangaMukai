@@ -1,5 +1,5 @@
 import { MANGAMUKAI_API } from '../config/api';
-import { clearStoredAuth, getStoredToken } from './authService';
+import { clearStoredAuth, getStoredToken, getAuthCacheKey } from './authService';
 
 export interface MusicTrack {
   id: number;
@@ -45,6 +45,7 @@ export const setEntityReaction = async (type: 'manga' | 'chapter' | 'comment', i
   const response = await fetch(`${MANGAMUKAI_API}/reactions/${type}/${id}`, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ reaction }) });
   const data = await response.json();
   if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo guardar la reacción.');
+  if (type === 'chapter') invalidateChapterEngagement();
   return data;
 };
 
@@ -134,14 +135,59 @@ export const postMangaComment = async (
     if (!res.ok) return null;
     const data = await res.json();
     if (data.error) return null;
-    if (chapterId) window.dispatchEvent(new CustomEvent('mm_chapter_comments_changed', { detail: { chapterId } }));
+    if (chapterId) {
+      invalidateChapterEngagement();
+      window.dispatchEvent(new CustomEvent('mm_chapter_comments_changed', { detail: { chapterId } }));
+    }
     return normalizeComment(data.comment || data);
   } catch {
     return null;
   }
 };
 
-export const getChapterEngagement = async (ids: Array<string | number>) => {
+type ChapterEngagement = { counts: Record<string, number>; engagement: Record<string, EntityReactions> };
+const chapterSnapshots = new Map<string, { count: number; reaction: EntityReactions; at: number }>();
+const chapterRequests = new Map<string, Promise<ChapterEngagement>>();
+let chapterOwner = '';
+let chapterRevision = 0;
+const invalidateChapterEngagement = () => {
+  chapterRevision++;
+  chapterSnapshots.clear();
+  chapterRequests.clear();
+};
+export const peekChapterEngagement = (ids: Array<string | number>): ChapterEngagement => {
+  const owner = getAuthCacheKey();
+  if (owner !== chapterOwner) { invalidateChapterEngagement(); chapterOwner = owner; }
+  const result: ChapterEngagement = { counts: {}, engagement: {} };
+  for (const id of ids) {
+    const entry = chapterSnapshots.get(String(id));
+    if (!entry || Date.now() - entry.at >= 60_000) continue;
+    result.counts[id] = entry.count;
+    result.engagement[id] = entry.reaction;
+  }
+  return result;
+};
+export const getChapterEngagement = async (ids: Array<string | number>, refresh = false): Promise<ChapterEngagement> => {
+  const cached = peekChapterEngagement(ids);
+  const missing = [...new Set(ids.map(String))].filter(id => refresh || !(id in cached.counts)).sort();
+  if (!missing.length) return cached;
+  const key = missing.join(',');
+  let request = chapterRequests.get(key);
+  if (!request) {
+    const revision = chapterRevision;
+    request = fetchChapterEngagement(missing).then(result => {
+      if (revision === chapterRevision) {
+        for (const id of missing) chapterSnapshots.set(id, { count: result.counts[id] || 0, reaction: result.engagement[id] || { reactions: {}, my_reaction: '' }, at: Date.now() });
+        while (chapterSnapshots.size > 4000) chapterSnapshots.delete(chapterSnapshots.keys().next().value!);
+      }
+      return result;
+    }).finally(() => { if (chapterRequests.get(key) === request) chapterRequests.delete(key); });
+    chapterRequests.set(key, request);
+  }
+  const fresh = await request;
+  return { counts: { ...cached.counts, ...fresh.counts }, engagement: { ...cached.engagement, ...fresh.engagement } };
+};
+const fetchChapterEngagement = async (ids: Array<string | number>) => {
   const counts: Record<string, number> = {};
   const engagement: Record<string, EntityReactions> = {};
   for (let start = 0; start < ids.length; start += 100) {

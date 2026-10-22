@@ -30,8 +30,8 @@ export const Countdown = ({ targetDate }: { targetDate: string }) => {
   }, [targetDate]);
 
   return (
-    <span className="text-[10px] text-pink-400 font-mono flex items-center gap-1 bg-pink-500/10 px-2 py-1 rounded">
-      <Clock size={10} /> {timeLeft}
+    <span role="timer" className="text-xs md:text-sm text-pink-700 font-mono flex items-center gap-1 bg-pink-500/10 px-2 py-1 rounded">
+      <Clock size={14} aria-hidden="true" /> {timeLeft}
     </span>
   );
 };

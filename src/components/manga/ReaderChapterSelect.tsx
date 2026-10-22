@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { PurchasedIcon } from './designIcons';
-import navbarCoins from '../../assets/recharge/icon-2.svg';
+import navbarCoins from '../../assets/recharge/icon-2-small.webp';
 
 export interface ReaderChapterOption { id: string; number: number; isPaid?: boolean; isPurchased?: boolean; price?: number; }
 

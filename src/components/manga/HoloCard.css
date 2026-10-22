@@ -79,3 +79,14 @@
 @media (prefers-reduced-motion: reduce) {
   .holo-card__face canvas { transition: none; }
 }
+
+/* Mobile reward preview: foil sheen without a WebGL context or another texture. */
+.holo-card.is-lightweight-foil .holo-card__face--front::after {
+  content: ''; position: absolute; inset: -40%; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, #7de9ff40 42%, #ffc1fa50 49%, #fff7b840 56%, transparent 68%);
+  animation: holo-lightweight-sheen 4.8s ease-in-out infinite;
+}
+@keyframes holo-lightweight-sheen { 0%, 100% { transform: translateX(-18%); opacity: .3; } 50% { transform: translateX(18%); opacity: .7; } }
+@media (prefers-reduced-motion: reduce) {
+  .holo-card.is-lightweight-foil .holo-card__face--front::after { animation: none; }
+}

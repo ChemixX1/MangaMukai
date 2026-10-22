@@ -19,9 +19,9 @@ export function routeModuleKey(path: string): string | null {
 
 export function idleRouteCandidates(pathname: string, constrained: boolean): string[] {
   // Keep speculation small and leave the reader's existing chapter prefetch in charge.
-  const candidates = pathname === '/' ? ['/manga-bn', '/comunidad']
-    : ['/manga-bn', '/manga-19'].includes(pathname) ? ['/', '/comunidad']
-      : pathname === '/comunidad' ? ['/']
+  const candidates = pathname === '/' ? ['/manga-bn', '/comunidad', '/chat', '/tienda']
+    : ['/manga-bn', '/manga-19'].includes(pathname) ? ['/', '/comunidad', '/chat', '/tienda']
+      : pathname === '/comunidad' ? ['/mensajes', '/chat', '/']
         : [];
-  return candidates.slice(0, constrained ? 1 : 2);
+  return candidates.slice(0, constrained ? 1 : 4);
 }

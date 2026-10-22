@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect } from 'react';
-import { BrowserRouter, HashRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 import { migrateOldDataToWordPress } from './services/migrationService';
 import { MaintenanceGate } from './components/common/MaintenanceGate';
 import { MobileSectionHeader, MobileTabBar, Navbar } from './components/layout';
@@ -10,6 +10,7 @@ import { syncReaderPrefetchAuth, syncReaderPrefetchRoute } from './services/read
 import { AUTH_CHANGED_EVENT } from './services/authService';
 import { NavigationPreload } from './components/common/NavigationPreload';
 import { blockBackgroundTasks } from './utils/backgroundTasks';
+import { createRouteScrollManager } from './utils/routeScroll';
 
 const Router = import.meta.env.VITE_GITHUB_PAGES === 'true' ? HashRouter : BrowserRouter;
 
@@ -37,29 +38,16 @@ const CharacterChatPage = lazy(() => import('./pages/CharacterChatPage'));
 const ShopPage = lazy(() => import('./pages/ShopPage'));
 const LegalDocumentPage = lazy(() => import('./pages/LegalDocumentPage').then(({ LegalDocumentPage: Page }) => ({ default: Page })));
 
-const ScrollToTop = () => {
-  const { pathname, hash } = useLocation();
-  useEffect(() => {
-    if (hash) {
-      let anchor = hash.slice(1);
-      try { anchor = decodeURIComponent(anchor); } catch {}
-      const scrollToAnchor = () => {
-        const target = document.getElementById(anchor);
-        if (!target) return false;
-        target.scrollIntoView({ block: 'start' });
-        return true;
-      };
-      if (scrollToAnchor()) return;
-      const observer = new MutationObserver(() => {
-        if (scrollToAnchor()) observer.disconnect();
-      });
-      observer.observe(document.getElementById('root') ?? document.body, { childList: true, subtree: true });
-      const timeout = window.setTimeout(() => observer.disconnect(), 10000);
-      return () => { observer.disconnect(); window.clearTimeout(timeout); };
-    }
+const manageRouteScroll = createRouteScrollManager();
+
+const RouteScroll = () => {
+  const { pathname, hash, key } = useLocation();
+  const navigationType = useNavigationType();
+  useLayoutEffect(() => {
     // The community restores its position once its cached feed is mounted.
-    if (pathname !== '/comunidad') window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [pathname, hash]);
+    if (pathname === '/comunidad' && !hash) return;
+    return manageRouteScroll(key, navigationType === 'POP', hash);
+  }, [pathname, hash, key, navigationType]);
   return null;
 };
 
@@ -105,7 +93,6 @@ function AppInner() {
     <Router>
 
       <MaintenanceGate />
-      <ScrollToTop />
       <SubscriptionBackgroundPreload />
       <RouteSeo />
       <NavigationPreload />
@@ -114,6 +101,8 @@ function AppInner() {
       <MobileSectionHeader />
       <div className={`mobile-tabbar-space min-h-screen font-sans ${pageColors}`}>
         <Suspense fallback={<RouteLoadingFallback />}>
+          {/* Apply scroll only when the destination commits, while preserving back/forward positions. */}
+          <RouteScroll />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/nosotros" element={<AboutPage />} />

@@ -44,7 +44,7 @@ const TrendingCard = ({ manga, rank, accent, isCopy, isMobile }: TrendingCardPro
   const views = formatHomeViews(manga.views);
   const chapters = formatChapterCount(manga.chapterCount);
   return (
-    <Link to={`/manga/${manga.id}`} draggable={false} tabIndex={isCopy ? -1 : undefined}
+    <Link to={`/manga/${manga.id}`} state={{ mangaAccent: accent }} draggable={false} tabIndex={isCopy ? -1 : undefined}
       aria-label={`${rank}. ${title}: ${chapters}, ${views} vistas`}
       className="home-ranking-card" style={{ width: card.width, marginRight: card.gap }}>
       <div className="home-ranking-surface">

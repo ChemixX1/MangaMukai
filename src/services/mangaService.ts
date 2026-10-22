@@ -13,6 +13,17 @@ const CATALOG_SESSION_CACHE_KEY = 'mangamukai:catalog-cache:v1';
 
 let catalogCache: { data: MangaCapitulo[]; expiresAt: number } | null = null;
 let catalogRequest: Promise<MangaCapitulo[]> | null = null;
+const knownMangas = new Map<string, { manga: MangaCapitulo; expiresAt: number }>();
+
+/** Public home metadata is enough to paint the detail while it refreshes. */
+export const peekKnownManga = (id: string): MangaCapitulo | undefined => {
+  const detail = mangaDetailsCache.peek(id);
+  if (detail) return detail;
+  const known = knownMangas.get(id);
+  if (known && known.expiresAt > Date.now()) return known.manga;
+  knownMangas.delete(id);
+  if (catalogCache && catalogCache.expiresAt > Date.now()) return catalogCache.data.find(manga => String(manga.id) === id);
+};
 
 const readCatalogSessionCache = () => {
   if (typeof window === 'undefined') return null;
@@ -174,7 +185,7 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     rememberChapterMetadata(chapter.id, item.id, chapter.numero, item.titulo);
   });
 
-  return {
+  const manga: MangaCapitulo = {
     id:          item.id,
     titulo:      item.titulo,
     portada:     item.portada,
@@ -190,6 +201,7 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     status:      item.status || '',
     totalViews:  item.totalViews || 0,
     chapterCount: typeof item.chapterCount === 'number' && Number.isInteger(item.chapterCount) && item.chapterCount >= 0 ? item.chapterCount : undefined,
+    firstChapterId: Number.isInteger(Number(item.firstChapterId)) && Number(item.firstChapterId) > 0 ? Number(item.firstChapterId) : undefined,
     rawFecha:    item.fecha || '',
     tituloOriginal: item.titulo_original || '',
     fechaManga:  item.fecha_manga || '',
@@ -199,6 +211,10 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     publishedAt: item.published_at || item.fecha || '',
     capitulosRecientes: caps,
   };
+  knownMangas.delete(String(manga.id));
+  knownMangas.set(String(manga.id), { manga, expiresAt: Date.now() + CATALOG_CACHE_TTL });
+  while (knownMangas.size > 512) knownMangas.delete(knownMangas.keys().next().value!);
+  return manga;
 };
 
 export const getUltimosCapitulos = async (): Promise<MangaCapitulo[]> => {
@@ -443,6 +459,9 @@ const loadSeriesChapters = (eroSeri: number | string): Promise<SeriesChapter[] |
 
 export const getChaptersBySeries = async (eroSeri: number | string): Promise<SeriesChapter[]> =>
   (await loadSeriesChapters(eroSeri)) ?? [];
+
+export const peekSeriesChapters = (id: number | string): SeriesChapter[] | undefined =>
+  seriesChaptersCache.peek(String(id)) ?? undefined;
 
 export const getSeriesChapterCount = async (eroSeri: number | string): Promise<number | null> => {
   const cached = getCachedSeriesChapterCount(eroSeri);

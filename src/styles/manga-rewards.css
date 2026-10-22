@@ -8,11 +8,6 @@
   font-family: Montserrat, sans-serif;
   background: radial-gradient(ellipse at 50% 65%, #ff9de5aa, transparent 58%), radial-gradient(ellipse at 50% 0, #ec4cff99, transparent 65%), linear-gradient(125deg, #7900d4, #ed008c 52%, #9d00bc);
 }
-@property --reward-air-offset {
-  syntax: '<length>';
-  inherits: false;
-  initial-value: 0px;
-}
 .manga-reward-banner::before, .manga-reward-modal::before,
 .manga-reward-banner::after, .manga-reward-modal::after {
   content: '';
@@ -29,15 +24,9 @@
 .manga-reward-banner::after, .manga-reward-modal::after {
   opacity: 1;
   background: repeating-conic-gradient(from 12deg at 50% 60%, #c4c4cc45 0deg 17deg, transparent 17deg 45deg);
-  mask-image: repeating-radial-gradient(circle at 50% 60%,
-    transparent var(--reward-air-offset),
-    transparent calc(var(--reward-air-offset) + 24px),
-    #000 calc(var(--reward-air-offset) + 38px),
-    #000 calc(var(--reward-air-offset) + 64px),
-    transparent calc(var(--reward-air-offset) + 80px),
-    transparent calc(var(--reward-air-offset) + 112px));
+  mask-image: repeating-radial-gradient(circle at 50% 60%, transparent 0 24px, #000 38px 64px, transparent 80px 112px);
   transform-origin: 50% 60%;
-  animation: reward-backdrop-enter 1.3s cubic-bezier(.16, 1, .3, 1) both, reward-air 1.8s linear infinite;
+  animation: reward-air 4.8s ease-in-out infinite;
 }
 @keyframes reward-backdrop-enter {
   0% { transform: translateY(35%) scaleY(.15); opacity: 0; }
@@ -45,8 +34,8 @@
   100% { transform: translateY(0) scaleY(1); opacity: 1; }
 }
 @keyframes reward-air {
-  from { --reward-air-offset: 0px; }
-  to { --reward-air-offset: -112px; }
+  0%, 100% { transform: translate3d(0, 3%, 0) scale(1); opacity: .5; }
+  50% { transform: translate3d(0, -5%, 0) scale(1.12); opacity: .85; }
 }
 .manga-reward-banner { display: grid; align-items: center; width: 100%; max-width: none; margin: 20px auto 0; padding: 14px 0; border: 0; border-radius: 14px; cursor: pointer; text-align: center; box-shadow: none; }
 .manga-detail-mobile .manga-reward-banner { width: 88.6364%; }
@@ -687,24 +676,48 @@
   85%, 100% { transform: translateX(130%); }
 }
 @media (max-width: 1023px) {
-  /* One short entrance, with no full-screen glow filters or continuous animation. */
+  /* Keep the desktop effects with smaller layers and compositor-only motion. */
   .manga-reward-banner::before, .manga-reward-banner::after,
   .manga-reward-modal::before, .manga-reward-modal::after { animation: reward-backdrop-enter .45s ease-out both; }
-  .is-reached .reward-road-card { animation: none; }
+  .is-reached:not(.is-claimed) .reward-road-card { animation: reward-ready 3.6s ease-in-out infinite; }
   .reward-reveal .reward-reveal-beam, .reward-reveal .reward-reveal-flash { display: none; }
   .reward-reveal .reward-reveal-halo { animation-duration: .4s; animation-delay: 0s; }
-  .reward-reveal .reward-reveal-halo::before, .reward-reveal .reward-reveal-halo::after { animation: none; }
+  .reward-reveal .reward-reveal-halo::before { animation: reward-halo-spin 24s linear infinite; }
   .reward-reveal .reward-reveal-halo::after, .reward-reveal .reward-reveal-ring::after { display: none; }
   .reward-reveal .reward-reveal-ring::before { box-shadow: none; animation-duration: .6s; }
   .reward-reveal .reward-reveal-sparkle { filter: none; box-shadow: none; animation-duration: .7s; animation-delay: .08s; }
-  .reward-reveal .reward-reveal-prize, .reward-reveal .reward-reveal-cover-card { filter: none; animation: none; }
+  .reward-reveal .reward-reveal-prize, .reward-reveal .reward-reveal-cover-card { filter: none; }
+  .reward-reveal .reward-reveal-prize { animation: reward-prize-float 4s ease-in-out .45s infinite; }
   .reward-reveal .reward-reveal-continue::after { display: none; }
   .manga-reward-dialog.is-revealing { backdrop-filter: none; -webkit-backdrop-filter: none; background: #fffffff2; }
   .dark .manga-reward-dialog.is-revealing, .manga-reward-dialog.is-revealing.theme-dark { background: #000000f2; }
 }
+
+.manga-reward-banner::before, .manga-reward-banner::after,
+.manga-reward-banner .reward-road-card { animation-play-state: var(--reward-play-state, paused); }
+@media (max-width: 1023px) {
+  .manga-detail-mobile .manga-reward-banner { margin-top: 12px; padding-block: 5px; }
+  .manga-detail-mobile .manga-reward-banner::after { animation: reward-air 5s ease-in-out infinite; animation-play-state: var(--reward-play-state, paused); }
+  .manga-detail-mobile .manga-reward-banner .reward-road-prizes { width: 94%; gap: 8px; padding-inline: 8px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-card { max-width: 92px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-card-back { top: 19px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-art { height: 34px; filter: none; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-art img { width: 92px; height: 58px; bottom: -14px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-name { min-height: 23px; padding-bottom: 3px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-name strong { font-size: 13px; line-height: 20px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-level { font-size: 11px; margin-block: 0 3px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-level > svg { width: 16px; height: 16px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-status > img { width: 27px; height: 27px; filter: none; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-status { top: 12px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-meter { height: 20px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-meter-area { margin-top: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
+  .is-reached:not(.is-claimed) .reward-road-card { animation: none; }
+  .manga-detail-mobile .manga-reward-banner::after,
   .manga-reward-banner::before, .manga-reward-banner::after,
   .manga-reward-modal::before, .manga-reward-modal::after { animation: none; }
   .reward-reveal-beam, .reward-reveal-flash, .reward-reveal-ring, .reward-reveal-sparkles { display: none; animation: none; }
+  .reward-reveal .reward-reveal-prize, .reward-reveal .reward-reveal-halo, .reward-reveal .reward-reveal-halo::before,
   .reward-reveal-prize, .reward-reveal-halo, .reward-reveal-halo::before, .reward-reveal-halo::after, .reward-reveal-continue::after { animation: none; }
 }

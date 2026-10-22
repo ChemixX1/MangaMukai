@@ -62,6 +62,7 @@ export interface MangaCapitulo {
   status?: string;
   totalViews?: number;
   chapterCount?: number;
+  firstChapterId?: number;
   rawFecha?: string;
   tituloOriginal?: string;
   fechaManga?: string;

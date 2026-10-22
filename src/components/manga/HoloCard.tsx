@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 import './HoloCard.css';
@@ -387,6 +387,7 @@ export default function HoloCard({
   const [ready, setReady] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const flippable = Boolean(backImage || backContent);
+  const foil = useMemo(() => parseColor(foilColor), [foilColor]);
 
   settingsRef.current = {
     imageFit,
@@ -396,7 +397,7 @@ export default function HoloCard({
     edgeSparkle: clamp(edgeSparkle, 0, 1),
     frame: clamp(frame, 0, 20) / 100,
     glare: clamp(glare, 0, 1),
-    foil: parseColor(foilColor),
+    foil,
     radius: Math.max(0, radius),
     tiltMax: clamp(tiltMax, 0, 45),
     tiltDamping: clamp(tiltDamping, 16, 40),
@@ -420,7 +421,8 @@ export default function HoloCard({
     if (!root || !rotor || !canvas) return undefined;
 
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    const gl = foilEnabled ? canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false }) : null;
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const gl = foilEnabled && !reduce ? canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: false, powerPreference: 'low-power' }) : null;
     let program: WebGLProgram | null = null;
     let texture: WebGLTexture | null = null;
     let buffer: WebGLBuffer | null = null;
@@ -502,7 +504,7 @@ export default function HoloCard({
     let calm = 0;
 
     const draw = () => {
-      if (!gl || !program) return;
+      if (!gl || !program || !visible || document.hidden) return;
       const s = settingsRef.current!;
       const w = canvas.width;
       const h = canvas.height;
@@ -546,8 +548,11 @@ export default function HoloCard({
 
     const tick = (now: number) => {
       raf = 0;
-      if (!alive) return;
-      const dt = Math.min(1 / 30, Math.max(1 / 240, (now - last) / 1000));
+      if (!alive || !visible || document.hidden) return;
+      // Idle motion needs only 30 fps; pointer interactions keep native smoothness.
+      const interval = pointerRef.current.inside && !coarse ? 1000 / 60 : 1000 / 30;
+      if (now - last < interval - 1) { raf = requestAnimationFrame(tick); return; }
+      const dt = Math.min(1 / 20, Math.max(1 / 240, (now - last) / 1000));
       last = now;
       const s = settingsRef.current!;
       const pointer = pointerRef.current;
@@ -597,12 +602,12 @@ export default function HoloCard({
         Math.abs(state.tiltX - targetX) +
         Math.abs(state.tiltY - targetY);
       calm = motion > 0.02 ? 0 : calm + dt;
-      if (!visible || (!drifting && !pointer.inside && calm > 0.3)) return;
+      if (!drifting && calm > 0.3) return;
       raf = requestAnimationFrame(tick);
     };
 
     const wake = () => {
-      if (raf || !alive) return;
+      if (raf || !alive || !visible || document.hidden) return;
       calm = 0;
       last = performance.now();
       raf = requestAnimationFrame(tick);
@@ -610,7 +615,7 @@ export default function HoloCard({
     wakeRef.current = wake;
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1 : 1.5);
       const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
       const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
       if (canvas.width !== w || canvas.height !== h) {
@@ -660,6 +665,11 @@ export default function HoloCard({
       if (visible) wake();
     });
     visibility.observe(root);
+    const onVisibility = () => {
+      if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
+      else wake();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     resize();
 
     return () => {
@@ -669,6 +679,7 @@ export default function HoloCard({
       loadRef.current = null;
       resizeObserver.disconnect();
       visibility.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
       if (gl) {
         gl.deleteTexture(texture);
         gl.deleteBuffer(buffer);

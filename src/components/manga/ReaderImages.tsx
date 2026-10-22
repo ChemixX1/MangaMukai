@@ -1,3 +1,4 @@
+import { ReaderLoadingSkeleton } from './ReaderLoadingSkeleton';
 import { useEffect, useRef, useState } from 'react';
 import { READER_IMAGE_BATCH } from '../../services/readerPrefetchSession';
 
@@ -49,7 +50,7 @@ export function ReaderImages({ images, title, onComplete }: {
     return () => { active = false; pending.forEach(cancel => cancel()); };
   }, [manifest]);
 
-  return <>
+  return <div className="reader-strip">
     {pages.map((page) => page.failed ? (
       <div key={page.id} className="grid min-h-60 w-full place-items-center text-sm text-ink/60" role="status">No se pudo cargar la página {page.page_number}.</div>
     ) : (
@@ -59,6 +60,6 @@ export function ReaderImages({ images, title, onComplete }: {
         className="m-0 block h-auto w-full shrink-0 select-none p-0"
         decoding="sync" draggable={false} />
     ))}
-    {pages.length < images.length && <div className="min-h-60 w-full" role="status" aria-label="Cargando páginas" />}
-  </>;
+    {pages.length < images.length && <ReaderLoadingSkeleton />}
+  </div>;
 }

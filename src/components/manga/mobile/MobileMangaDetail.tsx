@@ -66,8 +66,9 @@ export const MobileMangaDetail = ({
   isBookmarked, isLiked, likes, interactionBusy, onBookmark, onLike,
   reactionCounts, selectedReaction, reactionError, onReact,
   purchasedIds, userCoins, userInfo, onPurchaseSuccess, onReadFirst, hasFirstChapter,
-  synopsis,
+  synopsis, accent,
 }: {
+  accent: 'pink' | 'cyan' | 'hot';
   commentsLoading: boolean;
   commentsError: string;
   chaptersLoading: boolean;
@@ -113,7 +114,7 @@ export const MobileMangaDetail = ({
     if (type.includes('manhua')) return '#22C55E';
     if (type.includes('manhwa')) return '#B000AD';
     if (type.includes('comic')) return '#38BDF8';
-    return '#FF008C';
+    return 'var(--detail-magenta, #FF008C)';
   })();
 
   const normalize = (value: string) => value.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -123,13 +124,13 @@ export const MobileMangaDetail = ({
     : chapters;
 
   return (
-    <main className="manga-detail-mobile-shell relative min-h-screen overflow-x-clip bg-surface text-ink">
+    <main data-accent={accent} className="manga-detail-mobile-shell relative min-h-screen overflow-x-clip bg-surface text-ink">
       <div className="pointer-events-none fixed inset-0 z-0" aria-hidden="true">
         <img src={manga.portada} alt="" className="h-full w-full origin-top scale-105 object-cover object-top blur-[2px]" />
         <div className="absolute inset-0 bg-surface/[.95]" />
         <div className="absolute inset-0 bg-gradient-to-b from-surface/40 via-transparent to-surface" />
       </div>
-    <div className="manga-detail-mobile focus-scope tap-transparent relative z-10 mx-auto flow-root min-h-screen w-full max-w-[440px] overflow-x-hidden text-ink [--focus-color:#ff008c] [--focus-offset:2px]">
+    <div className="manga-detail-mobile focus-scope tap-transparent relative z-10 mx-auto flow-root min-h-screen w-full max-w-[440px] overflow-x-hidden text-ink [--focus-color:var(--detail-magenta)] [--focus-offset:2px]">
       <div className="manga-detail-mobile-topbar">
         <div className="manga-detail-mobile-clock-row">
           <div className="manga-detail-mobile-controls">
@@ -260,8 +261,7 @@ export const MobileMangaDetail = ({
         </div>
       </nav>
 
-      {tab === 'chapters' ? (
-        <section aria-label="Capítulos" className="manga-chapters-section mx-auto w-[89.0909%]">
+      <section hidden={tab !== 'chapters'} aria-label="Capítulos" className="manga-chapters-section mx-auto w-[89.0909%]">
           <div className="manga-chapter-search">
             <label className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border-[0.5px] border-zinc-400/60 bg-zinc-500/10 px-3.5">
               <SearchIcon size={22} className="shrink-0 text-ink/60" />
@@ -303,7 +303,7 @@ export const MobileMangaDetail = ({
             )}
           </div>
         </section>
-      ) : tab === 'synopsis' ? (
+      {tab === 'synopsis' ? (
         <section aria-label="Sinopsis" className="mx-auto mt-7 w-[89.0909%]">
           <div className="rounded-2xl border-[0.5px] border-zinc-400/60 p-4">
             <p className={`text-justify font-montserrat text-[13px] font-normal leading-5 text-ink/90 ${synopsisExpanded ? '' : 'line-clamp-6'}`}>

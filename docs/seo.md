@@ -34,3 +34,25 @@ Esta estructura ayuda a descubrir las secciones, pero no permite imponer
 una lista exacta de resultados ni un plazo de actualización.
 
 Referencia: [enlaces de sitio de Google](https://developers.google.com/search/docs/appearance/sitelinks?hl=es).
+
+
+## Migración pendiente a direcciones por título
+
+El cliente sigue usando `/manga/:id`: la API actual consulta `/manga/{id}`
+y el PHP que sirve metadatos y sitemap no está en este repositorio.
+Antes de cambiar los enlaces, el servidor debe proporcionar un `slug` único,
+estable y persistido por serie, resolverlo mediante un índice y devolver el ID
+interno junto con los datos. No resolver títulos descargando todo el catálogo.
+
+La migración debe coordinar enlaces del cliente, canonical, metadatos iniciales,
+sitemap y redirecciones HTTP 301 de las direcciones numéricas y alias antiguos.
+Conservar el slug al editar el título evita romper enlaces compartidos. Las
+colisiones entre títulos necesitan un sufijo estable decidido por el servidor.
+Verificar apertura directa, recarga, navegación atrás, comentarios y precarga.
+
+Las URLs descriptivas facilitan entender el contenido; no aceleran por sí mismas
+las consultas ni convierten el ID público de una serie en un secreto. Mantener
+la autorización de capítulos de pago, compras y conversaciones en cada endpoint.
+
+Referencias: [estructura de URLs de Google](https://developers.google.com/search/docs/crawling-indexing/url-structure)
+y [prevención de IDOR de OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html).

@@ -56,8 +56,8 @@ export const ReactionRingGradient = () => (
   <svg width="0" height="0" className="absolute" aria-hidden="true">
     <defs>
       <linearGradient id={RING_GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
-        <stop stopColor="#FF008C" />
-        <stop offset="1" stopColor="#B000AD" />
+        <stop stopColor="var(--detail-magenta, #FF008C)" />
+        <stop offset="1" stopColor="color-mix(in srgb, var(--detail-magenta, #FF008C), #000 30%)" />
       </linearGradient>
     </defs>
   </svg>

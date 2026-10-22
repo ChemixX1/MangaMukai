@@ -164,3 +164,23 @@
 @media (max-width: 1023px) {
   .reader-music-section { margin-top: 16px; }
 }
+
+/* Keep strips in one paint layer: per-image translateZ(0) can expose fractional seams. */
+.reader-strip { display: block; width: 100%; margin: 0; padding: 0; border: 0; line-height: 0; }
+.reader-strip > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  vertical-align: top;
+  transform: none;
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+  image-rendering: auto;
+}
+.reader-strip > [role='status'] { line-height: normal; }

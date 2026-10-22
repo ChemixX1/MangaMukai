@@ -155,7 +155,7 @@ const MOBILE_COVER_LAYOUTS: Record<CoverLayout, CoverLayoutConfig> = {
     side: { width: 165, height: 245 },
     slots: { first: 0, last: 2 },
     prev: -83,
-    next: 203.5,
+    next: 181.5,
     activeBorder: false,
     sideBorder: false,
     badges: false,
@@ -532,7 +532,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
                   const skipClick = swiped.current && event.detail !== 0;
                   swiped.current = false;
                   if (skipClick) return;
-                  if (isActive) navigate(`/manga/${item.id}`);
+                  if (isActive) navigate(`/manga/${item.id}`, { state: { mangaAccent: accent } });
                   else goTo(index);
                 }}
                 className={`home-hero-cover absolute left-0 top-0 block overflow-hidden rounded-lg bg-media p-0 ${layout.coverClass} ${isSide && layout.base ? 'home-hero-cover-side' : ''} ${bordered ? 'border border-white' : ''} ${visible ? 'cursor-pointer' : 'cursor-default'}`}
@@ -633,7 +633,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
             <div className="home-hero-actions order-4 mt-9 flex items-center justify-center gap-[7px] pl-[5px] lg:absolute lg:left-[5.98px] lg:top-[435.09px] lg:mt-0 lg:justify-start lg:gap-[20.17px] lg:pl-0">
               <button
                 type="button"
-                onClick={() => navigate(`/manga/${activeItem.id}`)}
+                onClick={() => navigate(`/manga/${activeItem.id}`, { state: { mangaAccent: accent } })}
                 className="flex h-12 w-44 items-center justify-center gap-3 rounded-md font-montserrat text-sm font-extrabold uppercase text-white transition-transform hover:brightness-110 active:scale-95 lg:h-[59.1px] lg:w-[198px] lg:gap-2 lg:rounded-[7px] lg:text-base lg:shadow-[0_4px_4px_rgba(0,0,0,0.25)]"
                 style={{ backgroundColor: accentColor }}
               >

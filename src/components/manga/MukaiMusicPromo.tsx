@@ -1,3 +1,4 @@
+import { getStoredToken } from '../../services/authService';
 import { Link } from 'react-router-dom';
 import { prefetchRoute } from '../../utils/prefetchRoute';
 import backdrop from '../../assets/manga/mukai-music-background.webp';
@@ -17,7 +18,7 @@ export const MukaiMusicPromo = () => (
       <MusicCrown />
       <p className="mukai-music-title">MUKAI<span>MUSIC</span></p>
       <p className="mukai-music-description">Desbloquea los SoundTracks y escucha música mientras lees</p>
-      <Link className="mukai-music-subscribe" to="/pro" onPointerEnter={() => prefetchRoute('/pro')} onFocus={() => prefetchRoute('/pro')} onTouchStart={() => prefetchRoute('/pro')}>SUSCRÍBETE</Link>
+      <Link className="mukai-music-subscribe" to={getStoredToken() ? "/pro" : "/auth/login?returnTo=%2Fpro"} state={{ returnTo: "/pro" }} onPointerEnter={() => prefetchRoute('/pro')} onFocus={() => prefetchRoute('/pro')} onTouchStart={() => prefetchRoute('/pro')}>SUSCRÍBETE</Link>
     </div>
   </div>
 );

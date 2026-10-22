@@ -224,7 +224,7 @@ const CommentBody = ({ content, className }: { content: string; className: strin
     {content.split(STICKER_TOKEN).filter(Boolean).map((part, index) => {
       const sticker = part.startsWith('[sticker:') ? stickerFromToken(part) : null;
       return sticker
-        ? <img key={index} src={sticker.url} alt={sticker.name} title={sticker.name} loading="lazy" className="my-1 mr-2 inline-block h-12 w-12 object-contain align-middle lg:h-[72px] lg:w-[72px]" />
+        ? <img key={index} src={sticker.url} alt={sticker.name} title={sticker.name} loading="lazy" className="my-1 block h-12 w-12 object-contain lg:h-[72px] lg:w-[72px]" />
         : <span key={index} dangerouslySetInnerHTML={{ __html: sanitizeRichText(part) }} />;
     })}
   </p>

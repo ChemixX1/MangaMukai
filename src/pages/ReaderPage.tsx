@@ -13,6 +13,7 @@ import { ReaderReactions } from "../components/manga/ReaderReactions";
 import { MangaCommunityLinks } from "../components/manga/MangaCommunityLinks";
 import { MangaComments } from "../components/manga/MangaComments";
 import { MangaMusicCard } from "../components/manga/MangaMusicCard";
+import { ReaderLoadingSkeleton } from "../components/manga/ReaderLoadingSkeleton";
 import { ReaderImages } from "../components/manga/ReaderImages";
 import { getMangaComments, type MangaComment } from "../services/communityService";
 import { useTheme } from "../hooks/useTheme";
@@ -404,7 +405,7 @@ export const ReaderPage = () => {
             }} />
           ) : !loading ? (
               <div className="h-96 flex flex-col items-center justify-center text-zinc-500 gap-4"><p>Sin páginas.</p></div>
-          ) : null}
+          ) : <ReaderLoadingSkeleton key={chapterId} />}
 
 
           {!loading && (imagesComplete || lock) && <>

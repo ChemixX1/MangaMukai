@@ -2,7 +2,7 @@ import { PremiumElectricBorder } from '../ui/PremiumElectricBorder';
 import { prefetchRoute } from '../../utils/prefetchRoute';
 import { User as UserIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import coins1000 from '../../assets/recharge/icon-2.svg';
+import coins1000 from '../../assets/recharge/icon-2-small.webp';
 import { BellGlyph } from '../common';
 import { AlarmIcon, MoonIcon, SearchLensIcon, SunIcon } from '../ui';
 import type { NavbarViewProps } from './useNavbarState';

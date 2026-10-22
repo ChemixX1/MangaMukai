@@ -23,8 +23,8 @@ test('external and relative destinations cannot become prefetch keys', () => {
 
 test('automatic navigation warming is bounded and leaves reading and private routes alone', () => {
   assert.deepEqual(idleRouteCandidates('/', true), ['/manga-bn']);
-  assert.deepEqual(idleRouteCandidates('/', false), ['/manga-bn', '/comunidad']);
-  assert.deepEqual(idleRouteCandidates('/manga-bn', false), ['/', '/comunidad']);
+  assert.deepEqual(idleRouteCandidates('/', false), ['/manga-bn', '/comunidad', '/chat', '/tienda']);
+  assert.deepEqual(idleRouteCandidates('/manga-bn', false), ['/', '/comunidad', '/chat', '/tienda']);
   for (const path of ['/read/1', '/manga/1', '/profile', '/pro/pago', '/auth/login', '/mensajes']) {
     assert.deepEqual(idleRouteCandidates(path, false), []);
   }

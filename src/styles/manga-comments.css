@@ -77,9 +77,9 @@
 .manga-comments.manga-comments-reference .manga-comment-row { align-items: flex-start; gap: 8px; }
 .manga-comments.manga-comments-reference .manga-comment-avatar { width: 40px; height: 40px; background: #18181b; color: #ffffff8c; }
 .manga-comments.manga-comments-reference .manga-comment-article > header { flex-wrap: wrap; align-items: baseline; gap: 5px 10px; min-height: 28px; padding-top: 9px; }
-.manga-comments.manga-comments-reference .manga-comment-article h3 { min-width: 0; max-width: 100%; font: 800 16px/18px Montserrat, sans-serif; }
-.manga-comments.manga-comments-reference .manga-comment-article time { color: var(--comment-muted); font: 300 12px/16px Montserrat, sans-serif; }
-.manga-comments.manga-comments-reference .manga-comment-body { margin-top: 9px; font: 400 14px/19px Montserrat, sans-serif; text-align: justify; }
+.manga-comments.manga-comments-reference .manga-comment-article h3 { min-width: 0; max-width: 100%; font: 700 14px/19px Montserrat, sans-serif; }
+.manga-comments.manga-comments-reference .manga-comment-article time { color: var(--comment-muted); font: 500 12px/16px Montserrat, sans-serif; }
+.manga-comments.manga-comments-reference .manga-comment-body { margin-top: 2px; font: 400 14px/19px Montserrat, sans-serif; text-align: justify; }
 .manga-comments.manga-comments-reference .manga-comment-expand { margin-top: 5px; }
 .manga-comments.manga-comments-reference .manga-comment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 18px; }
 .manga-comments.manga-comments-reference .manga-comment-actions > .manga-comment-reaction {
@@ -130,7 +130,7 @@
 .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-article > header { min-height: 20px; padding-top: 0; }
 .manga-comments.manga-comments-reference .manga-comment.is-reply h3 { font-size: 14px; line-height: 16px; }
 .manga-comments.manga-comments-reference .manga-comment.is-reply time { font-size: 10px; line-height: 14px; }
-.manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-body { margin-top: 4px; font-size: 12px; line-height: 17px; }
+.manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-body { margin-top: 2px; font-size: 12px; line-height: 17px; }
 .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-actions { margin-top: 13px; gap: 5px; }
 .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-reaction { min-width: 34px; height: 30px; padding: 3px 5px; font-size: 12px; }
 .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-reply { font-size: 12px; }
@@ -150,24 +150,57 @@
   .manga-comments.manga-comments-reference .manga-comments-heading { font-size: 15px; }
   .manga-comments.manga-comments-reference .manga-comment-list { margin-top: 23px; padding-top: 22px; gap: 22px; }
   .manga-comments.manga-comments-reference .manga-comment-list > .manga-comment + .manga-comment { padding-top: 22px; }
-  .manga-comments.manga-comments-reference .manga-comment-article > header { gap: 3px 8px; padding-top: 3px; }
-  .manga-comments.manga-comments-reference .manga-comment-article h3 { font-size: 13px; line-height: 17px; }
-  .manga-comments.manga-comments-reference .manga-comment-article time { font-size: 10px; line-height: 14px; }
-  .manga-comments.manga-comments-reference .manga-comment-body { margin-top: 7px; font-size: 12px; line-height: 18px; text-align: start; }
-  .manga-comments.manga-comments-reference .manga-comment-actions { gap: 4px; margin-top: 13px; }
+  .manga-comments.manga-comments-reference .manga-comment-article > header { gap: 3px 8px; padding-top: 0; min-height: 20px; }
+  .manga-comments.manga-comments-reference .manga-comment-article h3 { font-size: 14px; line-height: 20px; }
+  .manga-comments.manga-comments-reference .manga-comment-article time,
+  .manga-comments.manga-comments-reference .manga-comment.is-reply time { font-size: 12px; line-height: 16px; font-weight: 500; }
+  .manga-comments.manga-comments-reference .manga-comment-editor { font-size: 15px; line-height: 23px; }
+  .manga-comments.manga-comments-reference .manga-comment-body { margin-top: 2px; font-size: 14px; line-height: 21px; text-align: start; }
+  .manga-comments.manga-comments-reference .manga-comment-actions { gap: 5px; margin-top: 17px; }
   .manga-comments.manga-comments-reference .manga-comment-actions > .manga-comment-reaction { min-width: 33px; padding-inline: 4px; }
   .manga-comments.manga-comments-reference .manga-comment-actions > .manga-comment-reply { justify-content: flex-end; margin-left: auto; padding-right: 0; font-size: 12px; }
-  .manga-comments.manga-comments-reference .manga-comment-toggle { font-size: 11px; }
+  .manga-comments.manga-comments-reference .manga-comment-toggle { font-size: 13px; line-height: 19px; }
+  .manga-comments.manga-comments-reference .manga-comment-expand { font-size: 13px; }
   .manga-comments.manga-comments-reference .manga-comment-replies { margin-left: 19px; padding-left: 12px; }
-  .manga-comments.manga-comments-reference .manga-comment.is-reply h3 { font-size: 12px; }
+  .manga-comments.manga-comments-reference .manga-comment.is-reply h3 { font-size: 14px; }
+  .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-body { font-size: 14px; line-height: 21px; }
+  .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-actions { margin-top: 17px; }
   .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-actions { gap: 4px; }
   .manga-comments.manga-comments-reference .manga-comment-reply-form .manga-comment-toolbar { gap: 2px; padding-inline: 4px; }
   .manga-comments.manga-comments-reference .manga-comment-context { font-size: 9px; }
   .manga-comments.manga-comments-reference .manga-comment-publish > button { width: 110px; }
 }
 
+:is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment-article h3 { font-size: 16px; line-height: 23px; }
+:is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment-body { font-size: 16px; line-height: 23px; font-weight: 500; }
+:is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment.is-reply h3 { font-size: 14px; line-height: 21px; }
+:is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-body { font-size: 14px; line-height: 21px; }
+
+@media (max-width: 639px) {
+  .reader-page .manga-comments.manga-comments-reference .manga-comment-article h3 { font-size: 15px; line-height: 20px; }
+  .reader-page .manga-comments.manga-comments-reference .manga-comment-body { font-size: 14px; line-height: 21px; }
+  .reader-page .manga-comments.manga-comments-reference .manga-comment.is-reply h3 { font-size: 14px; line-height: 19px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .manga-comments.manga-comments-reference .manga-comment-reaction,
   .manga-comments.manga-comments-reference .manga-comment-toggle svg { transition: none; }
   .manga-comments.manga-comments-reference .manga-comment-reaction.is-reacting .manga-comment-reaction-icon { animation: none; }
+}
+
+@media (min-width: 1024px) {
+  :is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment-article h3,
+  :is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment-body { font-size: 14px; line-height: 21px; }
+  :is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment.is-reply h3,
+  :is(.manga-detail-desktop, .reader-page) .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-body { font-size: 12px; line-height: 19px; }
+}
+
+@media (max-width: 639px) {
+  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-article h3 { font-size: 15px; font-weight: 800; }
+  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-article time { font-size: 13px; font-weight: 600; }
+  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-body { font-size: 15px; line-height: 23px; font-weight: 500; }
+  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-actions { margin-left: -48px; flex-wrap: nowrap; gap: 3px; overflow-x: auto; padding-bottom: 3px; }
+  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-actions { margin-left: -36px; }
+  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-actions > button { flex-shrink: 0; }
+  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-actions > .manga-comment-reply { margin-left: auto; padding-left: 5px; font-weight: 500; }
 }

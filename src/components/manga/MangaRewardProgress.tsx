@@ -2,11 +2,14 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties
 import { createPortal } from 'react-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { BookOpen, Check, ShoppingBag, X } from 'lucide-react';
-import rewardLock from '../../assets/manga/reward-lock.svg';
+import rewardLock from '../../assets/manga/reward-lock.webp';
 import rewardClaimed from '../../assets/manga/reward-claimed.svg';
-import rewardCoins from '../../assets/manga/reward-coins.svg';
-import rewardDiscount from '../../assets/manga/reward-discount.svg';
-import rewardCover from '../../assets/manga/reward-cover.svg';
+import rewardCoins from '../../assets/manga/reward-coins.webp';
+import rewardDiscount from '../../assets/manga/reward-discount.webp';
+import rewardCover from '../../assets/manga/reward-cover.webp';
+import rewardCoinsThumb from '../../assets/manga/reward-coins-thumb.webp';
+import rewardDiscountThumb from '../../assets/manga/reward-discount-thumb.webp';
+import rewardCoverThumb from '../../assets/manga/reward-cover-thumb.webp';
 import collectionCardBack from '../../assets/profile/collection-card-back.svg';
 import profileBanner from '../../assets/banners/illustration-anime-character-rain.webp';
 import HoloCard from './HoloCard';
@@ -90,12 +93,12 @@ function RewardRoad({ points, target, loading, claimedLevels, onSelect }: { poin
           <button type="button" className={`reward-road-card reward-road-card--${prize.kind}`} disabled={loading} aria-label={`${prize.title}, nivel ${level}. ${status}`} aria-haspopup="dialog" onClick={() => onSelect(level, reached)}>
             <span className="reward-road-card-back" aria-hidden="true" />
             <span className="reward-road-card-base" aria-hidden="true" />
-            {!loading && !reached && <span className="reward-road-status" aria-hidden="true"><img src={rewardLock} alt="" draggable={false} /></span>}
+            {!loading && !reached && <span className="reward-road-status" aria-hidden="true"><img src={rewardLock} alt="" width={96} height={93} loading="lazy" decoding="async" draggable={false} /></span>}
             {claimed && <span className="reward-road-status reward-road-status--claimed" aria-hidden="true"><img src={rewardClaimed} alt="" draggable={false} /></span>}
             <span className={`reward-road-art reward-road-art--${prize.kind}`}>
-              {prize.kind === 'coins' && <img src={rewardCoins} alt="" draggable={false} />}
-              {prize.kind === 'discount' && <img src={rewardDiscount} alt="" draggable={false} />}
-              {prize.kind === 'cover' && <img src={rewardCover} alt="" draggable={false} />}
+              {prize.kind === 'coins' && <img src={rewardCoinsThumb} alt="" width={240} height={151} loading="lazy" decoding="async" draggable={false} />}
+              {prize.kind === 'discount' && <img src={rewardDiscountThumb} alt="" width={240} height={219} loading="lazy" decoding="async" draggable={false} />}
+              {prize.kind === 'cover' && <img src={rewardCoverThumb} alt="" width={240} height={209} loading="lazy" decoding="async" draggable={false} />}
             </span>
             <span className="reward-road-name"><strong className={prize.kind === 'coins' ? 'reward-road-amount' : prize.kind === 'discount' ? 'reward-road-discount-name' : undefined} aria-label={prize.kind === 'coins' ? '200 monedas' : undefined}>{prize.title}</strong>{prize.caption && <small>{prize.caption}</small>}</span>
           </button>
@@ -124,13 +127,26 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
   const [previewTitle, setPreviewTitle] = useState('Portada de colección');
   const [, setRevision] = useState(0);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const reducedMotion = useReducedMotion();
   const isMobile = useIsMobileViewport();
   const sparkles = reducedMotion ? [] : isMobile ? revealSparkles.filter((_, index) => index % 2 === 0) : revealSparkles;
+  useEffect(() => {
+    const banner = bannerRef.current;
+    if (!banner) return;
+    let visible = false;
+    const sync = () => banner.style.setProperty('--reward-play-state', visible && !document.hidden && !open ? 'running' : 'paused');
+    const observer = new IntersectionObserver(entries => { visible = entries.some(entry => entry.isIntersecting); sync(); });
+    observer.observe(banner);
+    document.addEventListener('visibilitychange', sync);
+    sync();
+    return () => { observer.disconnect(); document.removeEventListener('visibilitychange', sync); };
+  }, [open]);
   const mobileEntrance = { duration: .32, ease: 'easeOut' as const };
   useEffect(() => subscribeMangaRewardProgress(() => setRevision(value => value + 1)), []);
   useEffect(() => {
+    if (!open || revealLevel === null || prizes[(revealLevel - 1) % prizes.length].kind !== 'cover') return;
     let active = true;
     void getUltimosCapitulos().then(catalog => {
       if (!active || !catalog.length) return;
@@ -139,7 +155,7 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
       if (previewManga?.titulo) setPreviewTitle(previewManga.titulo);
     });
     return () => { active = false; };
-  }, []);
+  }, [open, revealLevel]);
   const completed = userId ? getAccountCompletedRewardChapterIds(userId) : new Set<string>();
   const progress = calculateMangaRewardProgress(
     userId ? purchasedIds : [],
@@ -171,7 +187,7 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
   const revealedClaimed = revealLevel !== null && claimedLevels?.has(revealLevel) === true;
   const revealedImage = revealedPrize?.kind === 'coins' ? rewardCoins : revealedPrize?.kind === 'discount' ? rewardDiscount : rewardCover;
   return <>
-    <div className="manga-reward-banner" role="group" aria-label={`Premios de tu cuenta por nivel. ${label}`}>
+    <div ref={bannerRef} className="manga-reward-banner" role="group" aria-label={`Premios de tu cuenta por nivel. ${label}`}>
       <RewardRoad {...roadProps} />
     </div>
     {createPortal(
@@ -248,16 +264,16 @@ export const MangaRewardProgress = ({ purchasedIds, userId, claimedLevels, loadi
                       preset="rainbow"
                       intensity={0.65}
                       foilEnabled={!isMobile && !reducedMotion}
-                      idle={!isMobile && !reducedMotion}
+                      idle={!reducedMotion}
                       shadow={!isMobile}
                       tiltMax={20}
                       hoverScale={1.04}
                       frame={0}
                       radius={0}
-                      className="profile-cover-dialog-art reward-reveal-cover-card"
+                      className={`profile-cover-dialog-art reward-reveal-cover-card${isMobile ? ' is-lightweight-foil' : ''}`}
                     />
                   ) : (
-                    <img className="reward-reveal-prize" src={revealedImage} alt="" draggable={false} />
+                    <img className="reward-reveal-prize" src={revealedImage} alt="" decoding="async" draggable={false} />
                   )}
                 </motion.div>
               </div>

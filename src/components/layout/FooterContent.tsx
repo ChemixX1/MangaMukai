@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
+import '../../styles/footer.css';
 import footerBackdrop from '../../assets/home/footer-backdrop.webp';
 import footerBackdropPc from '../../assets/home/FooterPC.png';
 import mascotPeek from '../../assets/home/mascot-peek.webp';
@@ -40,7 +41,7 @@ type FooterLink = { label: string; to?: string; href?: string };
 const LEGAL_LINKS: FooterLink[] = [
   { label: 'Política de Privacidad', to: '/privacidad' },
   { label: 'Términos de Servicio', to: '/terminos' },
-  { label: 'Normas de la Comunidad', to: '/normas-comunidad' },
+  { label: 'Normas Comunidad', to: '/normas-comunidad' },
   { label: 'Política de Cookies', to: '/cookies' },
 
   { label: 'Cookie Settings', to: '/cookies#como-gestionarlas' },
@@ -215,10 +216,10 @@ const MobileFooterContent = () => (
 
     <div className="-mx-3 mt-[23px] flex flex-col gap-4">
       {FOOTER_LEGAL_ROWS.map((row, rowIndex) => (
-        <ul key={rowIndex} className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-2 whitespace-nowrap min-[400px]:gap-x-[27px]">
+        <ul key={rowIndex} className={`footer-legal-row${rowIndex === 1 ? ' footer-legal-row--cookies' : ''}`}>
           {row.map((item) => (
             <li key={item.label} className="flex">
-              <FooterAnchor link={item} className="font-montserrat text-[9px] font-medium leading-none text-[color:var(--mm-legal-ink)] transition-colors hover:text-ink" />
+              <FooterAnchor link={item} className="footer-legal-link font-montserrat font-medium text-[color:var(--mm-legal-ink)] transition-colors hover:text-ink" />
             </li>
           ))}
         </ul>
@@ -278,10 +279,10 @@ const DesktopFooter = ({ className }: { className: string }) => (
       </div>
 
       {FOOTER_LEGAL_ROWS.map((row, rowIndex) => (
-        <ul key={rowIndex} className="absolute left-1/2 flex -translate-x-1/2 gap-8 whitespace-nowrap" style={{ top: DESKTOP_LEGAL_ROW_TOPS[rowIndex] }}>
+        <ul key={rowIndex} className={`footer-legal-row absolute left-1/2 -translate-x-1/2${rowIndex === 1 ? ' footer-legal-row--cookies' : ''}`} style={{ top: DESKTOP_LEGAL_ROW_TOPS[rowIndex] }}>
           {row.map((item) => (
             <li key={item.label} className="flex">
-              <FooterAnchor link={item} className="font-montserrat text-sm font-medium leading-[normal] text-ink/90 transition-colors hover:text-ink" />
+              <FooterAnchor link={item} className="footer-legal-link font-montserrat font-medium text-ink/90 transition-colors hover:text-ink" />
             </li>
           ))}
         </ul>
@@ -314,8 +315,8 @@ export const Footer = ({ className = '', homeDesign = false }: { className?: str
         </ul>
         <div className="home-footer-newsletter"><NewsletterForm inputId="footer-newsletter-email" variant={isMobile ? 'mobile' : 'desktop'} /></div>
         {FOOTER_LEGAL_ROWS.map((row, index) => (
-          <ul key={index} className="home-footer-legal">
-            {row.map((link) => <li key={link.label}><FooterAnchor link={link} className="font-montserrat text-sm font-medium text-ink/90" /></li>)}
+          <ul key={index} className={`home-footer-legal footer-legal-row${index === 1 ? ' footer-legal-row--cookies' : ''}`}>
+            {row.map((link) => <li key={link.label}><FooterAnchor link={link} className="footer-legal-link font-montserrat font-medium text-ink/90" /></li>)}
           </ul>
         ))}
         <p className="home-footer-copyright">© 2026 All Rights Reserved<br /><span>v2.0.0</span></p>

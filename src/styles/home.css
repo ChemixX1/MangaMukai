@@ -329,7 +329,7 @@
 .home-latest-card > a > div { top: auto; bottom: 0; height: 157px; background: linear-gradient(180.34deg, rgb(var(--mm-panel) / 0) .3%, rgb(var(--mm-panel)) 90.56%); }
 .home-theme-light .home-latest-card > a > div { height: 78px; background: linear-gradient(180deg, rgb(var(--mm-panel) / 0), rgb(var(--mm-panel) / .9) 65%, rgb(var(--mm-panel))); }
 .home-latest-card h3 { bottom: 13px; left: 6px; right: 6px; z-index: 3; min-height: 28px; font: 600 13px/14px Montserrat, sans-serif; }
-.home-latest-chapters { height: 69px; border-top: .5px dashed rgb(var(--mm-ink)); border-radius: 0 0 9px 8px; box-shadow: 0 4px 4px rgb(0 0 0 / .25); }
+.home-latest-chapters { height: 69px; border-top: .5px solid rgb(128 128 128 / .6); border-radius: 0 0 9px 8px; box-shadow: 0 4px 4px rgb(0 0 0 / .25); }
 .home-chapter-first { height: 34px; }
 .home-chapter-second { top: 34px; }
 .home-chapter-separator { top: 34px; left: 0; width: 100%; height: 0; z-index: 1; border-top: .5px solid rgb(100 100 100 / .41); background: none; pointer-events: none; }
@@ -445,19 +445,15 @@
   .home-theme-dark .home-hero-row { box-shadow: 0 -4px 4px rgb(0 0 0 / .25); }
   .home-hero { padding-bottom: 0; }
   .home-hero-podium { transform: translate3d(0, -4px, -12px); z-index: 1; }
-  .home-hero-stacked { height: 835px; }
-  .home-hero-row { height: 895px; }
+  .home-hero-stacked, .home-hero-row { height: 835px; }
   .home-hero-row h2 { line-height: 32px; }
   .home-hero-synopsis { height: 130px; }
   .home-hero-actions { gap: 12px; margin-top: 34px; }
   .home-hero-actions > button:first-child { width: 171px; height: 51px; gap: 7px; }
   .home-hero-actions > button[aria-pressed] { width: 141px; height: 46px; padding-inline: 8px; }
   .home-hero-tabs { position: absolute; top: 796px; left: 0; right: 0; margin-top: 0; }
-  .home-hero-row .home-hero-tabs { top: 806px; }
-  .home-block-popular { margin-top: 32px; }
-  .home-block-youth { margin-top: 0; }
+  .home-block-popular, .home-block-youth { margin-top: 32px; }
   .home-trending-heading { height: 136px; }
-  .home-block-youth .home-trending-heading { height: 140px; }
   .home-trending-heading > div:first-child { left: 8px; align-items: flex-start; gap: 3px; }
   .home-trending-icon { width: 48px; height: 48px; }
   .home-trending-heading h2 { margin-top: 14px; font-size: 20px; line-height: 32px; }
@@ -472,12 +468,11 @@
   .home-ranking-chapter { font-size: 10px; gap: 2px; }
   .home-ranking-chapter svg { width: 17px; height: 17px; }
   .home-ranking-type { padding-inline: 3px; }
-  .home-block-latest { margin-top: 43px; }
-  .home-block-youth-latest { margin-top: 68px; }
+  .home-block-latest, .home-block-youth-latest { margin-top: 43px; }
   .home-latest-container { width: min(398px, calc(100% - 42px)); padding: 0; }
   .home-latest-heading { height: 104px; }
   .home-latest-heading > span { left: -4px; top: -5px; width: 44px; height: 44px; }
-  .home-latest-heading h2 { left: 49px; top: 0; font-size: 20px; line-height: 32px; }
+  .home-latest-heading h2 { left: 53px; top: 0; font-size: 20px; line-height: 32px; }
   .home-latest-heading [role="tablist"] { left: 63px; top: 45px; }
   .home-latest-grid { column-gap: 17px; row-gap: 22px; }
   .home-latest-card > a, .home-latest-skeleton-cover { aspect-ratio: 190.5 / 275; }
@@ -545,7 +540,7 @@
   .home-hero-actions > button[aria-pressed] { width: 130px; }
   .home-latest-container, .home-announcements { width: calc(100% - 28px); }
   .home-latest-grid { column-gap: 12px; }
-  .home-latest-heading h2 { left: 40px; }
+  .home-latest-heading h2 { left: 44px; }
   .home-latest-heading [role="tablist"] { left: 49px; }
   .home-chapter-meta { padding-inline: 4px; }
   .home-chapter-meta svg { width: 14px; height: 14px; }

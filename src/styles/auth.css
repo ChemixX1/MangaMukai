@@ -288,3 +288,8 @@ body:has(.auth-reference) .navbar-primary-link { font-family: 'Anta', sans-serif
   .auth-reference .auth-phone-grid .auth-phone-icon { left: 8px; width: 16px; height: 16px; }
   .auth-reference .auth-form-card-register .auth-fields-panel input.auth-phone-number::placeholder { font-size: clamp(9px, 2.7vw, 12px); }
 }
+
+.auth-reference .auth-form-card-login .auth-remember { font-size: 13px; line-height: 20px; gap: 8px 16px; padding-block: 6px; }
+.auth-reference .auth-remember :is(label, a) { min-height: 44px; display: inline-flex; align-items: center; }
+.auth-reference .auth-remember-checkbox { width: 18px; height: 18px; }
+@media (min-width: 1024px) { .auth-reference .auth-form-card-login .auth-remember { font-size: 14px; } }

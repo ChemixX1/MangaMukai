@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Biblioteca } from '../../pages/Biblioteca';
 import { SearchIcon, SearchCloseIcon, SearchEraseIcon } from './SearchIcons';
 import { searchBanners } from '../../config/searchAppearance';
@@ -8,6 +8,12 @@ import { SEARCH_FILTERS, setSearchFilter, setSearchTerm, useSearchFilter, useSea
 import { SlidePanel } from './SlidePanel';
 
 export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLight: boolean; onClose: () => void }) => {
+  const [contentReady, setContentReady] = useState(false);
+  useEffect(() => {
+    if (!open || contentReady) return;
+    const timer = window.setTimeout(() => setContentReady(true), 420);
+    return () => window.clearTimeout(timer);
+  }, [open, contentReady]);
   const searchTerm = useSearchTerm();
   const searchFilter = useSearchFilter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -20,8 +26,8 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
 
   useEffect(() => {
     if (!open) return;
-    const frame = window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
-    return () => window.cancelAnimationFrame(frame);
+    const timer = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 420);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   const text = isLight ? 'text-black' : 'text-white';
@@ -80,7 +86,7 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
 
         </div>
       </div>
-      <Biblioteca collectionAction={searchFilter !== 'todos' ? (
+      {contentReady ? <Biblioteca collectionAction={searchFilter !== 'todos' ? (
         <Link
           to={searchFilter === 'bn' ? '/manga-bn' : '/manga-19'}
           onClick={onClose}
@@ -88,7 +94,7 @@ export const SearchOverlay = ({ open, isLight, onClose }: { open: boolean; isLig
         >
           Ir a {searchFilter === 'bn' ? 'Manga B&N' : 'Manga Hot'}
         </Link>
-      ) : undefined} />
+      ) : undefined} /> : <div role="status" aria-label="Preparando búsqueda" className="mx-auto w-full max-w-lg space-y-4 p-4 motion-safe:animate-pulse"><div className="h-24 rounded-xl bg-zinc-400/15" /><div className="h-40 rounded-xl bg-zinc-400/15" /></div>}
         </div>
         <aside className="search-banner" aria-hidden="true"><img src={searchBanners.right} alt="" /></aside>
       </div>

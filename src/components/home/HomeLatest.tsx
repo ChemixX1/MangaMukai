@@ -82,7 +82,7 @@ const LatestCard = ({ manga, accent, eager, onOpenPaid }: LatestCardProps) => {
   const accentColor = ACCENT_COLOR[accent];
   return (
     <article className="home-latest-card flex flex-col">
-      <Link to={`/manga/${manga.id}`} className="group relative block aspect-[218/329] overflow-hidden rounded-t-xl bg-media">
+      <Link to={`/manga/${manga.id}`} state={{ mangaAccent: accent }} className="group relative block aspect-[218/329] overflow-hidden rounded-t-xl bg-media">
         <img src={manga.coverImage} alt={`Portada del manga ${manga.title}`} loading={eager ? 'eager' : 'lazy'} decoding="async" className="h-full w-full object-cover" />
         <div aria-hidden="true" className="absolute inset-x-0 top-[67.17%] h-[27.36%] bg-gradient-to-b from-panel/0 from-[22.22%] to-panel to-[56.67%]" />
         <h3 className="absolute inset-x-3 bottom-[28px] line-clamp-2 text-center font-montserrat text-xs font-semibold leading-4 text-ink lg:bottom-[31.5px]">

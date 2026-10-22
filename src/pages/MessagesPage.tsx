@@ -1,3 +1,4 @@
+import { getCachedMessageHistory, loadMessageHistory } from '../services/messageHistory';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -20,7 +21,6 @@ import { getCachedMessageInbox, loadMessageInbox } from '../services/messageInbo
 import { getCommunityPosition } from '../services/communityViewState';
 import {
   CHAT_ACCENT,
-  getConversationMessages,
   getPublicProfile,
   markConversationRead,
   sendChatMessage,
@@ -115,7 +115,7 @@ export const MessagesPage = () => {
 
   const loadMessages = useCallback(async (target: number, before?: number) => {
     try {
-      const result = await getConversationMessages(target, before);
+      const result = await loadMessageHistory(target, before);
       if (activeIdRef.current !== target) return;
       setMessages((current) => [...new Map([...current, ...result.messages].map((message) => [message.id, message])).values()].sort((a, b) => a.id - b.id));
       if (before || !hasLoaded.current) setHasMore(result.hasMore);
@@ -133,13 +133,14 @@ export const MessagesPage = () => {
   }, [loadConversations]);
 
   useEffect(() => {
-    setMessages([]);
+    const cached = getCachedMessageHistory(activeId);
+    setMessages(cached?.messages ?? []);
     setChatError('');
-    setHasMore(false);
+    setHasMore(cached?.hasMore ?? false);
     hasLoaded.current = false;
     stickToBottom.current = true;
     if (!activeId) return;
-    setChatLoading(true);
+    setChatLoading(!cached);
     void loadMessages(activeId);
     const timer = window.setInterval(() => { if (!document.hidden) void loadMessages(activeId); }, 5000);
     return () => window.clearInterval(timer);

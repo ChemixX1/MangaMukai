@@ -1,3 +1,5 @@
+import { scheduleBackgroundTask } from '../utils/backgroundTasks';
+import { loadMessageHistory } from '../services/messageHistory';
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight, BookOpen, Heart, Loader2, Send, User, X } from 'lucide-react';
@@ -34,8 +36,18 @@ export default function CommunityPage() {
   const { pathname, search } = useLocation();
   const saved = pathname === '/comunidad/guardados';
   useEffect(() => {
-    void import('./MessagesPage').catch(() => undefined);
-    if (user.signedIn) void loadMessageInbox().catch(() => undefined);
+    let active = true;
+    const cancel = scheduleBackgroundTask('community:messages', async () => {
+      await import('./MessagesPage');
+      if (!active || !user.signedIn) return;
+      const inbox = await loadMessageInbox();
+      // One recent chat at a time, without marking messages as read.
+      for (const conversation of inbox.conversations.slice(0, 2)) {
+        if (!active) return;
+        await loadMessageHistory(conversation.other_user.id, undefined, true);
+      }
+    });
+    return () => { active = false; cancel(); };
   }, [user.id, user.signedIn]);
   if (!saved && pathname === '/comunidad' && new URLSearchParams(search).get('tab') === 'saved') {
     return <Navigate to="/comunidad/guardados" replace />;

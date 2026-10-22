@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { normalizeSeoPath, routeSeo, SEO_ROUTES, SITE_NAME, SITE_URL, type RouteSeo } from '../config/seo';
-import { getKnownMangaTitle } from '../services/mangaTitles';
+import { getKnownMangaTitle, rememberVisitedMangaTitle } from '../services/mangaTitles';
 
 const buildTitle = (section?: string | null) => section?.trim() ? `${section.trim()} | ${SITE_NAME}` : SEO_ROUTES['/'].title;
 
@@ -136,6 +136,8 @@ export const useDocumentTitle = (section?: string | null, description?: string |
   const { path, image, adult, noindex } = options;
   useEffect(() => {
     if (path && normalizeSeoPath(path) !== activePath) return;
+    const mangaId = path && /^\/manga\/(\d+)$/.exec(normalizeSeoPath(path))?.[1];
+    if (mangaId && section?.trim()) rememberVisitedMangaTitle(mangaId, section);
     if (section === undefined && !description && !image && noindex === undefined) return;
     const title = section === undefined ? activeSeo.title : buildTitle(section);
     const nextDescription = description || activeSeo.description;

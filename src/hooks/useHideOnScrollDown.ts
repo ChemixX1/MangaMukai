@@ -4,14 +4,14 @@ export const useHideOnScrollDown = () => {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    let lastY = window.scrollY;
+    const scrollY = () => Math.max(0, Math.min(window.scrollY, document.documentElement.scrollHeight - window.innerHeight));
+    let lastY = scrollY();
     const onScroll = () => {
-      const currentY = window.scrollY;
+      const currentY = scrollY();
       const delta = currentY - lastY;
       if (Math.abs(delta) < 6) return;
       lastY = currentY;
-      const maxY = document.documentElement.scrollHeight - window.innerHeight;
-      setHidden(currentY > 90 && delta > 0 && currentY < maxY - 40);
+      setHidden(currentY > 90 && delta > 0);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);

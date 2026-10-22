@@ -3,7 +3,7 @@ import type { HomePrefetchStage, HomePrefetchTarget } from '../utils/homeNavigat
 import { buildMangaRecommendations } from '../utils/mangaRecommendations';
 import { preloadImages } from '../utils/preloadImages';
 import { getAuthCacheKey } from './authService';
-import { getMangaComments, type MangaComment } from './communityService';
+import { getChapterEngagement, getMangaComments, type MangaComment } from './communityService';
 import { getChaptersBySeries, getMangaById, getRelatedMangas, getUltimosCapitulos, type RelatedManga, type SeriesChapter } from './mangaService';
 import { homeReaderSession, pauseHomeReaderSession, peekHomeReaderChapters } from './readerPrefetchSession';
 
@@ -74,6 +74,7 @@ export async function prepareHomeManga(target: HomePrefetchTarget, signal: Abort
   }
   // Seed the selector as soon as its list arrives, before chapter content or comments.
   const session = homeReaderSession(target.mangaId, seriesId, detail.chapters!);
+  if (!signal.aborted) void getChapterEngagement(detail.chapters!.map(chapter => chapter.id)).catch(() => undefined);
   if (stage === 'detail' || signal.aborted) return;
   if (stage === 'reader' || stage === 'all') {
     const pause = () => pauseHomeReaderSession(session);

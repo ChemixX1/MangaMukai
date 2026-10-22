@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { blockBackgroundTasks, getBackgroundPolicy } from '../../utils/backgroundTasks';
+import { blockBackgroundTasks, getBackgroundPolicy, scheduleBackgroundTask } from '../../utils/backgroundTasks';
 import { idleRouteCandidates, routeModuleKey } from '../../utils/routePrefetchPolicy';
 import { prefetchRoute } from '../../utils/prefetchRoute';
 
@@ -31,7 +31,14 @@ export function NavigationPreload() {
       if (routeModuleKey(path) === routeModuleKey(pathname)) return;
       clear();
       activeLink = link;
-      cancelIntent = prefetchRoute(path);
+      const cancelRoute = prefetchRoute(path);
+      const mangaId = /^\/manga\/([^/?#]+)/.exec(path)?.[1];
+      const controller = new AbortController();
+      const cancelDetail = mangaId ? scheduleBackgroundTask(`detail:${mangaId}`, async () => {
+        const { prepareHomeManga } = await import('../../services/homeNavigationPrefetch');
+        if (!controller.signal.aborted) await prepareHomeManga({ mangaId, chapterIds: [] }, controller.signal, 'detail');
+      }, { priority: 'intent' }) : () => {};
+      cancelIntent = () => { cancelRoute(); cancelDetail(); controller.abort(); };
     };
     const leave = (event: Event) => {
       const next = (event as MouseEvent).relatedTarget;

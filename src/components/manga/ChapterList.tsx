@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import navbarCoins from '../../assets/recharge/icon-2.svg';
+import navbarCoins from '../../assets/recharge/icon-2-small.webp';
 
 import { ChapterNewBadge, ChapterCommentedIcon } from './ChapterStateIcons';
 import { isRecentChapter } from '../../utils/chapterFreshness';
@@ -10,7 +10,7 @@ import PulseHeart from '../common/PulseHeart';
 import { readGuestChapterLike, setGuestChapterLike } from '../../utils/guestChapterLikes';
 import { createQueuedLike } from '../../utils/queuedLike';
 import { getChapterPreviewImage, type SeriesChapter } from '../../services/mangaService';
-import { getChapterEngagement, getMangaComments, setEntityReaction } from '../../services/communityService';
+import { getChapterEngagement, peekChapterEngagement, getMangaComments, setEntityReaction } from '../../services/communityService';
 import { buyChapter, getStoredToken } from '../../services/authService';
 import {
   ChapterCommentIcon,
@@ -251,9 +251,10 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [localUnlocked, setLocalUnlocked] = useState<Set<string>>(new Set());
   const [timedUnlocked, setTimedUnlocked] = useState<Set<string>>(new Set());
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [chapterLikes, setChapterLikes] = useState<Record<string, number>>({});
-  const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(new Set());
+  const [initialEngagement] = useState(() => peekChapterEngagement(chapters.map(chapter => chapter.id)));
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>(initialEngagement.counts);
+  const [chapterLikes, setChapterLikes] = useState<Record<string, number>>(() => Object.fromEntries(chapters.map(({ id }) => [String(id), (initialEngagement.engagement[id]?.reactions.like || 0) + Number(!getStoredToken() && readGuestChapterLike(String(id)))])));
+  const [likedChapterIds, setLikedChapterIds] = useState<Set<string>>(() => new Set(chapters.filter(({ id }) => !getStoredToken() ? readGuestChapterLike(String(id)) : initialEngagement.engagement[id]?.my_reaction === 'like').map(({ id }) => String(id))));
   const [commentedIds, setCommentedIds] = useState<Set<string>>(new Set());
   const likeQueues = useRef(new Map<string, ReturnType<typeof createQueuedLike>>());
   useEffect(() => {
@@ -264,9 +265,9 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
   const chapterIds = chapters.map((chapter) => String(chapter.id)).join(',');
   useEffect(() => {
     let active = true;
-    const load = () => {
+    const load = (event?: Event) => {
       if (!chapterIds) return;
-      void getChapterEngagement(chapterIds.split(',')).then(({ counts, engagement }) => {
+      void getChapterEngagement(chapterIds.split(','), !!event).then(({ counts, engagement }) => {
         if (!active) return;
         setCommentCounts(counts);
         const guest = !getStoredToken();
@@ -372,6 +373,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
     return sortOrder === 'asc' ? byDate : -byDate;
   });
   const visible = showAll ? ordered : ordered.slice(0, VISIBLE_CHAPTERS);
+  const cachedEngagement = peekChapterEngagement(visible.map(chapter => chapter.id));
 
   const visibleCommentIds = visible.filter(chapter => (commentCounts[String(chapter.id)] || 0) > 0).map(chapter => String(chapter.id)).join(',');
   useEffect(() => {
@@ -406,8 +408,9 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
         {visible.map((chapter) => {
           const id = String(chapter.id);
           const locked = isLocked(chapter);
-          const liked = likedChapterIds.has(id);
-          const comments = commentCounts[id] || 0;
+          const liked = id in chapterLikes ? likedChapterIds.has(id) : !getStoredToken() ? readGuestChapterLike(id) : cachedEngagement.engagement[id]?.my_reaction === 'like';
+          const likes = chapterLikes[id] ?? ((cachedEngagement.engagement[id]?.reactions.like || 0) + Number(!getStoredToken() && readGuestChapterLike(id)));
+          const comments = commentCounts[id] ?? cachedEngagement.counts[id] ?? 0;
           const freesLater = locked && Boolean(chapter.free_at) && new Date(chapter.free_at as string) > new Date();
           return (
             <li key={id}>
@@ -430,7 +433,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
                   {locked ? (
                     <span title={`${chapter.price_coins} monedas`} className="manga-chapter-price">
                       <img src={navbarCoins} alt="" aria-hidden="true" width={25} height={22} className="shrink-0 object-contain" />
-                      {chapter.price_coins}
+                      <span className="manga-chapter-price-amount">{chapter.price_coins}<span className="sr-only"> monedas</span></span>
                     </span>
                   ) : isPurchased(chapter) ? (
                     <span role="img" aria-label="Comprado" title="Comprado" className="manga-chapter-purchased">
@@ -452,7 +455,7 @@ export const ChapterList = ({ mangaId, chapters, purchasedChapterIds, userCoins,
                   <PulseHeart
                     bare
                     liked={liked}
-                    count={chapterLikes[id] || 0}
+                    count={likes}
                     onChange={() => { void toggleLike(chapter.id); }}
                     interruptible
                     label={liked ? 'Quitar me gusta' : 'Me gusta'}

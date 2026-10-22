@@ -141,7 +141,7 @@ test('navigation updates titles and canonical URLs and clears private robots met
   applyRouteSeo('/manga/43');
   assert.equal(document.title, 'Otro manga | MangaMukai');
   applyRouteSeo('/manga/999');
-  assert.equal(document.title, 'Ficha del manga | MangaMukai', 'unknown titles never reuse another manga name');
+  assert.equal(document.title, 'MangaMukai', 'unknown titles never reuse another manga name');
   applyRouteSeo('/not-a-page');
   assert.equal(meta('robots'), 'noindex,follow');
   assert.equal(meta('googlebot-image'), 'noindex');

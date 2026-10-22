@@ -1,4 +1,4 @@
-import bonusCoins from '../assets/recharge/icon-2.svg';
+import bonusCoins from '../assets/recharge/icon-2-small.webp';
 import { lazy, Suspense, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadSubscriptionBackground } from '../utils/subscriptionBackground';

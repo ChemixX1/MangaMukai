@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { X, Lock, AlertCircle, Clock, Home, LogIn } from "lucide-react";
+import { X, Lock, AlertCircle, Home, LogIn } from "lucide-react";
 import { Countdown } from "../common";
-import navbarCoins from "../../assets/recharge/icon-2.svg";
+import navbarCoins from "../../assets/recharge/icon-2-small.webp";
 import logoModal from "../../assets/modals/coin-purchase.webp";
 import { useTheme } from "../../hooks/useTheme";
 import { lockPageScroll } from "../../utils/scrollLock";
@@ -40,15 +40,18 @@ export const PurchaseModal = ({
     return lockPageScroll({ preservePosition: true });
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const canAfford = !loginRequired && userBalance >= price;
   const isFutureFree = freeAt && new Date(freeAt) > new Date();
 
   return createPortal(
     <AnimatePresence>
-      <div
-        className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      {isOpen && <motion.div
+        key="purchase-dialog"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: reduceMotion ? 0 : .2 }}
+        className="fixed inset-x-0 top-0 z-[300] flex h-dvh items-center justify-center p-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="purchase-modal-title"
@@ -66,16 +69,18 @@ export const PurchaseModal = ({
         />
 
         <motion.div
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 16 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: reduceMotion ? 0 : 0.5, ease: [0.16, 1, 0.3, 1] }}
+          layout="size"
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: reduceMotion ? 0 : .3, ease: [0.22, 1, 0.36, 1], layout: { duration: reduceMotion ? 0 : .32 } }}
           className="relative z-10 max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-3xl bg-white bg-cover bg-top font-montserrat text-black md:max-w-[560px]"
           style={{ backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.18) 20%, rgba(255,255,255,0.88) 43%, #fff 78%), url('${logoModal}')` }}
           onClick={(event) => event.stopPropagation()}
         >
+          <AnimatePresence initial={false} mode="popLayout">
           {purchaseComplete ? (
-            <div className="relative px-6 pb-10 pt-40 text-center md:px-10 md:pt-48" role="status">
+            <motion.div key="complete" layout="position" initial={reduceMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: reduceMotion ? 0 : .28, ease: 'easeOut' }} className="relative px-6 pb-10 pt-40 text-center md:px-10 md:pt-48" role="status">
               <motion.svg width="72" height="72" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto mb-5" aria-hidden="true">
                 <motion.path initial={{ pathLength: reduceMotion ? 1 : 0, fillOpacity: reduceMotion ? 1 : 0 }} animate={{ pathLength: 1, fillOpacity: 1 }} transition={{ duration: reduceMotion ? 0 : 0.8, fillOpacity: { delay: reduceMotion ? 0 : 0.65 } }} stroke="#FFA43D" strokeWidth="0.25" fill="#FFA43D" d="M19.96 8.52C19.98 8.35 20 8.17 20 8C20 5.62 17.86 3.71 15.48 4.04C14.79 2.81 13.47 2 12 2C10.53 2 9.21 2.8 8.52 4.04C6.14 3.71 4 5.63 4 8C4 8.17 4.01 8.35 4.04 8.52C2.81 9.21 2 10.53 2 12C2 13.47 2.8 14.79 4.04 15.48C4.02 15.65 4 15.83 4 16C4 18.38 6.14 20.28 8.52 19.96C9.21 21.19 10.53 22 12 22C13.47 22 14.79 21.2 15.48 19.96C17.86 20.28 20 18.37 20 16C20 15.83 19.99 15.65 19.96 15.48C21.19 14.79 22 13.47 22 12C22 10.53 21.2 9.21 19.96 8.52ZM18.52 13.92L17.42 14.21L17.85 15.26C17.94 15.49 17.99 15.74 17.99 15.99C17.99 17.09 17.09 17.99 15.99 17.99C15.74 17.99 15.49 17.94 15.26 17.84L14.21 17.41L13.92 18.51C13.69 19.38 12.9 19.99 12 19.99C11.1 19.99 10.31 19.38 10.08 18.51L9.79 17.41L8.74 17.84C8.51 17.93 8.26 17.99 8.01 17.99C6.91 17.99 6.01 17.09 6.01 15.99C6.01 15.74 6.06 15.49 6.15 15.26L6.58 14.21L5.48 13.92C4.61 13.69 4 12.9 4 12C4 11.1 4.61 10.31 5.48 10.08L6.58 9.79L6.15 8.74C6.06 8.51 6.01 8.26 6.01 8.01C6.01 6.91 6.91 6.01 8.01 6.01C8.26 6.01 8.51 6.06 8.74 6.16L9.79 6.59L10.08 5.49C10.31 4.62 11.1 4.01 12 4.01C12.9 4.01 13.69 4.62 13.92 5.49L14.21 6.59L15.26 6.16C15.49 6.07 15.74 6.01 15.99 6.01C17.09 6.01 17.99 6.91 17.99 8.01C17.99 8.26 17.94 8.51 17.85 8.74L17.42 9.79L18.52 10.08C19.39 10.31 20 11.1 20 12C20 12.9 19.39 13.69 18.52 13.92Z" />
                 <motion.path initial={{ pathLength: reduceMotion ? 1 : 0, fillOpacity: reduceMotion ? 1 : 0 }} animate={{ pathLength: 1, fillOpacity: 1 }} transition={{ delay: reduceMotion ? 0 : 0.6, duration: reduceMotion ? 0 : 0.45 }} stroke="#FFA43D" strokeWidth="0.25" fill="#FFA43D" d="M11 12.59L9.71004 11.29L8.29004 12.71L11 15.41L15.74 10.71L14.33 9.28998L11 12.59Z" />
@@ -87,9 +92,9 @@ export const PurchaseModal = ({
                 <button type="button" onClick={onReadChapter} className="rounded-xl bg-[#FFA43D] px-3 py-3 text-sm font-bold text-black hover:bg-orange-300">Ir al Capítulo</button>
                 <button type="button" onClick={onClose} className="rounded-xl border border-current/20 px-3 py-3 text-sm font-bold hover:bg-zinc-500/10">Regresar</button>
               </div>
-            </div>
+            </motion.div>
           ) : (
-          <div className="relative overflow-hidden">
+          <motion.div key="confirm" layout="position" initial={false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8, pointerEvents: 'none' }} transition={{ duration: reduceMotion ? 0 : .18 }} className="relative overflow-hidden">
 
 
             <div className="relative px-6 pb-5 pt-44 text-center overflow-hidden md:px-10 md:pt-52">
@@ -115,7 +120,7 @@ export const PurchaseModal = ({
                 transition={{ delay: 0.2 }}
                 className="relative z-10 text-xl md:text-2xl font-bold text-black mb-1"
               >
-                Desbloquear capítulo {chapterNumber}
+                Comprar capítulo {chapterNumber}
               </motion.h3>
 
 
@@ -123,12 +128,11 @@ export const PurchaseModal = ({
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="relative z-10 flex justify-center mb-2"
+                  className="relative z-10 mt-3 mb-2 flex justify-center"
                 >
                   <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 backdrop-blur-md">
-                    <Clock size={10} className="text-black md:w-3 md:h-3" />
-                    <span className="text-[9px] md:text-[10px] font-bold text-black tracking-widest flex items-center gap-1">
-                       GRATIS EN: <Countdown targetDate={freeAt!} />
+                    <span className="text-xs md:text-sm font-semibold text-black flex flex-wrap justify-center items-center gap-2">
+                       Gratis en: <Countdown targetDate={freeAt!} />
                     </span>
                   </div>
                 </motion.div>
@@ -222,7 +226,7 @@ export const PurchaseModal = ({
                       <p className="text-[10px] md:text-xs text-black leading-relaxed">
                         Saldo insuficiente. Necesitas{" "}
                         <span className="font-bold text-black">{price - userBalance}</span>{" "}
-                        monedas más para desbloquear.
+                        monedas más para comprar.
                       </p>
                     </div>
                   </div>
@@ -254,7 +258,7 @@ export const PurchaseModal = ({
                     <div className="absolute inset-0 bg-gradient-to-r from-[#FFA43D] to-[#FFCD0F] transition-opacity duration-300 group-hover:opacity-90" />
                     <span className="relative text-black font-extrabold flex items-center justify-center gap-2">
                       <Lock size={16} aria-hidden="true" />
-                      {loading ? "Procesando..." : "Desbloquear"}
+                      {loading ? "Procesando..." : "Comprar"}
                     </span>
                   </motion.button>
                 ) : (
@@ -272,10 +276,11 @@ export const PurchaseModal = ({
                 )}
               </div>
             </div>
-          </div>
+          </motion.div>
           )}
+          </AnimatePresence>
         </motion.div>
-      </div>
+      </motion.div>}
     </AnimatePresence>,
     document.body,
   );
