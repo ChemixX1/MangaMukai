@@ -1,10 +1,11 @@
+import { NAVIGATION_CACHE_TTL_MS, NAVIGATION_CACHE_MAX_SERIES } from '../utils/navigationCachePolicy';
 import type { MangaCapitulo } from '../types/manga';
 import type { HomePrefetchStage, HomePrefetchTarget } from '../utils/homeNavigationQueue';
 import { buildMangaRecommendations } from '../utils/mangaRecommendations';
 import { preloadImages } from '../utils/preloadImages';
 import { getAuthCacheKey } from './authService';
 import { getChapterEngagement, getMangaComments, type MangaComment } from './communityService';
-import { getChaptersBySeries, getMangaById, getRelatedMangas, getUltimosCapitulos, type RelatedManga, type SeriesChapter } from './mangaService';
+import { getChaptersBySeries, getMangaById, peekKnownManga, peekSeriesChapters, getRelatedMangas, getUltimosCapitulos, type RelatedManga, type SeriesChapter } from './mangaService';
 import { homeReaderSession, pauseHomeReaderSession, peekHomeReaderChapters } from './readerPrefetchSession';
 
 interface PreparedDetail {
@@ -14,8 +15,8 @@ interface PreparedDetail {
   comments?: MangaComment[];
 }
 const preparedDetails = new Map<string, { data: PreparedDetail; owner: string; loadedAt: number; commentsAt?: number }>();
-const DETAIL_TTL = 5 * 60 * 1000;
-const DETAIL_LIMIT = 128;
+const DETAIL_TTL = NAVIGATION_CACHE_TTL_MS;
+const DETAIL_LIMIT = NAVIGATION_CACHE_MAX_SERIES;
 
 /** Publish each section independently; opening a partial snapshot never waits for extras. */
 export function peekPreparedMangaDetail(id: string, maxAge = DETAIL_TTL): PreparedDetail | undefined {
@@ -29,10 +30,10 @@ export function peekPreparedMangaDetail(id: string, maxAge = DETAIL_TTL): Prepar
 }
 
 function savePreparedDetail(id: string, data: PreparedDetail, commentsUpdated = false) {
-  const previous = preparedDetails.get(id);
   for (const [key, entry] of preparedDetails) {
     if (Date.now() - entry.loadedAt >= DETAIL_TTL) preparedDetails.delete(key);
   }
+  const previous = preparedDetails.get(id);
   preparedDetails.set(id, {
     data, loadedAt: previous?.loadedAt ?? Date.now(),
     owner: commentsUpdated ? getAuthCacheKey() : previous?.owner ?? getAuthCacheKey(),
@@ -41,10 +42,20 @@ function savePreparedDetail(id: string, data: PreparedDetail, commentsUpdated = 
   while (preparedDetails.size > DETAIL_LIMIT) preparedDetails.delete(preparedDetails.keys().next().value!);
 }
 
+/** Hero/ranking cards prepare the selector and the opening chapter too. */
+export function homeCoverPrefetchTarget(id: number | string): HomePrefetchTarget {
+  const manga = peekKnownManga(String(id));
+  const first = manga?.firstChapterId ?? manga?.capitulosRecientes.find(chapter => Number(chapter.numero) === 1 && chapter.id > 0)?.id;
+  return {
+    mangaId: String(id), seriesId: String(manga?.eroSeri || id),
+    warmFirstChapter: true, chapterIds: first ? [String(first)] : [],
+  };
+}
+
 export async function prepareHomeManga(target: HomePrefetchTarget, signal: AbortSignal, stage: HomePrefetchStage | 'all' = 'all'): Promise<void> {
   if (signal.aborted) return;
   if (stage === 'selector') {
-    if (!target.prioritizeChapters || !target.seriesId) return;
+    if (!target.seriesId) return;
     const chapters = peekHomeReaderChapters(target.seriesId) ?? await getChaptersBySeries(target.seriesId);
     if (!signal.aborted && chapters.length) homeReaderSession(target.mangaId, target.seriesId, chapters);
     return;
@@ -62,7 +73,7 @@ export async function prepareHomeManga(target: HomePrefetchTarget, signal: Abort
   if (!detail) {
     const manga = await getMangaById(target.mangaId);
     if (!manga || signal.aborted) return;
-    detail = { manga };
+    detail = { manga, chapters: peekSeriesChapters(manga.eroSeri || manga.id) };
     savePreparedDetail(target.mangaId, detail);
   }
   const seriesId = String(detail.manga.eroSeri || detail.manga.id);
@@ -80,7 +91,10 @@ export async function prepareHomeManga(target: HomePrefetchTarget, signal: Abort
     const pause = () => pauseHomeReaderSession(session);
     signal.addEventListener('abort', pause, { once: true });
     try {
-      for (const id of target.chapterIds) {
+      const first = target.warmFirstChapter
+        ? [...detail.chapters!].sort((a, b) => a.chapter_number - b.chapter_number)[0]?.id : undefined;
+      const ids = [...new Set([...target.chapterIds, ...(first ? [String(first)] : [])])];
+      for (const id of ids) {
         if (signal.aborted) return;
         const chapter = detail.chapters!.find(item => String(item.id) === id);
         const released = chapter?.free_at && new Date(chapter.free_at).getTime() <= Date.now();

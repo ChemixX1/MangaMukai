@@ -56,3 +56,32 @@ test('latest home data retains firstChapterId alongside recent chapters and shar
   assert.equal(api.peekSeriesChapters(23), a);
   assert.equal(requests, 2, 'opening detail can reuse both home metadata and chapter rows without another request');
 });
+
+
+test('confirmed zero from home skips chapter requests; unknown and positive data still load', async t => {
+  let chapterRequests = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url.includes('/latest-men')) return { ok: true, json: async () => ({ success: true, mangas: [
+      { ...manga, id: 80, chapterCount: 0 },
+      { ...manga, id: 81 },
+      { ...manga, id: 82, chapterCount: 0, firstChapterId: 8201 },
+    ] }) };
+    chapterRequests++;
+    return { ok: true, json: async () => ({ success: true, chapters: [{ id: 8201, chapter_number: 1 }] }) };
+  });
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 600000 });
+  await api.getLatestMenUpdates();
+  assert.deepEqual(api.peekSeriesChapters(80), []);
+  assert.deepEqual(await api.getChaptersBySeries(80), []);
+  assert.equal(chapterRequests, 0);
+  assert.equal(api.peekSeriesChapters(81), undefined);
+  assert.equal(api.peekSeriesChapters(82), undefined);
+  await api.getChaptersBySeries(81);
+  await api.getChaptersBySeries(82);
+  assert.equal(chapterRequests, 2);
+  t.mock.timers.tick(61000);
+  await api.getChaptersBySeries(82);
+  assert.equal(chapterRequests, 2, 'home chapter lists survive navigation after one minute');
+  t.mock.timers.tick(300000);
+  assert.equal(api.peekSeriesChapters(80), undefined, 'empty home hints expire too');
+});

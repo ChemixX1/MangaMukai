@@ -21,6 +21,7 @@ import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { getKnownMangaTitle } from "../services/mangaTitles";
 import { peekChapterMetadata, readChapterNavigationState, type ChapterMetadata } from "../services/chapterMetadata";
 import { cleanTitle } from "../utils/mangaFormat";
+import { getBackgroundPolicy } from "../utils/backgroundTasks";
 import { ReaderChapterSelect } from "../components/manga/ReaderChapterSelect";
 import { chapterReaderSession, peekReaderSession, type ReaderPrefetchSession, type ReaderSibling } from "../services/readerPrefetchSession";
 import '../styles/reader.css';
@@ -151,10 +152,24 @@ export const ReaderPage = () => {
       if (document.hidden) current?.pause();
       else if (chapterRef.current && imagesCompleteRef.current) current?.warmAround(siblingsRef.current, chapterRef.current, unlockedRef.current || new Set());
     };
+    const connection = (navigator as Navigator & { connection?: Partial<EventTarget> }).connection;
+    let canSpeculate = getBackgroundPolicy().allowSpeculation;
+    const network = () => {
+      const allowed = getBackgroundPolicy().allowSpeculation;
+      const recovered = allowed && !canSpeculate;
+      canSpeculate = allowed;
+      if (recovered && !document.hidden) visibility();
+    };
     window.addEventListener(AUTH_CHANGED_EVENT, changed);
+    window.addEventListener('online', network);
+    window.addEventListener('offline', network);
+    connection?.addEventListener?.('change', network);
     document.addEventListener('visibilitychange', visibility);
     return () => {
       window.removeEventListener(AUTH_CHANGED_EVENT, changed);
+      window.removeEventListener('online', network);
+      window.removeEventListener('offline', network);
+      connection?.removeEventListener?.('change', network);
       document.removeEventListener('visibilitychange', visibility);
       sessionRef.current?.pause();
       sessionRef.current = null;

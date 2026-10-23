@@ -7,7 +7,7 @@ import { uploadProfilePostMedia } from '../../services/profilePostService';
 type Attachment = { file: File; preview: string; url?: string };
 const emojis = ['🌸', '❤️', '😂', '😍', '✨', '🔥', '😭', '📚', '👏', '🤯'];
 
-export function MessageComposer({ onSend }: { onSend: (body: string) => Promise<void> }) {
+export function MessageComposer({ onSend, onActivity }: { onSend: (body: string) => Promise<void>; onActivity?: () => void }) {
   const [content, setContent] = useState('');
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -56,7 +56,7 @@ export function MessageComposer({ onSend }: { onSend: (body: string) => Promise<
       if (mounted.current) setSending(false);
     }
   };
-  return <form onSubmit={submit} className="messages-composer">
+  return <form onSubmit={submit} onFocus={onActivity} onInput={onActivity} className="messages-composer">
     {error && <p role="alert" className="mb-2 text-xs text-red-500">{error}</p>}
     {attachment && <div className="messages-attachment-preview">
       <img src={attachment.preview} alt="Archivo adjunto" />

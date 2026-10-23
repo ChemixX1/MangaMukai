@@ -7,6 +7,7 @@ const services = await build({
   stdin: { contents: `export * from './src/services/readerPrefetchSession';
     export * from './src/services/chapterMetadata';
     export * from './src/services/mangaTitles';
+    export { getBackgroundPolicy } from './src/utils/backgroundTasks';
     export { getLatestWomenUpdates, getUltimosCapitulos, getChaptersBySeries } from './src/services/mangaService';
     export { getStoredUser, getStoredToken, getAuthCacheKey, AUTH_CHANGED_EVENT } from './src/services/authService';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'cjs', define: { 'import.meta.env': '{}' },
@@ -14,16 +15,26 @@ const services = await build({
 const page = await build({ entryPoints: ['src/pages/ReaderPage.tsx'], bundle: true, write: false,
   platform: 'node', format: 'cjs', jsx: 'automatic', external: ['react', 'react/jsx-runtime', 'react-router-dom', 'lucide-react', '../*'] });
 const tick = () => new Promise(resolve => setImmediate(resolve));
+const scheduled = () => new Promise(resolve => setTimeout(resolve, 0));
 const require = createRequire(import.meta.url);
 const siblings = [0, 1.5, 2].map((number, index) => ({ id: 1001 + index, chapter_number: number, title: `Capítulo ${number}`, is_paid: false, price_coins: 0 }));
 
 function setup(t) {
-  const previous = Object.fromEntries(['fetch', 'window', 'document', 'localStorage', 'sessionStorage'].map(key => [key, globalThis[key]]));
+  const previous = Object.fromEntries(['fetch', 'Image', 'window', 'document', 'localStorage', 'sessionStorage'].map(key => [key, globalThis[key]]));
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const device = { onLine: true, hardwareConcurrency: 8, deviceMemory: 8, connection: Object.assign(new EventTarget(), { effectiveType: '4g' }) };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: device });
   const stored = new Map();
   const storage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) };
   globalThis.localStorage = globalThis.sessionStorage = storage;
-  globalThis.window = { location: { hostname: 'localhost' }, sessionStorage: storage, addEventListener() {}, removeEventListener() {} };
-  globalThis.document = { hidden: false, addEventListener() {}, removeEventListener() {} };
+  globalThis.window = Object.assign(new EventTarget(), { location: { hostname: 'localhost' }, sessionStorage: storage });
+  globalThis.document = Object.assign(new EventTarget(), { hidden: false });
+  const images = [];
+  globalThis.Image = class {
+    complete = false;
+    set src(url) { this.url = url; images.push(this); }
+    removeAttribute() { this.aborted = true; }
+  };
   const requests = [];
   const content = new Map();
   let listGate;
@@ -75,7 +86,8 @@ function setup(t) {
     if (name === 'react') return hooks;
     if (name === 'react/jsx-runtime') return require(name);
     if (name === 'react-router-dom') return { Link: 'Link', useParams: () => ({ chapterId: route }), useLocation: () => ({ pathname: `/read/${route}`, search: '', hash: '' }), useNavigate: () => () => {} };
-    if (['readerPrefetchSession', 'chapterMetadata', 'mangaTitles', 'mangaService', 'authService'].some(service => name.endsWith(`/${service}`))) return api;
+    if (name.endsWith('/mangaService')) return { ...api, trackChapterView: async () => {} };
+    if (['readerPrefetchSession', 'chapterMetadata', 'mangaTitles', 'authService', 'backgroundTasks'].some(service => name.endsWith(`/${service}`))) return api;
     if (name.endsWith('/useTheme')) return { useTheme: () => ({ theme: 'dark', toggleTheme() {} }) };
     if (name.endsWith('/useDocumentTitle')) return { useDocumentTitle() {} };
     if (name.endsWith('/mangaFormat')) return { cleanTitle: value => value };
@@ -85,8 +97,12 @@ function setup(t) {
   new Function('require', 'module', 'exports', page.outputFiles[0].text)(imports, pageModule, pageModule.exports);
   const render = () => { cursor = 0; return pageModule.exports.ReaderPage(); };
   const commit = () => effects.splice(0).forEach(effect => effect());
-  t.after(() => { cleanups.forEach(cleanup => cleanup?.()); api.clearReaderPrefetch(); Object.assign(globalThis, previous); });
-  return { api, requests, render, commit, content, stored,
+  const unmount = () => { cleanups.forEach(cleanup => cleanup?.()); cleanups.length = 0; };
+  t.after(() => {
+    unmount(); api.clearReaderPrefetch(); Object.assign(globalThis, previous);
+    if (navigatorDescriptor) Object.defineProperty(globalThis, 'navigator', navigatorDescriptor); else delete globalThis.navigator;
+  });
+  return { api, requests, render, commit, content, stored, device, images, unmount,
     navigate: id => { route = id; api.syncReaderPrefetchRoute(`/read/${id}`); },
     stallList: () => { listGate = Promise.withResolvers(); return listGate.resolve; },
   };
@@ -180,4 +196,72 @@ test('restored catalog data supplies chapter numbers; missing and invalid number
     assert.equal(env.api.peekChapterMetadata('invalid'), undefined);
   }
   assert.equal(env.requests.length, 0);
+});
+
+for (const interruption of ['slow network', 'offline']) {
+  test(`reader resumes the next chapter after ${interruption} without restarting allowed downloads`, async t => {
+    const env = setup(t);
+    env.api.mangaReaderSession('100', '100', siblings);
+    env.render(); env.commit(); await tick();
+    env.content.get('1002').resolve({ success: true, images: ['https://images.test/current.webp'] });
+    await tick();
+    find(env.render(), node => node.type === 'ReaderImages').props.onComplete();
+    await scheduled();
+    env.content.get('1003').resolve({ success: true, images: Array.from({ length: 8 }, (_, i) => `https://images.test/next/${i}.webp`) });
+    await tick();
+    assert.equal(env.images.length, 2);
+    env.images[0].onload(); await tick();
+    const before = env.images.length;
+    if (interruption === 'offline') {
+      env.device.onLine = false;
+      window.dispatchEvent(new Event('offline'));
+    } else {
+      env.device.connection.effectiveType = '3g';
+      env.device.connection.dispatchEvent(new Event('change'));
+    }
+    await tick();
+    assert.ok(env.images.slice(1).every(image => image.aborted));
+    env.device.onLine = true;
+    env.device.connection.effectiveType = '4g';
+    if (interruption === 'offline') window.dispatchEvent(new Event('online'));
+    else env.device.connection.dispatchEvent(new Event('change'));
+    await scheduled(); await tick();
+    assert.deepEqual(env.images.slice(before).map(image => image.url), ['https://images.test/next/1.webp', 'https://images.test/next/2.webp']);
+    assert.equal(env.requests.filter(({ url }) => url.includes('/chapters/content?id=1003')).length, 1);
+    env.device.connection.dispatchEvent(new Event('change'));
+    window.dispatchEvent(new Event('online'));
+    await scheduled();
+    assert.equal(env.images.length, before + 2, 'allowed-to-allowed events keep current speculative downloads');
+    assert.ok(env.images.slice(before).every(image => !image.aborted));
+  });
+}
+
+test('network recovery respects foreground loading and hidden state, and listeners stop on unmount', async t => {
+  const env = setup(t);
+  env.device.connection.effectiveType = '3g';
+  env.api.mangaReaderSession('100', '100', siblings);
+  env.render(); env.commit(); await tick();
+  env.content.get('1002').resolve({ success: true, images: ['https://images.test/current.webp'] });
+  await tick();
+  env.device.connection.effectiveType = '4g';
+  env.device.connection.dispatchEvent(new Event('change'));
+  await scheduled();
+  assert.equal(env.content.has('1003'), false, 'current images must finish first');
+  document.hidden = true;
+  find(env.render(), node => node.type === 'ReaderImages').props.onComplete();
+  env.device.onLine = false; window.dispatchEvent(new Event('offline'));
+  env.device.onLine = true; window.dispatchEvent(new Event('online'));
+  await scheduled();
+  assert.equal(env.content.has('1003'), false, 'hidden pages stay paused after recovery');
+  document.hidden = false;
+  document.dispatchEvent(new Event('visibilitychange'));
+  await scheduled();
+  assert.equal(env.content.has('1003'), true);
+  const requestsBefore = env.requests.length;
+  env.unmount();
+  env.device.onLine = false; window.dispatchEvent(new Event('offline'));
+  env.device.onLine = true; window.dispatchEvent(new Event('online'));
+  env.device.connection.dispatchEvent(new Event('change'));
+  await scheduled();
+  assert.equal(env.requests.length, requestsBefore);
 });

@@ -1,3 +1,5 @@
+import { getBackgroundPolicy } from '../utils/backgroundTasks';
+import { NAVIGATION_CACHE_TTL_MS, NAVIGATION_CACHE_MAX_SERIES } from '../utils/navigationCachePolicy';
 import { MANGAMUKAI_API, WORDPRESS_POSTS_API } from '../config/api';
 import { getAuthCacheKey, getStoredToken } from './authService';
 import { peekChapterMetadata, type ChapterMetadata } from './chapterMetadata';
@@ -138,7 +140,13 @@ export class ReaderPrefetchSession {
       this.mangaId = bundle.mangaId;
       this.cache.set(id, bundle);
 
-      if (this.cache.size > 48) for (const key of this.cache.keys()) { if (key !== this.focused && key !== id) { this.cache.delete(key); break; } }
+      if (this.cache.size > 48) for (const key of this.cache.keys()) {
+        if (key !== this.focused && key !== id) {
+          this.cache.delete(key);
+          this.warmed.delete(key);
+          break;
+        }
+      }
       return bundle;
     }).finally(() => { if (this.pending.get(id)?.controller === controller) this.pending.delete(id); });
     this.pending.set(id, { promise, controller });
@@ -160,49 +168,68 @@ export class ReaderPrefetchSession {
   }
   async warmImages(bundle: ReaderBundle, full = false) {
     if (this.disposed) throw cancelled();
+    const policy = getBackgroundPolicy();
+    if (!policy.allowSpeculation || document.hidden) return;
+    const target = full && !policy.constrained ? bundle.images.length : Math.min(READER_IMAGE_BATCH, bundle.images.length);
+    let warmed = this.warmed.get(bundle.id) || 0;
+    if (warmed >= target) return;
     const controller = new AbortController(); this.imageJobs.set(controller, bundle.id);
-    const target = full ? bundle.images.length : Math.min(READER_IMAGE_BATCH, bundle.images.length);
-    const images = bundle.images.slice(this.warmed.get(bundle.id) || 0, target);
-    let successful = true;
-    let cursor = 0;
+    const connection = (navigator as Navigator & { connection?: Partial<Pick<EventTarget, 'addEventListener' | 'removeEventListener'>> }).connection;
+    const stopIfUnavailable = () => {
+      if (document.hidden || !getBackgroundPolicy().allowSpeculation) controller.abort();
+    };
+    document.addEventListener?.('visibilitychange', stopIfUnavailable);
+    window.addEventListener?.('offline', stopIfUnavailable);
+    connection?.addEventListener?.('change', stopIfUnavailable);
+    const completed = new Set<number>();
+    let cursor = warmed;
     const worker = async () => {
-      while (cursor < images.length && !controller.signal.aborted) {
-        const url = images[cursor++];
-        await new Promise<void>((resolve, reject) => {
+      while (cursor < target && !controller.signal.aborted) {
+        if (document.hidden || !getBackgroundPolicy().allowSpeculation) return;
+        const index = cursor++;
+        const loaded = await new Promise<boolean>((resolve, reject) => {
           const image = new Image();
           const cleanup = () => { clearTimeout(timer); image.onload = null; image.onerror = null; controller.signal.removeEventListener('abort', abort); };
-          const done = () => { cleanup(); resolve(); };
-          const failed = () => { successful = false; done(); };
+          const done = () => { cleanup(); resolve(true); };
+          const failed = () => { cleanup(); resolve(false); };
           const abort = () => { cleanup(); image.removeAttribute('src'); reject(cancelled()); };
           const timer = setTimeout(() => { image.removeAttribute('src'); failed(); }, 10000);
           image.onload = done; image.onerror = failed;
           image.fetchPriority = 'low';
           controller.signal.addEventListener('abort', abort, { once: true });
           if (controller.signal.aborted) { abort(); return; }
-          image.src = url;
+          image.src = bundle.images[index];
           if (image.complete) { if (image.naturalWidth > 0) done(); else failed(); }
         });
+        if (loaded && !controller.signal.aborted) {
+          completed.add(index);
+          // Save the contiguous prefix so a paused download resumes where it stopped.
+          while (completed.delete(warmed)) warmed++;
+          if (this.cache.has(bundle.id)) this.warmed.set(bundle.id, Math.max(warmed, this.warmed.get(bundle.id) || 0));
+        }
       }
     };
-    try { await Promise.all([worker(), worker()]); if (!controller.signal.aborted && successful) this.warmed.set(bundle.id, Math.max(target, this.warmed.get(bundle.id) || 0)); }
-    finally { this.imageJobs.delete(controller); }
+    try { await Promise.all(Array.from({ length: policy.constrained ? 1 : 2 }, worker)); }
+    finally {
+      document.removeEventListener?.('visibilitychange', stopIfUnavailable);
+      window.removeEventListener?.('offline', stopIfUnavailable);
+      connection?.removeEventListener?.('change', stopIfUnavailable);
+      this.imageJobs.delete(controller);
+    }
   }
   warmAround(chapters: ReaderSibling[], currentId: string, unlocked: Set<string>) {
     this.pause();
-    if (this.disposed || document.hidden) return;
-    const index = chapters.findIndex(chapter => String(chapter.id) === currentId);
-    const order: ReaderSibling[] = [];
-    if (index < 0) order.push(...chapters);
-    if (index >= 0) {
-
-      if (chapters[index+1]) order.push(chapters[index+1]);
-      if (chapters[index-1]) order.push(chapters[index-1]);
-      order.push(...chapters.slice(index + 2), ...chapters.slice(0, Math.max(0, index - 1)).reverse());
-    }
+    if (this.disposed || document.hidden || !getBackgroundPolicy().allowSpeculation) return;
+    const ordered = [...chapters].sort((a, b) => a.chapter_number - b.chapter_number);
+    const index = ordered.findIndex(chapter => String(chapter.id) === currentId);
+    // Detail prepares only the opening chapter; reading prepares only its immediate successor.
+    // Never skip a locked successor to download unrelated later chapters.
+    const next = currentId ? (index >= 0 ? ordered[index + 1] : undefined) : ordered[0];
+    const order = next ? [next] : [];
     const generation = this.generation;
     this.schedule = setTimeout(() => { void (async () => {
       for (const chapter of order) {
-        if (generation !== this.generation || this.disposed || document.hidden) return;
+        if (generation !== this.generation || this.disposed || document.hidden || !getBackgroundPolicy().allowSpeculation) return;
         const id = String(chapter.id);
 
         const released = !!chapter.free_at && new Date(chapter.free_at).getTime() <= Date.now();
@@ -214,7 +241,7 @@ export class ReaderPrefetchSession {
         if ((this.warmed.get(id) ?? -1) >= target) continue;
         try {
           const bundle = await this.load(id);
-          if (generation !== this.generation) return;
+          if (generation !== this.generation || !getBackgroundPolicy().allowSpeculation) return;
           if (!bundle.error && !bundle.locked) {
             await this.warmImages(bundle, !!currentId);
             if (currentId && (this.warmed.get(id) ?? 0) >= bundle.images.length) this.warmed.set(id, Infinity);
@@ -236,8 +263,8 @@ export class ReaderPrefetchSession {
 let shared: ReaderPrefetchSession | null = null;
 let owner: string | null = null;
 const homeSessions = new Map<string, { session: ReaderPrefetchSession; expiresAt: number }>();
-const HOME_SESSION_LIMIT = 128;
-const HOME_SESSION_TTL = 5 * 60 * 1000;
+const HOME_SESSION_LIMIT = NAVIGATION_CACHE_MAX_SERIES;
+const HOME_SESSION_TTL = NAVIGATION_CACHE_TTL_MS;
 
 function pruneHomeSessions() {
   for (const [key, entry] of homeSessions) {
@@ -267,7 +294,8 @@ export function pauseHomeReaderSession(session: ReaderPrefetchSession) {
 }
 
 /** A selector prepared separately must survive eviction from the smaller HTTP-data cache. */
-export function peekHomeReaderChapters(mangaId: string, maxAge = 60_000) {
+export function peekHomeReaderChapters(mangaId: string, maxAge = HOME_SESSION_TTL) {
+  pruneHomeSessions();
   if (owner !== getAuthCacheKey()) return;
   const entry = homeSessions.get(mangaId);
   if (!entry || Date.now() - (entry.expiresAt - HOME_SESSION_TTL) >= maxAge) return;
@@ -282,6 +310,7 @@ function activateHomeSession(session: ReaderPrefetchSession) {
 
 // Metadata remains available while chapter images load or are evicted.
 export function peekReaderSession(id: string) {
+  pruneHomeSessions();
   if (owner !== getAuthCacheKey()) return null;
   if (shared?.owns(id)) return shared;
   return [...homeSessions.values()].find(entry => entry.expiresAt > Date.now() && entry.session.owns(id))?.session ?? null;

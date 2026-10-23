@@ -35,7 +35,7 @@ comenzó no puede cancelarse; la cancelación afecta trabajos aún en cola.
 | --- | --- | --- |
 | Novedades y listas recientes | 60 segundos | 8 |
 | Fichas de manga | 60 segundos | 24 |
-| Listas de capítulos | 60 segundos | 12 |
+| Listas de capítulos | 2 minutos | 24 |
 | Recomendaciones | 5 minutos | 24 |
 
 El inicio conserva su último contenido al regresar. Si han pasado 60 segundos,
@@ -79,15 +79,20 @@ en un enlace directo comienza en cuanto llegan los metadatos. Ambos avanzan de
 forma independiente. Home, ficha y lector comparten la caché pública y las
 peticiones de listados en curso. Los comentarios del lector se piden después.
 
-Se conserva una instantánea parcial durante cinco minutos, con un máximo de
-128 fichas. Al abrir `MangaDetail`, las secciones preparadas hace menos de un
+Se conserva una instantánea parcial durante dos minutos, con un máximo de
+24 fichas. Los listados públicos, las fichas preparadas y las sesiones del
+inicio comparten los límites de `navigationCachePolicy.ts`. La cola selecciona
+como máximo 24 series distintas, priorizando las tarjetas visibles y las
+páginas actuales antes de las siguientes. Así no prepara más series de las que
+puede conservar entre etapas ni vuelve a descargar datos recién expulsados.
+Al abrir `MangaDetail`, las secciones preparadas hace menos de un
 minuto se reutilizan directamente; las antiguas se muestran mientras se
 actualizan mediante las cachés públicas compartidas. Recomendaciones y catálogo
 pueden completar la barra lateral por separado. Los comentarios se solicitan
 después del listado, sin esperar al catálogo y con una espera de tiempo libre
 limitada a 250 ms en navegadores con `requestIdleCallback`.
 Los comentarios preparados solo se muestran durante 60 segundos y para la
-misma cuenta. Las cachés públicas anteriores conservan sus límites y vigencia.
+misma cuenta. Las otras cachés públicas conservan sus límites y vigencia.
 
 El fondo de Mukai Music ya estaba en WebP; se recomprimió de 117.994 a 71.378
 bytes conservando los 768 × 432 píxeles y su prioridad de descarga baja.
@@ -96,9 +101,54 @@ De los dos capítulos recientes mostrados en cada tarjeta, solo se solicitan los
 publicados y gratuitos, comprobando también la lista de capítulos. Se preparan
 sus datos y las primeras cinco imágenes, con prioridad baja. No se registran
 vistas ni progreso y no se realizan compras. Las sesiones del inicio se mantienen
-separadas (máximo 128, cinco minutos); al navegar se conserva la sesión elegida
+separadas (máximo 24, dos minutos); al navegar se conserva la sesión elegida
 y se descartan las demás. Un cambio de cuenta invalida las sesiones. La carga
-del capítulo completo y de sus vecinos sigue a cargo del lector existente.
+del capítulo actual sigue a cargo del lector. Las portadas del hero y del
+ranking también pueden preparar las primeras cinco imágenes del primer
+capítulo de la serie, si está disponible sin pago.
+
+## Precarga durante la lectura
+
+Cuando terminan las imágenes del capítulo actual, se prepara únicamente su
+sucesor inmediato. Un capítulo bloqueado no se salta para descargar otros más
+lejanos, y el último capítulo no genera precargas. En la ficha solo se prepara
+el capítulo inicial.
+
+La precarga automática se omite con ahorro de datos, sin conexión, en 2G/3G o
+cuando el navegador informa hasta 1,5 Mbps. En dispositivos que informan hasta
+4 GB de memoria o cuatro núcleos se limita a cinco imágenes y una descarga a
+la vez; en los demás se puede preparar el siguiente capítulo completo con dos
+descargas simultáneas de prioridad baja. Esto no limita la carga del capítulo
+que el usuario está leyendo.
+
+Ocultar la pestaña o pasar a una conexión restringida cancela las imágenes
+especulativas en curso. Se conserva el prefijo de imágenes ya descargadas para
+no volver a solicitarlo al reanudar. Al recuperar una conexión permitida, el
+lector reanuda la preparación si las imágenes del capítulo actual ya terminaron;
+la ficha también reanuda su precarga. Los marcadores se eliminan junto con los
+datos del capítulo al expulsarlo de la caché; los bytes de las imágenes quedan
+bajo la política de caché HTTP del navegador.
+
+## Consultas del chat
+
+`adaptivePolling.ts` programa cada consulta después de terminar la anterior.
+Los mensajes se consultan cada cinco segundos mientras se conversa; después
+de un minuto sin escritura ni mensajes nuevos pasan a 15 segundos, y desde
+tres minutos a 30 segundos. Escribir recupera la frecuencia rápida sin hacer
+una petición por tecla; enviar y volver a una pestaña visible o recuperar la
+conexión provocan una actualización inmediata.
+
+La bandeja pasa de 15 a 30 y 60 segundos, y el perfil de 30 a 60 segundos. Con
+la pestaña oculta o sin conexión se suspenden los temporizadores. Los errores
+aumentan la espera de forma exponencial hasta dos minutos; escribir no acorta
+esa espera y una respuesta correcta la restablece.
+
+Con 1.000 conversaciones visibles, cinco segundos suponen aproximadamente
+200 consultas de mensajes por segundo. Si todas llevan tres minutos sin
+actividad, 30 segundos reducen esa cifra teórica a unas 33 consultas por
+segundo. No incluye bandeja, perfiles ni envíos; no es una medición de carga
+del servidor. Al llegar un mensaje a una conversación inactiva, su detección
+puede tardar hasta 30 segundos más el tiempo de respuesta de la petición.
 
 La configuración de caché administrada en el servidor permite reutilizar durante un año los archivos
 estáticos cuyo nombre contiene la huella generada por Vite. Cada versión

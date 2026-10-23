@@ -1,3 +1,4 @@
+import { homeCoverPrefetchTarget } from '../../services/homeNavigationPrefetch';
 import { HERO_AUTOPLAY_MS, HERO_TRANSITION_SECONDS, HERO_COVER_EASE } from './heroMotion';
 import { HERO_TAG_CLASS, HERO_TAG_ROW, HERO_TITLE_CLASS } from './heroTagStyles';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -456,7 +457,7 @@ export const HeroCarousel = ({ items, loading, accent, label, coverLayout, keybo
   useHomePrefetchGroup(sectionRef, items.filter((_, index) => {
     const delta = relativeIndex(index);
     return delta >= layout.slots.first && delta <= layout.slots.last;
-  }).map(item => ({ mangaId: String(item.id), chapterIds: [] })));
+  }).map(item => homeCoverPrefetchTarget(item.id)));
 
   if (!loading && !activeItem) return null;
 

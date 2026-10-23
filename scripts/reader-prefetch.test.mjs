@@ -11,11 +11,16 @@ const chapters = [1, 2, 3].map(id => ({ id, chapter_number: id, title: `Capítul
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function setup(t, { stalled = false, locked = false } = {}) {
-  const originals = Object.fromEntries(['fetch', 'Image', 'localStorage', 'sessionStorage', 'document'].map(key => [key, globalThis[key]]));
+  const originals = Object.fromEntries(['fetch', 'Image', 'localStorage', 'sessionStorage', 'document', 'window'].map(key => [key, globalThis[key]]));
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const device = { onLine: true, hardwareConcurrency: 8, deviceMemory: 8, connection: Object.assign(new EventTarget(), { effectiveType: '4g', saveData: false }) };
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: device });
+  globalThis.window = new EventTarget();
+  t.after(() => { if (navigatorDescriptor) Object.defineProperty(globalThis, 'navigator', navigatorDescriptor); else delete globalThis.navigator; });
   let token = null;
   let user = null;
   globalThis.localStorage = globalThis.sessionStorage = { getItem: key => key === 'mm_token' ? token : key === 'mm_user' && user ? JSON.stringify(user) : null };
-  globalThis.document = { hidden: false };
+  globalThis.document = Object.assign(new EventTarget(), { hidden: false });
   const requests = [];
   const images = [];
   globalThis.Image = class {
@@ -37,7 +42,7 @@ function setup(t, { stalled = false, locked = false } = {}) {
     return { ok: true, json: async () => data };
   };
   t.after(() => { api.clearReaderPrefetch(); Object.assign(globalThis, originals); });
-  return { requests, images, setToken: value => { token = value; }, setUser: value => { user = value; } };
+  return { requests, images, device, setToken: value => { token = value; }, setUser: value => { user = value; } };
 }
 
 test('refreshing the token for the same account preserves loaded pages and in-flight images', async t => {
@@ -114,11 +119,11 @@ test('home-to-detail navigation keeps the prepared chapter and its alias', async
 test('home sessions expire, stay bounded and never survive a changed account', async t => {
   const { setToken } = setup(t);
   t.mock.timers.enable({ apis: ['Date'], now: 1000 });
-  for (let id = 1; id <= 129; id++) api.homeReaderSession(String(id), String(id), [{ ...chapters[0], id }]);
+  for (let id = 1; id <= 25; id++) api.homeReaderSession(String(id), String(id), [{ ...chapters[0], id }]);
   assert.equal(api.peekReaderSession('1'), null);
-  assert.ok(api.peekReaderSession('129'));
-  t.mock.timers.tick(5 * 60 * 1000);
-  assert.equal(api.peekReaderSession('129'), null);
+  assert.ok(api.peekReaderSession('25'));
+  t.mock.timers.tick(2 * 60 * 1000);
+  assert.equal(api.peekReaderSession('25'), null);
   api.homeReaderSession('100', '100', chapters);
   setToken('another-account');
   api.syncReaderPrefetchAuth();
@@ -168,15 +173,15 @@ test('other sections and other manga discard the session and cancel downloads', 
   await assert.rejects(next.load('4'), { name: 'AbortError' });
 });
 
-test('reader downloads both immediate neighbors completely, next before previous', async t => {
+test('reader downloads only the immediate next chapter even when later chapters are free', async t => {
   const { requests, images } = setup(t);
-  const session = api.mangaReaderSession('100', '100', [...chapters, { id: 4, chapter_number: 4, is_paid: true, price_coins: 20 }]);
+  const session = api.mangaReaderSession('100', '100', [...chapters, { id: 4, chapter_number: 4, is_paid: false, price_coins: 0 }]);
   session.focus('2');
-  session.warmAround([...chapters, { id: 4, chapter_number: 4, is_paid: true, price_coins: 20 }], '2', new Set());
+  session.warmAround([...chapters, { id: 4, chapter_number: 4, is_paid: false, price_coins: 0 }], '2', new Set());
   await delay(180);
   const content = requests.filter(request => request.url.includes('/chapters/content'));
-  assert.deepEqual(content.map(request => /id=(\d+)/.exec(request.url)[1]), ['3', '1']);
-  assert.equal(images.length, 44);
+  assert.deepEqual(content.map(request => /id=(\d+)/.exec(request.url)[1]), ['3']);
+  assert.equal(images.length, 22);
 });
 
 test('reader continues a five-strip detail prefetch without re-requesting those strips', async t => {
@@ -189,10 +194,10 @@ test('reader continues a five-strip detail prefetch without re-requesting those 
   session.warmAround(chapters, '2', new Set());
   await delay(180);
   assert.equal(images.filter(image => image.url.includes('/3/')).length, 22);
-  assert.equal(new Set(images.map(image => image.url)).size, 44);
+  assert.equal(new Set(images.map(image => image.url)).size, 22);
   session.warmAround(chapters, '2', new Set());
   await delay(180);
-  assert.equal(images.length, 44);
+  assert.equal(images.length, 22);
 });
 
 test('locked neighbor is skipped until a confirmed purchase invalidates its bundle', async t => {
@@ -274,4 +279,124 @@ test('the reader reserves loading space until image dimensions are known', async
   } finally {
     cleanups.forEach(fn => fn?.()); globalThis.Image = previousImage; globalThis.window = previousWindow;
   }
+});
+
+
+test('detail prepares just the first chapter and the last reader chapter prepares nothing', async t => {
+  const { requests } = setup(t);
+  const session = api.mangaReaderSession('100', '100', chapters);
+  session.warmAround(chapters, '', new Set());
+  await delay(180);
+  assert.deepEqual(requests.filter(r => r.url.includes('/chapters/content')).map(r => /id=(\d+)/.exec(r.url)[1]), ['1']);
+  const before = requests.length;
+  session.focus('3');
+  session.warmAround(chapters, '3', new Set());
+  await delay(180);
+  assert.equal(requests.length, before);
+});
+
+test('slow networks, data saving and offline skip speculation without blocking the chapter being read', async t => {
+  const { requests, images, device } = setup(t);
+  const session = api.mangaReaderSession('100', '100', chapters);
+  for (const overrides of [{ effectiveType: '3g' }, { effectiveType: '2g' }, { effectiveType: '4g', saveData: true }, { effectiveType: '4g', saveData: false, downlink: 1 }]) {
+    device.connection = overrides;
+    session.warmAround(chapters, '1', new Set());
+    await delay(10);
+  }
+  device.connection = { effectiveType: '4g' };
+  device.onLine = false;
+  session.warmAround(chapters, '1', new Set());
+  await delay(10);
+  assert.equal(requests.length, 0);
+  const current = await session.load('1');
+  assert.equal(current.images.length, 22);
+  await session.warmImages(current);
+  assert.equal(images.length, 0);
+});
+
+test('small devices warm at most five strips of the next chapter', async t => {
+  const { images, device } = setup(t);
+  device.deviceMemory = 2;
+  const session = api.mangaReaderSession('100', '100', chapters);
+  session.focus('1');
+  session.warmAround(chapters, '1', new Set());
+  await delay(180);
+  assert.equal(images.length, 5);
+  assert.ok(images.every(image => image.url.includes('/2/')));
+});
+
+test('expiration disposes parked sessions without interrupting the active reader', async t => {
+  setup(t);
+  t.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const active = api.mangaReaderSession('100', '100', chapters);
+  active.focus('1');
+  const current = await active.load('1');
+  const parked = api.homeReaderSession('200', '200', [{ ...chapters[0], id: 9 }]);
+  t.mock.timers.tick(120000);
+  assert.equal(api.peekReaderSession('9'), null);
+  await assert.rejects(parked.load('9'), { name: 'AbortError' });
+  assert.equal(api.peekReaderSession('1'), active);
+  assert.equal(active.peek('1'), current);
+});
+
+for (const state of ['slow-network', 'offline', 'hidden']) {
+  test(`in-flight speculative images stop immediately when ${state}`, async t => {
+    const { images, device } = setup(t, { stalled: true });
+    const session = api.mangaReaderSession('100', '100', chapters);
+    const current = await session.load('1');
+    const rejected = assert.rejects(session.warmImages(current), { name: 'AbortError' });
+    assert.equal(images.length, 2);
+    if (state === 'slow-network') {
+      device.connection.effectiveType = '3g';
+      device.connection.dispatchEvent(new Event('change'));
+    } else if (state === 'offline') {
+      device.onLine = false;
+      window.dispatchEvent(new Event('offline'));
+    } else {
+      document.hidden = true;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+    await rejected;
+    assert.ok(images.every(image => image.aborted));
+    assert.equal(session.peek('1'), current, 'the chapter remains usable');
+  });
+}
+
+test('interrupted prefetch resumes after completed images even if they finish out of order', async t => {
+  const { images } = setup(t, { stalled: true });
+  const session = api.mangaReaderSession('100', '100', chapters);
+  const current = await session.load('1');
+  const rejected = assert.rejects(session.warmImages(current), { name: 'AbortError' });
+  images[1].onload();
+  await delay(0);
+  images[0].onload();
+  await delay(0);
+  const before = images.length;
+  session.pause();
+  await rejected;
+  const resumed = session.warmImages(current);
+  for (let index = before; index < images.length; index++) {
+    images[index].onload();
+    await delay(0);
+  }
+  await resumed;
+  assert.equal(images.filter(image => image.url.endsWith('/0.webp')).length, 1);
+  assert.equal(images.filter(image => image.url.endsWith('/1.webp')).length, 1);
+  assert.deepEqual(images.slice(before).map(image => image.url.split('/').at(-1)), ['2.webp', '3.webp', '4.webp']);
+});
+
+test('evicting a chapter also removes its completed prefetch marker', async t => {
+  const { images, requests } = setup(t);
+  const many = Array.from({ length: 51 }, (_, index) => ({ ...chapters[0], id: index + 1, chapter_number: index + 1 }));
+  const session = api.mangaReaderSession('100', '100', many);
+  session.focus('1');
+  session.warmAround(many, '1', new Set());
+  await delay(180);
+  assert.equal(images.length, 22);
+  for (let id = 3; id <= 51; id++) await session.load(String(id));
+  assert.equal(session.peek('2'), undefined);
+  session.warmAround(many, '1', new Set());
+  await delay(180);
+  assert.equal(requests.filter(request => request.url.endsWith('content?id=2')).length, 2);
+  assert.equal(images.length, 44);
 });

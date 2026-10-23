@@ -5,6 +5,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { createPublicDataCache } from '../src/utils/publicDataCache.ts';
+import * as navigationCachePolicy from '../src/utils/navigationCachePolicy.ts';
 
 test('simultaneous consumers share a request and revisits reuse the result until expiry', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: 1000 });
@@ -72,6 +73,7 @@ function setup(responseFor, catalog = null) {
     console: { error() {} },
     require: name => name.includes('publicDataCache')
       ? { createPublicDataCache }
+      : name.includes('navigationCachePolicy') ? navigationCachePolicy
       : name.includes('mangaTitles') ? { rememberMangaTitle: (id, title) => titles.set(String(id), title) }
       : name.includes('chapterMetadata') ? { rememberChapterMetadata }
       : { MANGAMUKAI_API: '/api', WORDPRESS_POSTS_API: '/posts' },
@@ -141,7 +143,7 @@ test('chapter lists and their count expire, so a revisit can see newly released 
   assert.equal(requests.length, 1);
   assert.equal(service.getCachedSeriesChapterCount(1), 1);
   chapters = [...chapters, { id: 2, chapter_number: 2, is_paid: false, price_coins: 0 }];
-  t.mock.timers.tick(60_000);
+  t.mock.timers.tick(2 * 60_000);
   assert.equal(service.getCachedSeriesChapterCount(1), null);
   const refreshed = await service.getChaptersBySeries(1);
   assert.equal(refreshed.length, 2);
@@ -158,4 +160,17 @@ test('temporary empty responses and blocked browser storage do not prevent retry
   assert.equal(requests.length, 3);
   assert.equal((await service.getUltimosCapitulos()).length, 1);
   assert.equal(requests.length, 3, 'the in-memory catalogue still works when storage is blocked');
+});
+
+test('the chapter-list service retains at most 24 series and reuses those still cached', async () => {
+  const { service, requests } = setup(url => ({
+    success: true,
+    chapters: [{ id: Number(/\/series\/(\d+)/.exec(url)[1]), chapter_number: 1, is_paid: false, price_coins: 0 }],
+  }));
+  for (let id = 1; id <= 25; id++) await service.getChaptersBySeries(id);
+  assert.equal(service.peekSeriesChapters(1), undefined);
+  assert.equal((await service.getChaptersBySeries(2))[0].id, 2);
+  assert.equal(requests.length, 25, 'retained lists need no repeat request');
+  await service.getChaptersBySeries(1);
+  assert.equal(requests.length, 26, 'evicted lists are fetched again on demand');
 });

@@ -1,3 +1,4 @@
+import { homeCoverPrefetchTarget } from '../../services/homeNavigationPrefetch';
 import { useReducedMotion } from 'framer-motion';
 import { GooeySelector } from '../ui/GooeySelector';
 import { useRef, useState, type CSSProperties } from 'react';
@@ -120,7 +121,7 @@ export const TrendingSection = ({
     leadingInset: TRENDING_CARD[isMobile ? 'mobile' : 'desktop'].inset,
     pauseOnHover: !isMobile,
   });
-  useHomePrefetchGroup(sectionRef, items.map(item => ({ mangaId: String(item.id), chapterIds: [] })));
+  useHomePrefetchGroup(sectionRef, items.map(item => homeCoverPrefetchTarget(item.id)));
 
   return (
     <section ref={sectionRef} id={!filterMangas ? (audience === 'men' ? 'mangas-juveniles' : 'tendencia-ahora') : undefined} className={`relative w-full ${className}`} aria-busy={loading}>

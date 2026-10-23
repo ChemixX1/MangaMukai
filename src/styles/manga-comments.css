@@ -199,8 +199,4 @@
   .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-article h3 { font-size: 15px; font-weight: 800; }
   .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-article time { font-size: 13px; font-weight: 600; }
   .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-body { font-size: 15px; line-height: 23px; font-weight: 500; }
-  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-actions { margin-left: -48px; flex-wrap: nowrap; gap: 3px; overflow-x: auto; padding-bottom: 3px; }
-  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment.is-reply .manga-comment-actions { margin-left: -36px; }
-  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-actions > button { flex-shrink: 0; }
-  .manga-detail-mobile .manga-comments.manga-comments-reference .manga-comment-actions > .manga-comment-reply { margin-left: auto; padding-left: 5px; font-weight: 500; }
 }

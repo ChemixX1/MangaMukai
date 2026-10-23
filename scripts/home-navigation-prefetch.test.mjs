@@ -5,6 +5,7 @@ import { build } from 'esbuild';
 const bundle = await build({
   stdin: { contents: `export * from './src/services/homeNavigationPrefetch';
     export * from './src/services/readerPrefetchSession';
+    export { createHomeNavigationQueue } from './src/utils/homeNavigationQueue';
     export { getMangaById, getChaptersBySeries, getRelatedMangas } from './src/services/mangaService';`, resolveDir: process.cwd() },
   bundle: true, write: false, platform: 'node', format: 'esm', define: { 'import.meta.env': '{}' },
 });
@@ -134,7 +135,7 @@ test('prepared comments are short-lived and scoped to the account; public snapsh
   assert.equal(api.peekPreparedMangaDetail('100', 60_000), undefined, 'foreground revalidates public data after one minute');
   assert.equal(api.peekPreparedMangaDetail('100').comments, undefined);
   assert.equal(api.peekPreparedMangaDetail('100').manga.id, 100);
-  t.mock.timers.tick(4 * 60_000);
+  t.mock.timers.tick(60_000);
   assert.equal(api.peekPreparedMangaDetail('100'), undefined);
 });
 
@@ -184,4 +185,57 @@ test('slow comments cannot hold the synopsis, selector, recommendations or chapt
   releaseComments();
   await pending;
   assert.equal(api.peekPreparedMangaDetail('100').comments.length, 1);
+});
+
+
+test('hero cards without chapter metadata prepare the selector then the actual opening chapter', async t => {
+  const { api, requests } = await setup(t);
+  const target = api.homeCoverPrefetchTarget('100');
+  assert.equal(target.prioritizeChapters, undefined);
+  assert.equal(target.warmFirstChapter, true);
+  const signal = new AbortController().signal;
+  await api.prepareHomeManga(target, signal, 'selector');
+  assert.equal(requests.length, 1);
+  await api.prepareHomeManga(target, signal, 'detail');
+  await api.prepareHomeManga(target, signal, 'reader');
+  const content = requests.filter(({ url }) => url.includes('/chapters/content'));
+  assert.equal(content.length, 1);
+  assert.match(content[0].url, /id=1001/);
+  assert.equal(requests.filter(({ url }) => url.includes('/series/')).length, 1);
+});
+
+
+test('prepared detail snapshots retain at most 24 series', async t => {
+  const { api } = await setup(t);
+  for (let id = 100; id < 125; id++) {
+    await api.prepareHomeManga({ mangaId: String(id), chapterIds: [] }, new AbortController().signal, 'detail');
+  }
+  assert.equal(api.peekPreparedMangaDetail('100'), undefined);
+  assert.ok(api.peekPreparedMangaDetail('101'));
+  assert.ok(api.peekPreparedMangaDetail('124'));
+});
+
+test('the home pipeline stays inside its cache budget without refetching lists between stages', async t => {
+  const { api, requests } = await setup(t);
+  const jobs = [];
+  const queue = api.createHomeNavigationQueue(task => {
+    const job = { task, cancelled: false };
+    jobs.push(job);
+    return () => { job.cancelled = true; };
+  }, api.prepareHomeManga);
+  const targets = Array.from({ length: 25 }, (_, index) => {
+    const id = index + 100;
+    return { mangaId: String(id), seriesId: String(id), chapterIds: [String(id * 10 + 1)] };
+  });
+  queue.setGroup('latest', { current: targets, next: [], visible: true });
+  queue.setEnabled(true);
+  while (jobs.length) {
+    const job = jobs.shift();
+    if (!job.cancelled) await job.task();
+  }
+  queue.stop();
+  assert.equal(requests.filter(({ url }) => url.includes('/series/')).length, 24, 'each retained list is fetched once across all four stages');
+  assert.equal(requests.filter(({ url }) => url.includes('/manga/')).length, 24, 'reader and extras reuse the prepared detail');
+  assert.equal(requests.filter(({ url }) => url.includes('/chapters/content')).length, 24);
+  assert.equal(api.peekPreparedMangaDetail('124'), undefined, 'the excess candidate waits for a visible page change');
 });

@@ -1,3 +1,4 @@
+import { NAVIGATION_CACHE_TTL_MS, NAVIGATION_CACHE_MAX_SERIES } from '../utils/navigationCachePolicy';
 
 
 import type { WPManga, MangaCapitulo } from '../types/manga';
@@ -418,8 +419,8 @@ export const getChapterPreviewImage = async (
 };
 
 const seriesChaptersCache = createPublicDataCache<SeriesChapter[] | null>({
-  ttlMs: 60 * 1000,
-  maxEntries: 12,
+  ttlMs: NAVIGATION_CACHE_TTL_MS,
+  maxEntries: NAVIGATION_CACHE_MAX_SERIES,
   shouldCache: chapters => chapters !== null,
 });
 const chapterCountCache = new Map<string, { count: number; expiresAt: number }>();
@@ -443,6 +444,8 @@ export const getCachedSeriesChapterCount = (id: number | string): number | null 
 };
 
 const loadSeriesChapters = (eroSeri: number | string): Promise<SeriesChapter[] | null> => {
+  const known = peekSeriesChapters(eroSeri);
+  if (known !== undefined) return Promise.resolve(known);
   const key = String(eroSeri);
   return seriesChaptersCache.load(key, () => fetch(`${MM_API}/series/${key}/chapters`)
     .then(async (res) => {
@@ -460,8 +463,14 @@ const loadSeriesChapters = (eroSeri: number | string): Promise<SeriesChapter[] |
 export const getChaptersBySeries = async (eroSeri: number | string): Promise<SeriesChapter[]> =>
   (await loadSeriesChapters(eroSeri)) ?? [];
 
-export const peekSeriesChapters = (id: number | string): SeriesChapter[] | undefined =>
-  seriesChaptersCache.peek(String(id)) ?? undefined;
+export const peekSeriesChapters = (id: number | string): SeriesChapter[] | undefined => {
+  const cached = seriesChaptersCache.peek(String(id));
+  if (cached) return cached;
+  const manga = peekKnownManga(String(id));
+  // Missing metadata is not evidence of an empty series. Positive hints win.
+  if (manga?.firstChapterId || manga?.capitulosRecientes.some(chapter => chapter.id > 0) || (manga?.chapterCount ?? 0) > 0) return;
+  if (manga?.chapterCount === 0 || getCachedSeriesChapterCount(id) === 0) return [];
+};
 
 export const getSeriesChapterCount = async (eroSeri: number | string): Promise<number | null> => {
   const cached = getCachedSeriesChapterCount(eroSeri);

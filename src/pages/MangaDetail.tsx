@@ -59,6 +59,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { getKnownMangaTitle } from '../services/mangaTitles';
 import { collectionBadge } from '../utils/womenBlackWhite';
 import { whenIdle } from '../utils/whenIdle';
+import { getBackgroundPolicy } from '../utils/backgroundTasks';
 import { mangaReaderSession } from '../services/readerPrefetchSession';
 import { peekPreparedMangaDetail } from '../services/homeNavigationPrefetch';
 import { ensureMusicLibrary } from '../services/musicPlayer';
@@ -372,7 +373,8 @@ const MangaDetailContent = () => {
 
         setLoading(false);
         setSecondaryReady(true);
-        const chaptersRequest = (fresh?.chapters ? Promise.resolve(fresh.chapters) : getChaptersBySeries(mangaPostId)).then(data => {
+        const cachedChapters = fresh?.chapters ?? peekSeriesChapters(mangaPostId) ?? initial?.chapters;
+        const chaptersRequest = (cachedChapters !== undefined ? Promise.resolve(cachedChapters) : getChaptersBySeries(mangaPostId)).then(data => {
           if (active) {
             mangaReaderSession(id, String(mangaPostId), data);
             setChapters(data);
@@ -447,8 +449,25 @@ const MangaDetailContent = () => {
     const warm = () => session.warmAround([...chapters].sort((a, b) => a.chapter_number - b.chapter_number), '', purchasedIds);
     const cancel = whenIdle(warm);
     const visibility = () => { if (document.hidden) session.pause(); else warm(); };
+    const connection = (navigator as Navigator & { connection?: Partial<EventTarget> }).connection;
+    let canSpeculate = getBackgroundPolicy().allowSpeculation;
+    const network = () => {
+      const allowed = getBackgroundPolicy().allowSpeculation;
+      const recovered = allowed && !canSpeculate;
+      canSpeculate = allowed;
+      if (recovered && !document.hidden) warm();
+    };
+    window.addEventListener('online', network);
+    window.addEventListener('offline', network);
+    connection?.addEventListener?.('change', network);
     document.addEventListener('visibilitychange', visibility);
-    return () => { cancel(); session.pause(); document.removeEventListener('visibilitychange', visibility); };
+    return () => {
+      cancel(); session.pause();
+      window.removeEventListener('online', network);
+      window.removeEventListener('offline', network);
+      connection?.removeEventListener?.('change', network);
+      document.removeEventListener('visibilitychange', visibility);
+    };
   }, [id, manga, loading, chaptersLoading, commentsLoading, relatedLoading, chapters, purchasedIds]);
   const filteredChapters = useMemo(() => {
     const query = chapterSearch.trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');

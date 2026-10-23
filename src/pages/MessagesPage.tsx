@@ -15,6 +15,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { CommunityIcon } from '../components/community/CommunityIcons';
 import { MessageComposer } from '../components/community/MessageComposer';
 import { chatMessagePreview, formatChatDate, parseChatMessage } from '../utils/chatMessage';
+import { createAdaptivePoller, observePollingVisibility, type AdaptivePoller, type PollResult } from '../utils/adaptivePolling';
 import '../styles/messages.css';
 import { getStoredToken, getStoredUser } from '../services/authService';
 import { getCachedMessageInbox, loadMessageInbox } from '../services/messageInbox';
@@ -70,6 +71,11 @@ export const MessagesPage = () => {
   const stickToBottom = useRef(true);
   const hasLoaded = useRef(false);
   const activeIdRef = useRef(activeId);
+  const messageSession = useRef(0);
+  const latestMessageId = useRef(0);
+  const inboxSignature = useRef('');
+  const messagePolling = useRef<AdaptivePoller | null>(null);
+  const inboxPolling = useRef<AdaptivePoller | null>(null);
 
   useDocumentTitle(partner ? `Chat con ${partner.username}` : 'Mensajes');
 
@@ -84,22 +90,28 @@ export const MessagesPage = () => {
   const communityReturn = getCommunityPosition(String(currentUserId))?.url || '/comunidad';
   const goBack = () => navigate(communityReturn, { state: { restoreCommunityScroll: true } });
 
-  const loadConversations = useCallback(async (force = false) => {
+  const loadConversations = useCallback(async (force = false): Promise<PollResult> => {
     try {
       const result = await loadMessageInbox(force);
+      const signature = result.conversations.map(item => `${item.other_user.id}:${item.id}:${item.unread_count}`).join('|');
+      const changed = signature !== inboxSignature.current;
+      inboxSignature.current = signature;
       setConversations(result.conversations);
       setListError('');
+      return changed ? 'changed' : 'unchanged';
     } catch (caught) {
       setListError(caught instanceof Error ? caught.message : 'No se pudo conectar con los mensajes.');
+      return 'error';
     } finally {
       setListLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadConversations();
-    const timer = window.setInterval(() => { if (!document.hidden) void loadConversations(); }, 15000);
-    return () => window.clearInterval(timer);
+    const poller = createAdaptivePoller(loadConversations, { activeMs: 15_000, idleMs: 30_000, quietMs: 60_000 });
+    inboxPolling.current = poller;
+    const stop = observePollingVisibility(poller);
+    return () => { stop(); inboxPolling.current = null; };
   }, [loadConversations]);
 
   useEffect(() => {
@@ -107,16 +119,23 @@ export const MessagesPage = () => {
     setPartner(null);
     if (!activeId) return;
     let active = true;
-    const loadPartner = () => getPublicProfile(activeId).then((profile) => { if (active && activeIdRef.current === activeId) setPartner(profile); }).catch(() => undefined);
-    void loadPartner();
-    const timer = window.setInterval(() => { if (!document.hidden) void loadPartner(); }, 30000);
-    return () => { active = false; window.clearInterval(timer); };
+    const poller = createAdaptivePoller(async () => {
+      const profile = await getPublicProfile(activeId);
+      if (active && activeIdRef.current === activeId) setPartner(profile);
+      return 'unchanged';
+    }, { activeMs: 30_000, idleMs: 60_000, quietMs: 60_000 });
+    const stop = observePollingVisibility(poller);
+    return () => { active = false; stop(); };
   }, [activeId]);
 
-  const loadMessages = useCallback(async (target: number, before?: number) => {
+  const loadMessages = useCallback(async (target: number, before?: number): Promise<PollResult> => {
+    const session = messageSession.current;
+    const isCurrent = () => activeIdRef.current === target && messageSession.current === session;
     try {
       const result = await loadMessageHistory(target, before);
-      if (activeIdRef.current !== target) return;
+      if (!isCurrent()) return 'unchanged';
+      const changed = !before && result.messages.some(message => message.id > latestMessageId.current);
+      if (!before) latestMessageId.current = Math.max(latestMessageId.current, ...result.messages.map(message => message.id));
       setMessages((current) => [...new Map([...current, ...result.messages].map((message) => [message.id, message])).values()].sort((a, b) => a.id - b.id));
       if (before || !hasLoaded.current) setHasMore(result.hasMore);
       hasLoaded.current = true;
@@ -124,16 +143,20 @@ export const MessagesPage = () => {
       const pendingRead = result.messages.some((message) => message.sender_id === target && !message.read_at);
       if (pendingRead && !document.hidden) void markConversationRead(target).then(() => { notifyNavbar(); void loadConversations(true); }).catch(() => undefined);
       setChatError('');
+      if (changed) inboxPolling.current?.activity();
+      return changed ? 'changed' : 'unchanged';
     } catch (caught) {
-      if (activeIdRef.current !== target) return;
+      if (!isCurrent()) return 'unchanged';
       setChatError(caught instanceof Error ? caught.message : 'No se pudo abrir la conversación.');
+      return 'error';
     } finally {
-      if (activeIdRef.current === target) setChatLoading(false);
+      if (isCurrent()) setChatLoading(false);
     }
   }, [loadConversations]);
 
   useEffect(() => {
     const cached = getCachedMessageHistory(activeId);
+    latestMessageId.current = Math.max(0, ...(cached?.messages ?? []).map(message => message.id));
     setMessages(cached?.messages ?? []);
     setChatError('');
     setHasMore(cached?.hasMore ?? false);
@@ -141,9 +164,11 @@ export const MessagesPage = () => {
     stickToBottom.current = true;
     if (!activeId) return;
     setChatLoading(!cached);
-    void loadMessages(activeId);
-    const timer = window.setInterval(() => { if (!document.hidden) void loadMessages(activeId); }, 5000);
-    return () => window.clearInterval(timer);
+    const session = messageSession.current;
+    const poller = createAdaptivePoller(() => loadMessages(activeId), { activeMs: 5_000, idleMs: 15_000, quietMs: 30_000 });
+    messagePolling.current = poller;
+    const stop = observePollingVisibility(poller);
+    return () => { messageSession.current = session + 1; stop(); messagePolling.current = null; };
   }, [activeId, loadMessages]);
 
   const lastMessageId = messages.at(-1)?.id;
@@ -154,11 +179,14 @@ export const MessagesPage = () => {
 
   const submit = async (body: string) => {
     if (!activeId || !body) return;
+    const session = messageSession.current;
     const sent = await sendChatMessage(activeId, body);
-    if (activeIdRef.current !== activeId) return;
+    if (activeIdRef.current !== activeId || messageSession.current !== session) return;
     stickToBottom.current = true;
     setMessages((current) => [...current.filter((message) => message.id !== sent.id), sent]);
     setChatError('');
+    messagePolling.current?.refresh();
+    inboxPolling.current?.activity();
     void loadConversations(true);
   };
 
@@ -327,7 +355,7 @@ export const MessagesPage = () => {
 
               {chatError && <p className="bg-red-500/10 px-4 py-2 text-xs text-red-500">{chatError}</p>}
 
-              <MessageComposer key={activeId} onSend={submit} />
+              <MessageComposer key={activeId} onSend={submit} onActivity={() => messagePolling.current?.activity()} />
             </>
           )}
         </section>
