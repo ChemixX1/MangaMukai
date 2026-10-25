@@ -56,6 +56,8 @@ async function setup(t, { stallContent = false, stallChapters = false, stallComm
       data = { success: true, ...manga(Number(/\/manga\/(\d+)/.exec(url)[1])) };
     } else if (url.includes('/related/') || url.endsWith('/catalog')) {
       data = { success: true, mangas: [manga(900), manga(901)] };
+    } else if (url.includes('/interactions?')) {
+      data = { success: true, online_readers: 2, bookmarks: [], likes: [], history: [], manga_likes: 12 };
     } else if (url.includes('/chapters/comment-counts?')) {
       data = { counts: { '1001': 2 }, engagement: { '1001': { reactions: { like: 7 }, my_reaction: '' } } };
     } else if (url.includes('/comments?')) {
@@ -78,10 +80,10 @@ test('recent cards prepare the reader list first even when the detail response i
   assert.match(requests[0].url, /\/series\/100\/chapters/);
   assert.equal(api.peekReaderSession('1001').peekSiblings().length, 3);
   assert.equal(api.peekPreparedMangaDetail('100'), undefined);
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 3);
   releaseDetail(); await pending;
   assert.equal(api.peekPreparedMangaDetail('100').chapters.length, 3);
-  assert.equal(requests.length, 3, 'detail shares the list and warms chapter engagement');
+  assert.equal(requests.length, 4, 'detail shares the list and warms likes and chapter engagement');
 });
 
 test('home prepares detail sections and only five strips of the requested accessible recent chapters', async t => {
@@ -147,7 +149,7 @@ test('synopsis is published before the list, and the reader selector is ready be
   await startedChapters;
   assert.equal(api.peekPreparedMangaDetail('100').manga.titulo, 'Manga 100');
   assert.equal(api.peekPreparedMangaDetail('100').chapters, undefined);
-  assert.equal(requests.length, 2, 'only the manga and its chapter list have been requested');
+  assert.equal(requests.length, 3, 'the manga, its chapter list and its likes load independently');
   releaseChapters();
   await pending;
   const partial = api.peekPreparedMangaDetail('100');
@@ -157,7 +159,7 @@ test('synopsis is published before the list, and the reader selector is ready be
   assert.equal(api.peekReaderSession('1001').peekSiblings().length, 3);
   assert.equal(images.length, 0);
   await api.prepareHomeManga(target, signal, 'reader');
-  assert.equal(requests.length, 4, 'reader reuses the manga/list alongside chapter engagement prefetch');
+  assert.equal(requests.length, 5, 'reader reuses the manga/list alongside likes and chapter engagement prefetch');
   assert.equal(images.length, 5);
   assert.equal(api.peekReaderSession('1001').peek('1001').images.length, 22);
   assert.equal(api.peekPreparedMangaDetail('100').comments, undefined);

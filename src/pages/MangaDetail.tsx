@@ -12,8 +12,11 @@ import { BookOpen, ChevronDown } from 'lucide-react';
 import {
   getChaptersBySeries,
   getMangaById,
+  getCachedSeriesChapterCount,
   peekKnownManga,
+  peekKnownMangas,
   peekSeriesChapters,
+  peekRelatedMangas,
   getRelatedMangas,
   getUltimosCapitulos,
   trackChapterView,
@@ -22,6 +25,7 @@ import {
 } from '../services/mangaService';
 import {
   getInteractions,
+  peekInteractions,
   toggleMangaLike,
 } from '../services/interactionsService';
 import { seedSavedMangas, toggleSavedManga } from '../services/savedMangas';
@@ -73,9 +77,17 @@ import { hasKnownChapters, knownFirstChapterId, mangaDetailAccent } from '../uti
 
 const initialDetail = (id: string) => {
   const prepared = peekPreparedMangaDetail(id);
-  const manga = prepared?.manga ?? peekKnownManga(id);
-  if (!manga) return undefined;
-  return { ...prepared, manga, chapters: prepared?.chapters ?? peekSeriesChapters(manga.eroSeri || manga.id) };
+  const known = prepared?.manga ?? peekKnownManga(id);
+  if (!known) return undefined;
+  const manga = { ...known, chapterCount: known.chapterCount ?? getCachedSeriesChapterCount(known.eroSeri || known.id) ?? undefined };
+  const seriesId = manga.eroSeri || manga.id;
+  const related = prepared?.related ?? buildMangaRecommendations(manga, peekKnownMangas(), peekRelatedMangas(seriesId) ?? []);
+  return {
+    ...prepared, manga,
+    chapters: prepared?.chapters ?? peekSeriesChapters(seriesId),
+    related: related.length ? related : prepared?.related,
+    interactions: peekInteractions(String(manga.id)),
+  };
 };
 
 const formatCompactNumber = (value: number) => new Intl.NumberFormat('es-PE', {
@@ -165,7 +177,7 @@ const MangaDetailContent = () => {
   const isLightMode = theme === 'light';
   const isMobile = useIsMobileViewport();
 
-  const prepared = id ? initialDetail(id) : undefined;
+  const [prepared] = useState(() => id ? initialDetail(id) : undefined);
   const [manga, setManga] = useState<MangaCapitulo | null>(() => prepared?.manga ?? null);
   const [chapters, setChapters] = useState<SeriesChapter[]>(() => prepared?.chapters ?? []);
   const [related, setRelated] = useState<RelatedManga[]>(() => prepared?.related ?? []);
@@ -217,21 +229,20 @@ const MangaDetailContent = () => {
   const [userCoins, setUserCoins] = useState(0);
   const [userInfo, setUserInfo] = useState<{ id: string; username: string }>({ id: '', username: '' });
 
-  const [isBookmarked, setIsBookmarked] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(() => prepared?.interactions?.bookmarks.some(item => String(item) === id) ?? false);
+  const [isLiked, setIsLiked] = useState(() => prepared?.interactions?.likes.some(item => String(item) === id)
+    ?? (!getStoredToken() && !!id && readGuestMangaLike(id)));
   const likeQueueRef = useRef<ReturnType<typeof createQueuedLike> | null>(null);
   useEffect(() => {
     likeQueueRef.current = null;
     return () => { likeQueueRef.current?.dispose(); likeQueueRef.current = null; };
   }, [id]);
   const [interactionBusy, setInteractionBusy] = useState<'bookmark' | 'like' | ''>('');
-  const [engagement, setEngagement] = useState({ online: 0, bookmarks: 0, likes: 0 });
-  useEffect(() => {
-    if (!manga?.id || getStoredToken()) return;
-    const liked = readGuestMangaLike(String(manga.id));
-    setIsLiked(liked);
-    setEngagement((current) => ({ ...current, likes: Number(liked) }));
-  }, [manga?.id]);
+  const [engagement, setEngagement] = useState(() => ({
+    online: Number(prepared?.interactions?.online_readers || 0),
+    bookmarks: Number(prepared?.interactions?.manga_bookmarks || 0),
+    likes: prepared?.interactions?.manga_likes ?? Number(!getStoredToken() && !!id && readGuestMangaLike(id)),
+  }));
   const synopsisRef = useRef<HTMLParagraphElement>(null);
   const coverColumnRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -331,98 +342,94 @@ const MangaDetailContent = () => {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    const initial = initialDetail(id);
-    setLoading(!initial);
-    setChaptersLoading(!initial?.chapters);
-    setCommentsLoading(!initial?.comments);
-    setRelatedLoading(!initial?.related);
-    setCommentsError('');
-    setChaptersError('');
-    setSecondaryReady(!!initial);
+    const initial = prepared;
     let cancelSecondary = () => {};
     const commentsController = new AbortController();
-    setError(null);
-    setManga(initial?.manga ?? null);
-    setChapters(initial?.chapters ?? []);
-    setRelated(initial?.related ?? []);
-    setInitialComments(initial?.comments ?? []);
-    setSynopsisExpanded(false);
-    setActiveContent('chapters');
-    setTabIndex(0);
-    setChapterSearch('');
-    setChapterSortOrder('desc');
-    setSelectedReaction(null);
-    setReactionCounts(createReactionCounts());
-    setEngagement({ online: 0, bookmarks: 0, likes: 0 });
 
+    const loadSections = async (mangaData: MangaCapitulo) => {
+      const mangaPostId = mangaData.eroSeri || mangaData.id;
+      setSecondaryReady(true);
+      const cachedChapters = peekSeriesChapters(mangaPostId) ?? initial?.chapters;
+      const chaptersRequest = (cachedChapters !== undefined ? Promise.resolve(cachedChapters) : getChaptersBySeries(mangaPostId, { throwOnError: true })).then(data => {
+        if (active) {
+          mangaReaderSession(id, String(mangaPostId), data);
+          setChapters(data);
+        }
+      }).catch(() => { if (active) setChaptersError('No se pudieron cargar los capítulos.'); })
+        .finally(() => { if (active) setChaptersLoading(false); });
+      if (initial?.related?.length) {
+        setRelatedLoading(false);
+      }
+      const preparedRelated = peekPreparedMangaDetail(id, 60_000)?.related;
+      if (preparedRelated) {
+        setRelated(preparedRelated);
+        setRelatedLoading(false);
+      } else {
+        let catalog = peekKnownMangas();
+        let recommendations = peekRelatedMangas(mangaPostId) ?? [];
+        const needsCatalog = !catalog.length || mangaData.totalViews === undefined;
+        let pendingSources = needsCatalog ? 2 : 1;
+        const updateRelated = () => {
+          if (!active) return;
+          const items = buildMangaRecommendations(mangaData, catalog, recommendations);
+          if (items.length) {
+            setRelated(items);
+            setRelatedLoading(false);
+          } else if (pendingSources === 0) setRelatedLoading(false);
+        };
+        updateRelated();
+        // Show whichever source arrives first; the full catalog must not hold the sidebar.
+        void getRelatedMangas(mangaPostId, 18).then(data => {
+          recommendations = data;
+        }).catch(() => {}).finally(() => { pendingSources--; updateRelated(); });
+        if (needsCatalog) void getUltimosCapitulos().then(data => {
+          if (data.length) catalog = data;
+          if (!active) return;
+          const catalogManga = catalog.find(item => String(item.eroSeri || item.id) === String(mangaPostId));
+          if (catalogManga) {
+            setManga(current => current && String(current.id) === String(mangaData.id)
+              ? { ...current, totalViews: catalogManga.totalViews ?? current.totalViews, chapterCount: catalogManga.chapterCount ?? current.chapterCount }
+              : current);
+          }
+        }).catch(() => {}).finally(() => { pendingSources--; updateRelated(); });
+      }
+      await chaptersRequest;
+      if (!active || initial?.comments) return;
+      cancelSecondary = whenIdle(() => {
+        if (!active) return;
+        void getMangaComments(String(mangaData.id), undefined, commentsController.signal).then(data => {
+          if (active) setInitialComments(data);
+        }).catch(() => { if (active) setCommentsError('No se pudieron cargar los comentarios.'); })
+          .finally(() => { if (active) setCommentsLoading(false); });
+      }, 250);
+    };
+
+    // The series and account requests do not depend on a refreshed synopsis.
+    if (initial) void loadSections(initial.manga);
+    void loadInteractions(String(initial?.manga.id ?? id), () => active).catch(() => {});
     const fetchData = async () => {
       try {
         const fresh = peekPreparedMangaDetail(id, 60_000);
         const mangaData = fresh?.manga ?? await getMangaById(id);
         if (!active) return;
         if (!mangaData) {
-          setError('Manga no encontrado.');
+          if (!initial) setError('Manga no encontrado.');
           setLoading(false);
           return;
         }
-
-        setManga({ ...mangaData, firstChapterId: mangaData.firstChapterId ?? initial?.manga.firstChapterId });
-
-        void ensureMusicLibrary();
-        const mangaPostId = mangaData.eroSeri || mangaData.id;
-
+        setManga(current => ({
+          ...mangaData,
+          totalViews: mangaData.totalViews ?? current?.totalViews ?? initial?.manga.totalViews,
+          firstChapterId: mangaData.firstChapterId ?? initial?.manga.firstChapterId,
+          chapterCount: mangaData.chapterCount ?? initial?.manga.chapterCount,
+        }));
         setLoading(false);
-        setSecondaryReady(true);
-        const cachedChapters = fresh?.chapters ?? peekSeriesChapters(mangaPostId) ?? initial?.chapters;
-        const chaptersRequest = (cachedChapters !== undefined ? Promise.resolve(cachedChapters) : getChaptersBySeries(mangaPostId)).then(data => {
-          if (active) {
-            mangaReaderSession(id, String(mangaPostId), data);
-            setChapters(data);
-          }
-        }).catch(() => { if (active) setChaptersError('No se pudieron cargar los capítulos.'); })
-          .finally(() => { if (active) setChaptersLoading(false); });
-        if (fresh?.related) {
-          setRelated(fresh.related);
-          setRelatedLoading(false);
-        } else {
-          let catalog: MangaCapitulo[] = [];
-          let recommendations: RelatedManga[] = [];
-          const updateRelated = () => {
-            if (!active) return;
-            setRelated(buildMangaRecommendations(mangaData, catalog, recommendations));
-            setRelatedLoading(false);
-          };
-          // Show whichever source arrives first; the full catalog must not hold the sidebar.
-          void getRelatedMangas(mangaPostId, 18).then(data => {
-            recommendations = data;
-            updateRelated();
-          }).catch(updateRelated);
-          void getUltimosCapitulos().then(data => {
-            catalog = data;
-            if (!active) return;
-            const catalogManga = catalog.find(item => String(item.eroSeri || item.id) === String(mangaPostId));
-            if (catalogManga) {
-              setManga(current => current && String(current.id) === String(mangaData.id)
-                ? { ...current, totalViews: catalogManga.totalViews ?? current.totalViews, chapterCount: catalogManga.chapterCount ?? current.chapterCount }
-                : current);
-            }
-            updateRelated();
-          }).catch(updateRelated);
-        }
-        void loadInteractions(String(mangaData.id), () => active).catch(() => {});
-        await chaptersRequest;
-        if (!active || initial?.comments) return;
-        cancelSecondary = whenIdle(() => {
-          if (!active) return;
-          void getMangaComments(String(mangaData.id), undefined, commentsController.signal).then(data => {
-            if (active) setInitialComments(data);
-          }).catch(() => { if (active) setCommentsError('No se pudieron cargar los comentarios.'); })
-            .finally(() => { if (active) setCommentsLoading(false); });
-        }, 250);
+        if (!initial) void loadSections(mangaData);
+        void ensureMusicLibrary();
       } catch (requestError) {
         console.error('Error MangaDetail:', requestError);
         if (active) {
-          setError('No se pudo cargar el manga.');
+          if (!initial) setError('No se pudo cargar el manga.');
           setLoading(false);
         }
       }
@@ -434,10 +441,11 @@ const MangaDetailContent = () => {
       cancelSecondary();
       commentsController.abort();
     };
-  }, [id, loadInteractions]);
+  }, [id, loadInteractions, prepared]);
 
-  const firstChapterId = knownFirstChapterId(manga, chaptersLoading ? undefined : chapters);
-  const hasFirstChapter = Boolean(firstChapterId || (chaptersLoading && hasKnownChapters(manga)));
+  const chaptersPending = chaptersLoading || !!chaptersError;
+  const firstChapterId = knownFirstChapterId(manga, chaptersPending ? undefined : chapters);
+  const hasFirstChapter = Boolean(firstChapterId || (chaptersPending && hasKnownChapters(manga)));
   const detailAccent = mangaDetailAccent(manga, location.state?.mangaAccent);
   const readingFirst = useRef(false);
   const currentMangaId = useRef(id);
@@ -488,7 +496,7 @@ const MangaDetailContent = () => {
     if (!manga || !hasFirstChapter || readingFirst.current) return;
     readingFirst.current = true;
     try {
-      const chapterId = firstChapterId ?? knownFirstChapterId(manga, await getChaptersBySeries(manga.eroSeri || manga.id));
+      const chapterId = firstChapterId ?? knownFirstChapterId(manga, await getChaptersBySeries(manga.eroSeri || manga.id, { throwOnError: true }));
       if (currentMangaId.current !== id) return;
       if (!chapterId) {
         setChaptersError('No se pudo abrir el primer capítulo. Inténtalo de nuevo.');
@@ -496,6 +504,8 @@ const MangaDetailContent = () => {
       }
       void trackChapterView(chapterId, manga.id);
       navigate(`/read/${chapterId}`);
+    } catch {
+      if (currentMangaId.current === id) setChaptersError('No se pudo abrir el primer capítulo. Inténtalo de nuevo.');
     } finally {
       readingFirst.current = false;
     }
@@ -817,7 +827,7 @@ const MangaDetailContent = () => {
             </motion.section>
 
             <motion.div ref={sidebarRef} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.5 }} className="manga-detail-sidebar flex flex-col gap-5">
-              {secondaryReady ? <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} /> : <div className="h-40 rounded-2xl bg-ink/5" aria-label="Cargando música" />}
+              {secondaryReady ? <MangaMusicCard cover={manga.portada} compactHeight isLight={isLightMode} youthPromo={detailAccent === 'cyan' && location.state?.mangaAccent === 'cyan'} /> : <div className="h-40 rounded-2xl bg-ink/5" aria-label="Cargando música" />}
               <MangaRecommendations loading={relatedLoading} items={related} currentId={manga.id} className="xl:min-h-0 xl:flex-1 xl:px-4" listClassName="h-[600px] xl:h-auto xl:min-h-0 xl:flex-1" />
             </motion.div>
           </div>

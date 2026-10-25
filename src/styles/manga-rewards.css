@@ -699,16 +699,16 @@
   .manga-detail-mobile .manga-reward-banner { margin-top: 12px; padding-block: 5px; }
   .manga-detail-mobile .manga-reward-banner::after { animation: reward-air 5s ease-in-out infinite; animation-play-state: var(--reward-play-state, paused); }
   .manga-detail-mobile .manga-reward-banner .reward-road-prizes { width: 94%; gap: 8px; padding-inline: 8px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-card { max-width: 92px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-card-back { top: 19px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-art { height: 34px; filter: none; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-art img { width: 92px; height: 58px; bottom: -14px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-name { min-height: 23px; padding-bottom: 3px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-name strong { font-size: 13px; line-height: 20px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-level { font-size: 11px; margin-block: 0 3px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-level > svg { width: 16px; height: 16px; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-status > img { width: 27px; height: 27px; filter: none; }
-  .manga-detail-mobile .manga-reward-banner .reward-road-status { top: 12px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-card { width: 76%; max-width: 78px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-card-back { top: 16px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-art { width: 48px; height: 29px; filter: none; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-art img { width: 78px; height: 49px; bottom: -12px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-name { min-height: 21px; padding-bottom: 3px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-name strong { font-size: 11px; line-height: 18px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-level { font-size: 10px; margin-block: 0 3px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-level > svg { width: 14px; height: 14px; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-status > img { width: 23px; height: 23px; filter: none; }
+  .manga-detail-mobile .manga-reward-banner .reward-road-status { top: 10px; left: -8px; }
   .manga-detail-mobile .manga-reward-banner .reward-road-meter { height: 20px; }
   .manga-detail-mobile .manga-reward-banner .reward-road-meter-area { margin-top: 0; }
 }

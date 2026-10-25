@@ -2,10 +2,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px 32px;
+  gap: 12px 20px;
 }
 .footer-legal-row .footer-legal-link {
-  font-size: 16px;
+  font-size: 12px;
   line-height: 1.4;
   text-align: center;
   white-space: nowrap;
@@ -15,7 +15,15 @@
   justify-content: center;
   column-gap: 20px;
 }
-.manga-detail-footer .footer-legal-row .footer-legal-link { font-size: 14px; }
+.manga-detail-footer .footer-legal-row .footer-legal-link { font-size: 12px; }
+
+@media (min-width: 1024px) {
+  .home-footer-newsletter + .home-footer-legal.footer-legal-row {
+    width: auto;
+    max-width: calc(100% - 24px);
+    justify-content: center;
+  }
+}
 
 @media (max-width: 1023px) {
   .footer-legal-row,

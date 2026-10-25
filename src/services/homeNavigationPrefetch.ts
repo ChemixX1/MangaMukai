@@ -4,6 +4,7 @@ import type { HomePrefetchStage, HomePrefetchTarget } from '../utils/homeNavigat
 import { buildMangaRecommendations } from '../utils/mangaRecommendations';
 import { preloadImages } from '../utils/preloadImages';
 import { getAuthCacheKey } from './authService';
+import { getInteractions } from './interactionsService';
 import { getChapterEngagement, getMangaComments, type MangaComment } from './communityService';
 import { getChaptersBySeries, getMangaById, peekKnownManga, peekSeriesChapters, getRelatedMangas, getUltimosCapitulos, type RelatedManga, type SeriesChapter } from './mangaService';
 import { homeReaderSession, pauseHomeReaderSession, peekHomeReaderChapters } from './readerPrefetchSession';
@@ -70,6 +71,8 @@ export async function prepareHomeManga(target: HomePrefetchTarget, signal: Abort
       if (!signal.aborted) homeReaderSession(target.mangaId, target.seriesId!, chapters);
       return chapters;
     }) : undefined;
+  // Warm the like alongside the detail without delaying the reader or chapter list.
+  if (stage === 'detail' || stage === 'all') void Promise.resolve().then(() => getInteractions(target.mangaId)).catch(() => undefined);
   if (!detail) {
     const manga = await getMangaById(target.mangaId);
     if (!manga || signal.aborted) return;

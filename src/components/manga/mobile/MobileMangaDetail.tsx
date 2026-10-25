@@ -238,7 +238,7 @@ export const MobileMangaDetail = ({
       </div>
 
       <section aria-label="Mukai Music" className="manga-detail-mobile-music">
-        <div className="h-full overflow-hidden rounded-2xl">{secondaryReady && <MangaMusicCard cover={manga.portada} compactHeight isLight={theme === 'light'} />}</div>
+        <div className="h-full overflow-hidden rounded-2xl">{secondaryReady && <MangaMusicCard cover={manga.portada} compactHeight isLight={theme === 'light'} youthPromo={accent === 'cyan' && location.state?.mangaAccent === 'cyan'} />}</div>
       </section>
 
 

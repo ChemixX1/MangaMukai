@@ -35,6 +35,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  background: rgb(var(--mm-ink) / .06);
   border-radius: var(--hc-radius);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;

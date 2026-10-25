@@ -26,6 +26,23 @@ export const peekKnownManga = (id: string): MangaCapitulo | undefined => {
   if (catalogCache && catalogCache.expiresAt > Date.now()) return catalogCache.data.find(manga => String(manga.id) === id);
 };
 
+/** Reuse Home's catalog and visible lists without waiting for another request. */
+export const peekKnownMangas = (): MangaCapitulo[] => {
+  if (!catalogCache) catalogCache = readCatalogSessionCache();
+  const now = Date.now();
+  const mangas = new Map<string, MangaCapitulo>();
+  if (catalogCache && catalogCache.expiresAt > now) {
+    for (const manga of catalogCache.data) mangas.set(String(manga.id), manga);
+  }
+  for (const [id, entry] of knownMangas) {
+    if (entry.expiresAt > now) mangas.set(id, entry.manga);
+    else knownMangas.delete(id);
+  }
+  return [...mangas.values()].map(manga => ({
+    ...manga, chapterCount: manga.chapterCount ?? getCachedSeriesChapterCount(manga.eroSeri || manga.id) ?? undefined,
+  }));
+};
+
 const readCatalogSessionCache = () => {
   if (typeof window === 'undefined') return null;
 
@@ -200,7 +217,8 @@ const mapearMangaCatalog = (item: any): MangaCapitulo => {
     genero,
     eroSeri:     item.id,
     status:      item.status || '',
-    totalViews:  item.totalViews || 0,
+    totalViews: typeof item.totalViews === 'number' && Number.isFinite(item.totalViews) && item.totalViews >= 0
+      ? item.totalViews : peekKnownManga(String(item.id))?.totalViews,
     chapterCount: typeof item.chapterCount === 'number' && Number.isInteger(item.chapterCount) && item.chapterCount >= 0 ? item.chapterCount : undefined,
     firstChapterId: Number.isInteger(Number(item.firstChapterId)) && Number(item.firstChapterId) > 0 ? Number(item.firstChapterId) : undefined,
     rawFecha:    item.fecha || '',
@@ -293,16 +311,20 @@ export const getNewReleases = (): Promise<MangaCapitulo[]> => recentListsCache.l
 
 export const getMangaById = (id: number | string): Promise<MangaCapitulo | null> => mangaDetailsCache.load(String(id), async () => {
   try {
+    const known = peekKnownManga(String(id));
     const res = await fetch(`${MM_API}/manga/${id}`);
     if (!res.ok) return null;
 
     const item: any = await res.json();
     if (!item.success) return null;
+    const mapped = mapearMangaCatalog(item);
     return {
-      ...mapearMangaCatalog(item),
+      ...mapped,
+      firstChapterId: mapped.firstChapterId ?? known?.firstChapterId,
+      chapterCount: mapped.chapterCount ?? known?.chapterCount ?? getCachedSeriesChapterCount(id) ?? undefined,
 
       tipo: typeof item.tipo === 'string' ? item.tipo.trim() : '',
-      totalViews: typeof item.totalViews === 'number' ? item.totalViews : undefined,
+      totalViews: mapped.totalViews ?? known?.totalViews,
     };
   } catch (error) {
     console.error('Error getMangaById:', error);
@@ -460,8 +482,11 @@ const loadSeriesChapters = (eroSeri: number | string): Promise<SeriesChapter[] |
     }));
 };
 
-export const getChaptersBySeries = async (eroSeri: number | string): Promise<SeriesChapter[]> =>
-  (await loadSeriesChapters(eroSeri)) ?? [];
+export const getChaptersBySeries = async (eroSeri: number | string, options?: { throwOnError?: boolean }): Promise<SeriesChapter[]> => {
+  const chapters = await loadSeriesChapters(eroSeri);
+  if (chapters === null && options?.throwOnError) throw new Error('No se pudieron cargar los capítulos.');
+  return chapters ?? [];
+};
 
 export const peekSeriesChapters = (id: number | string): SeriesChapter[] | undefined => {
   const cached = seriesChaptersCache.peek(String(id));
@@ -598,6 +623,9 @@ const relatedMangasCache = createPublicDataCache<RelatedManga[]>({
   maxEntries: 24,
   shouldCache: items => items.length > 0,
 });
+
+export const peekRelatedMangas = (mangaId: number | string, limit = 18): RelatedManga[] | undefined =>
+  relatedMangasCache.peek(`${mangaId}:${limit}`);
 
 export const getRelatedMangas = (mangaId: number | string, limit = 10): Promise<RelatedManga[]> => relatedMangasCache.load(`${mangaId}:${limit}`, async () => {
   try {

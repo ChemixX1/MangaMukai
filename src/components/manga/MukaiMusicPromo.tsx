@@ -2,6 +2,9 @@ import { getStoredToken } from '../../services/authService';
 import { Link } from 'react-router-dom';
 import { prefetchRoute } from '../../utils/prefetchRoute';
 import backdrop from '../../assets/manga/mukai-music-background.webp';
+import backdropSmall from '../../assets/manga/mukai-music-background-small.webp';
+import youthBackdrop from '../../assets/manga/mukai-music-youth.webp';
+import youthBackdropSmall from '../../assets/manga/mukai-music-youth-small.webp';
 import '../../styles/mukai-music-promo.css';
 
 const MusicCrown = () => (
@@ -11,9 +14,15 @@ const MusicCrown = () => (
   </svg>
 );
 
-export const MukaiMusicPromo = () => (
-  <div className="mukai-music-promo mukai-music-promo--subscription">
-    <img src={backdrop} alt="" aria-hidden="true" loading="eager" fetchPriority="low" decoding="async" />
+export const MukaiMusicPromo = ({ youth = false }: { youth?: boolean } = {}) => (
+  <div className={`mukai-music-promo mukai-music-promo--subscription${youth ? ' mukai-music-promo--youth' : ''}`}>
+    <img
+      src={youth ? youthBackdropSmall : backdropSmall}
+      srcSet={youth ? `${youthBackdropSmall} 384w, ${youthBackdrop} 768w` : `${backdropSmall} 384w, ${backdrop} 768w`}
+      sizes="(min-width: 1024px) 264px, (min-width: 440px) 220px, 50vw"
+      width={768} height={432}
+      alt="" aria-hidden="true" loading="lazy" fetchPriority="low" decoding="async"
+    />
     <div className="mukai-music-promo-content">
       <MusicCrown />
       <p className="mukai-music-title">MUKAI<span>MUSIC</span></p>

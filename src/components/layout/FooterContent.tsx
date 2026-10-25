@@ -4,8 +4,9 @@ import { Link } from 'react-router-dom';
 
 import '../../styles/footer.css';
 import footerBackdrop from '../../assets/home/footer-backdrop.webp';
-import footerBackdropPc from '../../assets/home/FooterPC.png';
-import mascotPeek from '../../assets/home/mascot-peek.webp';
+import footerBackdropPc from '../../assets/home/footer-desktop.webp';
+import mascotPeek from '../../assets/home/mascot-peek-small.webp';
+import mascotPeekLarge from '../../assets/home/mascot-peek-large.webp';
 import { DEVELOPER_URL, SOCIAL_LINKS } from '../../config/social';
 import { useIsMobileViewport } from '../../hooks/useIsMobileViewport';
 import { subscribeToNewsletter } from '../../services/newsletterService';
@@ -129,6 +130,10 @@ const NewsletterForm = ({ inputId, variant = 'mobile' }: { inputId: string; vari
     <div className="relative">
       <img
         src={mascotPeek}
+        srcSet={`${mascotPeek} 280w, ${mascotPeekLarge} 560w`}
+        sizes={variant === 'desktop' ? '280px' : '189px'}
+        width={560}
+        height={224}
         alt=""
         aria-hidden="true"
         loading="lazy"

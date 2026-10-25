@@ -22,6 +22,7 @@ interface MangaMusicCardProps {
   cover: string;
   compactHeight?: boolean;
   isLight?: boolean;
+  youthPromo?: boolean;
 }
 
 const formatTime = (time: number) => {
@@ -31,7 +32,7 @@ const formatTime = (time: number) => {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
-export const MangaMusicCard = ({ compactHeight = false, isLight = false }: MangaMusicCardProps) => {
+export const MangaMusicCard = ({ compactHeight = false, isLight = false, youthPromo = false }: MangaMusicCardProps) => {
   const navigate = useNavigate();
 
   const { tracks, loading, currentId, isPlaying, currentTime, duration, error: audioError, volume, playlistOpen: showPlaylist } = useMusicPlayer();
@@ -61,7 +62,7 @@ export const MangaMusicCard = ({ compactHeight = false, isLight = false }: Manga
   if (isLocked) {
     return (
       <aside aria-label="Mukai Music" className="manga-music-locked-card w-full shrink-0 overflow-hidden rounded-2xl">
-        <MukaiMusicPromo />
+        <MukaiMusicPromo youth={youthPromo} />
       </aside>
     );
   }
